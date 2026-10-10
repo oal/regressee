@@ -1,0 +1,50 @@
+name: Private target checks (not release or desktop qualification)
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  private-check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-2025
+            target: x86_64-pc-windows-msvc
+          - os: macos-14
+            target: aarch64-apple-darwin
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
+      CARGO_BUILD_JOBS: '4'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Require pre-provisioned pinned compiler and SDK (no global installs)
+        shell: bash
+        run: |
+          rustc --version
+          cargo --version
+          rustup target list --installed
+      - run: cargo fmt --all -- --check
+      - run: cargo build --locked --workspace --all-features --all-targets --target ${{ matrix.target }}
+      - run: cargo test --locked --workspace --all-features --target ${{ matrix.target }} -- --test-threads=1
+      - run: cargo clippy --locked --workspace --all-features --all-targets --target ${{ matrix.target }} -- -D warnings
+      - run: cargo build --release --locked -p regressee-app --features ui --bin regressee --target ${{ matrix.target }}
+      - name: Linux ABI inspection, default-policy sandbox still a separate native gate
+        if: runner.os == 'Linux'
+        run: |
+          readelf -d target/${{ matrix.target }}/release/regressee
+          readelf --version-info target/${{ matrix.target }}/release/regressee
+      - name: macOS architecture/deployment/dependency inspection
+        if: runner.os == 'macOS'
+        run: |
+          lipo -info target/${{ matrix.target }}/release/regressee
+          otool -L target/${{ matrix.target }}/release/regressee
+          otool -l target/${{ matrix.target }}/release/regressee
+      # No artifact upload, signing, secret access, vendor submission or dispatch
+      # occurs without explicit owner execution. Windows Server CI is not Win11
+      # standard-user desktop; Mac compilation cannot pass blocked supervision.

@@ -1,0 +1,21 @@
+/target/
+/.runtime/
+/artifacts/
+/worker/node_modules/
+/.impeccable/
+*.partial
+__pycache__/
+
+# Local configuration and logs are not source or portable project fixtures.
+.env
+.env.*
+!.env.example
+*.log
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm
+*.key
+*.p12

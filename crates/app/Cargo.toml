@@ -1,0 +1,47 @@
+[package]
+name = "regressee-app"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[features]
+default = []
+ui = ["dep:gpui", "dep:image", "dep:log"]
+ui-tests = ["ui", "gpui/test-support"]
+ui-inspection = ["ui"]
+
+[dependencies]
+regressee-core = { path = "../core" }
+regressee-storage = { path = "../storage" }
+regressee-runtime = { path = "../runtime" }
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+hex.workspace = true
+uuid.workspace = true
+url.workspace = true
+tempfile.workspace = true
+png = "=0.17.16"
+image = { version = "=0.25.10", default-features = false, optional = true }
+gpui = { workspace = true, optional = true }
+log = { version = "=0.4.34", optional = true }
+zeroize = "=1.9.1"
+
+[dev-dependencies]
+ed25519-dalek = "=2.2.0"
+zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
+libc = "=0.2.177"
+
+[[bin]]
+name = "regressee"
+path = "src/main.rs"
+required-features = ["ui"]
+
+[[bin]]
+name = "regressee-foundation"
+path = "src/foundation.rs"
+
+[[bin]]
+name = "regressee-flow"
+path = "src/flow.rs"

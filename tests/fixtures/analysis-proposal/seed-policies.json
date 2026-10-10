@@ -1,0 +1,60 @@
+{
+  "schema": "regressee.analysis-policy-seed-proposal.v1",
+  "license": "MPL-2.0",
+  "status": "PROPOSAL ONLY: requires Rust implementation, independent verification, and broader corpus/user calibration",
+  "production_algorithm_id": null,
+  "metric": {
+    "name": "CIEDE2000",
+    "color_input": "opaque 8-bit sRGB converted to CIELAB with D65 reference white",
+    "distance_units": "Delta E 00, NOT percent RGB channel difference",
+    "weights": {"kL": 1, "kC": 1, "kH": 1},
+    "significant_pixel_rule": "Delta E 00 > pixel_tolerance; unmatched coordinates are structural regardless of color"
+  },
+  "common": {
+    "anti_alias_suppression": false,
+    "automatic_alignment_or_warp": false,
+    "tile_size_capture_pixels": 32,
+    "tile_stride_capture_pixels": 16,
+    "tile_grid": "origins (16*i,16*j) within the canvas, i,j>=0; windows clipped at right/bottom edges",
+    "tile_min_eligible_pixels": 64,
+    "region_connectivity": 4,
+    "region_area_metric": "actual unmasked significant pixel count; not bounding-box area",
+    "region_dilation": false,
+    "threshold_comparison": "global fraction, tile fraction, tile count and region count use >=; pixel distance uses >",
+    "classification_rule": "After comparability/mask gates and positive eligible denominator: Changed if any global, local, region, or validated height-change criterion triggers. Otherwise NoSignificantChange only within eligible coverage.",
+    "height_change_rule": "any nonzero height delta is explicit structural review evidence after mask revalidation",
+    "unexpected_width_or_dpr_rule": "block ordinary comparison/approval; explain profile-integrity mismatch",
+    "zero_eligible_rule": "insufficient evidence; never NoSignificantChange, never a numeric 0 percent",
+    "ignored_coverage_warning_fraction": 0.5,
+    "large_mask_rule": "warning only; cannot establish whole-page coverage or hide stored dimension evidence",
+    "rendering_environment_mismatch_rule": "caution mode, not a trustworthy clean release check",
+    "capture_failure_rule": "CouldNotCapture; never unchanged",
+    "review_decisions": "unreviewed/intentional/needs-fix remain separate from metric classification"
+  },
+  "presets": [
+    {
+      "name": "Sensitive",
+      "pixel_tolerance_delta_e_00": 1.0,
+      "global_changed_fraction": 0.0005,
+      "local_changed_fraction": 0.025,
+      "local_min_changed_pixels": 4,
+      "connected_region_min_pixels": 8
+    },
+    {
+      "name": "Balanced",
+      "pixel_tolerance_delta_e_00": 2.0,
+      "global_changed_fraction": 0.002,
+      "local_changed_fraction": 0.05,
+      "local_min_changed_pixels": 8,
+      "connected_region_min_pixels": 16
+    },
+    {
+      "name": "Relaxed",
+      "pixel_tolerance_delta_e_00": 4.0,
+      "global_changed_fraction": 0.02,
+      "local_changed_fraction": 0.1,
+      "local_min_changed_pixels": 16,
+      "connected_region_min_pixels": 64
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+name: Phase 0 executable harness (not runtime qualification)
+on:
+  workflow_dispatch:
+  push:
+    paths: ['crates/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/phase0.yml']
+permissions:
+  contents: read
+jobs:
+  spike:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install exact development toolchain
+        shell: bash
+        run: rustup toolchain install 1.98.1 --profile minimal
+      - name: Rust core tests
+        run: cargo test --locked
+      - name: Build local private runtime pack source
+        run: python scripts/bootstrap.py
+      - name: Package, provision and smoke (no system Node)
+        shell: bash
+        run: |
+          cargo run --locked --bin regressee-spike -- pack
+          cargo run --locked --bin regressee-spike -- repair
+          cargo run --locked --bin regressee-spike -- smoke
+          cargo run --locked --bin regressee-spike -- protocol-test
+      - name: GPUI compile on Windows/macOS (not opening-window evidence)
+        if: runner.os != 'Linux'
+        run: cargo build --locked --features ui --bins

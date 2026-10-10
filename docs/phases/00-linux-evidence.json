@@ -1,0 +1,131 @@
+{
+  "platform": "Linux",
+  "headed_requested": true,
+  "results": [
+    {
+      "command": [
+        "smoke",
+        "--headed"
+      ],
+      "exit": 0,
+      "seconds": 18.618,
+      "sampled_peak_rss_bytes": {
+        "rust": 7876608,
+        "node": 106725376,
+        "browser": 1954185216
+      },
+      "live_owned_processes_after": 0,
+      "observed_process_count": 43
+    },
+    {
+      "command": [
+        "protocol-test"
+      ],
+      "exit": 0,
+      "seconds": 81.811,
+      "sampled_peak_rss_bytes": {
+        "rust": 9674752,
+        "node": 95117312,
+        "browser": 851496960
+      },
+      "live_owned_processes_after": 0,
+      "observed_process_count": 31
+    },
+    {
+      "command": [
+        "repair",
+        "--cancel-after-ms",
+        "100"
+      ],
+      "exit": 1,
+      "seconds": 11.382,
+      "sampled_peak_rss_bytes": {
+        "rust": 11534336,
+        "node": 0,
+        "browser": 0
+      },
+      "live_owned_processes_after": 0,
+      "observed_process_count": 1
+    },
+    {
+      "command": [
+        "smoke"
+      ],
+      "exit": 0,
+      "seconds": 16.507,
+      "sampled_peak_rss_bytes": {
+        "rust": 8269824,
+        "node": 105545728,
+        "browser": 1681190912
+      },
+      "live_owned_processes_after": 0,
+      "observed_process_count": 41
+    },
+    {
+      "command": [
+        "smoke"
+      ],
+      "exit": 1,
+      "seconds": 14.395,
+      "sampled_peak_rss_bytes": {
+        "rust": 7942144,
+        "node": 0,
+        "browser": 0
+      },
+      "live_owned_processes_after": 0,
+      "observed_process_count": 1
+    },
+    {
+      "command": [
+        "repair"
+      ],
+      "exit": 0,
+      "seconds": 41.591,
+      "sampled_peak_rss_bytes": {
+        "rust": 14127104,
+        "node": 95465472,
+        "browser": 855453696
+      },
+      "live_owned_processes_after": 0,
+      "observed_process_count": 11
+    },
+    {
+      "command": [
+        "smoke"
+      ],
+      "exit": 0,
+      "seconds": 21.109,
+      "sampled_peak_rss_bytes": {
+        "rust": 8466432,
+        "node": 108527616,
+        "browser": 1713643520
+      },
+      "live_owned_processes_after": 0,
+      "observed_process_count": 42
+    },
+    {
+      "command": [
+        "parent-hang",
+        "SIGKILL parent"
+      ],
+      "exit": -9,
+      "live_owned_processes_after": 0,
+      "observed_process_count": 10
+    },
+    {
+      "command": [
+        "protocol-test"
+      ],
+      "exit": 0,
+      "seconds": 84.362,
+      "sampled_peak_rss_bytes": {
+        "rust": 9093120,
+        "node": 100003840,
+        "browser": 852807680
+      },
+      "live_owned_processes_after": 0,
+      "observed_process_count": 31
+    }
+  ],
+  "note": "Development environment only, not a clean-machine or cross-OS qualification. RSS samples are sums, not unique/PSS memory."
+}

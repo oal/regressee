@@ -1,0 +1,789 @@
+{
+  "bounds": {
+    "max_file_bytes": 2097152,
+    "max_height": 2048,
+    "max_pixels": 262144,
+    "max_width": 256
+  },
+  "cases": [
+    {
+      "after": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/unchanged-after.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        64
+      ],
+      "before": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/unchanged-before.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        64
+      ],
+      "canvas_dimensions": [
+        96,
+        64
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "96*64=6144 eligible; identical RGB samples.",
+      "dimensions_changed": false,
+      "id": "unchanged",
+      "intended_evidence_and_semantic_expectation": "Exact unchanged control; can establish no significant change only after comparability gates.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 6144,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 0,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 0,
+        "raw_overlap_rgb_changed_pixels": 0,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 6144,
+          "numerator": 0
+        },
+        "unmasked_raw_4_connected_components": 0,
+        "unmasked_raw_changed_pixels": 0,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/small-rgb-noise-after.png",
+        "sha256": "4ef5a5a527f5bb0435f0d92c1e42714956c848c622b522abd81b74fb4f00e9bf",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        64
+      ],
+      "before": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/small-rgb-noise-before.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        64
+      ],
+      "canvas_dimensions": [
+        96,
+        64
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "Every one of 96*64 pixels has +1 in each RGB channel.",
+      "dimensions_changed": false,
+      "id": "small-rgb-noise",
+      "intended_evidence_and_semantic_expectation": "Synthetic low-amplitude color drift, not real anti-aliasing; perceptual tolerance should suppress it, even though raw connectivity is global.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 6144,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 6144,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 6144,
+        "raw_overlap_rgb_changed_pixels": 6144,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 6144,
+          "numerator": 6144
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 6144,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 591985,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 2048,
+        "path": "images/tiny-icon-long-page-after.png",
+        "sha256": "005fc2a40cc56a1c2830cfc49c14f3190122cabc3dd1b803496cfc687751fea6",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        2048
+      ],
+      "before": {
+        "bytes": 591985,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 2048,
+        "path": "images/tiny-icon-long-page-before.png",
+        "sha256": "8279069f2bf181e2dde332ebcb686ae958d0571262fdf182eb53a3575903eec2",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        2048
+      ],
+      "canvas_dimensions": [
+        96,
+        2048
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "8*8=64 changed; denominator 96*2048=196608; fraction=1/3072.",
+      "dimensions_changed": false,
+      "id": "tiny-icon-long-page",
+      "intended_evidence_and_semantic_expectation": "Coherent high-contrast 8x8 synthetic icon across a tile seam; review-worthy candidate must not disappear in long-page global dilution.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 196608,
+        "eligible_unmasked_pixels": 196608,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 64,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 64,
+        "raw_overlap_rgb_changed_pixels": 64,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 196608,
+          "numerator": 64
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 64,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 37028,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 96,
+        "path": "images/large-coherent-region-after.png",
+        "sha256": "966ada57ea27054a5f572a4f950593d915e4497e9419298476c64ac5b72a75a5",
+        "width": 128
+      },
+      "after_dimensions": [
+        128,
+        96
+      ],
+      "before": {
+        "bytes": 37028,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 96,
+        "path": "images/large-coherent-region-before.png",
+        "sha256": "462c4f37bd040706e5dc9958b869eca1d471060a16fea94f1b97fc463f9233cd",
+        "width": 128
+      },
+      "before_dimensions": [
+        128,
+        96
+      ],
+      "canvas_dimensions": [
+        128,
+        96
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "80*48=3840 changed; denominator 128*96=12288.",
+      "dimensions_changed": false,
+      "id": "large-coherent-region",
+      "intended_evidence_and_semantic_expectation": "Large high-contrast contiguous rectangle; preserve bounds and area as visual-change evidence, not a defect verdict.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 12288,
+        "eligible_unmasked_pixels": 12288,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 3840,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 3840,
+        "raw_overlap_rgb_changed_pixels": 3840,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 12288,
+          "numerator": 3840
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 3840,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 37028,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 96,
+        "path": "images/scattered-high-contrast-noise-after.png",
+        "sha256": "7ad62a889bc7d920a875c801762bc3ae437e9b02138ec6a13a8d8afa3c3cf64c",
+        "width": 128
+      },
+      "after_dimensions": [
+        128,
+        96
+      ],
+      "before": {
+        "bytes": 37028,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 96,
+        "path": "images/scattered-high-contrast-noise-before.png",
+        "sha256": "462c4f37bd040706e5dc9958b869eca1d471060a16fea94f1b97fc463f9233cd",
+        "width": 128
+      },
+      "before_dimensions": [
+        128,
+        96
+      ],
+      "canvas_dimensions": [
+        128,
+        96
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "16 columns * 12 rows of isolated pixels = 192; fraction=1/64.",
+      "dimensions_changed": false,
+      "id": "scattered-high-contrast-noise",
+      "intended_evidence_and_semantic_expectation": "High-contrast isolated synthetic speckles: global percentage may flag them, but region evidence must distinguish them from one coherent component.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 12288,
+        "eligible_unmasked_pixels": 12288,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 1,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 192,
+        "raw_overlap_rgb_changed_pixels": 192,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 12288,
+          "numerator": 192
+        },
+        "unmasked_raw_4_connected_components": 192,
+        "unmasked_raw_changed_pixels": 192,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 23188,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 80,
+        "path": "images/added-height-band-after.png",
+        "sha256": "1c237ca476b445e41a05bc45c7354c733efcb0fe844d65f0f5da0bbd9e22fc4e",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        80
+      ],
+      "before": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/added-height-band-before.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        64
+      ],
+      "canvas_dimensions": [
+        96,
+        80
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "96*(80-64)=1536 unmatched pixels; 96*80=7680 eligible.",
+      "dimensions_changed": true,
+      "id": "added-height-band",
+      "intended_evidence_and_semantic_expectation": "Appended band has exactly the same RGB as background; it remains explicit structural evidence, never matching fabricated padding.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 7680,
+        "eligible_unmasked_pixels": 7680,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 1536,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 1536,
+        "raw_overlap_rgb_changed_pixels": 0,
+        "raw_structural_pixels": 1536,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 7680,
+          "numerator": 1536
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 1536,
+        "unmasked_structural_pixels": 1536
+      }
+    },
+    {
+      "after": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/removed-height-band-after.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        64
+      ],
+      "before": {
+        "bytes": 23188,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 80,
+        "path": "images/removed-height-band-before.png",
+        "sha256": "1c237ca476b445e41a05bc45c7354c733efcb0fe844d65f0f5da0bbd9e22fc4e",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        80
+      ],
+      "canvas_dimensions": [
+        96,
+        80
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "96*(80-64)=1536 unmatched pixels; symmetric denominator 7680.",
+      "dimensions_changed": true,
+      "id": "removed-height-band",
+      "intended_evidence_and_semantic_expectation": "Removed band must preserve direction of height delta while matching the added-band raw area.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 7680,
+        "eligible_unmasked_pixels": 7680,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 1536,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 1536,
+        "raw_overlap_rgb_changed_pixels": 0,
+        "raw_structural_pixels": 1536,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 7680,
+          "numerator": 1536
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 1536,
+        "unmasked_structural_pixels": 1536
+      }
+    },
+    {
+      "after": {
+        "bytes": 32436,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 112,
+        "path": "images/inserted-middle-band-after.png",
+        "sha256": "a08fba0daf0c6ada51208761ff47b8ee68ac17763a5f942d2665ef2a2b7f3d81",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        112
+      ],
+      "before": {
+        "bytes": 27812,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 96,
+        "path": "images/inserted-middle-band-before.png",
+        "sha256": "4a6cc2209cae4ff04ce54ac40054e83db60c2bc0684ac2f9801477d153f6d369",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        96
+      ],
+      "canvas_dimensions": [
+        96,
+        112
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "96*8 old bar + 96*8 shifted bar + 96*16 unmatched tail = 3072; 10752 eligible.",
+      "dimensions_changed": true,
+      "id": "inserted-middle-band",
+      "intended_evidence_and_semantic_expectation": "Synthetic 16-row middle insertion shifts an 8-row bar; aligned coordinates preserve shift plus height evidence without automatic warping.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 10752,
+        "eligible_unmasked_pixels": 10752,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 1536,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 3072,
+        "raw_overlap_rgb_changed_pixels": 1536,
+        "raw_structural_pixels": 1536,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 10752,
+          "numerator": 3072
+        },
+        "unmasked_raw_4_connected_components": 3,
+        "unmasked_raw_changed_pixels": 3072,
+        "unmasked_structural_pixels": 1536
+      }
+    },
+    {
+      "after": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/ignored-rectangles-after.png",
+        "sha256": "591c740ef5ccce52e4cd06ef95d50599de50e21bcc3135f25a82dd331bae10e8",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        64
+      ],
+      "before": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/ignored-rectangles-before.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        64
+      ],
+      "canvas_dimensions": [
+        96,
+        64
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "24*16 + 4*4 =400 raw; mask union (16*16+16*16-8*16)+8*8=448; eligible=5696; unmasked=16.",
+      "dimensions_changed": false,
+      "id": "ignored-rectangles",
+      "intended_evidence_and_semantic_expectation": "Two overlapping masks hide a changed rectangle; a third covers unchanged pixels. Count mask union once and retain the separate 4x4 unmasked change.",
+      "masks": [
+        {
+          "height": 16,
+          "width": 16,
+          "x": 8,
+          "y": 8
+        },
+        {
+          "height": 16,
+          "width": 16,
+          "x": 16,
+          "y": 8
+        },
+        {
+          "height": 8,
+          "width": 8,
+          "x": 60,
+          "y": 10
+        }
+      ],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 5696,
+        "ignored_union_pixels": 448,
+        "largest_unmasked_raw_component_pixels": 16,
+        "masked_raw_changed_pixels": 384,
+        "raw_changed_pixels": 400,
+        "raw_overlap_rgb_changed_pixels": 400,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 5696,
+          "numerator": 16
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 16,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/ignored-only-change-after.png",
+        "sha256": "261eb9bdde7455e81707ccbf3c7ccd3bc63db911231b9b2d029992c55e982d4d",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        64
+      ],
+      "before": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/ignored-only-change-before.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        64
+      ],
+      "canvas_dimensions": [
+        96,
+        64
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "24*16=384 raw, all masked; same 448-pixel mask union; eligible=5696; unmasked=0.",
+      "dimensions_changed": false,
+      "id": "ignored-only-change",
+      "intended_evidence_and_semantic_expectation": "No raw change outside masks; may establish no significant change only in eligible area, while originals and ignored coverage remain visible.",
+      "masks": [
+        {
+          "height": 16,
+          "width": 16,
+          "x": 8,
+          "y": 8
+        },
+        {
+          "height": 16,
+          "width": 16,
+          "x": 16,
+          "y": 8
+        },
+        {
+          "height": 8,
+          "width": 8,
+          "x": 60,
+          "y": 10
+        }
+      ],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 5696,
+        "ignored_union_pixels": 448,
+        "largest_unmasked_raw_component_pixels": 0,
+        "masked_raw_changed_pixels": 384,
+        "raw_changed_pixels": 384,
+        "raw_overlap_rgb_changed_pixels": 384,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 5696,
+          "numerator": 0
+        },
+        "unmasked_raw_4_connected_components": 0,
+        "unmasked_raw_changed_pixels": 0,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/entire-image-masked-after.png",
+        "sha256": "dc573c01a83d7e8878bf852e44b1709946d842f47760a23f53be24b2ed8f64ce",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        64
+      ],
+      "before": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/entire-image-masked-before.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        64
+      ],
+      "canvas_dimensions": [
+        96,
+        64
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "6144 raw and ignored; eligible=0, changed=0; 0/0 is undefined, NOT zero percent.",
+      "dimensions_changed": false,
+      "id": "entire-image-masked",
+      "intended_evidence_and_semantic_expectation": "Insufficient eligible evidence; must not claim unchanged or divide by zero. Current enum could use NotComparable plus an explicit all-masked reason.",
+      "masks": [
+        {
+          "height": 64,
+          "width": 96,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 0,
+        "ignored_union_pixels": 6144,
+        "largest_unmasked_raw_component_pixels": 0,
+        "masked_raw_changed_pixels": 6144,
+        "raw_changed_pixels": 6144,
+        "raw_overlap_rgb_changed_pixels": 6144,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": false,
+          "denominator": 0,
+          "numerator": 0
+        },
+        "unmasked_raw_4_connected_components": 0,
+        "unmasked_raw_changed_pixels": 0,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/near-entire-image-masked-after.png",
+        "sha256": "dc573c01a83d7e8878bf852e44b1709946d842f47760a23f53be24b2ed8f64ce",
+        "width": 96
+      },
+      "after_dimensions": [
+        96,
+        64
+      ],
+      "before": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/near-entire-image-masked-before.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        64
+      ],
+      "canvas_dimensions": [
+        96,
+        64
+      ],
+      "comparable_geometry": true,
+      "count_derivation": "96*63=6048 ignored; remaining 96 pixels all changed, fraction=96/96.",
+      "dimensions_changed": false,
+      "id": "near-entire-image-masked",
+      "intended_evidence_and_semantic_expectation": "98.4375% ignored: warn about limited coverage; report 100% change of the remaining area, not 100% of the page.",
+      "masks": [
+        {
+          "height": 63,
+          "width": 96,
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 96,
+        "ignored_union_pixels": 6048,
+        "largest_unmasked_raw_component_pixels": 96,
+        "masked_raw_changed_pixels": 6048,
+        "raw_changed_pixels": 6144,
+        "raw_overlap_rgb_changed_pixels": 6144,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 96,
+          "numerator": 96
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 96,
+        "unmasked_structural_pixels": 0
+      }
+    },
+    {
+      "after": {
+        "bytes": 20100,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/unexpected-width-change-after.png",
+        "sha256": "88e014c18873d546ddd6c5847e9d429271c159902dd1ab60e3c7c5cd1eca8576",
+        "width": 104
+      },
+      "after_dimensions": [
+        104,
+        64
+      ],
+      "before": {
+        "bytes": 18564,
+        "encoding": "PNG RGB8 opaque, non-interlaced, filter 0",
+        "height": 64,
+        "path": "images/unexpected-width-change-before.png",
+        "sha256": "c4fdcddb44fe7eabc78c90d77b7fb2d77b80eebcb1a8679883bee96e0cd6e423",
+        "width": 96
+      },
+      "before_dimensions": [
+        96,
+        64
+      ],
+      "canvas_dimensions": [
+        104,
+        64
+      ],
+      "comparable_geometry": false,
+      "count_derivation": "Illustrative coordinate union: (104-96)*64=512 unmatched; canvas=6656. Not a valid automatic profile comparison.",
+      "dimensions_changed": true,
+      "id": "unexpected-width-change",
+      "intended_evidence_and_semantic_expectation": "Unexpected width change requires profile-integrity gate; illustrative counts must not authorize automatic comparison or approval.",
+      "masks": [],
+      "policy_classification": "not evaluated; see seed proposals in report",
+      "reference_counts": {
+        "canvas_pixels": 6656,
+        "eligible_unmasked_pixels": 6656,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 512,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 512,
+        "raw_overlap_rgb_changed_pixels": 0,
+        "raw_structural_pixels": 512,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 6656,
+          "numerator": 512
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 512,
+        "unmasked_structural_pixels": 512
+      }
+    }
+  ],
+  "generator": "corpus.py",
+  "license": "MPL-2.0",
+  "measurement_contract": {
+    "canvas": "max(width) by max(height); all cases have a rectangular union with no absent-in-both corner. Width-mismatch case is illustrative, not automatically comparable.",
+    "connected_components": "4-neighbor connectivity of the UNMASKED exact raw change bitmap, including unmatched bands; no dilation or bounding-box-area substitution.",
+    "denominator": "Union canvas pixels minus mask union; zero denominator yields undefined fraction, never zero percent.",
+    "masks": "Half-open capture-pixel rectangles; geometric union counted once. Same-coordinate coverage applied to both images; every mask here fits both dimensions; no dimension-change case uses masks.",
+    "perceptual_policy": "No perceptual metric or policy has been implemented/evaluated by this helper; raw oracles are separate from seed proposals.",
+    "raw_pixel_difference": "Any unequal RGB sample at aligned coordinates, or exactly one image has a pixel there; no tolerance, padding, resampling, alignment, or anti-alias suppression."
+  },
+  "provenance": "Original algorithmic color blocks generated by corpus.py; NOT site screenshots, real photos, font rasterizations, or calibrated user examples.",
+  "schema": "regressee.synthetic-analysis-corpus.v1"
+}

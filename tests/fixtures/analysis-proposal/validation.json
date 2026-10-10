@@ -1,0 +1,308 @@
+{
+  "case_count": 13,
+  "cases": [
+    {
+      "counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 6144,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 0,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 0,
+        "raw_overlap_rgb_changed_pixels": 0,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 6144,
+          "numerator": 0
+        },
+        "unmasked_raw_4_connected_components": 0,
+        "unmasked_raw_changed_pixels": 0,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "unchanged",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 6144,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 6144,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 6144,
+        "raw_overlap_rgb_changed_pixels": 6144,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 6144,
+          "numerator": 6144
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 6144,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "small-rgb-noise",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 196608,
+        "eligible_unmasked_pixels": 196608,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 64,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 64,
+        "raw_overlap_rgb_changed_pixels": 64,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 196608,
+          "numerator": 64
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 64,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "tiny-icon-long-page",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 12288,
+        "eligible_unmasked_pixels": 12288,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 3840,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 3840,
+        "raw_overlap_rgb_changed_pixels": 3840,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 12288,
+          "numerator": 3840
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 3840,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "large-coherent-region",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 12288,
+        "eligible_unmasked_pixels": 12288,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 1,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 192,
+        "raw_overlap_rgb_changed_pixels": 192,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 12288,
+          "numerator": 192
+        },
+        "unmasked_raw_4_connected_components": 192,
+        "unmasked_raw_changed_pixels": 192,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "scattered-high-contrast-noise",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 7680,
+        "eligible_unmasked_pixels": 7680,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 1536,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 1536,
+        "raw_overlap_rgb_changed_pixels": 0,
+        "raw_structural_pixels": 1536,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 7680,
+          "numerator": 1536
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 1536,
+        "unmasked_structural_pixels": 1536
+      },
+      "id": "added-height-band",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 7680,
+        "eligible_unmasked_pixels": 7680,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 1536,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 1536,
+        "raw_overlap_rgb_changed_pixels": 0,
+        "raw_structural_pixels": 1536,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 7680,
+          "numerator": 1536
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 1536,
+        "unmasked_structural_pixels": 1536
+      },
+      "id": "removed-height-band",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 10752,
+        "eligible_unmasked_pixels": 10752,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 1536,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 3072,
+        "raw_overlap_rgb_changed_pixels": 1536,
+        "raw_structural_pixels": 1536,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 10752,
+          "numerator": 3072
+        },
+        "unmasked_raw_4_connected_components": 3,
+        "unmasked_raw_changed_pixels": 3072,
+        "unmasked_structural_pixels": 1536
+      },
+      "id": "inserted-middle-band",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 5696,
+        "ignored_union_pixels": 448,
+        "largest_unmasked_raw_component_pixels": 16,
+        "masked_raw_changed_pixels": 384,
+        "raw_changed_pixels": 400,
+        "raw_overlap_rgb_changed_pixels": 400,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 5696,
+          "numerator": 16
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 16,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "ignored-rectangles",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 5696,
+        "ignored_union_pixels": 448,
+        "largest_unmasked_raw_component_pixels": 0,
+        "masked_raw_changed_pixels": 384,
+        "raw_changed_pixels": 384,
+        "raw_overlap_rgb_changed_pixels": 384,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 5696,
+          "numerator": 0
+        },
+        "unmasked_raw_4_connected_components": 0,
+        "unmasked_raw_changed_pixels": 0,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "ignored-only-change",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 0,
+        "ignored_union_pixels": 6144,
+        "largest_unmasked_raw_component_pixels": 0,
+        "masked_raw_changed_pixels": 6144,
+        "raw_changed_pixels": 6144,
+        "raw_overlap_rgb_changed_pixels": 6144,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": false,
+          "denominator": 0,
+          "numerator": 0
+        },
+        "unmasked_raw_4_connected_components": 0,
+        "unmasked_raw_changed_pixels": 0,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "entire-image-masked",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 6144,
+        "eligible_unmasked_pixels": 96,
+        "ignored_union_pixels": 6048,
+        "largest_unmasked_raw_component_pixels": 96,
+        "masked_raw_changed_pixels": 6048,
+        "raw_changed_pixels": 6144,
+        "raw_overlap_rgb_changed_pixels": 6144,
+        "raw_structural_pixels": 0,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 96,
+          "numerator": 96
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 96,
+        "unmasked_structural_pixels": 0
+      },
+      "id": "near-entire-image-masked",
+      "passed": true
+    },
+    {
+      "counts": {
+        "canvas_pixels": 6656,
+        "eligible_unmasked_pixels": 6656,
+        "ignored_union_pixels": 0,
+        "largest_unmasked_raw_component_pixels": 512,
+        "masked_raw_changed_pixels": 0,
+        "raw_changed_pixels": 512,
+        "raw_overlap_rgb_changed_pixels": 0,
+        "raw_structural_pixels": 512,
+        "unmasked_changed_fraction": {
+          "defined": true,
+          "denominator": 6656,
+          "numerator": 512
+        },
+        "unmasked_raw_4_connected_components": 1,
+        "unmasked_raw_changed_pixels": 512,
+        "unmasked_structural_pixels": 512
+      },
+      "id": "unexpected-width-change",
+      "passed": true
+    }
+  ],
+  "chunk_crcs_verified": 78,
+  "corruption_cases_rejected": [
+    "bad_signature",
+    "chunk_crc_mismatch",
+    "invalid_zlib_adler_with_valid_chunk_crc",
+    "missing_iend",
+    "oversized_ihdr_with_valid_crc",
+    "trailing_bytes",
+    "truncated_chunk"
+  ],
+  "png_count": 26,
+  "schema": "regressee.synthetic-analysis-validation.v1",
+  "sha256_verified": 26,
+  "status": "PASS",
+  "total_decoded_pixels": 576512,
+  "total_png_bytes": 1737266,
+  "validation_scope": "Independent decode/CRC/zlib/SHA256/raw mathematical oracles only; no Rust, perceptual-policy, site, runtime, or defect-detection verification."
+}
