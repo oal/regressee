@@ -33,6 +33,9 @@ use std::{
 #[cfg(all(feature = "ui-inspection", target_os = "linux"))]
 mod ui_inspection;
 
+#[cfg(all(test, feature = "ui-renderer-capture", target_os = "linux"))]
+mod ui_renderer_capture;
+
 fn mask_outline_width(width: f32, height: f32) -> f32 {
     1.0_f32.min(width / 2.).min(height / 2.).max(0.)
 }
@@ -1748,6 +1751,7 @@ impl Shell {
             self.approved_origins.clear();
             self.focus.environments = 1;
         }
+        self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
         self.focus.screen = Screen::Setup;
         self.error = None;
         self.notice = None;
@@ -2647,7 +2651,7 @@ impl Shell {
             body=body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(format!("{} intended page mappings · {} · preview shows first 16; probe visits at most 3, never a full discovery.",e.mapped.len(),if e.probed{"Representative probe confirmed"}else{"Probe not confirmed for these saved settings"})))
                 .children(e.mapped.iter().take(16).map(|(a,b)|div().text_size(px(13.)).child(format!("{a} → {b}"))));
         }
-        body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Open the browser, complete login and consent, then choose I'm ready. Public-site browser setup is unavailable in this development preview.")).into_any_element()
+        body.child(div().debug_selector(|| "environment-login-hint".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Open the browser, complete login and consent, then choose I'm ready. Public-site browser setup is unavailable in this development preview.")).into_any_element()
     }
     fn preview_page_ids(&self) -> Vec<regressee_core::domain::PageId> {
         self.preview
@@ -5442,6 +5446,12 @@ fn main() -> anyhow::Result<()> {
                 ..Default::default()
             },
             |window, cx| {
+                // The app uses a fixed font database. Keep a bounded set of
+                // shaped lines across screens instead of reshaping Setup on
+                // every return; wrapped layouts still use GPUI's frame cache.
+                window
+                    .text_system()
+                    .retain_unwrapped_layouts(2048, 8 * 1024 * 1024);
                 let shell = cx.new(|cx| Shell::new(cx, jobs, events));
                 window.focus(
                     &shell
@@ -5470,6 +5480,137 @@ mod approval_fixture;
 mod tests {
     use super::*;
     use gpui::TestAppContext;
+    #[gpui::test]
+    fn retained_navigation_text_is_exact_and_resettable(cx: &mut TestAppContext) {
+        struct OtherScreen;
+        impl Render for OtherScreen {
+            fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+                div().child("An unrelated screen")
+            }
+        }
+        let (_, cx) = cx.add_window_view(|_, _| OtherScreen);
+        cx.update(|window, cx| {
+            let text: SharedString = "Retained navigation geometry".into();
+            let runs = [gpui::TextRun {
+                len: text.len(),
+                font: gpui::font(FONT),
+                color: rgb(INK).into(),
+                background_color: None,
+                underline: None,
+                strikethrough: None,
+            }];
+            let shape = |window: &Window, size, width| {
+                window
+                    .text_system()
+                    .shape_line(text.clone(), size, &runs, width)
+            };
+            window
+                .text_system()
+                .retain_unwrapped_layouts(2048, 8 * 1024 * 1024);
+            let first = shape(window, px(14.), None);
+            let _ = window.draw(cx);
+            let _ = window.draw(cx);
+            let returned = shape(window, px(14.), None);
+            assert!(
+                Arc::ptr_eq(&*first, &*returned),
+                "reuse across unrelated frames"
+            );
+            let resized = shape(window, px(15.), None);
+            let forced = shape(window, px(14.), Some(px(8.)));
+            assert!(!Arc::ptr_eq(&*first, &*resized));
+            assert!(!Arc::ptr_eq(&*first, &*forced));
+            // Reset releases side references, not live shapes or frame geometry.
+            window
+                .text_system()
+                .retain_unwrapped_layouts(0, 8 * 1024 * 1024);
+            let _ = window.draw(cx);
+            let _ = window.draw(cx);
+            let reset = shape(window, px(14.), None);
+            assert!(!Arc::ptr_eq(&*first, &*reset));
+            assert_eq!(first.width, returned.width);
+            // A deliberately tiny byte budget cannot admit this shape.
+            window.text_system().retain_unwrapped_layouts(2048, 1);
+            let _ = window.draw(cx);
+            let _ = window.draw(cx);
+            let oversized = shape(window, px(14.), None);
+            let _ = window.draw(cx);
+            let _ = window.draw(cx);
+            assert!(!Arc::ptr_eq(&*oversized, &*shape(window, px(14.), None)));
+        });
+    }
+    /// Times the real Shell navigation/layout/CPU scene path on GPUI's test
+    /// platform. No compositor, GPU presentation, or native font claim.
+    #[gpui::test]
+    fn setup_cpu_render_profile(cx: &mut TestAppContext) {
+        #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+        if std::env::var_os("REGRESSEE_PROFILE_REAL_FONTS").is_some_and(|value| value == "1") {
+            cx.enable_offscreen_renderer().unwrap();
+        }
+        let dir = tempfile::tempdir().unwrap();
+        let paths = AppPaths::isolated(dir.path());
+        let mut store = regressee_storage::Store::open(paths.clone()).unwrap();
+        let project =
+            Project::draft("Setup CPU timing fixture".into(), "http://127.0.0.1:43210/").unwrap();
+        store.save_project(&project, None).unwrap();
+        drop(store);
+        let (jobs, events) = Jobs::start(paths);
+        let owned = jobs.clone();
+        let retain_text =
+            std::env::var_os("REGRESSEE_PROFILE_RETAIN_TEXT").is_some_and(|value| value == "1");
+        let (shell, cx) = cx.add_window_view(|window, cx| {
+            if retain_text {
+                window
+                    .text_system()
+                    .retain_unwrapped_layouts(2048, 8 * 1024 * 1024);
+            }
+            Shell::new(cx, jobs, events)
+        });
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                finish_request(s, cx);
+                s.activate_control(Control::OpenProject(0), window, cx);
+                while s.pending.is_some() {
+                    finish_request(s, cx);
+                }
+            });
+        });
+        for (width, height) in [(1120., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            for advanced in [false, true] {
+                shell.update(cx, |s, cx| {
+                    s.focus.advanced = advanced;
+                    cx.notify();
+                });
+                for cycle in 0..3 {
+                    for screen in [Screen::Projects, Screen::Setup] {
+                        cx.update(|window, cx| {
+                            // Isolate the true cold shape cost from subsequent
+                            // returns. Reset only the side cache, not frame state.
+                            let cold = screen == Screen::Setup && cycle == 0;
+                            if cold && retain_text {
+                                window.text_system().retain_unwrapped_layouts(2048, 8 * 1024 * 1024);
+                            }
+                            let started = std::time::Instant::now();
+                            shell.update(cx, |s, cx| s.navigate(screen, window, cx));
+                            let handler = started.elapsed();
+                            let draw_started = std::time::Instant::now();
+                            let _ = window.draw(cx);
+                            eprintln!(
+                                "CPU profile: screen={} size={}x{} advanced={} cycle={} cold_after_cache_reset={} handler_ms={:.3} draw_ms={:.3}",
+                                screen.label(), width, height, advanced, cycle, cold && retain_text,
+                                handler.as_secs_f64() * 1000.,
+                                draw_started.elapsed().as_secs_f64() * 1000.,
+                            );
+                            shell.update(cx, |s, cx| {
+                                while s.pending.is_some() { finish_request(s, cx); }
+                            });
+                        });
+                    }
+                }
+            }
+        }
+        owned.join_after_ui();
+    }
     #[gpui::test]
     fn projects_import_label_is_contained_at_real_window_sizes(cx: &mut TestAppContext) {
         let dir = tempfile::tempdir().unwrap();

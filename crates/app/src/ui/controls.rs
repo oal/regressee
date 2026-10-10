@@ -260,6 +260,7 @@ pub fn check(
 /// section's controls with `.child` / `.children` at the call site.
 pub fn section(title: &'static str, help: &'static str) -> Div {
     div()
+        .debug_selector(move || format!("section-{title}"))
         .flex()
         .flex_col()
         .gap(px(12.))
@@ -395,6 +396,7 @@ pub fn empty(title: &'static str, explanation: &'static str) -> Div {
 }
 pub fn field(label: &'static str, hint: &'static str, input: AnyElement) -> Div {
     div()
+        .debug_selector(move || format!("field-{label}"))
         .flex()
         .flex_col()
         .gap_2()

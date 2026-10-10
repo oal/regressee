@@ -9,6 +9,7 @@ default = []
 ui = ["dep:gpui", "dep:image", "dep:log"]
 ui-tests = ["ui", "gpui/test-support"]
 ui-inspection = ["ui"]
+ui-renderer-capture = ["ui-tests", "gpui/offscreen-capture"]
 
 [dependencies]
 regressee-core = { path = "../core" }

@@ -24,6 +24,30 @@ wait for independent verification.
 
 ## Current evidence
 
+### Renderer-side capture and Setup timing — latest continuation
+
+**Readable screenshots now work:** a default-off diagnostic feature uses the
+pinned GPUI/Blade renderer, real Linux Cosmic fonts and the actual glyph/image
+atlas without a compositor or OS-window launch. Calibrated GPU readback passed;
+the first synthetic batch produced **28 app images across all five screens at
+both sizes**. The bounded correction confirmation stopped after nine wide images
+on a remaining timezone-chevron geometry fault; login-help overlap also remains.
+Whole-UI acceptance is still OPEN, not a rendered-frame/input PASS.
+
+The dominant **repeat** Setup cost is now demonstrated: GPUI discarded its text
+geometry between screens. Production explicitly enables bounded window-local
+unwrapped-layout retention. Final real-font debug A/B shows **317–420 ms →
+22–36 ms** CPU draw on repeat navigation; cold draw remains **302–396 ms**.
+The complete user's ~1s native delay and OS presentation/input remain unqualified.
+Independent source review passes renderer/cache; its extent-overflow P2 was
+fixed and independently retested without GPU initialization. See
+`renderer-capture-results-20261010.md`, `setup-render-profile-20261010.md` and
+`renderer-and-cache-source-verification-20261010.md` under `docs/research/`.
+No native relaunch, GPU policy change, compositor helper or public runtime
+distribution is supplied by this work. Existing platform/release gaps below remain.
+
+### Previous native-window correction round — historical scoped evidence
+
 **The native UI sweep is unfinished.** Later user screenshots identify severe
 layout/affordance defects beyond the earlier focus fix. The collapsed Import
 label was reproduced in GPUI test-platform bounds and narrowly repaired; one
@@ -55,9 +79,11 @@ developer distribution is not the promised automatic setup workflow.
 
 Capture timezone now uses a bundled searchable native selector, not free text.
 Unknown saved values are retained; catalog/ICU compatibility is not universal.
-The user's reported ~1s debug Setup navigation remains undiagnosed. Optional
+At that earlier checkpoint, the user's ~1s debug Setup navigation was undiagnosed. Optional
 constant-label timing markers separate construction, layout/prepaint and CPU
 scene paint; they do not measure GPU-visible or real OS-input latency.
+The latest real-font diagnosis and repeat-navigation repair are documented above;
+they do not retroactively qualify the failed native-window round.
 
 - `docs/research/ui-controls-correction-20261010.md` — current shared control,
   feedback, selector integration and local regression scope.

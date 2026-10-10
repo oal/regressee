@@ -604,6 +604,8 @@ impl Render for TimezoneSelect {
                     )
                     .child(
                         div()
+                            .debug_selector(|| "timezone-value".into())
+                            .flex()
                             .flex_1()
                             .min_w(px(0.))
                             .overflow_hidden()
@@ -618,7 +620,13 @@ impl Render for TimezoneSelect {
                                 .child("Not in list"),
                         )
                     })
-                    .child(chevron(self.open)),
+                    .child(
+                        div()
+                            .debug_selector(|| "timezone-chevron".into())
+                            .flex()
+                            .flex_shrink_0()
+                            .child(chevron(self.open)),
+                    ),
             )
             // Construct the overlay from this frame's actual trigger bounds,
             // not cached render-time coordinates (which lag resize/scroll).

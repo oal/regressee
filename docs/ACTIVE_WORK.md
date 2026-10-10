@@ -2,7 +2,40 @@
 
 Updated: 2026-10-10
 
-## Current task — user-requested full native UI sweep
+## Latest continuation — Setup latency and renderer-side capture
+
+Renderer capture is **implemented and actually working** through opt-in GPUI/
+Blade offscreen tests, real Cosmic fonts and actual atlas. Calibrated proof and
+28 initial app images cover both sizes/all five screens; this is not OS-window
+presentation/input qualification. The one UI confirmation failed after nine wide
+images: UTC is restored, but chevron alignment and login-hint overlap remain.
+No further polishing/capture round or native relaunch. New-project scroll reset is
+implemented without an after-image. The ineffective width trial was removed.
+
+Real-font CPU A/B demonstrates the repeat Setup text-reshaping bottleneck:
+**317–420 ms → 22–36 ms** with production's bounded window-local unwrapped-layout
+retention. Cold remains **302–396 ms**; complete native ~1s observation not closed.
+Parent public-API cache regression passes; the three excluded-vendor pure tests
+remain unrun, with failed command selection documented rather than changing locks.
+
+- `ses_ed8fa6e39ffedfkBZGbEENyDfz`: renderer feasibility/implementation settled.
+- `ses_ed8e2ef5bffei0KitZ6BQfX7tr`: cache diagnosis/implementation settled.
+- `ses_ed88c151affex1tgM0WPBhI49e`: independent source PASS; identified extent P2
+  now corrected, independently checked and pure boundary test PASS. Settled.
+- Parent local gate settled: 188 locked/offline tests pass / 28 deliberate ignores;
+  workspace/all-target Clippy `-D warnings`, fmt and ordinary `ui` build pass.
+  No inspection/capture feature in the normal executable; not natively launched.
+  SHA-256 `5c6150e292d36f9f5fa66dcd27295d4b98db79f327ef30cee845fda0dc47c22c`.
+  All checks/agents settled; no compile-slot owner or owned native process remains.
+
+Reports: `renderer-capture-results-20261010.md`, `setup-render-profile-20261010.md`,
+`renderer-and-cache-source-verification-20261010.md` in `docs/research/`.
+Pinned GPUI source/provenance and API live under `vendor/`; private images/logs/
+stores stay outside source Git. Source remote is `git@github.com:oal/regressee.git`,
+previous checkpoint `afcddc9`. Existing automatic public distribution, native OS
+input/presentation, supported platform/clean-machine/release gates remain open.
+
+## Historical task — user-requested full native UI sweep
 
 ### Current correction batch after user screenshots
 
