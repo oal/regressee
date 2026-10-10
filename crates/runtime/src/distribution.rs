@@ -20,6 +20,7 @@ pub const MANIFEST_LIMIT: u64 = 4 * 1024 * 1024;
 pub enum Scope {
     DevelopmentLoopback,
     QualifiedPublic,
+    OfficialPinned,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -31,6 +32,10 @@ pub struct Distribution {
 }
 impl Distribution {
     pub fn validate(&self) -> Result<()> {
+        ensure!(
+            self.scope != Scope::OfficialPinned,
+            "official catalog trust is not a signed distribution configuration"
+        );
         ensure!(self.version == 1, "unsupported distribution configuration");
         ensure!(
             self.url.username().is_empty() && self.url.password().is_none(),

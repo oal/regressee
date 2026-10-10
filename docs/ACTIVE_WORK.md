@@ -1,8 +1,63 @@
 # Active delegated work — restart recovery
 
-Updated: 2026-10-10
+Updated: 2026-10-11
 
-## Latest continuation — Setup latency and renderer-side capture
+## Latest continuation — official first-use setup and overlap correction
+
+- Approved decision 0011 replaces the default signed-pack-server requirement with
+  embedded complete inventories/bundled Playwright and pinned official downloads.
+  Installer/asset/app implementers delivered; parent integrated and built.
+- `ses_ed84224a7ffeCR22EI6zPCKvXQ`: provisioner plus all three independent P2 repairs
+  delivered; settled. No shared compile slot remains owned by this agent.
+- `ses_ed83f76f7ffeSTfA3rBS6l8yjG`: app/default integration delivered; settled.
+- `ses_ed83c9712ffeOCZEKXQzNwL5GS`: independent finished-source/asset review and
+  **12 focused inert tests PASS**; all four P2 findings closed. Settled.
+- `ses_ed8411eabffeshVsa6HuxY3LqN`: asset implementation and fresh independent
+  actual first-use/36-image review delivered **PASS**; settled. Live check 114.42s,
+  258,433,266 bytes, two discovered pages/two captures, reopened Ready without
+  repeat installation, pointer/project unchanged, 127 bound inputs unchanged,
+  zero observed remaining owned processes. Do not repeat it.
+
+Parent final post-commit-fix gate: **206 passed / 29 deliberate ignores**, all-target/all-feature
+Clippy with warnings denied, format check and ordinary `ui` build PASS. The first
+Clippy attempt's test-only byte-array spelling was corrected, preserving the log.
+The new overlap/arrow correction's confirmation **PASS**, 36 offscreen app images
+covering both sizes/lower Results/History/timezone/feedback and scroll-reset checks.
+Private images and source/test-binary binding:
+`regressee-official-verification-r7ki95gq/final-layout/` under approved scratch.
+No further polishing/native round is authorized or needed as restart recovery.
+
+Ordinary `target/debug/regressee` SHA-256:
+`642db4c5c4e6951cf4d8824aa5c695fe6003cd42716ef74ade8cb7c5c033a3c7`.
+No inspection/capture feature; not natively launched. It includes the narrow
+post-commit cancellation-reporting repair. All parent builds/tests are settled.
+Parent's initial real first-use attempt completed official install/smoke/discovery
+but hit its incorrectly short 120s shell timeout during capture; it remains a
+partial failed check, not a PASS. No owned processes remained after that timeout.
+
+Independent reports and parent checks are final/settled. This is a verified
+source checkpoint for the already authorized origin, not a release. Default setup is now
+implemented, but unsupported-platform/native/cold-Setup/clean-machine/keystore/
+signing/licensing qualification is not inferred. Do not repeat guardian/scale
+qualification, create keys/servers, alter sandbox/TLS/policies or touch user data.
+
+Independent P2-04 finding: explicit setup could commit then report cancellation.
+Parent now returns the committed install result, and explicit Jobs terminal
+readiness uses an uncancelled verification token only after setup succeeds.
+First-use website continuation still checks its original shared cancellation.
+Two inert/mock regressions pass in the parent fresh serial suite, and the
+independent reviewer executed these plus the original-token continuation guard:
+all three PASS, no source/binary drift. This is not a real live late-Cancel test.
+No additional live check or
+UI recapture is needed; no production UI changed after the accepted screenshots.
+
+Authored staged whitespace checks pass. The full staged check reports original
+third-party license whitespace/CRLF; the exact upstream license bytes are retained,
+not rewritten to silence that check. Assets, downloads, stores and rendered
+evidence have distinct bindings; no private archives/test stores/images/logs are
+part of this source checkpoint.
+
+## Preceding checkpoint — Setup latency and renderer-side capture
 
 Renderer capture is **implemented and actually working** through opt-in GPUI/
 Blade offscreen tests, real Cosmic fonts and actual atlas. Calibrated proof and

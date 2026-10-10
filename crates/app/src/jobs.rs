@@ -230,17 +230,45 @@ pub struct Jobs {
 }
 impl Jobs {
     pub fn start(paths: AppPaths) -> (Arc<Self>, Receiver<Update>) {
-        Self::start_inner(paths, None)
+        Self::start_inner(paths, |paths| Product::configured(&paths.cache))
     }
     pub fn start_with_distribution(
         paths: AppPaths,
         distribution: regressee_runtime::distribution::Distribution,
     ) -> (Arc<Self>, Receiver<Update>) {
-        Self::start_inner(paths, Some(distribution))
+        Self::start_inner(paths, move |paths| {
+            distribution.validate()?;
+            Ok(Product {
+                distribution: Some(distribution),
+                official_runtime: false,
+                runtime_cache: paths.cache.join("product-runtime"),
+                auth: Default::default(),
+            })
+        })
+    }
+    /// Test-only injection; production `start` always uses configured app trust.
+    #[cfg(any(test, feature = "ui-tests"))]
+    pub fn start_with_product(paths: AppPaths, product: Product) -> (Arc<Self>, Receiver<Update>) {
+        Self::start_inner(paths, move |_| {
+            if let Some(d) = &product.distribution {
+                d.validate()?;
+            }
+            Ok(product)
+        })
+    }
+    #[cfg(any(test, feature = "ui-tests"))]
+    pub fn start_without_runtime(paths: AppPaths) -> (Arc<Self>, Receiver<Update>) {
+        let product = Product {
+            distribution: None,
+            official_runtime: false,
+            runtime_cache: paths.cache.join("product-runtime"),
+            auth: Default::default(),
+        };
+        Self::start_with_product(paths, product)
     }
     fn start_inner(
         paths: AppPaths,
-        distribution: Option<regressee_runtime::distribution::Distribution>,
+        configure: impl FnOnce(&AppPaths) -> anyhow::Result<Product> + Send + 'static,
     ) -> (Arc<Self>, Receiver<Update>) {
         let (commands, rx) = mpsc::sync_channel(COMMAND_CAPACITY);
         let (updates, results) = mpsc::sync_channel(UPDATE_CAPACITY);
@@ -253,15 +281,7 @@ impl Jobs {
         let paused = Arc::new(AtomicBool::new(false));
         let pause = paused.clone();
         let thread = thread::spawn(move || {
-            let product = if let Some(d) = distribution {
-                d.validate().map(|_| Product {
-                    distribution: Some(d),
-                    runtime_cache: paths.cache.join("product-runtime"),
-                    auth: Default::default(),
-                })
-            } else {
-                Product::configured(&paths.cache)
-            };
+            let product = configure(&paths);
             let mut store = Store::open(paths).ok();
             if let Some(s) = store.as_mut() {
                 let _ = s.recover_runs();
@@ -500,13 +520,14 @@ fn product_work(
                 product.probe_environment(store, project, cancel.clone())?,
             ))),
             Work::RuntimeStatus => Ok(Reply::RuntimeReadiness(product.readiness(cancel)?)),
-            Work::SetupRuntime => {
-                product.setup_with_progress(cancel.clone(), &mut |phase| {
-                    setup_update(updates, id, phase);
-                })?;
-                regressee_runtime::distribution::check_cancel(cancel)?;
-                Ok(Reply::RuntimeReadiness(product.readiness(cancel)?))
-            }
+            Work::SetupRuntime => explicit_setup_reply(
+                || {
+                    product.setup_with_progress(cancel.clone(), &mut |phase| {
+                        setup_update(updates, id, phase);
+                    })
+                },
+                |committed| product.readiness(committed),
+            ),
             Work::Evidence(project) => {
                 Ok(Reply::Evidence(Box::new(store.project_evidence(project)?)))
             }
@@ -717,6 +738,16 @@ fn first_use_project(work: &Work) -> Option<ProjectId> {
         _ => None,
     }
 }
+fn explicit_setup_reply(
+    setup: impl FnOnce() -> anyhow::Result<String>,
+    readiness: impl FnOnce(&AtomicBool) -> anyhow::Result<crate::product::RuntimeReadiness>,
+) -> anyhow::Result<Reply> {
+    setup()?;
+    // Explicit installation already committed. Verify/report its actual state
+    // without converting a late Cancel into a false installation failure. This
+    // token is only for terminal verification, never for website continuation.
+    Ok(Reply::RuntimeReadiness(readiness(&AtomicBool::new(false))?))
+}
 fn automatic_setup_allowed(work: &Work, has_baseline: bool) -> bool {
     match work {
         // Login/probe can prepare a pinned comparison: never select a new
@@ -850,6 +881,38 @@ fn publish(sender: &SyncSender<Update>, mut update: Update, stop: &AtomicBool) -
 mod tests {
     use super::*;
     #[test]
+    fn explicit_setup_reports_committed_state_despite_late_cancel() -> anyhow::Result<()> {
+        let cancel = AtomicBool::new(false);
+        let reply = explicit_setup_reply(
+            || {
+                // Model Cancel arriving in the installer's post-commit Ready callback.
+                cancel.store(true, Ordering::Release);
+                Ok("Committed".into())
+            },
+            |verification| {
+                assert!(cancel.load(Ordering::Acquire));
+                assert!(!verification.load(Ordering::Acquire));
+                Ok(crate::product::RuntimeReadiness {
+                    status: crate::product::RuntimeState::Ready,
+                    setup_available: true,
+                    message: "Private browser is ready.",
+                    identity: None,
+                    scope: Some(regressee_runtime::distribution::Scope::OfficialPinned),
+                })
+            },
+        )?;
+        assert!(matches!(reply, Reply::RuntimeReadiness(state)
+            if state.status == crate::product::RuntimeState::Ready));
+        assert!(
+            explicit_setup_reply(
+                || anyhow::bail!("cancelled before commit"),
+                |_| panic!("failed setup must not report committed readiness"),
+            )
+            .is_err()
+        );
+        Ok(())
+    }
+    #[test]
     fn first_use_policy_never_installs_for_comparison_or_resume() {
         let project = ProjectId::new();
         let resume = RunId::new();
@@ -948,6 +1011,7 @@ mod tests {
         let product = Product {
             distribution: None,
             runtime_cache: paths.cache.join("product-runtime"),
+            official_runtime: false,
             auth: Default::default(),
         };
         let cancel = Arc::new(AtomicBool::new(false));
@@ -1005,7 +1069,7 @@ mod tests {
     fn same_actions_as_ui_save_and_reopen_without_fixture_runtime() {
         let dir = tempfile::tempdir().unwrap();
         let paths = AppPaths::isolated(dir.path());
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let project = Project::draft("Actor website".into(), "https://example.test").unwrap();
         let id = project.id;
         jobs.submit(Request {
@@ -1021,7 +1085,7 @@ mod tests {
             Reply::Project(_)
         ));
         jobs.join_after_ui();
-        let (jobs, events) = Jobs::start(paths);
+        let (jobs, events) = Jobs::start_without_runtime(paths);
         jobs.submit(Request {
             id: 2,
             work: Work::Load(id),
@@ -1060,7 +1124,7 @@ mod tests {
         assert!(thread.join().unwrap());
         assert_eq!(rx.recv().unwrap().id, 2);
         let dir = tempfile::tempdir().unwrap();
-        let (jobs, _) = Jobs::start(AppPaths::isolated(dir.path()));
+        let (jobs, _) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
         jobs.join_after_ui();
         assert!(
             jobs.submit(Request {

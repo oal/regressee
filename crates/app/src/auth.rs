@@ -430,7 +430,7 @@ impl Product {
             )),
             "Representative page must be on a mapped website, not the identity provider"
         );
-        let installed = distribution::resolve(&self.runtime_cache, self.trust()?, &cancel)?;
+        let installed = self.resolve_runtime(&cancel)?;
         for u in std::iter::once(&address)
             .chain(std::iter::once(&representative))
             .chain(settings.identity_origins.iter())
@@ -618,7 +618,7 @@ impl Product {
         let p = store.load_project(project)?.project;
         let env = store.selected_environment(&p)?;
         let state = self.auth_state(store, project, &env)?;
-        let installed = distribution::resolve(&self.runtime_cache, self.trust()?, &cancel)?;
+        let installed = self.resolve_runtime(&cancel)?;
         let mut worker = self.spawn_worker(&installed)?;
         let job = RunId::new();
         worker.handshake(job, cancel.clone())?;
@@ -745,6 +745,7 @@ mod tests {
         let product = Product {
             distribution: None,
             runtime_cache: root.path().join("cache"),
+            official_runtime: false,
             auth: std::sync::Mutex::new(owner()?),
         };
         let scope = SessionReference {
@@ -868,6 +869,7 @@ mod tests {
         let product = Product {
             distribution: None,
             runtime_cache: root.path().join("cache"),
+            official_runtime: false,
             auth: Default::default(),
         };
         let scope = SessionReference {
@@ -936,6 +938,7 @@ mod tests {
         let product = Product {
             distribution: None,
             runtime_cache: root.path().join("cache"),
+            official_runtime: false,
             auth: Default::default(),
         };
         let scope = SessionReference {
@@ -991,6 +994,7 @@ mod tests {
             let product = Product {
                 distribution: None,
                 runtime_cache: root.path().join("cache"),
+                official_runtime: false,
                 auth: std::sync::Mutex::new(AuthOwner {
                     vault: Some(EncryptedSessions::with_provider(
                         &vault_path,
@@ -1150,6 +1154,7 @@ mod tests {
         let product = Product {
             distribution: None,
             runtime_cache: root.path().join("cache"),
+            official_runtime: false,
             auth: std::sync::Mutex::new(AuthOwner {
                 vault: Some(EncryptedSessions::with_provider(
                     &vault_path,
@@ -1238,6 +1243,7 @@ mod tests {
         let product = Product {
             distribution: None,
             runtime_cache: root.path().join("cache"),
+            official_runtime: false,
             auth: Default::default(),
         };
         assert!(

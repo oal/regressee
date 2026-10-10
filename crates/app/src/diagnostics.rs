@@ -14,6 +14,7 @@ pub enum RuntimeState {
     Unavailable,
     VerifiedLoopback,
     VerifiedPublic,
+    VerifiedOfficialPinned,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -84,18 +85,19 @@ pub fn collect(
         counts: store.diagnostic_counts()?,
     };
     if let Some(product) = product
-        && let Some(d) = &product.distribution
+        && (product.distribution.is_some() || product.official_runtime)
     {
         report.runtime = RuntimeState::Unavailable;
-        if let Ok(installed) =
-            regressee_runtime::distribution::resolve(&product.runtime_cache, d, cancel)
-        {
-            report.runtime = match d.scope {
+        if let Ok(installed) = product.resolve_runtime(cancel) {
+            report.runtime = match installed.manifest.scope {
                 regressee_runtime::distribution::Scope::DevelopmentLoopback => {
                     RuntimeState::VerifiedLoopback
                 }
                 regressee_runtime::distribution::Scope::QualifiedPublic => {
                     RuntimeState::VerifiedPublic
+                }
+                regressee_runtime::distribution::Scope::OfficialPinned => {
+                    RuntimeState::VerifiedOfficialPinned
                 }
             };
             if let RuntimeIdentity::Pinned {
@@ -105,7 +107,7 @@ pub fn collect(
                 browser,
             } = &installed.manifest.identity
             {
-                // Even signed strings are not copied into diagnostics.
+                // Even trusted strings are not copied into diagnostics.
                 report.versions = (|| -> Result<Versions> {
                     Ok(Versions {
                         node: version(node)?,
@@ -176,6 +178,35 @@ mod tests {
         let original = std::fs::read(&path)?;
         assert!(export(&report, &path, &AtomicBool::new(false)).is_err());
         assert_eq!(std::fs::read(path)?, original);
+        Ok(())
+    }
+
+    #[test]
+    fn app_pinned_diagnostics_are_read_only_and_never_copy_catalog_sources() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let paths = regressee_storage::AppPaths::isolated(root.path());
+        let store = regressee_storage::Store::open(paths.clone())?;
+        let product = crate::product::Product {
+            distribution: None,
+            official_runtime: true,
+            runtime_cache: paths.cache.join("product-runtime"),
+            auth: Default::default(),
+        };
+        let report = collect(&store, Some(&product), &AtomicBool::new(false))?;
+        assert_eq!(report.runtime, RuntimeState::Unavailable);
+        assert!(report.versions.is_none());
+        let json = serde_json::to_string(&report)?;
+        for private in [
+            "https://",
+            "nodejs.org",
+            "googleapis.com",
+            "sha256",
+            "public_key",
+            root.path().to_str().unwrap(),
+        ] {
+            assert!(!json.contains(private));
+        }
+        assert!(!product.runtime_cache.exists());
         Ok(())
     }
 }

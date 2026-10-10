@@ -334,13 +334,16 @@ turning that identity provider into crawl content.
 
 ### Private runtime
 
-Build platform-specific runtime packs in trusted release CI: pinned Node,
-compiled worker, Playwright library and metadata, and matching Chromium.
-Users do not run npm or receive a generated developer project.
+Default provisioning now uses an app-embedded, complete file inventory and
+bundled Playwright/worker source, with exact official Node/Chromium HTTPS archive
+pins. This user-approved revision avoids a separate runtime distribution server;
+see decision 0011. Configured signed runtime packs remain a separate supported
+override. Users do not run npm or receive a generated developer project.
 
-The app downloads a versioned manifest/pack on first use, verifies its signature
-and checksums, extracts safely, smoke-tests browser launch plus a screenshot,
-and atomically marks it ready. Show disk/download estimates, progress, cancel,
+The app downloads pinned archives on first use, verifies their hashes and lengths
+before extraction and every installed file against the embedded catalog,
+smoke-tests sandboxed browser launch plus a screenshot, and atomically marks it
+ready. Show disk/download estimates, progress, cancel,
 retry, and repair. Downloads use TLS; do not “fix” certificate failures by
 disabling verification. Support a configured proxy/custom trusted CA where
 feasible, with diagnostics for managed networks.

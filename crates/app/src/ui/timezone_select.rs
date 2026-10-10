@@ -550,6 +550,9 @@ impl Render for TimezoneSelect {
             .relative()
             .w_full()
             .h(px(CONTROL_HEIGHT))
+            .flex()
+            .flex_col()
+            .flex_shrink_0()
             .font_family(FONT)
             .on_action(cx.listener(Self::toggle))
             .on_action(cx.listener(Self::next))
@@ -563,9 +566,11 @@ impl Render for TimezoneSelect {
                     .id("timezone-select-button")
                     .debug_selector(|| "timezone-select-button".into())
                     .key_context("TimezoneSelectButton")
+                    .relative()
                     .w_full()
                     .h(px(CONTROL_HEIGHT))
-                    .px(px(12.))
+                    .pl(px(12.))
+                    .pr(px(40.))
                     .flex()
                     .items_center()
                     .gap(px(8.))
@@ -623,6 +628,10 @@ impl Render for TimezoneSelect {
                     .child(
                         div()
                             .debug_selector(|| "timezone-chevron".into())
+                            .absolute()
+                            .right(px(12.))
+                            .top(px(12.))
+                            .size(px(16.))
                             .flex()
                             .flex_shrink_0()
                             .child(chevron(self.open)),
@@ -733,6 +742,21 @@ mod tests {
                 shell_activations: 0,
             }
         })
+    }
+
+    #[gpui::test]
+    fn closed_trigger_keeps_chevron_at_right_edge(cx: &mut TestAppContext) {
+        let (_, cx) = setup(cx, "UTC");
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        let trigger = cx.debug_bounds("timezone-select-button").unwrap();
+        let value = cx.debug_bounds("timezone-value").unwrap();
+        let arrow = cx.debug_bounds("timezone-chevron").unwrap();
+        assert!(
+            arrow.right() >= trigger.right() - px(16.),
+            "trigger={trigger:?}, value={value:?}, arrow={arrow:?}"
+        );
     }
 
     #[core::prelude::v1::test]

@@ -53,7 +53,13 @@ in the candidate manifest. A repeat incremental build hash is not a clean-machin
 bit-reproducibility proof. Timestamped signing/notary bytes are distinct from
 reproducible unsigned payloads. Private candidate manifests do not confer trust.
 
-For runtime v3, `runtime-pack.py` prepares an unsigned manifest from a reviewed
+The default official-component catalogs and bundled source payload are generated
+by `python3 scripts/official-runtime.py`, then reviewed and committed as application
+inputs. Exact provenance, licenses, archive pins and complete inventory must bind
+to the packaged app; unreviewed regeneration is not a release gate. This does not
+publish or sign an app. See decision 0011 and the official-runtime asset report.
+
+For an optional signed runtime v3 override, `runtime-pack.py` prepares an unsigned manifest from a reviewed
 staging tree without following links. The owner signs its exact bytes with an
 external Ed25519 key (64-byte detached signature) and supplies only the public key
 to the configured product distribution. No private production key is committed.

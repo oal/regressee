@@ -2480,7 +2480,7 @@ impl Shell {
                     .map(crawl::origin)
                     .all(|origin| self.approved_origins.contains(&origin))
             });
-        let mut body=div().max_w(px(680.)).flex().flex_col().gap_6()
+        let mut body=div().w_full().max_w(px(680.)).flex_shrink_0().flex().flex_col().gap_6()
             .child(self.heading("Project setup","Tell us what to capture. Save your settings, then review the page list in Results."))
             .child(controls::section("Website", "Saving settings does not visit your website.")
                 .child(controls::field("Project name","Choose a recognizable name.",self.name.clone().into_any_element()))
@@ -2561,7 +2561,7 @@ impl Shell {
             body = body.child(div().text_size(px(14.)).text_color(rgb(MUTED)).child("Reduced motion, disabled animations, hidden caret and pointer-away capture are fixed. Font/image readiness, lazy loading and stability are bounded; tall/infinite pages fail rather than silently crop. Full page is limited to 32,768 pixels tall, 64 million pixels and 64 scroll steps, or the profile's lower limit. Virtualized rows and nested scroll areas are not expanded. Login may use approved identity providers without expanding crawl scope. Basic Auth, device-bound/rotating sessions, VPN and enterprise networks are not universally qualified."));
         }
         body
-            .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Saving edits never changes an existing baseline. Public-site capture is unavailable in this development preview.")).into_any_element()
+            .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Saving edits never changes an existing baseline. The private browser is installed automatically when needed.")).into_any_element()
     }
     fn environment_setup(&self, cx: &mut Context<Self>) -> AnyElement {
         let draft = self
@@ -2603,7 +2603,7 @@ impl Shell {
         body.into_any_element()
     }
     fn environment_actions(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut body = div().flex().flex_col().gap_3();
+        let mut body = div().flex().flex_col().gap_3().flex_shrink_0();
         if let Some(e) = &self.environment {
             body = body
                 .child(controls::status(
@@ -2651,7 +2651,19 @@ impl Shell {
             body=body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(format!("{} intended page mappings · {} · preview shows first 16; probe visits at most 3, never a full discovery.",e.mapped.len(),if e.probed{"Representative probe confirmed"}else{"Probe not confirmed for these saved settings"})))
                 .children(e.mapped.iter().take(16).map(|(a,b)|div().text_size(px(13.)).child(format!("{a} → {b}"))));
         }
-        body.child(div().debug_selector(|| "environment-login-hint".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Open the browser, complete login and consent, then choose I'm ready. Public-site browser setup is unavailable in this development preview.")).into_any_element()
+        body.child(
+            div()
+                .debug_selector(|| "environment-login-hint".into())
+                .flex()
+                .w_full()
+                .min_h(px(20.))
+                .flex_shrink_0()
+                .text_size(px(13.))
+                .line_height(px(20.))
+                .text_color(rgb(MUTED))
+                .child("Open the browser and complete login or consent. Then choose I'm ready."),
+        )
+        .into_any_element()
     }
     fn preview_page_ids(&self) -> Vec<regressee_core::domain::PageId> {
         self.preview
@@ -5553,7 +5565,7 @@ mod tests {
             Project::draft("Setup CPU timing fixture".into(), "http://127.0.0.1:43210/").unwrap();
         store.save_project(&project, None).unwrap();
         drop(store);
-        let (jobs, events) = Jobs::start(paths);
+        let (jobs, events) = Jobs::start_without_runtime(paths);
         let owned = jobs.clone();
         let retain_text =
             std::env::var_os("REGRESSEE_PROFILE_RETAIN_TEXT").is_some_and(|value| value == "1");
@@ -5620,7 +5632,7 @@ mod tests {
             Project::draft("Visual layout fixture".into(), "https://example.test/").unwrap();
         store.save_project(&project, None).unwrap();
         drop(store);
-        let (jobs, events) = Jobs::start(paths);
+        let (jobs, events) = Jobs::start_without_runtime(paths);
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, finish_request);
@@ -5652,11 +5664,59 @@ mod tests {
         owned.join_after_ui();
     }
     #[gpui::test]
+    fn setup_help_and_timezone_are_contained_in_the_scrolling_form(cx: &mut TestAppContext) {
+        let dir = tempfile::tempdir().unwrap();
+        let paths = AppPaths::isolated(dir.path());
+        let mut store = regressee_storage::Store::open(paths.clone()).unwrap();
+        let project = Project::draft("Layout regression".into(), "https://example.test/").unwrap();
+        store.save_project(&project, None).unwrap();
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(paths);
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                while s.pending.is_some() {
+                    finish_request(s, cx);
+                }
+                s.activate_control(Control::OpenProject(0), window, cx);
+                while s.pending.is_some() {
+                    finish_request(s, cx);
+                }
+                s.focus.advanced = true;
+                s.navigate(Screen::Setup, window, cx);
+                while s.pending.is_some() {
+                    finish_request(s, cx);
+                }
+            })
+        });
+        for (width, height) in [(1120., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            let button = cx.debug_bounds("timezone-select-button").unwrap();
+            let arrow = cx.debug_bounds("timezone-chevron").unwrap();
+            let value = cx.debug_bounds("timezone-value").unwrap();
+            let hint = cx.debug_bounds("environment-login-hint").unwrap();
+            let next = cx.debug_bounds("action-Details(Capture)").unwrap();
+            assert!(
+                arrow.right() >= button.right() - px(16.),
+                "button={button:?}, value={value:?}, arrow={arrow:?}, hint={hint:?}, next={next:?}"
+            );
+            assert!(
+                hint.size.height >= px(20.) && hint.bottom() + px(8.) <= next.top(),
+                "hint={hint:?}, next={next:?}"
+            );
+        }
+        owned.join_after_ui();
+    }
+    #[gpui::test]
     fn feedback_dismiss_is_attached_and_long_errors_leave_a_working_viewport(
         cx: &mut TestAppContext,
     ) {
         let dir = tempfile::tempdir().unwrap();
-        let (jobs, events) = Jobs::start(AppPaths::isolated(dir.path()));
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, finish_request);
@@ -5696,7 +5756,7 @@ mod tests {
     ) {
         use regressee_app::product::{RuntimeReadiness, RuntimeState};
         let dir = tempfile::tempdir().unwrap();
-        let (jobs, events) = Jobs::start(AppPaths::isolated(dir.path()));
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -5755,7 +5815,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
         drop(store);
-        let (jobs, events) = Jobs::start(AppPaths::isolated(dir.path()));
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -5808,7 +5868,7 @@ mod tests {
         let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
         let baseline = store.load_project(project).unwrap().project.active_baseline;
         drop(store);
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -5875,7 +5935,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
         drop(store);
-        let (jobs, events) = Jobs::start(AppPaths::isolated(dir.path()));
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         let saved_evidence = shell.update(cx, |s, cx| {
@@ -6043,7 +6103,7 @@ mod tests {
         let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
         let before = store.project_evidence(project).unwrap();
         drop(store);
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -6152,7 +6212,7 @@ mod tests {
         let paths = AppPaths::isolated(dir.path());
         let (store, _, _, _, _) = approval_fixture::fixture(dir.path());
         drop(store);
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         let destination = dir.path().join("diagnostic.json");
@@ -6207,7 +6267,7 @@ mod tests {
         let paths = AppPaths::isolated(dir.path());
         let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
         drop(store);
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -6289,7 +6349,7 @@ mod tests {
         let (store, project, run, valid, masked) = approval_fixture::fixture(dir.path());
         let count = store.baseline_history(project).unwrap().len();
         drop(store);
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -6432,7 +6492,7 @@ mod tests {
                 assert_eq!(*pixel, [(y >> 8) as u8, y as u8, x as u8, 255]); // GPUI BGRA
             }
         }
-        let (jobs, events) = Jobs::start(paths);
+        let (jobs, events) = Jobs::start_without_runtime(paths);
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -6639,7 +6699,7 @@ mod tests {
             .take(3)
             .map(|id| regressee_app::images::viewer_tile(&store, id).unwrap())
             .collect::<Vec<_>>();
-        let (jobs, events) = Jobs::start(paths);
+        let (jobs, events) = Jobs::start_without_runtime(paths);
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -6796,7 +6856,7 @@ mod tests {
         use regressee_core::domain::*;
         let dir = tempfile::tempdir().unwrap();
         let paths = AppPaths::isolated(dir.path());
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, finish_request);
@@ -6941,7 +7001,7 @@ mod tests {
     fn guided_controls_persist_lists_profiles_scope_and_speed(cx: &mut TestAppContext) {
         let dir = tempfile::tempdir().unwrap();
         let paths = AppPaths::isolated(dir.path());
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |shell, cx| {
@@ -6992,7 +7052,7 @@ mod tests {
     ) {
         let dir = tempfile::tempdir().unwrap();
         let paths = AppPaths::isolated(dir.path());
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
         shell.update(cx, |s, cx| {
@@ -7111,7 +7171,7 @@ mod tests {
     ) {
         let dir = tempfile::tempdir().unwrap();
         let paths = AppPaths::isolated(dir.path());
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned_jobs = jobs.clone();
         let (shell, cx) = cx.add_window_view(|window, cx| {
             let shell = Shell::new(cx, jobs, events);
@@ -7298,7 +7358,7 @@ mod tests {
     #[gpui::test]
     fn shell_focus_actions_busy_guard_and_dialog_restore(cx: &mut TestAppContext) {
         let dir = tempfile::tempdir().unwrap();
-        let (jobs, events) = Jobs::start(AppPaths::isolated(dir.path()));
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
         let owned_jobs = jobs.clone();
         let (shell, cx) = cx.add_window_view(|window, cx| {
             let mut shell = Shell::new(cx, jobs, events);
@@ -7355,7 +7415,7 @@ mod tests {
     ) {
         let dir = tempfile::tempdir().unwrap();
         let paths = AppPaths::isolated(dir.path());
-        let (jobs, events) = Jobs::start(paths.clone());
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
         let owned = jobs.clone();
         let (shell, cx) = cx.add_window_view(|window, cx| {
             let shell = Shell::new(cx, jobs, events);

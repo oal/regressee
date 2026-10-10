@@ -4741,6 +4741,7 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "ed25519-dalek",
+ "flate2",
  "hex",
  "keyring",
  "libc",
@@ -4749,6 +4750,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "tar",
  "tempfile",
  "tokio",
  "url",
@@ -5887,6 +5889,16 @@ dependencies = [
  "core-foundation-sys",
  "libc",
  "objc",
+]
+
+[[package]]
+name = "tar"
+version = "0.4.44"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d863878d212c87a19c1a610eb53bb01fe12951c0501cf5a0d65f724914a667a"
+dependencies = [
+ "filetime",
+ "libc",
 ]
 
 [[package]]

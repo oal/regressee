@@ -5,6 +5,7 @@ pub mod crawling;
 pub mod diagnostics;
 pub mod images;
 pub mod jobs;
+pub(crate) mod official_catalog;
 pub mod product;
 pub mod review;
 #[cfg(feature = "ui")]

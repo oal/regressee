@@ -71,6 +71,7 @@ fn product(cache: PathBuf, distribution: Option<Distribution>) -> Product {
     Product {
         distribution,
         runtime_cache: cache,
+        official_runtime: false,
         auth: Default::default(),
     }
 }

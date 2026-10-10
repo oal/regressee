@@ -373,6 +373,7 @@ fn actual_phase5_product_analysis_composite_and_replacement() -> Result<()> {
     let product = Product {
         distribution: Some(d.clone()),
         runtime_cache: PathBuf::from(std::env::var("REGRESSEE_PHASE5_RUNTIME_CACHE")?),
+        official_runtime: false,
         auth: Default::default(),
     };
     let cancel = Arc::new(AtomicBool::new(false));
@@ -699,6 +700,7 @@ fn actual_phase7_replacement_preview_baseline_check() -> Result<()> {
     let product = Product {
         distribution: Some(d),
         runtime_cache: PathBuf::from(std::env::var("REGRESSEE_PHASE5_RUNTIME_CACHE")?),
+        official_runtime: false,
         auth: Default::default(),
     };
     let mut store = Store::open(AppPaths::isolated(&output.join("app")))?;
@@ -874,6 +876,7 @@ fn actual_phase6_composite_zip_fresh_recipient_login_and_fixed_mapped_check() ->
     let product = Product {
         distribution: Some(d.clone()),
         runtime_cache: PathBuf::from(std::env::var("REGRESSEE_PHASE6_RUNTIME_CACHE")?),
+        official_runtime: false,
         auth: Default::default(),
     };
     *product.auth.lock().unwrap() =
@@ -1060,6 +1063,7 @@ fn actual_phase6_composite_zip_fresh_recipient_login_and_fixed_mapped_check() ->
     let fresh = Product {
         distribution: Some(recipient_trust),
         runtime_cache: recipient_paths.cache.join("product-runtime"),
+        official_runtime: false,
         auth: Default::default(),
     };
     ensure!(
@@ -1219,6 +1223,7 @@ fn actual_phase4_auth_environment_and_capture() -> Result<()> {
     let product = Product {
         distribution: Some(distribution.clone()),
         runtime_cache: paths.cache.join("product-runtime"),
+        official_runtime: false,
         auth: Default::default(),
     };
     let cancel = Arc::new(AtomicBool::new(false));
@@ -2325,6 +2330,7 @@ fn actual_signed_http_product_flow() -> Result<()> {
     let mut product = Product {
         distribution: Some(d.clone()),
         runtime_cache: paths.cache.join("product-runtime"),
+        official_runtime: false,
         auth: Default::default(),
     };
     let cancel = Arc::new(AtomicBool::new(false));
@@ -2641,6 +2647,7 @@ fn phase7_actual_1000_page_soak_pause_resume_cancel() -> Result<()> {
     let product = Product {
         distribution: Some(distribution),
         runtime_cache: PathBuf::from(std::env::var("REGRESSEE_PHASE7_RUNTIME_CACHE")?),
+        official_runtime: false,
         auth: Default::default(),
     };
     let site = Site::start(PathBuf::from("unused"))?;
@@ -3039,6 +3046,7 @@ fn actual_phase3_resource_corrections() -> Result<()> {
     let product = Product {
         distribution: Some(trust.clone()),
         runtime_cache: output.join("app/cache/product-runtime"),
+        official_runtime: false,
         auth: Default::default(),
     };
     let cancel = Arc::new(AtomicBool::new(false));
@@ -3090,6 +3098,7 @@ fn actual_phase3_policy_corrections() -> Result<()> {
     let product = Product {
         distribution: Some(trust.clone()),
         runtime_cache: output.join("app/cache/product-runtime"),
+        official_runtime: false,
         auth: Default::default(),
     };
     let cancel = Arc::new(AtomicBool::new(false));
@@ -3420,6 +3429,7 @@ fn actual_phase3_crawl_capture_resume_and_scale() -> Result<()> {
     let product = Product {
         distribution: Some(distribution.clone()),
         runtime_cache,
+        official_runtime: false,
         auth: Default::default(),
     };
     let cancel = Arc::new(AtomicBool::new(false));
@@ -3831,6 +3841,7 @@ fn actual_phase3_active_cancel_and_custom_viewport() -> Result<()> {
     let product = Product {
         distribution: Some(distribution),
         runtime_cache: retained.join("app/cache/product-runtime"),
+        official_runtime: false,
         auth: Default::default(),
     };
     let fixture = CrawlSite::start()?;

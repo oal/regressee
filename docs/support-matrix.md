@@ -3,6 +3,12 @@
 No row below is a public-release support claim. All three desktop OS families
 remain required before first release. Build recipes do not establish execution.
 
+Default app-pinned official runtime catalogs now cover Linux/Windows x86_64;
+Node/Playwright/Chromium are privately provisioned without system tooling. macOS
+catalogs are preparation only and do not lift its supervisor block. Provisioning
+implementation/results are distinct from the OS qualification rows below; see
+decision 0011 and the official-runtime verification reports.
+
 | Candidate target | Locally implemented / observed | Remaining code or execution gate |
 | --- | --- | --- |
 | Development Linux x86-64, glibc 2.43, kernel 7.2.4 | Actual locked GPUI build, owned loopback worker/capture/storage; exact private scratch cleanup | Native rendering/input, secure store, default GPU and installed package still unqualified |

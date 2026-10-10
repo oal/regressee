@@ -1,8 +1,10 @@
 # First run and safe review
 
-This is a private preview, not a public release. The historical runtime is
-restricted to authorized literal-loopback fixtures. Do not point it at public
-websites. See [support matrix](support-matrix.md) before installation.
+This is a private preview, not a public release. The default private browser uses
+app-pinned official downloads; internet is needed once for setup, with no Node/npm
+or terminal configuration. Historical development distributions remain restricted
+to authorized literal-loopback fixtures. See [support matrix](support-matrix.md)
+for the separate platform/clean-machine qualification limits.
 
 1. **Create project** and enter your test website address(es). Saving settings
    does not start visits. Visits themselves can have effects: use a read-only
@@ -116,13 +118,13 @@ rendering or public-site acceptance.
 - **Low disk:** pause, inspect History and the deletion impact preview, free space
   yourself, then resume. Active/shared references are protected. Runtime repair
   and interrupted-write cleanup are separate from retained screenshot history.
-- **Browser setup unavailable:** this build does not yet include the trusted
-  public runtime download required for ordinary website capture. That is an
-  unfinished product feature, not a requirement for you to install Node/npm or
-  configure developer tooling. Development distributions remain restricted to
-  authorized loopback fixtures. Retry/repair never downloads unverified code or
-  deletes baselines. A certificate problem is not solved by disabling TLS or
-  Chromium's sandbox.
+- **Browser setup unavailable:** Linux/Windows x86_64 now have an embedded default;
+  an unsupported OS/architecture, expired catalog or invalid explicit development
+  override can still block setup. macOS remains unsupported by this preview's
+  process supervisor. You should not install Node/npm yourself. For a failed
+  download, check internet access, free space and Settings' browser diagnostics,
+  then retry. Damaged installations require explicit **Repair browser**. Repair
+  never deletes baselines, disables TLS or turns off Chromium's sandbox.
 
 Full-page capture has bounded height/readiness/image budgets; virtualized lists,
 hidden controls, frames, canvas/video and complex image replacement are not

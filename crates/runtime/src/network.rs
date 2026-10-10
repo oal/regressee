@@ -68,11 +68,20 @@ impl NetworkSettings {
         Ok(())
     }
     pub fn client(&self) -> Result<reqwest::Client> {
+        self.client_with_timeout(std::time::Duration::from_secs(120))
+    }
+    /// Large pinned browser archives need a longer total budget than ordinary
+    /// requests, while a stalled connection still fails promptly.
+    pub(crate) fn download_client(&self) -> Result<reqwest::Client> {
+        self.client_with_timeout(std::time::Duration::from_secs(20 * 60))
+    }
+    fn client_with_timeout(&self, timeout: std::time::Duration) -> Result<reqwest::Client> {
         self.validate()?;
         let mut b = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .connect_timeout(std::time::Duration::from_secs(20))
-            .timeout(std::time::Duration::from_secs(120));
+            .read_timeout(std::time::Duration::from_secs(30))
+            .timeout(timeout);
         if let Some(proxy) = &self.proxy {
             b = b.proxy(reqwest::Proxy::all(proxy)?);
         }

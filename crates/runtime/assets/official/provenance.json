@@ -1,0 +1,449 @@
+{
+  "as_of": "2026-10-10",
+  "browser_verification": "Official Google HTTPS URL, cross-checked with Chrome for Testing metadata and Playwright browsers.json; computed SHA-256 pinned in app catalog, no independent publisher checksum/signature supplied",
+  "bundled_sha256": "0646531342f9a4c0c00253df68e4702dd9bc366fd487e8a299f2a492b3dd9fe9",
+  "catalogs": [
+    {
+      "catalog_sha256": "bb68be7ecba7a8640e4eee58166a0b1c5285023d5bec8ba3319587991ca432ee",
+      "components": [
+        {
+          "bytes": 58088022,
+          "destination": "node",
+          "format": "TarGz",
+          "only": "bin/node",
+          "prefix": "node-v24.21.0-linux-x64",
+          "sha256": "6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff",
+          "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-linux-x64.tar.gz"
+        },
+        {
+          "bytes": 200345244,
+          "destination": "browsers/chromium-1248/chrome-linux64",
+          "format": "Zip",
+          "only": null,
+          "prefix": "chrome-linux64",
+          "sha256": "43fd31766c7533a02dda2ded5ad50c2f861cd5400be7509c0abad71129f79d79",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/linux64/chrome-linux64.zip"
+        }
+      ],
+      "platform": "linux-x86_64"
+    },
+    {
+      "catalog_sha256": "9a544571f1a92aade03639cc4ded6eaf24a14b21ef02c74a7b320c6eb2b2ab2e",
+      "components": [
+        {
+          "bytes": 37618919,
+          "destination": "node",
+          "format": "Zip",
+          "only": "node.exe",
+          "prefix": "node-v24.21.0-win-x64",
+          "sha256": "158f7685b44de51f6c0df1d153526cbcd3e1bc739a8dfc607721cef75de9e541",
+          "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-win-x64.zip"
+        },
+        {
+          "bytes": 207073013,
+          "destination": "browsers/chromium-1248/chrome-win64",
+          "format": "Zip",
+          "only": null,
+          "prefix": "chrome-win64",
+          "sha256": "220021ecfdad08c116fc71a153e65e3861ba841c531afc4f7acc7bd5d44b41db",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/win64/chrome-win64.zip"
+        }
+      ],
+      "platform": "windows-x86_64"
+    },
+    {
+      "catalog_sha256": "969d6961bd458fe6ae0c3da1df3da953d94d34514097a5c7ba8c06969b726191",
+      "components": [
+        {
+          "bytes": 52909993,
+          "destination": "node",
+          "format": "TarGz",
+          "only": "bin/node",
+          "prefix": "node-v24.21.0-darwin-arm64",
+          "sha256": "bed7eea5325e1108f32ce5228ddd6a5f0f08a499ee42aa7442aea583702f6057",
+          "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-arm64.tar.gz"
+        },
+        {
+          "bytes": 194831853,
+          "destination": "browsers/chromium-1248/chrome-mac-arm64",
+          "format": "Zip",
+          "only": null,
+          "prefix": "chrome-mac-arm64",
+          "sha256": "987d2f8499c87d21676f78178550cfcbfb1bb53786821e2cff46c5a7e99b58be",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/mac-arm64/chrome-mac-arm64.zip"
+        }
+      ],
+      "platform": "macos-aarch64"
+    },
+    {
+      "catalog_sha256": "919bca85ad394775e8e643811e8d9aca0b22f18220cf67d90f068a143e65bc72",
+      "components": [
+        {
+          "bytes": 54203979,
+          "destination": "node",
+          "format": "TarGz",
+          "only": "bin/node",
+          "prefix": "node-v24.21.0-darwin-x64",
+          "sha256": "1462cb3b3046b815cf8ea436d3da450ec1a9f11dac7e5a46b0ada5305d7e8097",
+          "url": "https://nodejs.org/dist/v24.21.0/node-v24.21.0-darwin-x64.tar.gz"
+        },
+        {
+          "bytes": 205332100,
+          "destination": "browsers/chromium-1248/chrome-mac-x64",
+          "format": "Zip",
+          "only": null,
+          "prefix": "chrome-mac-x64",
+          "sha256": "4e75da96830224185ddddc80012ad3732d6a29a4f92bac728c84c8e8ebd66c34",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/mac-x64/chrome-mac-x64.zip"
+        }
+      ],
+      "platform": "macos-x86_64"
+    }
+  ],
+  "chrome_for_testing": {
+    "downloads": {
+      "chrome": [
+        {
+          "platform": "linux-arm64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/linux-arm64/chrome-linux-arm64.zip"
+        },
+        {
+          "platform": "linux64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/linux64/chrome-linux64.zip"
+        },
+        {
+          "platform": "mac-arm64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/mac-arm64/chrome-mac-arm64.zip"
+        },
+        {
+          "platform": "mac-x64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/mac-x64/chrome-mac-x64.zip"
+        },
+        {
+          "platform": "win32",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/win32/chrome-win32.zip"
+        },
+        {
+          "platform": "win64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/win64/chrome-win64.zip"
+        }
+      ],
+      "chrome-headless-shell": [
+        {
+          "platform": "linux-arm64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/linux-arm64/chrome-headless-shell-linux-arm64.zip"
+        },
+        {
+          "platform": "linux64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/linux64/chrome-headless-shell-linux64.zip"
+        },
+        {
+          "platform": "mac-arm64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/mac-arm64/chrome-headless-shell-mac-arm64.zip"
+        },
+        {
+          "platform": "mac-x64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/mac-x64/chrome-headless-shell-mac-x64.zip"
+        },
+        {
+          "platform": "win32",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/win32/chrome-headless-shell-win32.zip"
+        },
+        {
+          "platform": "win64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/win64/chrome-headless-shell-win64.zip"
+        }
+      ],
+      "chromedriver": [
+        {
+          "platform": "linux-arm64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/linux-arm64/chromedriver-linux-arm64.zip"
+        },
+        {
+          "platform": "linux64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/linux64/chromedriver-linux64.zip"
+        },
+        {
+          "platform": "mac-arm64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/mac-arm64/chromedriver-mac-arm64.zip"
+        },
+        {
+          "platform": "mac-x64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/mac-x64/chromedriver-mac-x64.zip"
+        },
+        {
+          "platform": "win32",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/win32/chromedriver-win32.zip"
+        },
+        {
+          "platform": "win64",
+          "url": "https://storage.googleapis.com/chrome-for-testing-public/156.0.8078.4/win64/chromedriver-win64.zip"
+        }
+      ]
+    },
+    "revision": "1706539",
+    "version": "156.0.8078.4"
+  },
+  "chromium": {
+    "browserVersion": "156.0.8078.4",
+    "installByDefault": true,
+    "name": "chromium",
+    "revision": "1248",
+    "title": "Chrome for Testing"
+  },
+  "node": "24.21.0",
+  "node_checksum_verification": {
+    "allowed_primary_fingerprints": [
+      "5BE8A3F6C8A5C01D106C0AD820B1A390B168D356",
+      "DD792F5973C6DE52C432CBDAC77ABFA00DDBF2B7",
+      "CC68F5A3106FF448322E48ED27F5E38D5B0A215F",
+      "890C08DB8579162FEE0DF9DB8BEAB4DFCF555EF4",
+      "C82FA3AE1CBEDC6BE46B9360C43CEC45C17AB93C",
+      "108F52B48DB57BB0CC439B2997B01419BD92F80A",
+      "655F3B5C1FB3FA8D1A0CA6BDE4A7D232B936D2FD",
+      "A363A499291CBBC940DD62E41F10027AF002F8B0"
+    ],
+    "status": "GPG verified",
+    "validsig": [
+      "[GNUPG:] VALIDSIG 5BE8A3F6C8A5C01D106C0AD820B1A390B168D356 2026-09-08 1788904155 0 4 0 22 8 01 5BE8A3F6C8A5C01D106C0AD820B1A390B168D356"
+    ]
+  },
+  "node_checksums_sha256": "f410428039e2c922a14058df067a4482691c9304a5c01a75847f9f3f2d3307f6",
+  "node_signed_checksums_sha256": "dd0fe71660e64f4dc01342664835509c84679d8a87ab4d76cc2f15fdda82ea3e",
+  "npm": {
+    "playwright": {
+      "archive_bytes": 905533,
+      "archive_sha256": "55cf2db31a1d9037b050ac272bec7a824c3c9ed3ef75a6e26d6e9e89d104f155",
+      "metadata": {
+        "_hasShrinkwrap": false,
+        "_id": "playwright@1.64.0",
+        "_nodeVersion": "24.21.0",
+        "_npmOperationalInternal": {
+          "host": "s3://npm-registry-packages-npm-production",
+          "tmp": "tmp/playwright_1.64.0_1791405775687_0.037639421386684635"
+        },
+        "_npmUser": {
+          "email": "npm-oidc-no-reply@github.com",
+          "name": "GitHub Actions",
+          "trustedPublisher": {
+            "id": "github",
+            "oidcConfigId": "25d220ca-8964-4aa1-bc3a-5145be51ca7a"
+          }
+        },
+        "_npmVersion": "11.19.0",
+        "author": {
+          "name": "Microsoft Corporation"
+        },
+        "bin": {
+          "playwright": "cli.js"
+        },
+        "bugs": {
+          "url": "https://github.com/microsoft/playwright/issues"
+        },
+        "dependencies": {
+          "playwright-core": "1.64.0"
+        },
+        "description": "A high-level API to automate web browsers",
+        "directories": {},
+        "dist": {
+          "attestations": {
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            },
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/playwright@1.64.0"
+          },
+          "fileCount": 60,
+          "integrity": "sha512-kVzTnYFYEyQ9RGzBjNCd2+yEqWmVbxl3AHPynv3qQ6JTjv4a+kwRcnqQwIpuP3NnrnIrE/Q6wWAIAvMfIE2/Yg==",
+          "shasum": "c105a3ffe174d487a5927a6836a79778b1180742",
+          "signatures": [
+            {
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+              "sig": "MEYCIQCowvbKXoYvi9I40waFaVTbYQzzSRWeAcv6c7SSju8nmgIhAOw70mSMijFS56ADEZLQFO66rZE8jOqls/sm4bl1tFaV"
+            },
+            {
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+              "sig": "MEUCIQDAuQdZ4eA787JWOT0aO4jOC3iH1S5hYUQU1AR/VS1l7wIgU0fgvtc2dzKrgbwsvuXHtbnMlT7+Wu1elRjpN3tPRrg="
+            }
+          ],
+          "tarball": "https://registry.npmjs.org/playwright/-/playwright-1.64.0.tgz",
+          "unpackedSize": 5033957
+        },
+        "engines": {
+          "node": ">=20"
+        },
+        "exports": {
+          ".": {
+            "default": "./index.js",
+            "import": "./index.mjs",
+            "require": "./index.js",
+            "types": "./index.d.ts"
+          },
+          "./lib/common": "./lib/common/index.js",
+          "./lib/program": "./lib/program.js",
+          "./lib/runner": "./lib/runner/index.js",
+          "./lib/transform/babelBundle": "./lib/transform/babelBundle.js",
+          "./lib/util": "./lib/util.js",
+          "./package.json": "./package.json",
+          "./test": {
+            "default": "./test.js",
+            "import": "./test.mjs",
+            "require": "./test.js",
+            "types": "./test.d.ts"
+          },
+          "./types/test": {
+            "types": "./types/test.d.ts"
+          },
+          "./types/testReporter": {
+            "types": "./types/testReporter.d.ts"
+          }
+        },
+        "gitHead": "606ecd8b34bac100db32561b6278ffd76e5eb3cd",
+        "homepage": "https://playwright.dev",
+        "license": "Apache-2.0",
+        "main": "index.js",
+        "maintainers": [
+          {
+            "email": "pavel.feldman@gmail.com",
+            "name": "pavelfeldman"
+          },
+          {
+            "email": "yury.semikhatsky@gmail.com",
+            "name": "yurys"
+          },
+          {
+            "email": "npmjs@microsoft.com",
+            "name": "microsoft1es"
+          },
+          {
+            "email": "dgozman@microsoft.com",
+            "name": "dgozman-ms"
+          },
+          {
+            "email": "microsoft-oss-publishing@microsoft.com",
+            "name": "microsoft-oss-releases"
+          }
+        ],
+        "name": "playwright",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/microsoft/playwright.git"
+        },
+        "types": "./index.d.ts",
+        "version": "1.64.0"
+      },
+      "verification": "Pinned SHA-512 SRI and npm registry ECDSA signature verified; no separate publisher/Sigstore attestation verification"
+    },
+    "playwright-core": {
+      "archive_bytes": 3171930,
+      "archive_sha256": "90c8b6b19da0a1b1e9a004cd6ff3e49e82668a0856e01efcc0e2d9c2b4466bb6",
+      "metadata": {
+        "_hasShrinkwrap": false,
+        "_id": "playwright-core@1.64.0",
+        "_nodeVersion": "24.21.0",
+        "_npmOperationalInternal": {
+          "host": "s3://npm-registry-packages-npm-production",
+          "tmp": "tmp/playwright-core_1.64.0_1791405862064_0.4064862473862705"
+        },
+        "_npmUser": {
+          "email": "npm-oidc-no-reply@github.com",
+          "name": "GitHub Actions",
+          "trustedPublisher": {
+            "id": "github",
+            "oidcConfigId": "005e5f14-1192-4fec-90aa-d5b66bc60ed8"
+          }
+        },
+        "_npmVersion": "11.19.0",
+        "author": {
+          "name": "Microsoft Corporation"
+        },
+        "bin": {
+          "playwright-core": "cli.js"
+        },
+        "bugs": {
+          "url": "https://github.com/microsoft/playwright/issues"
+        },
+        "description": "A high-level API to automate web browsers",
+        "directories": {},
+        "dist": {
+          "attestations": {
+            "provenance": {
+              "predicateType": "https://slsa.dev/provenance/v1"
+            },
+            "url": "https://registry.npmjs.org/-/npm/v1/attestations/playwright-core@1.64.0"
+          },
+          "fileCount": 115,
+          "integrity": "sha512-T9r+MZkTECl2+oUcZ26YgZzTrYidTsIhYYkJix+6iDOymOb1FB2RLLSOxRGnZGv5DStt+aduIVbt+E8WygXYpg==",
+          "shasum": "a765f91dabd2b2cadd67e87439842c1d6c72c652",
+          "signatures": [
+            {
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+              "sig": "MEYCIQCWRapsz9H6Xnq9x3d0rUXkzMBucgsFddyJYTYBKS8qLAIhAORnF1gi9AvGCn0MADwkI9OR/L4FOSlfX/v+Wwvw0CSI"
+            },
+            {
+              "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+              "sig": "MEUCIHIM6MfpDS876ZfUSP6wNXVv0HDddANsiIq7f6BRMHadAiEA8UzdJX0u1skHZqrrAZGrWTvICT394/buLgftCJU/9eU="
+            }
+          ],
+          "tarball": "https://registry.npmjs.org/playwright-core/-/playwright-core-1.64.0.tgz",
+          "unpackedSize": 13655528
+        },
+        "engines": {
+          "node": ">=20"
+        },
+        "exports": {
+          ".": {
+            "default": "./index.js",
+            "import": "./index.mjs",
+            "require": "./index.js",
+            "types": "./index.d.ts"
+          },
+          "./lib/bootstrap": "./lib/bootstrap.js",
+          "./lib/coreBundle": "./lib/coreBundle.js",
+          "./lib/tools/cli-client/program": "./lib/tools/cli-client/program.js",
+          "./lib/utilsBundle": "./lib/utilsBundle.js",
+          "./package.json": "./package.json"
+        },
+        "gitHead": "606ecd8b34bac100db32561b6278ffd76e5eb3cd",
+        "homepage": "https://playwright.dev",
+        "license": "Apache-2.0",
+        "maintainers": [
+          {
+            "email": "pavel.feldman@gmail.com",
+            "name": "pavelfeldman"
+          },
+          {
+            "email": "yury.semikhatsky@gmail.com",
+            "name": "yurys"
+          },
+          {
+            "email": "npmjs@microsoft.com",
+            "name": "microsoft1es"
+          },
+          {
+            "email": "dgozman@microsoft.com",
+            "name": "dgozman-ms"
+          },
+          {
+            "email": "microsoft-oss-publishing@microsoft.com",
+            "name": "microsoft-oss-releases"
+          }
+        ],
+        "name": "playwright-core",
+        "repository": {
+          "type": "git",
+          "url": "git+https://github.com/microsoft/playwright.git"
+        },
+        "types": "types/types.d.ts",
+        "version": "1.64.0"
+      },
+      "verification": "Pinned SHA-512 SRI and npm registry ECDSA signature verified; no separate publisher/Sigstore attestation verification"
+    }
+  },
+  "npm_registry_signing_key": {
+    "keyid": "SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U",
+    "public_key_der_base64": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEY6Ya7W++7aUPzvMTrezH6Ycx3c+HOKYCcNGybJZSCJq/fd7Qa8uuAKtdIkUQtQiEKERhAmE5lMMJhP8OkDOa2g=="
+  },
+  "playwright": "1.64.0",
+  "schema": 1,
+  "worker": "5.0.0"
+}

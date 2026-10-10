@@ -4,6 +4,7 @@ pub mod distribution;
 #[cfg(target_os = "linux")]
 mod linux_guardian;
 pub mod network;
+pub mod official;
 pub mod protocol;
 #[cfg(target_os = "linux")]
 mod scratch;

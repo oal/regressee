@@ -1,6 +1,6 @@
 # Regressee implementation status
 
-Updated: 2026-10-10
+Updated: 2026-10-11
 
 The user requested continuation after approving Python controls. See
 `docs/decisions/0005-serial-local-continuation.md` for the current execution
@@ -24,7 +24,55 @@ wait for independent verification.
 
 ## Current evidence
 
-### Renderer-side capture and Setup timing — latest continuation
+### Official automatic setup and the reported text overlap — latest
+
+The user approved the official-source architecture in decision 0011. Default
+Linux/Windows x86_64 setup now uses app-embedded catalogs, bundled Playwright and
+worker sources, and exact official Node/Chromium HTTPS archives. Node 24.21.0,
+Playwright 1.64.0 and Chromium 156.0.8078.4/revision1248 are pinned. No end-user
+Node/npm/configuration or separate runtime server/key is needed. Legacy signed
+overrides and DevelopmentLoopback restrictions remain separate and unchanged;
+macOS setup is still blocked before downloads by its missing process supervisor.
+
+Independent source review found three P2 inventory/TAR/ZIP parsing faults. All
+three have source repairs and inert regressions, independently verified in source
+with complete local catalog/archive/worker correspondence checks. A subsequent
+post-commit cancellation-reporting P2 has a narrow backend repair and mock
+regressions. **All four P2 findings are independently closed; 12 focused inert
+tests PASS**, with bound sources/binaries unchanged. Actual late cancellation of
+a live installer was not exercised; the reporting fix has source/mock evidence.
+The first actual default-setup check installed and smoke-tested the
+browser and discovered two owned fixture pages, but its 120s shell timeout cut
+off subsequent captures. That partial run is not a complete PASS. The fresh,
+properly bounded independent first-use check **PASS in 114.42s**: **258,433,266
+download bytes**, two discovered pages/two captures, reopened Ready without another
+installation, unchanged pointer/project and zero observed remaining owned
+processes. All 127 bound inputs remained unchanged during execution. It precedes
+the narrow cancellation-reporting repair, which does not change installation,
+capture or UI behavior. See `official-runtime-first-use-verification-20261010.md`.
+
+The reported login-help/button overlap and timezone-arrow alignment now pass a
+full-Shell geometry regression at both sizes. The new renderer confirmation
+**PASS: 36 synthetic app images**, including both sizes, lower Results/History,
+timezone popup and new-project feedback/scroll reset. The wide login help is
+visibly separate from the action. The smaller timezone-position image places
+that help below the viewport; non-overlap there is geometry evidence. Prior
+partial/failed confirmations and native failures remain preserved, not upgraded.
+Independent once-batched review of all 36 app images/calibration found no new
+sampled visual blocker. Wide fields fill the column rather than proving the
+intended 680px cap; exact width compliance and universal UI acceptance remain open.
+
+Parent final post-commit-fix gate: **206 tests PASS / 29 deliberate ignores**, all-target/all-feature
+Clippy `-D warnings`, fmt and ordinary locked/offline `ui` build PASS. Ordinary
+executable SHA-256: `642db4c5c4e6951cf4d8824aa5c695fe6003cd42716ef74ade8cb7c5c033a3c7`.
+It has no inspection/capture feature and was not natively launched. See the latest
+renderer report and official-runtime asset/integration/provisioner reports.
+First-open Setup CPU/native latency remains unresolved; the user's repeat-open
+improvement is new user evidence, not a cold-navigation or GPU presentation PASS.
+Supported-machine, native input, macOS, Windows integration, accessibility,
+real-keystore, signing and licensing release gates remain separate and open.
+
+### Renderer-side capture and Setup timing — preceding checkpoint
 
 **Readable screenshots now work:** a default-off diagnostic feature uses the
 pinned GPUI/Blade renderer, real Linux Cosmic fonts and the actual glyph/image
@@ -43,8 +91,9 @@ Independent source review passes renderer/cache; its extent-overflow P2 was
 fixed and independently retested without GPU initialization. See
 `renderer-capture-results-20261010.md`, `setup-render-profile-20261010.md` and
 `renderer-and-cache-source-verification-20261010.md` under `docs/research/`.
-No native relaunch, GPU policy change, compositor helper or public runtime
-distribution is supplied by this work. Existing platform/release gaps below remain.
+No native relaunch, GPU policy change or compositor helper was supplied by that
+checkpoint. Default provisioning is superseded by the latest section above;
+existing platform/release gaps below remain.
 
 ### Previous native-window correction round — historical scoped evidence
 
@@ -74,7 +123,7 @@ verified with **7 Product tests, 3 isolated Jobs tests and 5 public-API probes**
 Comparison/resume pins, no-auto-repair, cancellation and actual byte progress
 guards passed in backend/inert-fixture scope. See
 `docs/research/automatic-runtime-setup-gap-20261010.md`. Default public browser
-setup is not delivered by this build; requiring end users to configure a
+setup was not delivered at that checkpoint; requiring end users to configure a
 developer distribution is not the promised automatic setup workflow.
 
 Capture timezone now uses a bundled searchable native selector, not free text.

@@ -10,8 +10,9 @@ Guided crawling, authenticated capture, separate environment sessions, mapped
 fixed-baseline checks, adjustable analysis, ignored regions, selective baseline
 approvals, ZIP interchange and manual storage cleanup are real services wired to
 GPUI. Current evidence and open qualifications are tracked in the status index.
-The exercised historical browser is **development/owned-loopback-only**;
-public-site capture is refused pending current secure-runtime qualification.
+Automatic setup now uses app-pinned official Node/Chromium downloads and bundled
+Playwright/worker code. The historical development browser remains
+**owned-loopback-only**; it is not silently promoted to public trust.
 
 Start with the [first-run guide](docs/first-run-guide.md),
 [private support matrix](docs/support-matrix.md),
@@ -46,7 +47,8 @@ project plus a labeled synthetic storage object there for inspection. It does
 not capture a website. Default product data/cache use OS-local locations, never
 the project cwd. `REGRESSEE_DEV_DATA=/absolute/fresh-test-directory` explicitly
 isolates native developer checks. The app never launches the fixture worker.
-Its product runtime must come through verified configured distribution trust.
+Its product runtime comes through app-embedded official pins or an explicitly
+configured, signature-verified distribution override.
 
 ## Guided workflow and setup boundary
 
@@ -74,22 +76,20 @@ Production and staging logins remain separate. Preview/probe changed mappings
 before a full check. See [login and capture help](docs/auth-and-capture.md) for
 read-only-account advice, exact limits and unqualified auth/network cases.
 
-Settings → **Install browser now / Repair browser** uses real signed download/install
-and sandboxed screenshot smoke on the background owner. No production host/key
-is bundled yet; absent trust is explained and fails closed. Explicit installation
-configuration uses `REGRESSEE_DISTRIBUTION`; see
-[`docs/runtime-distribution.md`](docs/runtime-distribution.md). The actual local
-test flow signs/serves a development pack on an owned loopback fixture endpoint,
-never a public distribution service. Windows private Job ownership is implemented
-but not OS-qualified; macOS capture still fails closed because exact owned-tree
-supervision is an explicit code gap. No public-site/runtime/native
-acceptance is inferred from these tests.
+New unpinned work automatically installs a genuinely missing private browser.
+The default Linux/Windows x86_64 path downloads exact official archives, verifies
+embedded hashes and the complete file inventory, and runs the existing sandboxed
+screenshot smoke before activation. No Node/npm or end-user configuration is
+required. Settings → **Install browser now / Repair browser** uses the same
+background service. Damaged installations need explicit repair; checks/resumes
+preserve their pinned runtime. Optional `REGRESSEE_DISTRIBUTION` signed-pack
+overrides keep their existing verification and scope restrictions. See
+[`docs/runtime-distribution.md`](docs/runtime-distribution.md) and
+[decision 0011](docs/decisions/0011-app-pinned-official-runtime.md).
 
-New unpinned work now starts a genuinely missing browser setup automatically when
-a trusted supported distribution is available. Default public setup is still
-missing from this build—not something end users should solve by installing
-Node/npm. Damaged installations need explicit repair; checks/resumes preserve
-their pinned runtime. See the [first-use gap and scope](docs/research/automatic-runtime-setup-gap-20261010.md).
+Windows private Job ownership is implemented but not OS-qualified; macOS setup
+still fails closed because exact owned-tree supervision is an explicit code gap.
+App-pinned default availability is not public-release/native/platform acceptance.
 
 Settings → **Preview diagnostic contents** → review the exact sanitized structured
 JSON → **I reviewed this — export locally…** saves only after explicit consent.

@@ -90,5 +90,55 @@ Vendor provenance and the exact two-line-only root lock change were rechecked.
 Non-vendor staged whitespace check passes. The full staged check reports seven
 space-before-tab lines in unchanged upstream macOS Metal source; its pinned hash
 is preserved rather than formatting unrelated third-party shaders.
-All agent/build/test work is settled; remaining visual/native/public-runtime/
-platform/release work is explicitly separate.
+All agent/build/test work at that checkpoint was settled; remaining visual/native/
+public-runtime/platform/release work was explicitly separate.
+
+## Later user-reported overlap correction
+
+After another native user screenshot reported text behind the button, a new
+bounded correction session repaired the actual nested form constraints rather
+than changing text alone. A standalone timezone trigger was correctly aligned,
+but the same control in the scrolling Shell measured its arrow near the value.
+The login hint measured 20px tall while the following action began only 2px below
+its top. A focused full-Shell regression reproduced both failures.
+
+The final correction gives scrolling form sections/fields explicit full width
+and nonshrinking groups, uses a flex root for the selector, positions its drawn
+chevron at the trigger's right edge, and reserves the help line's minimum height.
+The full-Shell geometry regression passes at **1120×800 and 820×600**. Compact
+action styling, field editability, selection/focus and the bounded text cache stay
+unchanged. Obsolete public-setup-unavailable copy was removed only alongside the
+actual official-component provisioning implementation.
+
+The first new batch failed the strict arrow assertion after nine wide images;
+that failure remains at `regressee-official-verification-r7ki95gq/`. The single
+confirmation then **PASS** in **11.68s**, producing **36 app PNGs** (plus the copied
+reviewed calibration) under that directory's `final-layout/`. It reaches both
+sizes, all five screens, lower Results/viewer/analysis and History/network states,
+the timezone popup, and new-project feedback/scroll-reset checks. The wide final
+timezone image visibly shows separated login help and the next action; it was
+personally reviewed and previewed to the user. At the smaller size this particular
+scroll position places the login help below the viewport; its non-overlap is a
+geometry result, not a separately visible after-image at that position.
+
+The private `source-snapshot.json` binds the capture test executable and source
+inputs. A later Clippy-only change replaces an equivalent byte-character array
+with a byte-string array in a runtime test; no production UI changed afterward.
+The subsequent backend-only post-commit cancellation-reporting repair changes
+Product/Jobs sources after this capture binding; it changes neither UI markup nor
+layout. The independent 36-image review and first-use run are preserved with
+their own earlier bindings, not falsely rebound to the later executable.
+All original black/native-surface failures remain preserved. These are real
+GPUI/Blade offscreen pixels with synthetic evidence, **not OS presentation/input,
+human usability, universal state coverage or full release acceptance**.
+
+Final local suite: **204 passed / 29 deliberate ignores**, workspace/all-target/
+all-feature Clippy with `-D warnings` and format check PASS. Initial Clippy failure
+was the byte-character-slice spelling mentioned above; its log is retained.
+Ordinary `ui` build PASS, no inspection/capture feature and not natively launched;
+SHA-256 `cd93fd7d7648924b6dcf847468b731f5400cc5c269fbcca4ab5d6725be9c6d26`.
+
+The later backend-only cancellation-reporting repair passes **206 tests / 29
+deliberate ignores**, Clippy and fmt; its ordinary `ui` build SHA-256 is
+`642db4c5c4e6951cf4d8824aa5c695fe6003cd42716ef74ade8cb7c5c033a3c7`.
+That rebuild does not imply a new native or offscreen capture; no UI markup changed.

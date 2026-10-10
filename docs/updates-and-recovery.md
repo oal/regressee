@@ -1,10 +1,13 @@
 # Updates, evidence preservation and recovery
 
 There is no automatic app updater or hosted update service in this candidate.
-The owner supplies a reviewed signed runtime endpoint/key; production key custody,
-revocation/rotation, hosting, naming and platform signing are separate gates.
+Default browser updates require reviewed application-embedded official component
+pins and complete file inventories; no separate runtime endpoint/key is required.
+Optional signed-pack overrides retain their separate owner-managed endpoint/key.
+App signing, vulnerability response, support expiry and migration remain gates.
 
-Runtime repair installs a **new generation** after signature, inventory/hash,
+Runtime repair installs a **new generation** after embedded official pins (or the
+configured pack signature), inventory/hash,
 space and sandboxed smoke checks. Failure retains the existing generation.
 Generation selection never upgrades the runtime frozen into an existing baseline.
 Do not roll an expired/revoked public runtime back into navigation eligibility.

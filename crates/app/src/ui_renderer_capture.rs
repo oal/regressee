@@ -276,7 +276,7 @@ fn renderer_capture_app_batch(cx: &mut TestAppContext) {
     let before_evidence =
         serde_json::to_value(store.project_evidence(fixture_project).unwrap()).unwrap();
     drop(store);
-    let (jobs, events) = Jobs::start(AppPaths::isolated(dir.path()));
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
     let owned = jobs.clone();
     let (shell, cx) = cx.add_window_view(|window, cx| {
         window

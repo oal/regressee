@@ -130,7 +130,7 @@ impl Product {
                 .all(|m| m.source == m.destination),
             "Find pages on the source website. Use alternate environment mapping for fixed-baseline checks."
         );
-        let installed = distribution::resolve(&self.runtime_cache, self.trust()?, &cancel)?;
+        let installed = self.resolve_runtime(&cancel)?;
         ensure!(
             worker_version(&installed)? == regressee_runtime::protocol::WORKER_VERSION,
             "Repair to a trusted Phase 3 worker before discovery. Historical evidence remains intact."
@@ -447,7 +447,7 @@ impl Product {
         progress: &mut dyn FnMut(&str, u32, Option<u32>),
         preview_only: bool,
     ) -> Result<RunRecord> {
-        let installed = distribution::resolve(&self.runtime_cache, self.trust()?, &cancel)?;
+        let installed = self.resolve_runtime(&cancel)?;
         ensure!(
             worker_version(&installed)? == regressee_runtime::protocol::WORKER_VERSION,
             "Repair to a trusted Phase 4 worker for authenticated multi-page jobs. Older baselines require their matching runtime or an explicit replacement."

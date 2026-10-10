@@ -1,14 +1,22 @@
-# Product runtime setup — implemented interface, pending public distribution
+# Private browser setup
 
-Regressee’s **Install browser now / Repair browser** action calls the actual signed
-download/install/smoke/repair service on its background owner. It does not run npm,
-use a global Node or download an executable without verifying its signed file
-inventory. No production host/key is currently bundled. This is not a release
-configuration or a claim that the historical browser is safe for public sites.
+The default Linux/Windows x86_64 path bundles Playwright and the worker with the
+app, then downloads pinned official Node/Chromium archives privately on first use.
+No Node/npm installation, terminal configuration or Regressee download server is
+required. Exact HTTPS URLs, hashes, lengths and the complete resulting file
+inventory are embedded application trust, not cache-generated metadata.
+**Install browser now / Repair browser** uses the same background service and
+sandboxed screenshot smoke before activation. macOS remains blocked by the
+unimplemented owned-process-tree supervisor; catalog presence is not OS support.
+
+Current pins are Node 24.21.0, Playwright 1.64.0 and Chromium 156.0.8078.4, with
+support through 2027-01-10 UTC. `OfficialPinned` is distinct from release
+qualification. See [decision 0011](decisions/0011-app-pinned-official-runtime.md)
+and the [asset provenance](research/official-runtime-assets-20261010.md).
 
 ## Automatic first-use workflow
 
-With an explicitly trusted supported distribution, new Find pages, new-baseline
+With the app-pinned default or an explicitly trusted supported distribution, new Find pages, new-baseline
 capture and eligible login/probe work now install a genuinely missing runtime
 within the original background request. Download, verification, installation and
 browser-test progress are separate real stages. Cancellation also prevents the
@@ -18,16 +26,15 @@ Damaged/expired installations require explicit repair; comparisons and resumes
 do not install a different default behind a baseline's back. Settings reads typed
 backend capability/readiness, not the presence of an environment variable.
 
-**No trusted public default is bundled yet.** Ordinary public-site automatic setup
-is still an unfinished product requirement, not a request for users to install
-Node/npm or configure developer tools. The implementation tests use signed inert
-inventories and do not qualify a live runtime or all three operating systems.
-See [gap analysis](research/automatic-runtime-setup-gap-20261010.md) and
-[implementation scope](research/automatic-runtime-setup-implementation-20261010.md).
+The historical missing-default report is preserved as earlier evidence, not the
+current architecture. Actual test/qualification scope is recorded in the latest
+official-runtime reports; default availability alone is not clean-machine,
+Windows/macOS, native UI or public-release acceptance.
 
-## Installation configuration
+## Optional legacy signed-pack override
 
-For an explicitly configured installation, `REGRESSEE_DISTRIBUTION` names a local
+Ordinary users need no override. For an explicitly configured signed installation,
+`REGRESSEE_DISTRIBUTION` names a local
 JSON file (at most 16 KiB; regular file; unknown fields rejected):
 
 ```json

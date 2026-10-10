@@ -4,6 +4,7 @@ use anyhow::{Context, Result, ensure};
 use regressee_core::{domain::*, evidence::*};
 use regressee_runtime::{
     distribution::{self, Distribution, InstallProgress, Installed, Scope},
+    official,
     protocol::{Command, EventKind, FailureCode, Request},
     supervisor::{ProcessSupervisor, Worker, WorkerFailure},
 };
@@ -19,6 +20,8 @@ use std::{
 };
 pub struct Product {
     pub distribution: Option<Distribution>,
+    /// App-owned default only. Explicit distribution overrides never fall back.
+    pub official_runtime: bool,
     pub runtime_cache: PathBuf,
     pub auth: std::sync::Mutex<crate::auth::AuthOwner>,
 }
@@ -30,7 +33,7 @@ pub enum RuntimeState {
     Ready,
     RepairRequired,
 }
-/// UI-safe explanation. Availability means validated configured trust plus a
+/// UI-safe explanation. Availability means validated app/override trust plus a
 /// supported adapter, NOT public release/platform qualification.
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeReadiness {
@@ -65,8 +68,14 @@ fn unsupported_runtime_message() -> &'static str {
 }
 impl Product {
     pub fn configured(cache: &Path) -> Result<Self> {
-        let distribution = if let Some(p) = std::env::var_os("REGRESSEE_DISTRIBUTION") {
-            let p = PathBuf::from(p);
+        Self::configured_from(
+            cache,
+            std::env::var_os("REGRESSEE_DISTRIBUTION").map(PathBuf::from),
+        )
+    }
+    fn configured_from(cache: &Path, override_path: Option<PathBuf>) -> Result<Self> {
+        let official_runtime = override_path.is_none();
+        let distribution = if let Some(p) = override_path {
             let m = fs::symlink_metadata(&p)?;
             ensure!(
                 m.is_file() && regressee_core::platform::ordinary(&m) && m.len() <= 16384,
@@ -80,6 +89,7 @@ impl Product {
         };
         Ok(Self {
             distribution,
+            official_runtime,
             runtime_cache: cache.join("product-runtime"),
             auth: Default::default(),
         })
@@ -97,10 +107,63 @@ impl Product {
         );
         Ok(d)
     }
+    fn setup_catalog(&self) -> Result<&'static official::Catalog> {
+        ensure!(
+            self.distribution.is_none() && self.official_runtime,
+            "App-pinned browser components are not enabled"
+        );
+        ensure!(
+            supported_runtime_platform(std::env::consts::OS, std::env::consts::ARCH),
+            "{}",
+            unsupported_runtime_message()
+        );
+        crate::official_catalog::current()
+    }
+    fn setup_capability(&self) -> Result<Scope> {
+        if self.distribution.is_some() {
+            Ok(self.setup_trust()?.scope)
+        } else if self.official_runtime {
+            Ok(self.setup_catalog()?.manifest.scope)
+        } else {
+            Ok(self.setup_trust()?.scope)
+        }
+    }
+    /// Read-only verification. Never installs or substitutes a different runtime.
+    pub fn resolve_runtime(&self, cancel: &AtomicBool) -> Result<Installed> {
+        distribution::check_cancel(cancel)?;
+        if let Some(d) = &self.distribution {
+            distribution::resolve(&self.runtime_cache, d, cancel)
+        } else if self.official_runtime {
+            official::resolve(&self.runtime_cache, self.setup_catalog()?, cancel)
+        } else {
+            distribution::resolve(&self.runtime_cache, self.trust()?, cancel)
+        }
+    }
     /// Blocking, read-only status for the background owner. Never downloads.
     pub fn readiness(&self, cancel: &AtomicBool) -> Result<RuntimeReadiness> {
         distribution::check_cancel(cancel)?;
-        let Some(d) = &self.distribution else {
+        let scope = if let Some(d) = &self.distribution {
+            if d.validate().is_err() {
+                return Ok(RuntimeReadiness::invalid_configuration());
+            }
+            d.scope
+        } else if self.official_runtime {
+            // Supervisor eligibility precedes catalog selection: macOS assets
+            // do not enable the deliberately unsupported owned-tree adapter.
+            if !supported_runtime_platform(std::env::consts::OS, std::env::consts::ARCH) {
+                return Ok(RuntimeReadiness {
+                    status: RuntimeState::UnsupportedPlatform,
+                    setup_available: false,
+                    message: unsupported_runtime_message(),
+                    identity: None,
+                    scope: Some(Scope::OfficialPinned),
+                });
+            }
+            match self.setup_catalog() {
+                Ok(catalog) => catalog.manifest.scope,
+                Err(_) => return Ok(RuntimeReadiness::invalid_configuration()),
+            }
+        } else {
             return Ok(RuntimeReadiness {
                 status: RuntimeState::UnavailableDistribution,
                 setup_available: false,
@@ -109,16 +172,13 @@ impl Product {
                 scope: None,
             });
         };
-        if d.validate().is_err() {
-            return Ok(RuntimeReadiness::invalid_configuration());
-        }
         if !supported_runtime_platform(std::env::consts::OS, std::env::consts::ARCH) {
             return Ok(RuntimeReadiness {
                 status: RuntimeState::UnsupportedPlatform,
                 setup_available: false,
                 message: unsupported_runtime_message(),
                 identity: None,
-                scope: Some(d.scope),
+                scope: Some(scope),
             });
         }
         let resolved = match distribution::current_absent(&self.runtime_cache) {
@@ -127,16 +187,18 @@ impl Product {
                 return Ok(RuntimeReadiness {
                     status: RuntimeState::NotInstalled,
                     setup_available: true,
-                    message: if d.scope == Scope::DevelopmentLoopback {
+                    message: if scope == Scope::OfficialPinned {
+                        "The private browser will be installed automatically on first use."
+                    } else if scope == Scope::DevelopmentLoopback {
                         "Browser setup will start on first use. This configured development runtime is restricted to owned loopback fixtures, not public websites."
                     } else {
                         "Browser setup will start on first use using configured public trust. Release and platform qualification remain separate requirements."
                     },
                     identity: None,
-                    scope: Some(d.scope),
+                    scope: Some(scope),
                 });
             }
-            Ok(false) => distribution::resolve(&self.runtime_cache, d, cancel),
+            Ok(false) => self.resolve_runtime(cancel),
             Err(e) => Err(e),
         };
         distribution::check_cancel(cancel)?;
@@ -144,20 +206,22 @@ impl Product {
             Ok(installed) => RuntimeReadiness {
                 status: RuntimeState::Ready,
                 setup_available: true,
-                message: if d.scope == Scope::DevelopmentLoopback {
+                message: if scope == Scope::OfficialPinned {
+                    "Private browser is ready."
+                } else if scope == Scope::DevelopmentLoopback {
                     "Private browser verified. Development runtime: owned loopback fixtures only; public-site qualification is pending."
                 } else {
                     "Private browser verified using configured public trust. External release and platform qualification remain required."
                 },
                 identity: Some(installed.manifest.identity),
-                scope: Some(d.scope),
+                scope: Some(scope),
             },
             Err(_) => RuntimeReadiness {
                 status: RuntimeState::RepairRequired,
                 setup_available: true,
                 message: "The private browser could not be verified. Automatic replacement is blocked. Review browser diagnostics and explicitly repair; existing evidence is unchanged.",
                 identity: None,
-                scope: Some(d.scope),
+                scope: Some(scope),
             },
         })
     }
@@ -179,7 +243,7 @@ impl Product {
         setup: impl FnOnce() -> Result<()>,
     ) -> Result<Installed> {
         distribution::check_cancel(cancel)?;
-        let d = self.setup_trust()?;
+        self.setup_capability()?;
         let absent = distribution::current_absent(&self.runtime_cache)
             .context("Browser installation paths could not be verified. Automatic setup is blocked; existing evidence is unchanged.")?;
         distribution::check_cancel(cancel)?;
@@ -187,7 +251,7 @@ impl Product {
             setup()?;
             distribution::check_cancel(cancel)?;
         }
-        let installed = distribution::resolve(&self.runtime_cache, d, cancel)
+        let installed = self.resolve_runtime(cancel)
             .context("The private browser could not be verified. Automatic replacement is blocked; explicit repair is required. Existing evidence is unchanged.")?;
         distribution::check_cancel(cancel)?;
         Ok(installed)
@@ -212,17 +276,28 @@ impl Product {
         Worker::spawn_network(installed, &self.network()?)
     }
     pub fn status(&self, cancel: &AtomicBool) -> Result<String> {
-        let d = self.trust()?;
-        let runtime = distribution::resolve(&self.runtime_cache, d, cancel)?;
-        Ok(format!(
+        let runtime = self.resolve_runtime(cancel)?;
+        Ok(Self::installed_status(&runtime))
+    }
+    fn installed_status(runtime: &Installed) -> String {
+        format!(
             "{} · {}",
             runtime.manifest.id,
-            if d.scope == Scope::DevelopmentLoopback {
+            if runtime.manifest.scope == Scope::OfficialPinned {
+                "Private browser is ready. App-pinned official components."
+            } else if runtime.manifest.scope == Scope::DevelopmentLoopback {
                 "Development: owned loopback fixtures only. Public-site runtime qualification pending."
             } else {
                 "Configured public trust; external runtime qualification required"
             }
-        ))
+        )
+    }
+    fn committed_setup_result(installed: Result<Installed>) -> Result<String> {
+        let installed = installed.context("Browser setup could not finish. Check the network, free space and browser diagnostics, then retry. Existing evidence is unchanged.")?;
+        // The installer has committed and reported Ready. A late cancellation
+        // cannot turn that success into a false uncommitted failure. First-use
+        // callers still check their shared token before continuing website work.
+        Ok(Self::installed_status(&installed))
     }
     pub fn setup(
         &self,
@@ -241,22 +316,42 @@ impl Product {
         progress: &mut dyn FnMut(InstallProgress),
     ) -> Result<String> {
         distribution::check_cancel(&cancel)?;
-        let d = self.setup_trust()?;
+        self.setup_capability()?;
         let network = self.network().context("Browser network settings could not be validated. Setup is blocked; existing evidence is unchanged.")?;
-        distribution::setup_network_with_progress(
-            &self.runtime_cache,
-            d,
-            &cancel,
-            progress,
-            &mut |runtime| {
-                let mut worker = self.spawn_worker(runtime)?;
-                worker.handshake(RunId::new(), cancel.clone())?;
-                worker.stop(Instant::now() + Duration::from_secs(5))
-            },
-            &network,
-        ).context("Browser setup could not finish. Check the network, free space and browser diagnostics, then retry. Existing evidence is unchanged.")?;
-        distribution::check_cancel(&cancel)?;
-        self.status(&cancel)
+        // Handshake performs the owned headless screenshot smoke in memory.
+        // Both trust paths use the same supervisor and bounded shutdown.
+        let mut smoke = |runtime: &Installed| {
+            let mut worker = self.spawn_worker(runtime)?;
+            let ready = worker.handshake(RunId::new(), cancel.clone());
+            let stopped = worker.stop(Instant::now() + Duration::from_secs(5));
+            let (worker, browser) = ready?;
+            ensure!(
+                worker == worker_version(runtime)? && browser == browser_version(runtime)?,
+                "Browser setup smoke runtime identity mismatch"
+            );
+            stopped
+        };
+        let installed = if let Some(d) = &self.distribution {
+            distribution::setup_network_with_progress(
+                &self.runtime_cache,
+                d,
+                &cancel,
+                progress,
+                &mut smoke,
+                &network,
+            )
+        } else {
+            official::setup_network_with_progress(
+                &self.runtime_cache,
+                self.setup_catalog()?,
+                crate::official_catalog::bundled(),
+                &cancel,
+                progress,
+                &mut smoke,
+                &network,
+            )
+        };
+        Self::committed_setup_result(installed)
     }
     pub fn capture(
         &self,
@@ -266,7 +361,7 @@ impl Product {
         cancel: Arc<AtomicBool>,
         progress: &mut dyn FnMut(&str, u32, Option<u32>),
     ) -> Result<RunRecord> {
-        let installed = distribution::resolve(&self.runtime_cache, self.trust()?, &cancel)?;
+        let installed = self.resolve_runtime(&cancel)?;
         regressee_storage::require_space(&store.paths().data, 384 * 1024 * 1024)?;
         regressee_storage::require_space(&store.paths().cache, 384 * 1024 * 1024)?;
         let project = store.load_project(id)?.project;
@@ -664,6 +759,144 @@ pub(crate) fn map_failure(e: &anyhow::Error) -> CaptureError {
 mod automatic_runtime_tests {
     use super::*;
 
+    #[cfg(all(target_arch = "x86_64", any(target_os = "linux", windows)))]
+    #[test]
+    fn committed_setup_result_does_not_recheck_a_late_cancellation() -> Result<()> {
+        let cancel = AtomicBool::new(true);
+        let installed = Installed {
+            root: PathBuf::from("not-read-by-commit-reporting"),
+            manifest: crate::official_catalog::current()?.manifest.clone(),
+        };
+        let message = Product::committed_setup_result(Ok(installed))?;
+        assert!(message.contains("Private browser is ready"));
+        assert!(cancel.load(Ordering::Acquire));
+        assert!(
+            Product::committed_setup_result(Err(anyhow::anyhow!("uncommitted failure"))).is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn default_catalog_readiness_is_available_without_downloads_or_cache_io() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        // Inject absence directly, without mutating process-wide environment.
+        let product = Product::configured_from(root.path(), None)?;
+        assert!(product.official_runtime);
+        assert!(product.distribution.is_none());
+        assert!(
+            product.trust().is_err(),
+            "official pins are not a signed distribution"
+        );
+        let state = product.readiness(&AtomicBool::new(false))?;
+        assert_eq!(state.scope, Some(Scope::OfficialPinned));
+        assert!(state.identity.is_none());
+        if supported_runtime_platform(std::env::consts::OS, std::env::consts::ARCH) {
+            assert_eq!(state.status, RuntimeState::NotInstalled);
+            assert!(state.setup_available);
+            assert_eq!(
+                state.message,
+                "The private browser will be installed automatically on first use."
+            );
+            assert!(product.resolve_runtime(&AtomicBool::new(false)).is_err());
+        } else {
+            assert_eq!(state.status, RuntimeState::UnsupportedPlatform);
+            assert!(!state.setup_available);
+            assert!(
+                product
+                    .ensure_runtime_with(&AtomicBool::new(false), || panic!("unsupported setup"))
+                    .is_err()
+            );
+        }
+        assert!(
+            !product.runtime_cache.exists(),
+            "readiness/resolution wrote cache"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_override_is_legacy_only_and_invalid_configuration_never_falls_back() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("distribution.json");
+        assert!(Product::configured_from(root.path(), Some(path.clone())).is_err());
+        fs::write(&path, b"not a distribution")?;
+        assert!(Product::configured_from(root.path(), Some(path.clone())).is_err());
+        let key = ed25519_dalek::SigningKey::from_bytes(&[85; 32]);
+        let mut d = Distribution {
+            version: 1,
+            url: "http://127.0.0.1:9/inert.zip".parse()?,
+            public_key: hex::encode(key.verifying_key().to_bytes()),
+            scope: Scope::DevelopmentLoopback,
+        };
+        fs::write(&path, serde_json::to_vec(&d)?)?;
+        let product = Product::configured_from(root.path(), Some(path.clone()))?;
+        assert!(!product.official_runtime);
+        assert_eq!(product.trust()?.scope, Scope::DevelopmentLoopback);
+        d.scope = Scope::OfficialPinned;
+        d.url = "https://nodejs.org/dist/inert.zip".parse()?;
+        fs::write(&path, serde_json::to_vec(&d)?)?;
+        assert!(Product::configured_from(root.path(), Some(path)).is_err());
+        assert!(!product.runtime_cache.exists());
+        Ok(())
+    }
+
+    #[cfg(all(target_arch = "x86_64", any(target_os = "linux", windows)))]
+    #[test]
+    fn default_catalog_blocks_damaged_pointer_and_cancellation_without_replacement() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let product = Product::configured_from(root.path(), None)?;
+        let cancel = AtomicBool::new(false);
+        fs::create_dir(&product.runtime_cache)?;
+        for pointer in ["../unsafe", "runtime-missing"] {
+            fs::write(product.runtime_cache.join("current"), pointer)?;
+            assert_eq!(
+                product.readiness(&cancel)?.status,
+                RuntimeState::RepairRequired
+            );
+            assert!(
+                product
+                    .ensure_runtime_with(&cancel, || panic!("automatic replacement"))
+                    .is_err()
+            );
+            assert_eq!(
+                fs::read(product.runtime_cache.join("current"))?,
+                pointer.as_bytes()
+            );
+        }
+        cancel.store(true, Ordering::Release);
+        assert!(product.readiness(&cancel).is_err());
+        assert!(
+            product
+                .ensure_runtime_with(&cancel, || panic!("cancelled setup"))
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[cfg(all(target_arch = "x86_64", any(target_os = "linux", windows)))]
+    #[test]
+    fn default_catalog_first_use_callback_stays_in_request_cancellation_slot() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let product = Product::configured_from(root.path(), None)?;
+        let cancel = AtomicBool::new(false);
+        let mut setups = 0;
+        assert!(
+            product
+                .ensure_runtime_with(&cancel, || {
+                    setups += 1;
+                    cancel.store(true, Ordering::Release);
+                    Ok(())
+                })
+                .is_err()
+        );
+        assert_eq!(setups, 1);
+        assert!(!product.runtime_cache.exists());
+        let mut expired = crate::official_catalog::current()?.clone();
+        expired.manifest.support_until = Some(distribution::now() - 1);
+        assert!(official::validate(&expired, crate::official_catalog::bundled()).is_err());
+        Ok(())
+    }
+
     #[test]
     fn platform_eligibility_does_not_enable_macos_or_extra_architectures() {
         assert!(supported_runtime_platform("linux", "x86_64"));
@@ -685,6 +918,7 @@ mod automatic_runtime_tests {
         let product = Product {
             distribution: None,
             runtime_cache: root.path().join("cache"),
+            official_runtime: false,
             auth: Default::default(),
         };
         let cancel = AtomicBool::new(false);
@@ -714,6 +948,7 @@ mod automatic_runtime_tests {
                 scope: Scope::QualifiedPublic,
             }),
             runtime_cache: root.path().join("cache"),
+            official_runtime: false,
             auth: Default::default(),
         };
         let cancel = AtomicBool::new(false);
@@ -804,6 +1039,7 @@ mod automatic_runtime_tests {
                 Product {
                     distribution: Some(d),
                     runtime_cache: root.join("cache"),
+                    official_runtime: false,
                     auth: Default::default(),
                 },
                 pack,
@@ -1001,6 +1237,7 @@ mod automatic_runtime_tests {
                 scope: Scope::DevelopmentLoopback,
             }),
             runtime_cache: root.path().join("cache"),
+            official_runtime: false,
             auth: Default::default(),
         };
         let cancel = AtomicBool::new(false);
