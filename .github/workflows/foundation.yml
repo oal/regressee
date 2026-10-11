@@ -1,6 +1,12 @@
 name: Foundation checks (not desktop qualification)
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner to check (all preserves the normal matrix)
+        type: choice
+        default: all
+        options: [all, ubuntu-24.04, windows-2025, macos-14]
   push:
     paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.gitattributes', '.github/**']
   pull_request:
@@ -13,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-14]
+        os: ${{ fromJSON((inputs.runner == 'all' || inputs.runner == '') && '["ubuntu-24.04","windows-2025","macos-14"]' || format('["{0}"]', inputs.runner)) }}
     runs-on: ${{ matrix.os }}
     env:
       CARGO_BUILD_JOBS: '4'

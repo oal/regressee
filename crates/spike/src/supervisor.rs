@@ -221,7 +221,11 @@ impl Worker {
         });
         let mut command = Command::new(node);
         command
-            .arg(root.join("worker/src/index.mjs"))
+            // Rust's canonical Windows paths use the verbatim namespace. Keep
+            // Node's ESM entrypoint relative to the verified runtime directory
+            // instead of passing a verbatim path as a module specifier.
+            .current_dir(&root)
+            .arg("worker/src/index.mjs")
             .env("PLAYWRIGHT_BROWSERS_PATH", root.join("browsers"))
             .env("TMPDIR", &scratch)
             .env("TMP", &scratch)
@@ -232,7 +236,17 @@ impl Worker {
             )
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null());
+            // Phase 0 only uses synthetic fixtures. Its hosted smoke may opt in
+            // to startup diagnostics; product worker stderr remains private.
+            .stderr(
+                if std::env::var_os("REGRESSEE_PHASE0_WORKER_STDERR").as_deref()
+                    == Some(std::ffi::OsStr::new("1"))
+                {
+                    Stdio::inherit()
+                } else {
+                    Stdio::null()
+                },
+            );
         #[cfg(unix)]
         {
             use std::os::unix::process::CommandExt;

@@ -1,6 +1,12 @@
 name: Phase 0 executable harness (not runtime qualification)
 on:
   workflow_dispatch:
+    inputs:
+      runner:
+        description: Runner to check (all preserves the normal matrix)
+        type: choice
+        default: all
+        options: [all, ubuntu-24.04, windows-2025, macos-14]
   push:
     paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.gitattributes', '.github/**']
   pull_request:
@@ -13,11 +19,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-14]
+        os: ${{ fromJSON((inputs.runner == 'all' || inputs.runner == '') && '["ubuntu-24.04","windows-2025","macos-14"]' || format('["{0}"]', inputs.runner)) }}
     runs-on: ${{ matrix.os }}
     env:
       CARGO_BUILD_JOBS: '4'
       MACOSX_DEPLOYMENT_TARGET: '14.0'
+      REGRESSEE_PHASE0_WORKER_STDERR: '1'
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:

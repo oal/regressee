@@ -10,6 +10,15 @@ they do not qualify desktop behavior or publish a release.
 - `release-local.yml` is **manual only**. It also checks Intel macOS and builds
   the release binary for inspection. It does not upload or sign artifacts.
 
+Foundation and Phase 0 manual dispatches accept a `runner` choice to check just
+one platform. Relevant pushes and pull requests still check the full matrix.
+For example, to investigate Windows without repeating Linux/macOS:
+
+```sh
+gh workflow run foundation.yml --ref ci/fix-hosted-workflows -f runner=windows-2025
+gh workflow run phase0.yml --ref ci/fix-hosted-workflows -f runner=windows-2025
+```
+
 All jobs use `.github/actions/setup/action.yml`: Python 3.12, the Rust version
 from `rust-toolchain.toml`, formatting/lint components and cached Cargo downloads.
 Linux development libraries are installed only on the disposable hosted runner.
@@ -23,6 +32,9 @@ pinned Playwright CLI. Ubuntu's AppArmor user-namespace restriction is handled b
 an executable-scoped profile for only this job's exact pinned Chromium paths.
 No host Node/npm, global policy/sysctl disablement or sandbox-disabling flags are
 used. This hosted-runner policy is not default-policy desktop qualification.
+The synthetic Phase 0 worker inherits stderr only when
+`REGRESSEE_PHASE0_WORKER_STDERR=1` (enabled in its workflow) so startup failures
+are diagnosable. This does not enable product-worker stderr logging.
 
 ## Local checks
 

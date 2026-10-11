@@ -447,7 +447,7 @@ impl Worker {
             let bytes = zeroize::Zeroizing::new(protocol::encode_request(request)?);
             let input = &mut self.input;
             let child = &mut self.child;
-            return std::thread::scope(|scope| {
+            std::thread::scope(|scope| {
                 let (tx, rx) = mpsc::sync_channel(1);
                 scope.spawn(move || {
                     let _ = tx.send(input.write_all(&bytes));
@@ -469,7 +469,7 @@ impl Worker {
                         Err(_) => anyhow::bail!("Private pipe writer stopped"),
                     }
                 }
-            });
+            })
         }
         #[cfg(not(windows))]
         {
