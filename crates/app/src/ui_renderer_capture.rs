@@ -252,6 +252,625 @@ fn finish_jobs(shell: &mut Shell, cx: &mut Context<Shell>) {
     }
 }
 
+// Only the final workflow batch uses these helpers. Older diagnostic tests and
+// calibration guards intentionally remain unchanged.
+fn workflow_fixture_mixed_queue(s: &mut Shell) {
+    use regressee_core::domain::{CaptureError, InventoryPage, PageId};
+    // Presentation-only clones, NEVER saved/analyzed as real website results.
+    // Keep the real stored target/key and its Jobs-loaded screenshot selected.
+    // Extra rows have distinct keys and explicit fixture addresses; cloned CAS
+    // evidence is only used to exercise layout, not to establish eligibility.
+    let selected = s.selected_key.clone().unwrap();
+    let run = s.evidence.latest.as_mut().unwrap();
+    let template = run.run.targets[0].clone();
+    assert_eq!(template.key, selected);
+    let pixels = run.evidence(&selected).unwrap().clone();
+    let comparison = s.evidence.comparison.as_mut().unwrap();
+    let result = comparison
+        .revision
+        .results
+        .iter()
+        .find(|r| r.key == selected)
+        .unwrap()
+        .clone();
+    for (name, classification) in [
+        ("fixture-unchanged", Classification::NoSignificantChange),
+        ("fixture-failed-timeout", Classification::CouldNotCapture),
+        ("fixture-not-comparable", Classification::NotComparable),
+        ("fixture-changed", Classification::Changed),
+        ("fixture-failed-login", Classification::CouldNotCapture),
+    ] {
+        let page = InventoryPage {
+            id: PageId::new(),
+            canonical: template.requested.join(&format!("/{name}/")).unwrap(),
+            included: true,
+            reason: None,
+        };
+        let mut target = template.clone();
+        target.key.page = page.id;
+        target.requested = page.canonical.clone();
+        target.final_url = Some(page.canonical.clone());
+        target.warnings =
+            vec!["Synthetic fixture-only presentation row; not browser evidence".into()];
+        let mut classified = result.clone();
+        classified.key = target.key.clone();
+        classified.classification = classification;
+        match classification {
+            Classification::CouldNotCapture => {
+                target.outcome = TargetOutcome::Failed {
+                    code: if name.ends_with("login") {
+                        CaptureError::NeedsLogin
+                    } else {
+                        CaptureError::Timeout
+                    },
+                };
+                target.final_url = None;
+                classified.eligible_pixels = 0;
+                classified.changed_pixels = 0;
+            }
+            Classification::NotComparable => {
+                classified.eligible_pixels = 0;
+                classified.changed_pixels = 0;
+            }
+            Classification::NoSignificantChange => classified.changed_pixels = 0,
+            Classification::Changed => assert!(classified.changed_pixels > 0),
+        }
+        if !matches!(target.outcome, TargetOutcome::Failed { .. }) {
+            let mut capture = pixels.clone();
+            capture.metadata.key = target.key.clone();
+            capture.metadata.requested = page.canonical.to_string();
+            capture.metadata.final_url = page.canonical.to_string();
+            capture.metadata.warnings = target.warnings.clone();
+            run.captures.push(capture);
+        }
+        classified.validate().unwrap();
+        comparison.revision.results.push(classified);
+        run.run.inventory.pages.push(page);
+        run.run.targets.push(target);
+    }
+    run.run.state = JobState::CompletedWithErrors;
+    run.run.validate().unwrap();
+    assert_eq!(run.run.targets.len(), 6);
+    assert_eq!(s.selected_key.as_ref(), Some(&selected));
+    assert!(run.evidence(&selected).is_some());
+    // No invented perceptual reports are added: cloned rows cannot be approved.
+    for target in run.run.targets.iter().skip(1) {
+        assert!(
+            !comparison
+                .perceptual
+                .as_ref()
+                .unwrap()
+                .reports
+                .iter()
+                .any(|(key, _)| key == &target.key)
+        );
+    }
+}
+
+fn workflow_visible_bounds(
+    cx: &mut VisualTestContext,
+    selector: &str,
+    width: f32,
+    height: f32,
+) -> gpui::Bounds<gpui::Pixels> {
+    // GPUI's test selector API requires a static string. This opt-in finite
+    // batch interns a bounded number of short diagnostic selectors only.
+    let bounds = cx
+        .debug_bounds(Box::leak(selector.to_owned().into_boxed_str()))
+        .unwrap_or_else(|| panic!("required mounted selector: {selector}"));
+    assert!(
+        bounds.size.width > px(0.) && bounds.size.height > px(0.),
+        "empty {selector}"
+    );
+    assert!(
+        bounds.left() >= px(0.)
+            && bounds.top() >= px(0.)
+            && bounds.right() <= px(width)
+            && bounds.bottom() <= px(height),
+        "{selector} clipped outside {width}x{height}: {bounds:?}"
+    );
+    bounds
+}
+
+fn workflow_visible_action(cx: &mut VisualTestContext, control: Control, width: f32, height: f32) {
+    let action = workflow_visible_bounds(cx, &format!("action-{control:?}"), width, height);
+    let label = workflow_visible_bounds(cx, &format!("action-label-{control:?}"), width, height);
+    assert!(
+        action.size.height >= px(40.),
+        "action target shrunk: {control:?}"
+    );
+    assert!(
+        label.left() >= action.left()
+            && label.right() <= action.right()
+            && label.top() >= action.top()
+            && label.bottom() <= action.bottom(),
+        "action label clipped: {control:?}"
+    );
+}
+
+fn workflow_review_geometry(cx: &mut VisualTestContext, first_row: usize, width: f32, height: f32) {
+    let bar = workflow_visible_bounds(cx, "approval-next-action", width, height);
+    let list = workflow_visible_bounds(cx, "page-list", width, height);
+    let row = workflow_visible_bounds(cx, &format!("page-row-target-{first_row}"), width, height);
+    assert!(row.size.height >= px(PAGE_ROW_HEIGHT));
+    assert!(
+        row.top() >= list.top() && row.bottom() <= list.bottom() && row.bottom() <= bar.top(),
+        "first complete review row must be visible above approval bar"
+    );
+    // Use existing pane/tile selectors, not guessed layout coordinates. New
+    // workspace selectors are useful but are not necessary to pass this guard.
+    let after = workflow_visible_bounds(cx, "phase5-after", width, height);
+    assert!(after.size.height >= px(64.) && after.size.width >= px(96.));
+    assert!(
+        after.bottom() <= bar.top(),
+        "after pane hidden by approval bar"
+    );
+    let tile = cx
+        .debug_bounds("phase5-tile-1-1-0")
+        .expect("actual stored after image must be painted");
+    assert!(
+        (tile.right().min(after.right()) - tile.left().max(after.left())) >= px(32.)
+            && (tile.bottom().min(after.bottom()) - tile.top().max(after.top())) >= px(32.),
+        "stored screenshot pixels must be visible without scrolling"
+    );
+    if width >= 1280. {
+        let before = workflow_visible_bounds(cx, "phase5-before", width, height);
+        assert!(before.bottom() <= bar.top() && before.size.height >= px(64.));
+        assert!(
+            row.right() <= before.left(),
+            "wide review must put queue beside image panes"
+        );
+    }
+    workflow_visible_action(cx, Control::Phase5(23), width, height);
+}
+
+#[gpui::test]
+#[ignore = "one final bounded 34-image workflow confirmation batch after proof-image review"]
+fn renderer_capture_workflow_revamp(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    cx.update(|cx| {
+        text_input::bind(cx);
+        timezone_select::bind(cx);
+    });
+    let dir = tempfile::Builder::new()
+        .prefix("workflow-synthetic-store-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let original_project = serde_json::to_value(store.load_project(project).unwrap()).unwrap();
+    let original_evidence = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    // One fixed batch, no capture retries or QA loop. Every state gets a fresh
+    // shell: navigation resets stages, and access edits/masks/approval must not
+    // leak into another image. All actor commands below are read-only.
+    let mut manifest = Vec::new();
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        for (label, screen, stage, surface) in [
+            (
+                "projects",
+                Screen::Projects,
+                SetupStage::Settings,
+                ReviewSurface::Changes,
+            ),
+            (
+                "website",
+                Screen::Setup,
+                SetupStage::Website,
+                ReviewSurface::Changes,
+            ),
+            (
+                "access",
+                Screen::Setup,
+                SetupStage::Access,
+                ReviewSurface::Changes,
+            ),
+            (
+                "capture-options",
+                Screen::Setup,
+                SetupStage::Pages,
+                ReviewSurface::Changes,
+            ),
+            (
+                "review",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Changes,
+            ),
+            (
+                "pages-baseline",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Pages,
+            ),
+            (
+                "history",
+                Screen::History,
+                SetupStage::Settings,
+                ReviewSurface::Changes,
+            ),
+            (
+                "app-settings",
+                Screen::Settings,
+                SetupStage::Settings,
+                ReviewSurface::Changes,
+            ),
+            (
+                "fixture-mixed-queue",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Changes,
+            ),
+            (
+                "approval-selected",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Changes,
+            ),
+            (
+                "approval-impact-confirm",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Changes,
+            ),
+            (
+                "fixture-candidate-inspect-save",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Inspect,
+            ),
+            (
+                "fixture-discovery-before-capture",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Pages,
+            ),
+            (
+                "fixture-finite-capture-progress",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Capture,
+            ),
+            (
+                "fixture-missing-evidence",
+                Screen::Results,
+                SetupStage::Settings,
+                ReviewSurface::Changes,
+            ),
+            (
+                "fixture-login-required",
+                Screen::Setup,
+                SetupStage::Access,
+                ReviewSurface::Changes,
+            ),
+            (
+                "fixture-dirty-access",
+                Screen::Setup,
+                SetupStage::Access,
+                ReviewSurface::Changes,
+            ),
+        ] {
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    finish_jobs(s, cx);
+                    s.activate_control(Control::SelectProject(0), window, cx);
+                    finish_jobs(s, cx);
+                });
+            });
+            // Simulated window draws can queue atlas uploads without submitting
+            // a GPU frame. Flush the loaded state before a presentation fixture
+            // retires its images (the missing-evidence state), matching native
+            // frame submission. This is not another saved inspection image.
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+                window.capture_offscreen_frame().unwrap();
+            });
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    s.navigate(screen, window, cx);
+                    finish_jobs(s, cx);
+                    s.focus.setup_stage = stage;
+                    s.focus.review_surface = surface;
+                    s.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    assert!(!s.mask_dirty && s.analysis_pending.is_none() && s.analysis_due.is_none());
+                    assert!(s.approval_selection.is_empty() && s.approval.is_none());
+                    match label {
+                        "fixture-mixed-queue" => workflow_fixture_mixed_queue(s),
+                        "approval-selected" | "approval-impact-confirm" => {
+                            let key = s.selected_key.clone().unwrap();
+                            assert!(s.approval_eligible(&key), "stored fixture must be genuinely eligible before selecting");
+                            assert!(s.control_enabled(Control::Phase5(23), cx));
+                            s.activate_control(Control::Phase5(23), window, cx);
+                            assert!(s.approval_selection.contains(&key));
+                            assert!(s.control_enabled(Control::Phase5(24), cx));
+                            if label == "approval-impact-confirm" {
+                                // Real Jobs -> Store preview, bound to the exact
+                                // saved analysis/selection. NEVER dispatch Accept.
+                                s.activate_control(Control::Phase5(24), window, cx);
+                                assert!(s.pending.is_some(), "preview must really reach the actor");
+                                finish_jobs(s, cx);
+                                let preview = s.approval.as_ref().expect("actor approval preview");
+                                assert!(s.approval_matches(preview));
+                                assert_eq!(preview.selected, vec![key]);
+                                assert_eq!(preview.provenance.len(), 1);
+                                assert!(s.control_enabled(Control::Phase5(25), cx));
+                            }
+                        }
+                        "fixture-candidate-inspect-save" => {
+                            // Private first-baseline presentation ONLY. Retain
+                            // actual stored pixels; do not create/save a run or
+                            // pretend this clone is an activatable stored capture.
+                            s.evidence.latest.as_mut().unwrap().run.intent = RunIntent::NewBaseline;
+                            s.evidence.baseline = None;
+                            s.evidence.before = None;
+                            s.evidence.comparison = None;
+                            s.project.as_mut().unwrap().project.active_baseline = None;
+                            s.focus.baseline = false;
+                            s.focus.candidate = true;
+                            s.viewer_mode = 1; // Retained after pixels only; no invented first reference.
+                            s.viewer.as_mut().unwrap().request = None;
+                            s.notice = Some("Fixture-only candidate inspection using retained pixels; no new website capture. Save is explicit and is not executed in this batch.".into());
+                            assert!(s.focus.can_activate(Control::SaveBaseline));
+                            assert!(s.viewer.is_some());
+                        }
+                        "fixture-discovery-before-capture" => {
+                            // Typed, in-memory discovery preview. This inventory
+                            // is copied from saved synthetic evidence, NOT crawled.
+                            let mut inventory = s.evidence.latest.as_ref().unwrap().run.inventory.clone();
+                            let template = inventory.pages[0].clone();
+                            for name in ["fixture-included", "fixture-excluded", "fixture-help"] {
+                                let mut page = template.clone();
+                                page.id = regressee_core::domain::PageId::new();
+                                page.canonical = template.canonical.join(&format!("/{name}/")).unwrap();
+                                page.included = name != "fixture-excluded";
+                                page.reason = (!page.included).then(|| "Excluded in fixture preview".into());
+                                inventory.pages.push(page);
+                            }
+                            inventory.validate().unwrap();
+                            s.selected_page = Some(inventory.pages[0].id);
+                            let record = s.project.as_ref().unwrap();
+                            s.preview = Some(DiscoveryPreview {
+                                project_revision: record.revision,
+                                settings: record.project.clone(),
+                                inventory,
+                                aliases: vec![],
+                                notes: vec!["Synthetic fixture inventory preview; no discovery browser was run.".into()],
+                                visited: 4,
+                            });
+                            s.focus.preview = true;
+                            s.focus.candidate = false;
+                            assert!(s.preview.as_ref().unwrap().inventory.pages.iter().any(|p| !p.included));
+                        }
+                        "fixture-finite-capture-progress" => {
+                            // Finite progress presentation, not a capture job.
+                            s.focus.busy = true;
+                            s.focus.capturing = true;
+                            s.focus.pausable = false;
+                            s.progress = Some(("Synthetic fixture progress · 3 of 6 screenshot targets processed".into(), 3, Some(6)));
+                        }
+                        "fixture-missing-evidence" => {
+                            workflow_fixture_mixed_queue(s);
+                            let failed = s.evidence.latest.as_ref().unwrap().run.targets.iter()
+                                .find(|t| matches!(t.outcome, TargetOutcome::Failed { .. })).unwrap().key.clone();
+                            assert!(!s.approval_eligible(&failed));
+                            s.selected_key = Some(failed);
+                            s.clear_viewer();
+                            s.focus.viewer = false;
+                            assert!(!s.control_enabled(Control::Phase5(23), cx));
+                            assert!(!s.control_enabled(Control::Phase5(24), cx));
+                        }
+                        "fixture-login-required" | "fixture-dirty-access" => {
+                            // Unsaved access choice is private UI state. Do not
+                            // save login/settings or launch/probe any browser.
+                            s.choose(Choice::LoginRequired, cx);
+                            assert!(s.environment_unsaved(cx));
+                            assert!(!s.control_enabled(Control::Guided(31), cx));
+                            assert!(!s.control_enabled(Control::Guided(36), cx));
+                            s.activate_control(Control::Guided(31), window, cx);
+                            assert!(s.pending.is_none(), "dirty access must refuse browser dispatch");
+                        }
+                        _ => {}
+                    }
+                    s.configure_review_geometry(width);
+                    cx.notify();
+                });
+            });
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            if label == "fixture-dirty-access" {
+                let login = cx
+                    .debug_bounds("action-Guided(31)")
+                    .expect("login action mounted");
+                shell.update(cx, |s, cx| {
+                    let top = (login.top() - s.screen_scroll.bounds().top() - px(24.))
+                        .max(px(0.))
+                        .min(s.screen_scroll.max_offset().height);
+                    s.screen_scroll.set_offset(gpui::point(px(0.), -top));
+                    cx.notify();
+                });
+            }
+            let name = format!("workflow-{width:.0}x{height:.0}-{label}");
+            capture(cx, &root, &name).unwrap();
+            if matches!(
+                label,
+                "review" | "fixture-mixed-queue" | "approval-selected"
+            ) {
+                let first = shell.read_with(cx, |s, _| s.result_indices()[0]);
+                workflow_review_geometry(cx, first, width, height);
+                workflow_visible_action(cx, Control::Phase5(24), width, height);
+            }
+            if label == "approval-impact-confirm" {
+                workflow_visible_action(cx, Control::Phase5(25), width, height);
+                // The integrating source must expose the bounded exact impact
+                // surface with this selector. A missing/offscreen preview fails
+                // rather than silently accepting a correctly named wrong image.
+                let impact = workflow_visible_bounds(cx, "approval-decision", width, height);
+                assert!(
+                    impact.size.height >= px(32.) && impact.size.width >= px(160.),
+                    "exact impact must have a usable visible decision surface"
+                );
+            }
+            if screen == Screen::Setup {
+                workflow_visible_action(cx, Control::Save, width, height);
+            }
+            if label == "fixture-dirty-access" {
+                workflow_visible_action(cx, Control::Guided(31), width, height);
+                workflow_visible_bounds(cx, "environment-login-hint", width, height);
+            }
+            if label == "fixture-candidate-inspect-save" {
+                workflow_visible_action(cx, Control::SaveBaseline, width, height);
+            }
+            if label == "fixture-finite-capture-progress" {
+                let track = workflow_visible_bounds(cx, "progress-track", width, height);
+                let fill = workflow_visible_bounds(cx, "progress-fill", width, height);
+                let fraction = f32::from(fill.size.width) / f32::from(track.size.width);
+                assert!(
+                    (0.45..=0.55).contains(&fraction),
+                    "finite 3/6 progress must be shown, not an indeterminate fallback"
+                );
+            }
+            manifest.push(serde_json::json!({
+                "capture": name, "width": width, "height": height,
+                "synthetic_project_only": true,
+                "in_memory_presentation_only": label.starts_with("fixture-"),
+                "real_website_capture": false,
+                "baseline_mutation_dispatched": false,
+                "approval_preview_from_jobs": label == "approval-impact-confirm"
+            }));
+            owned.join_after_ui();
+        }
+    }
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        original_project,
+        serde_json::to_value(store.load_project(project).unwrap()).unwrap()
+    );
+    assert_eq!(
+        original_evidence,
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap()
+    );
+    assert_eq!(manifest.len(), 34);
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(root.join("workflow-confirmation-matrix.json"))
+        .unwrap();
+    serde_json::to_writer_pretty(file, &manifest).unwrap();
+}
+
+#[gpui::test]
+#[ignore = "bounded project-selection renderer batch, after personal proof-image review"]
+fn renderer_capture_project_selection(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("selection-store-")
+        .tempdir_in(&root)
+        .unwrap();
+    let paths = AppPaths::isolated(dir.path());
+    let (mut store, project_id, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let other = Project::draft(
+        "A long project name for a website with several environments ".repeat(2),
+        "https://example.test/",
+    )
+    .unwrap();
+    store.save_project(&other, None).unwrap();
+    drop(store);
+    for (width, height) in [(1120., 800.), (820., 600.)] {
+        let (jobs, events) = Jobs::start_without_runtime(paths.clone());
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, finish_jobs);
+        cx.simulate_resize(size(px(width), px(height)));
+        for (label, screen) in [
+            ("projects", Screen::Projects),
+            ("results-choose", Screen::Results),
+            ("history-choose", Screen::History),
+        ] {
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    s.navigate(screen, window, cx);
+                    finish_jobs(s, cx);
+                })
+            });
+            capture(
+                cx,
+                &root,
+                &format!("{width:.0}x{height:.0}-selection-{label}"),
+            )
+            .unwrap();
+        }
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.navigate(Screen::Results, window, cx);
+                let index = s
+                    .projects
+                    .items
+                    .iter()
+                    .position(|p| p.id == project_id)
+                    .unwrap();
+                s.activate_control(Control::SelectProject(index), window, cx);
+                finish_jobs(s, cx);
+            })
+        });
+        capture(
+            cx,
+            &root,
+            &format!("{width:.0}x{height:.0}-selection-results-selected"),
+        )
+        .unwrap();
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.activate_control(Control::ChooseProject, window, cx);
+                finish_jobs(s, cx);
+            })
+        });
+        capture(
+            cx,
+            &root,
+            &format!("{width:.0}x{height:.0}-selection-results-switch"),
+        )
+        .unwrap();
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.navigate(Screen::Projects, window, cx);
+                finish_jobs(s, cx);
+            })
+        });
+        capture(
+            cx,
+            &root,
+            &format!("{width:.0}x{height:.0}-selection-projects-selected"),
+        )
+        .unwrap();
+        owned.join_after_ui();
+    }
+}
+
 #[gpui::test]
 #[ignore = "bounded synthetic UI renderer batch, only after personal proof-image review"]
 fn renderer_capture_app_batch(cx: &mut TestAppContext) {
@@ -439,5 +1058,181 @@ fn renderer_capture_app_batch(cx: &mut TestAppContext) {
     assert_eq!(
         before_evidence,
         serde_json::to_value(store.project_evidence(fixture_project).unwrap()).unwrap()
+    );
+}
+
+#[gpui::test]
+#[ignore = "bounded status/progress renderer batch, only after personal proof-image review"]
+fn renderer_capture_status_progress(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    let proof = fs::read(root.join("renderer-proof.png")).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(reviewed["png_sha256"], hex::encode(Sha256::digest(proof)));
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("synthetic-status-store-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, _, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    drop(store);
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    cx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            finish_jobs(s, cx);
+            s.activate_control(Control::OpenProject(0), window, cx);
+            finish_jobs(s, cx);
+        })
+    });
+    for (width, height) in [(1120., 800.), (820., 600.)] {
+        cx.simulate_resize(size(px(width), px(height)));
+        for label in ["download", "discovery", "working", "notice"] {
+            shell.update(cx, |s, cx| {
+                s.focus.screen = if label == "download" { Screen::Setup } else { Screen::Results };
+                s.focus.busy = label != "notice";
+                s.focus.capturing = s.focus.busy;
+                s.focus.pausable = false;
+                s.progress = match label {
+                    "download" => Some((format!("Downloading private browser · {} of {} received", human_bytes(82_350_444), human_bytes(258_433_266)), 82_350_444, Some(258_433_266))),
+                    "discovery" => Some(("Finding rendered links · 23 pages visited — no clicking or forms".into(), 23, None)),
+                    _ => None,
+                };
+                s.error = None;
+                s.notice = Some("Review included pages and coverage before capturing. Your active baseline is unchanged.".into());
+                s.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                cx.notify();
+            });
+            capture(cx, &root, &format!("{width:.0}x{height:.0}-status-{label}")).unwrap();
+        }
+    }
+    owned.join_after_ui();
+}
+
+#[gpui::test]
+#[ignore = "bounded results-list renderer batch using in-memory synthetic targets only"]
+fn renderer_capture_results_rows(cx: &mut TestAppContext) {
+    use regressee_core::domain::{InventoryPage, PageId, ProfileId};
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    let proof = fs::read(root.join("renderer-proof.png")).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(reviewed["png_sha256"], hex::encode(Sha256::digest(proof)));
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("synthetic-rows-store-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let before = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    shell.update(cx, |s, cx| {
+        finish_jobs(s, cx);
+        s.focus.screen = Screen::Results;
+        s.queue(Work::Load(project), cx);
+        finish_jobs(s, cx);
+        s.queue(Work::Evidence(project), cx);
+        finish_jobs(s, cx);
+        s.clear_viewer();
+        s.focus.viewer = false;
+        s.evidence.comparison = None;
+        let r = s.evidence.latest.as_mut().unwrap();
+        let template = r.run.targets[0].clone();
+        let mut desktop = r.run.profiles[0].clone();
+        desktop.name = "Desktop".into();
+        let mut mobile = desktop.clone();
+        mobile.id = ProfileId::new();
+        mobile.name = "Mobile".into();
+        r.run.profiles = vec![desktop, mobile];
+        r.run.inventory.pages = [
+            "https://example.test/".to_owned(),
+            "https://example.test/articles/quad-tree-canvas/".to_owned(),
+            format!(
+                "https://example.test/articles/{}?view=all",
+                "a-long-page-name-".repeat(20)
+            ),
+        ]
+        .into_iter()
+        .map(|address| InventoryPage {
+            id: PageId::new(),
+            canonical: url::Url::parse(&address).unwrap(),
+            included: true,
+            reason: None,
+        })
+        .collect();
+        r.run.targets = r
+            .run
+            .inventory
+            .pages
+            .iter()
+            .flat_map(|page| {
+                r.run.profiles.iter().map(|profile| {
+                    let mut target = template.clone();
+                    target.key = TargetKey {
+                        page: page.id,
+                        profile: profile.id,
+                    };
+                    target.requested = page.canonical.clone();
+                    target
+                })
+            })
+            .collect();
+        s.selected_key = Some(r.run.targets[1].key.clone());
+        s.error = None;
+        s.notice = None;
+        cx.notify();
+    });
+    let inventory = shell.read_with(cx, |s, _| {
+        s.evidence.latest.as_ref().unwrap().run.inventory.clone()
+    });
+    for (width, height) in [(1120., 800.), (820., 600.)] {
+        cx.simulate_resize(size(px(width), px(height)));
+        for preview in [false, true] {
+            shell.update(cx, |s, cx| {
+                s.preview = preview.then(|| DiscoveryPreview {
+                    project_revision: s.project.as_ref().unwrap().revision,
+                    settings: s.project.as_ref().unwrap().project.clone(),
+                    inventory: inventory.clone(),
+                    aliases: vec![],
+                    notes: vec![],
+                    visited: 3,
+                });
+                s.focus.preview = preview;
+                s.selected_page = Some(inventory.pages[1].id);
+                s.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                cx.notify();
+            });
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            let list = cx.debug_bounds("page-list").unwrap();
+            shell.update(cx, |s, cx| {
+                let top = (list.top()
+                    - s.screen_scroll.bounds().top()
+                    - px(if preview { 190. } else { 160. }))
+                .max(px(0.))
+                .min(s.screen_scroll.max_offset().height);
+                s.screen_scroll.set_offset(gpui::point(px(0.), -top));
+                cx.notify();
+            });
+            let label = if preview {
+                "discovery-rows"
+            } else {
+                "results-rows"
+            };
+            capture(cx, &root, &format!("{width:.0}x{height:.0}-{label}")).unwrap();
+        }
+    }
+    owned.join_after_ui();
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        before,
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap()
     );
 }

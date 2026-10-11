@@ -3,6 +3,7 @@ pub mod analysis_engine;
 pub mod auth;
 pub mod crawling;
 pub mod diagnostics;
+pub mod formatting;
 pub mod images;
 pub mod jobs;
 pub(crate) mod official_catalog;

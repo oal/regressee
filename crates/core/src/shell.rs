@@ -78,21 +78,75 @@ impl Screen {
     pub fn label(self) -> &'static str {
         match self {
             Self::Projects => "Projects",
-            Self::Setup => "Project setup",
-            Self::Results => "Results",
+            Self::Setup => "Project settings",
+            Self::Results => "Review changes",
             Self::History => "History",
-            Self::Settings => "Settings",
+            Self::Settings => "App settings",
         }
     }
+}
+/// Presentation stages are independent of persistent project/capture state.
+/// Saving a project never advances into a network operation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SetupStage {
+    Website,
+    Access,
+    Pages,
+    #[default]
+    Settings,
+}
+impl SetupStage {
+    pub const ALL: [Self; 4] = [Self::Website, Self::Access, Self::Pages, Self::Settings];
+    pub fn index(self) -> usize {
+        Self::ALL.iter().position(|s| *s == self).unwrap()
+    }
+    pub fn mounts(self, control: Control) -> bool {
+        use Control::*;
+        match self {
+            Self::Settings => true,
+            Self::Website => matches!(control, Name | Address | Guided(11) | Save),
+            Self::Access => matches!(
+                control,
+                Environment(_)
+                    | Guided(6 | 27 | 31..=38)
+                    | CrawlField(10..=16)
+                    | Choice(
+                        self::Choice::PublicAccess
+                            | self::Choice::LoginRequired
+                            | self::Choice::SaveLogin
+                            | self::Choice::EphemeralLogin
+                            | self::Choice::LightTheme
+                            | self::Choice::DarkTheme
+                    )
+                    | Save
+            ),
+            Self::Pages => {
+                matches!(control, Guided(1..=3 | 6..=10 | 12 | 13 | 25) | CrawlField(0..=8) | Choice(self::Choice::AddressesOnly | self::Choice::AddressesAndLinks | self::Choice::FullPage | self::Choice::VisibleScreen | self::Choice::Gentle | self::Choice::Balanced | self::Choice::Fast | self::Choice::OriginalImages | self::Choice::ReplaceImages) | Details(Detail::Capture) | Save)
+            }
+        }
+    }
+}
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ReviewSurface {
+    #[default]
+    Changes,
+    Pages,
+    Capture,
+    Inspect,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Control {
     Navigate(Screen),
+    SetupStage(SetupStage),
+    PagesBaseline,
     NewProject,
     Name,
     Address,
     Save,
     OpenProject(usize),
+    SelectProject(usize),
+    ChooseProject,
+    CancelProjectChoice,
     PreviousPage,
     NextPage,
     ChooseFolder,
@@ -125,12 +179,16 @@ pub enum Control {
 #[derive(Debug, Clone)]
 pub struct FocusState {
     pub screen: Screen,
+    pub setup_stage: SetupStage,
+    pub review_surface: ReviewSurface,
     pub busy: bool,
     pub dialog: bool,
+    pub approval_dialog: bool,
     pub projects: usize,
     pub page: usize,
     pub more: bool,
     pub project_saved: bool,
+    pub choosing_project: bool,
     pub candidate: bool,
     pub baseline: bool,
     pub viewer: bool,
@@ -146,12 +204,16 @@ impl Default for FocusState {
     fn default() -> Self {
         Self {
             screen: Screen::Projects,
+            setup_stage: SetupStage::default(),
+            review_surface: ReviewSurface::default(),
             busy: true,
             dialog: false,
+            approval_dialog: false,
             projects: 0,
             page: 0,
             more: false,
             project_saved: false,
+            choosing_project: false,
             candidate: false,
             baseline: false,
             viewer: false,
@@ -166,11 +228,32 @@ impl Default for FocusState {
     }
 }
 impl FocusState {
+    pub fn shows_project_picker(&self) -> bool {
+        self.screen == Screen::Projects
+            || self.choosing_project
+            || (matches!(self.screen, Screen::Results | Screen::History) && !self.project_saved)
+    }
     pub fn controls(&self) -> Vec<Control> {
         if self.dialog {
             return vec![Control::CloseDialog];
         }
+        if self.approval_dialog {
+            return vec![
+                Control::Guided(47),
+                Control::Guided(48),
+                Control::Guided(49),
+                Control::Phase5(25),
+            ];
+        }
         let mut controls: Vec<_> = Screen::ALL.into_iter().map(Control::Navigate).collect();
+        controls.push(Control::PagesBaseline);
+        if !self.busy && self.project_saved && self.screen != Screen::Projects {
+            controls.push(if self.choosing_project {
+                Control::CancelProjectChoice
+            } else {
+                Control::ChooseProject
+            });
+        }
         controls.push(Control::DismissFeedback);
         if self.busy {
             if self.view_loading && self.screen == Screen::Results {
@@ -183,6 +266,7 @@ impl FocusState {
                     Control::PanDown,
                 ]);
                 controls.extend((0..18).map(Control::Phase5));
+                controls.push(Control::Guided(46));
                 controls.extend((0..9).map(Control::AnalysisField));
             }
             if self.screen == Screen::Results && self.project_saved {
@@ -190,6 +274,7 @@ impl FocusState {
                     Control::CrawlField(9),
                     Control::Guided(17),
                     Control::Guided(19),
+                    Control::Guided(45),
                 ]);
                 controls.extend(Choice::RESULTS.into_iter().map(Control::Choice));
             }
@@ -201,19 +286,28 @@ impl FocusState {
             }
             return controls;
         }
-        match self.screen {
-            Screen::Projects => {
-                controls.push(Control::NewProject);
+        if self.shows_project_picker() {
+            controls.push(Control::NewProject);
+            if self.screen == Screen::Projects {
                 controls.extend([0, 1, 3, 6, 7, 14, 15].map(Control::Phase6));
-                controls.extend((0..self.projects).map(Control::OpenProject));
-                if self.page > 0 {
-                    controls.push(Control::PreviousPage);
-                }
-                if self.more {
-                    controls.push(Control::NextPage);
+            }
+            for index in 0..self.projects {
+                controls.push(Control::SelectProject(index));
+                if self.screen == Screen::Projects {
+                    controls.push(Control::OpenProject(index));
                 }
             }
+            if self.page > 0 {
+                controls.push(Control::PreviousPage);
+            }
+            if self.more {
+                controls.push(Control::NextPage);
+            }
+            return controls;
+        }
+        match self.screen {
             Screen::Setup => {
+                controls.extend(SetupStage::ALL.into_iter().map(Control::SetupStage));
                 controls.extend([Control::Name, Control::Address]);
                 controls.push(Control::Guided(11));
                 controls.extend(
@@ -297,6 +391,8 @@ impl FocusState {
                     // Analysis controls can be mounted without image panes;
                     // the app filters these candidates by the actual sections.
                     controls.extend((0..29).map(Control::Phase5));
+                    controls.push(Control::Guided(44));
+                    controls.push(Control::Guided(45));
                     controls.push(Control::Details(Detail::Analysis));
                     controls.extend((0..10).map(Control::AnalysisField));
                 }
@@ -307,6 +403,7 @@ impl FocusState {
                     controls.push(Control::CheckChanges);
                 }
                 if self.viewer {
+                    controls.push(Control::Guided(46));
                     controls.extend([
                         Control::ZoomOut,
                         Control::ZoomIn,
@@ -323,6 +420,18 @@ impl FocusState {
                 controls.push(Control::Details(Detail::History));
             }
             _ => (),
+        }
+        if self.screen == Screen::Setup {
+            controls.retain(|control| {
+                matches!(
+                    control,
+                    Control::Navigate(_)
+                        | Control::SetupStage(_)
+                        | Control::PagesBaseline
+                        | Control::ChooseProject
+                        | Control::DismissFeedback
+                ) || self.setup_stage.mounts(*control)
+            });
         }
         controls
     }
@@ -347,6 +456,107 @@ impl FocusState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn approval_decision_traps_navigation_and_mutations_until_dismissed() {
+        let mut state = FocusState {
+            screen: Screen::Results,
+            busy: false,
+            project_saved: true,
+            approval_dialog: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            state.controls(),
+            [
+                Control::Guided(47),
+                Control::Guided(48),
+                Control::Guided(49),
+                Control::Phase5(25)
+            ]
+        );
+        assert!(!state.can_activate(Control::Navigate(Screen::Projects)));
+        assert!(!state.can_activate(Control::Phase5(23)));
+        assert!(!state.can_activate(Control::Phase5(26)));
+        assert!(!state.can_activate(Control::Save));
+        state.approval_dialog = false;
+        assert!(state.can_activate(Control::Navigate(Screen::Projects)));
+        assert!(state.can_activate(Control::Phase5(23)));
+    }
+    #[test]
+    fn guided_stages_only_offer_their_actual_form_controls() {
+        let mut state = FocusState {
+            screen: Screen::Setup,
+            busy: false,
+            project_saved: true,
+            setup_stage: SetupStage::Website,
+            ..Default::default()
+        };
+        assert!(state.can_activate(Control::Name));
+        assert!(state.can_activate(Control::Save));
+        assert!(!state.can_activate(Control::CrawlField(0)));
+        assert!(!state.can_activate(Control::Guided(31)));
+        state.setup_stage = SetupStage::Access;
+        assert!(!state.can_activate(Control::Name));
+        assert!(state.can_activate(Control::Choice(Choice::PublicAccess)));
+        assert!(state.can_activate(Control::Guided(31)));
+        assert!(!state.can_activate(Control::Guided(13)));
+        state.setup_stage = SetupStage::Pages;
+        assert!(state.can_activate(Control::CrawlField(0)));
+        assert!(state.can_activate(Control::Guided(13)));
+        assert!(!state.can_activate(Control::Guided(31)));
+        assert!(!state.can_activate(Control::Address));
+        state.setup_stage = SetupStage::Settings;
+        assert!(state.can_activate(Control::Address));
+        assert!(state.can_activate(Control::Guided(31)));
+    }
+    #[test]
+    fn results_and_history_offer_project_selection_without_opening_settings() {
+        for screen in [Screen::Results, Screen::History] {
+            let state = FocusState {
+                screen,
+                busy: false,
+                projects: 64,
+                page: 1,
+                more: true,
+                ..Default::default()
+            };
+            assert!(state.shows_project_picker());
+            for control in [
+                Control::NewProject,
+                Control::SelectProject(63),
+                Control::PreviousPage,
+                Control::NextPage,
+            ] {
+                assert!(state.can_activate(control));
+            }
+            assert!(!state.can_activate(Control::OpenProject(0)));
+            assert!(!state.can_activate(Control::CaptureBaseline));
+            assert_eq!(
+                state.next(Control::SelectProject(0), false),
+                Some(Control::SelectProject(1))
+            );
+        }
+    }
+    #[test]
+    fn project_picker_replaces_screen_controls_and_locks_selection_during_work() {
+        let mut state = FocusState {
+            screen: Screen::Results,
+            busy: false,
+            project_saved: true,
+            projects: 2,
+            ..Default::default()
+        };
+        assert!(state.can_activate(Control::ChooseProject));
+        assert!(!state.can_activate(Control::SelectProject(0)));
+        state.choosing_project = true;
+        assert!(state.can_activate(Control::CancelProjectChoice));
+        assert!(state.can_activate(Control::SelectProject(0)));
+        assert!(!state.can_activate(Control::CaptureBaseline));
+        state.busy = true;
+        assert!(!state.can_activate(Control::SelectProject(0)));
+        assert!(!state.can_activate(Control::CancelProjectChoice));
+        assert!(state.can_activate(Control::Navigate(Screen::Projects)));
+    }
     #[test]
     fn environment_fields_and_timezone_follow_the_visible_form_order() {
         let state = FocusState {

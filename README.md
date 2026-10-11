@@ -21,9 +21,10 @@ Start with the [first-run guide](docs/first-run-guide.md),
 Read [`docs/phases/07-status.md`](docs/phases/07-status.md),
 the latest [independent repair and scale report](docs/phases/07-guardian-verification.md),
 [`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) and
-[`DESIGN.md`](DESIGN.md). The sleek/modern visual system is a source-derived
-proposal, **not human-approved**. Native rendering/input and external OS /
-clean-machine gates remain open; decision 0005 permits continuing local work.
+[`DESIGN.md`](DESIGN.md) and the [approved workflow revamp](docs/workflow-revamp.md).
+The user selected the **Clear wayfinding** replacement direction and guided
+workflow; that approval is not native input, accessibility or release acceptance.
+External OS / clean-machine gates remain open; decision 0005 permits local work.
 
 ## Product foundation (developer commands)
 
@@ -116,7 +117,14 @@ licensing gates remain open. The earlier private candidate is stale for correcte
 source and must not be presented as the verified current app.
 
 Use **Create project**, enter a name and complete http(s) address, then **Save
-project**. Projects → **Open project** reopens saved settings. Ctrl/Cmd+N, S and
+website & continue**. Guided access and page/screen-size setup lead to discovery,
+reviewed capture and explicit baseline saving. Projects → **View results** selects
+a project and opens its workspace;
+**Edit settings** selects it and opens setup. Results and History offer a project
+chooser when none is selected. **Selected project** in the header identifies the
+shared selection; **Change project** switches it without opening the editor. The
+project rail separates **Review changes**, **Pages & baseline**, **History** and
+**Project settings** from **App settings**. Ctrl/Cmd+N, S and
 1…5 create/save/switch sections; Tab/Shift-Tab traverse active controls,
 Enter/Space activate buttons, Escape closes the information dialog, Ctrl/Cmd+Q
 quits. Native menu/titlebar/folder/discard prompts are used where supported.

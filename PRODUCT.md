@@ -3,9 +3,9 @@
 <!-- impeccable:product-schema 1 -->
 
 Regressee is the working name taken from the project directory. The name has not
-been separately confirmed. This document records the product decisions from the
-planning interview; `PLAN.md` contains the implementation strategy and proposed
-defaults.
+been separately confirmed. This document records the original planning decisions
+and the product-context confirmation on 2026-10-11; `PLAN.md` contains the
+implementation strategy and proposed defaults.
 
 ## Platform
 
@@ -39,6 +39,28 @@ terminal, or manually installing developer tooling.
 
 Typical project size is **100–1,000 distinct pages**, with one or more screen
 sizes per page.
+
+## Current Revamp Priorities
+
+Confirmed by the user on **2026-10-11**: the audience, local-only approach, native
+Rust/GPUI stack, and existing product scope remain correct. The request is a
+**full interface and workflow revamp**, not a change of product or removal of
+existing capabilities.
+
+The user identified three connected sources of confusion:
+
+1. **The whole workflow:** choosing a project, setup, finding pages, capturing
+   and saving a baseline, and checking for changes do not connect clearly.
+2. **Project setup:** website boundaries, capture options, login, and
+   environments are overwhelming.
+3. **Reviewing changes:** results, screenshots, failures, approvals, and baseline
+   history are difficult to understand.
+
+The revamp should make the next safe action clear throughout the workflow,
+reduce the burden of initial configuration, and help users understand the
+evidence and consequences of review decisions. Preserve the confirmed product
+capabilities and safety constraints below. No replacement visual direction was
+selected during this product-context interview.
 
 ## Positioning
 
@@ -100,12 +122,17 @@ failures in ordinary language rather than exposing an automation framework.
 - The interface must look **sleek and modern**.
 - Visual polish must support clarity and confidence rather than make the app
   feel like a developer dashboard.
-- No palette, font family, logo, or detailed visual world has been selected.
+- On **2026-10-11**, the user selected **Clear wayfinding** for the replacement
+  interface: deep-blue project navigation, white working surfaces, sky-tinted
+  selection, readable system UI typography, and a clear next safe action. The
+  user confirmed the workflow brief in `docs/workflow-revamp.md`. This is approval
+  of the direction and brief, not native usability or release qualification.
+- No logo or final product name has been selected.
 
 ## Product Principles
 
-1. Ordinary language and sensible defaults first; advanced controls remain
-   available without dominating the experience.
+1. Ordinary language, sensible defaults, and a clear next safe action first;
+   advanced controls remain available without dominating the experience.
 2. Do not confuse a visual difference with a confirmed defect, or a failed
    capture with an unchanged page.
 3. Preserve evidence and history; changing a baseline is deliberate and
@@ -115,9 +142,29 @@ failures in ordinary language rather than exposing an automation framework.
 
 ## Evidence on Hand
 
-The project directory was empty at planning time. There is no existing app,
-design system, logo, screenshot corpus, or usability research to preserve.
-The interview decisions above are the current product evidence.
+The project directory was empty at the original planning interview, but that is
+no longer the current state. The maintained native application lives in
+`crates/app`, with its GPUI shell in `crates/app/src/main.rs`, shared controls in
+`crates/app/src/ui`, and navigation/focus rules in `crates/core/src/shell.rs`.
+
+`README.md` and `docs/first-run-guide.md` describe the implemented workflows:
+guided discovery, authenticated capture, separate environments, fixed-baseline
+checks, result analysis and ignored regions, selective approvals, history,
+baseline ZIP sharing, browser setup, and manual storage cleanup. These are
+implementation evidence, not proof of usability or public-release readiness.
+
+`DESIGN.md` records the built **Clear wayfinding** replacement system. The user
+approved the direction and workflow brief, not a native-usability acceptance
+claim. Actual GPUI offscreen captures now demonstrate the development-host
+layouts; earlier automated OS-window captures were black, and the first-run
+guide separately records the user's successful plain launch/project creation.
+Native input, accessibility, cross-platform and release qualification must not
+be inferred from offscreen, backend or simulated tests.
+
+The current user explicitly reports a confusing interface and requests a full
+revamp, with the priorities recorded above. This is direct usability feedback,
+not a formal usability study. Repository fixture screenshots are synthetic
+evidence, not real project results or an approved visual reference.
 
 ## Open Decisions
 
@@ -125,7 +172,8 @@ These are implementation/design decisions, not unanswered core product scope:
 
 - Exact supported OS versions, CPU architectures, and Linux package format.
 - Specific pinned GPUI, Rust, Node, Playwright, and Chromium versions.
-- Detailed visual design and component approach within GPUI.
+- Remaining native usability/accessibility qualification of the selected visual
+  design and GPUI component behavior.
 - Calibrated comparison preset values, informed by test fixtures.
 - Precise supported image-replacement cases and limitations.
 - Final product name and release artifact hosting.

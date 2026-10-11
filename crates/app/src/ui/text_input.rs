@@ -1,6 +1,7 @@
 // Adapted from GPUI 0.2.2 examples/input.rs (Apache-2.0; Zed contributors).
 // SPDX-License-Identifier: Apache-2.0
 // Shared native input supports IME composition, selection and clipboard.
+use super::{controls::focus_outline, theme::*};
 use gpui::{
     App, Bounds, ClipboardItem, ContentMask, Context, CursorStyle, DispatchPhase, Element,
     ElementId, ElementInputHandler, Entity, EntityInputHandler, FocusHandle, GlobalElementId,
@@ -470,7 +471,7 @@ impl Element for EntryElement {
     ) -> (LayoutId, ()) {
         let mut s = Style::default();
         s.size.width = relative(1.).into();
-        s.size.height = px(28.).into();
+        s.size.height = px(CONTROL_LINE_HEIGHT).into();
         (w.request_layout(s, [], cx), ())
     }
     fn prepaint(
@@ -495,7 +496,7 @@ impl Element for EntryElement {
         });
         let line = w
             .text_system()
-            .shape_line(text.clone(), px(16.), &runs, None);
+            .shape_line(text.clone(), px(CONTROL_TEXT_SIZE), &runs, None);
         self.0.update(cx, |input, _| {
             let caret = line.x_for_index(input.caret());
             let visible = (bounds.size.width - px(4.)).max(px(0.));
@@ -541,16 +542,24 @@ impl Element for EntryElement {
                 w.paint_quad(fill(
                     Bounds::new(
                         point(x, b.top()),
-                        size(if r.is_empty() { px(2.) } else { end - x }, px(24.)),
+                        size(
+                            if r.is_empty() { px(2.) } else { end - x },
+                            px(CONTROL_LINE_HEIGHT),
+                        ),
                     ),
                     if r.is_empty() {
-                        rgb(0x08786f)
+                        rgb(ACCENT)
                     } else {
-                        rgb(0xd9f0ec)
+                        rgb(SELECTED)
                     },
                 ));
             }
-            let _ = line.paint(point(b.origin.x - scroll_x, b.origin.y), px(28.), w, cx);
+            let _ = line.paint(
+                point(b.origin.x - scroll_x, b.origin.y),
+                px(CONTROL_LINE_HEIGHT),
+                w,
+                cx,
+            );
         });
         self.0.update(cx, |i, _| {
             i.bounds = Some(b);
@@ -560,20 +569,13 @@ impl Element for EntryElement {
 }
 impl Render for TextInput {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
+        input_base()
             .id("text-input")
             .debug_selector(|| "text-input".into())
             .key_context("TextInput")
             .when(self.enabled, |el| el.track_focus(&self.focus))
             .when(!self.enabled, |el| el.opacity(0.5))
-            .border_1()
-            .border_color(rgb(0x87999f))
-            .focus(|s| s.border_color(rgb(0x08786f)).bg(rgb(0xf2faf8)))
-            .rounded(px(4.))
-            .overflow_hidden()
-            .px_3()
-            .py_1()
-            .bg(rgb(0xffffff))
+            .focus(|s| focus_outline(s, ACCENT, ACCENT))
             .cursor(CursorStyle::IBeam)
             .on_action(cx.listener(Self::backspace))
             .on_action(cx.listener(Self::delete))
@@ -594,6 +596,26 @@ impl Render for TextInput {
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .child(EntryElement(cx.entity()))
     }
+}
+
+fn input_base() -> gpui::Div {
+    div()
+        .w_full()
+        .h(px(CONTROL_HEIGHT))
+        .flex_shrink_0()
+        .flex()
+        .items_center()
+        .border_1()
+        .border_color(rgb(CONTROL_LINE))
+        .rounded(px(4.))
+        .overflow_hidden()
+        .px(px(12.))
+        .bg(rgb(SURFACE))
+        .font_family(FONT)
+        .text_color(rgb(INK))
+        .text_size(px(CONTROL_TEXT_SIZE))
+        .line_height(px(CONTROL_LINE_HEIGHT))
+        .font_weight(gpui::FontWeight::MEDIUM)
 }
 pub fn bind(cx: &mut App) {
     for key in ["ctrl", "cmd"] {
@@ -620,6 +642,37 @@ pub fn bind(cx: &mut App) {
         KeyBinding::new("cmd-shift-left", SelectHome, Some("TextInput")),
         KeyBinding::new("cmd-shift-right", SelectEnd, Some("TextInput")),
     ]);
+}
+
+#[cfg(test)]
+mod style_tests {
+    use super::*;
+
+    #[core::prelude::v1::test]
+    fn input_focus_keeps_white_editable_surface_and_shared_metrics() {
+        let mut input = input_base();
+        let base = Style::default().refined(input.style().clone());
+        let focused = base.clone().refined(focus_outline(
+            gpui::StyleRefinement::default(),
+            ACCENT,
+            ACCENT,
+        ));
+        assert_eq!(
+            base.background.as_ref().unwrap().color(),
+            Some(rgb(SURFACE).into())
+        );
+        assert_eq!(base.border_color, Some(rgb(CONTROL_LINE).into()));
+        assert_eq!(base.size.height, px(CONTROL_HEIGHT).into());
+        assert_eq!(base.size, focused.size);
+        assert_eq!(base.padding, focused.padding);
+        assert_eq!(base.border_widths, focused.border_widths);
+        assert_eq!(base.text, focused.text);
+        assert_eq!(base.background, focused.background);
+        assert_eq!(focused.border_color, Some(rgb(ACCENT).into()));
+        assert!(contrast(INK, SURFACE) >= 4.5);
+        assert!(contrast(ACCENT, SURFACE) >= 3.);
+        assert!(contrast(INK, SELECTED) >= 4.5);
+    }
 }
 
 #[cfg(all(test, feature = "ui-tests"))]
@@ -859,7 +912,7 @@ mod tests {
         let input = cx.update(|_, cx| view.read(cx).input.clone());
         cx.run_until_parked();
         let bounds = cx.debug_bounds("text-input").unwrap();
-        assert_eq!(bounds.size, size(px(160.), px(38.)));
+        assert_eq!(bounds.size, size(px(160.), px(CONTROL_HEIGHT)));
         cx.update(|_, cx| assert!(input.read(cx).scroll_x > px(0.)));
         cx.simulate_keystrokes("shift-home");
         cx.run_until_parked();

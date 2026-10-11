@@ -1,19 +1,22 @@
 ---
-name: Regressee foundation proposal
-description: Native operational visual system; human review and rendered qualification pending
+name: Regressee — Clear wayfinding
+description: User-approved direction, source-derived native Rust/GPUI system; native and release qualification pending
 colors:
-  primary: "#08786f"
-  primary-hover: "#05645c"
-  selected: "#d9f0ec"
-  ground: "#f6f8f9"
+  ground: "#f6fafd"
   surface: "#ffffff"
-  rail: "#edf2f4"
-  ink: "#183138"
-  muted: "#526970"
-  divider: "#c8d4d8"
-  control-border: "#87999f"
-  action-surface: "#e2e9ec"
-  action-hover: "#d3dfe3"
+  rail: "#183f65"
+  rail-ink: "#ffffff"
+  rail-muted: "#d7e8f5"
+  rail-hover: "#23517a"
+  ink: "#22313d"
+  muted: "#536778"
+  line: "#ced9e2"
+  control-line: "#7e93a6"
+  action-surface: "#f7fafc"
+  action-hover: "#e7f2fa"
+  accent: "#1765ac"
+  accent-hover: "#12558f"
+  selected: "#e7f2fa"
   error: "#9c3038"
   error-surface: "#fff2f2"
   warning: "#775311"
@@ -23,174 +26,267 @@ typography:
     fontFamily: "Segoe UI, .AppleSystemUIFont, DejaVu Sans"
     fontSize: "28px"
     fontWeight: 600
+  review-heading:
+    fontSize: "24px"
+    fontWeight: 600
   title:
     fontSize: "21px"
     fontWeight: 600
+  section:
+    fontSize: "18px"
+    fontWeight: 600
+    lineHeight: "24px"
   body:
     fontSize: "15px"
-    fontWeight: 400
-  field:
-    fontSize: "16px"
     fontWeight: 400
   action:
     fontSize: "14px"
     fontWeight: 500
-  label:
+    lineHeight: "20px"
+  help:
     fontSize: "13px"
     fontWeight: 400
+    lineHeight: "18px"
 rounded:
   status: "3px"
   control: "4px"
-  dialog: "6px"
 spacing:
   tight: "4px"
   related: "8px"
   row: "12px"
   group: "16px"
   section: "24px"
-  inset: "32px"
 components:
   button-primary:
-    backgroundColor: "{colors.primary}"
+    backgroundColor: "{colors.accent}"
     textColor: "{colors.surface}"
+    typography: "{typography.action}"
     rounded: "{rounded.control}"
     padding: "8px 12px"
-    height: "40px minimum"
+  button-primary-hover:
+    backgroundColor: "{colors.accent-hover}"
+    textColor: "{colors.surface}"
   button-secondary:
     backgroundColor: "{colors.action-surface}"
     textColor: "{colors.ink}"
+    typography: "{typography.action}"
+    rounded: "{rounded.control}"
+    padding: "8px 12px"
+  button-danger:
+    backgroundColor: "{colors.error-surface}"
+    textColor: "{colors.error}"
+    typography: "{typography.action}"
+    rounded: "{rounded.control}"
+    padding: "8px 12px"
+  navigation:
+    backgroundColor: "{colors.rail}"
+    textColor: "{colors.rail-ink}"
+    typography: "{typography.action}"
     rounded: "{rounded.control}"
     padding: "8px 12px"
   navigation-selected:
     backgroundColor: "{colors.selected}"
-    textColor: "{colors.primary-hover}"
+    textColor: "{colors.rail}"
     rounded: "{rounded.control}"
   field:
     backgroundColor: "{colors.surface}"
     textColor: "{colors.ink}"
+    typography: "{typography.action}"
     rounded: "{rounded.control}"
-    padding: "4px 12px"
+    padding: "0px 12px"
+    height: "40px"
+  choice-selected:
+    backgroundColor: "{colors.selected}"
+    textColor: "{colors.accent-hover}"
+    typography: "{typography.action}"
+    rounded: "{rounded.control}"
+    padding: "{spacing.row}"
 ---
 
-# Design System: Regressee foundation proposal
+# Design System: Regressee — Clear wayfinding
 
 ## Overview
 
-**Proposal, not user-approved.** This records the maintained GPUI source system,
-not a rendered/accessible/native-qualified design. Human review of representative
-setup and results surfaces is pending. The earlier provisional bench record is
-preserved verbatim in `docs/phase0-design.md`; decision 0005 allows local work
-without pretending its visual gate passed.
+**Creative North Star: "Clear wayfinding"**
 
-**Creative North Star: "A clear working desk" — proposed.** A project manager
-preparing a release in an ordinary well-lit office needs a bright, legible working
-surface, not a dark developer console. Modernity comes from exact alignment,
-confident type and clear states, not decorative charts, animation or fake imagery.
-Operate mode permits native system UI type. `docs/foundation-surface.md` holds
-the screen-specific topology, seed direction and flows; it is not brand approval.
+Make the next safe action obvious. Deep-blue project navigation anchors a bright,
+precisely aligned working surface for non-developers reviewing website releases.
+The signature is self-labelling task state with baseline consequences attached,
+not a developer dashboard, decorative charts or a mobile-app shell.
+
+The user approved this direction and the full workflow brief on 2026-10-11.
+This document records the built source system, not approval of its usability,
+native accessibility or public release. The chosen HTML sketch is illustrative;
+production GPUI source supplies the normative tokens above. The extensions-only
+sidecar carries native behavior and geometry, not a browser implementation.
 
 **Key Characteristics:**
-- Readable local task state, one primary action per task.
-- Horizontal list structure and restrained tonal navigation.
-- Ordinary language and honest incomplete-feature/evidence states.
+- Persistent project context and a clear next safe action.
+- Real coverage beside a searchable queue and untinted comparison evidence.
+- Deliberate baseline decisions, protected drafts and retained history.
+
+Authority: `PRODUCT.md`, `docs/workflow-revamp.md`,
+`.impeccable/surfaces/crates-app-src-main-rs.md` and the selected
+`.impeccable/mocks/decision/pick-6e22d8c4.html`. Implementation sources:
+`crates/app/src/ui/{theme,controls,text_input,timezone_select}.rs`,
+`crates/app/src/{main,workflow,workspace_history}.rs` and
+`crates/core/src/shell.rs`. Earlier direction remains in `docs/phase0-design.md`.
+
+Qualification boundary: the final independent verdict is **fix**: review geometry,
+attached approval and indexed coverage are resolved, but the reference's source
+environment still reads “environment not loaded” in the default review workspace.
+The complete 34-image renderer confirmation passed; this is not full UI acceptance.
+Offscreen Linux GPUI pixels establish only development-host rendering;
+they do not supersede earlier black OS-window captures or establish real input,
+IME, screen-reader, high-contrast, Windows/macOS or release qualification.
 
 ## Colors
 
-Cool near-white working surfaces, deep blue-green ink and one teal action accent.
-Primitives are extracted from `crates/app/src/ui/theme.rs`.
-
 ### Primary
-Teal identifies actions and current selection. The deeper variant carries hover
-and selected text; pale teal marks selection. Keyboard focus uses a separate ink
-outline, never a typography or geometry change.
+Deep-blue `rail` is the navigation anchor; `accent` marks the next task action.
+`accent-hover` deepens action hover/press. Sky `selected` identifies the current
+navigation, choice or page, never successful evidence by itself. Rail text uses
+`rail-ink` and `rail-muted`; unselected navigation hover uses `rail-hover`.
 
 ### Neutral
-Ground and rail establish navigation/content separation. Ink is body text,
-muted is secondary copy, divider separates groups, and control-border outlines
-interactive fields/buttons. Error and warning have both ink and pale surfaces;
-their words explain the state without relying on color.
+`ground`, `surface` and `action-surface` separate the workspace, editable fields
+and secondary actions. `ink` carries readable content; `muted` carries supporting
+copy. `line` is a separator, not an interactive boundary. `control-line` outlines
+controls; production darkens it from the sketch to meet the source contrast
+test's (3:1) threshold against field and secondary-action surfaces. This is not
+native accessibility certification. Keep semantic aliases even when values match.
 
-**The Evidence Rule.** A change classification is never rendered as a confirmed
-defect, and missing screenshots are never rendered as an unchanged result.
+Error and warning ink/surface pairs always accompany explanatory words.
+Informational feedback stays neutral white, distinct from selected navigation;
+information status labels may use the sky tint.
+
+**The Evidence Rule.** A change classification is never rendered as a confirmed defect, and missing screenshots are never rendered as an unchanged result.
 
 ## Typography
 
-One installed UI family carries task headings, body and controls. The frontmatter
-family list is an OS inventory, not a browser fallback stack: code requests Segoe
-UI on Windows, .AppleSystemUIFont on macOS and DejaVu Sans on this Linux target.
-Windows/macOS font resolution is not qualified here. No font assets are bundled.
+Use installed system UI type, not bundled brand fonts. The frontmatter family
+list is an OS inventory, not a CSS fallback stack: source requests Segoe UI on
+Windows, .AppleSystemUIFont on macOS and DejaVu Sans on Linux. Qualify font
+resolution and host-native affordances separately on each desktop platform.
 
-Headings are semibold, actions medium, prose regular. No decorative display type,
-uppercase kickers or technical monospace labels. Body explanations are bounded
-to about 660–680 logical pixels; exact wrapping at desktop scale remains a visual
-review obligation, not a passing screenshot assertion.
+Task headings use `headline`; bounded review uses `review-heading`. `title`
+serves empty states/information dialogs, and `section` groups forms. Body copy is
+regular; actions, editable fields and page addresses share the medium `action`
+metrics. Help and page details use `help`. Keep long form explanations bounded
+(660–680 logical px). No decorative display face or technical monospace hierarchy.
+
+**The Stable State Rule.** Focus, hover, press and selection change paint, never text metrics or control geometry.
 
 ## Layout
 
-The product shell uses a 204px navigation rail and 32px working inset. The initial
-window is 1120×800, minimum 820×600; OS window resize conventions remain native.
-Project context and feedback sit above the scrolling content. Setup's explicit
-Save settings action sits in a pinned bottom bar. Form width is capped at 680px,
-and project lists
-are paged to 64 rows. There is no mobile product layout: website capture profiles
-are not the devices on which Regressee runs. Large result virtualization arrives
-with actual result data, rather than rendering thousands of placeholders now.
+This is a resizable native desktop application. Default window (1280×800 logical
+px), minimum (820×600); fixed project rail (192px), working horizontal inset
+(24px). Setup forms cap at (680px), with an explicit pinned save footer.
+The pinned shared header names **Selected project** and offers **Change project**.
+Results and History offer an in-place chooser when no project is selected.
+Changing projects preserves the destination and confirms draft discard; reopening
+the same project must not reload away its draft. Projects separates **View results**
+from **Edit settings** and identifies the selected project with words and paint.
+
+Review remains side by side, including small desktop windows: queue width (200px)
+below viewport width (1100px), otherwise (272px), separated from the flexible
+viewer by (12px). Do not describe a stacking layout that is not implemented.
+Queue, image pane and viewer tools are independently bounded/scrolled; optional
+capture details have their own bounded scroll region (100px). Review does not
+use the ordinary full-screen scrolling form. Project context, coverage and the
+conditional approval bar remain attached to the task.
+
+Discovery and captured-target lists use virtualized, full-width rows (64px) with
+aligned horizontal insets (16px). Address and details truncate independently;
+selection and hover preserve row height. Lists fill their bounded viewport, not
+a fixed five-row panel. Zero search matches show an explanation, not an empty
+bordered list. Capture profiles describe mobile **web emulation**, tablet and
+desktop websites—not app devices or a mobile product layout.
 
 ## Elevation & Depth
 
-Flat by default, tonal rail separation and ordinary boundaries. No decorative
-shadows or animated entrance. The information dialog has a dimmed background;
-discard confirmation and folder selection use GPUI's native platform prompts
-where supported. Reduce-motion behavior is immediate because this shell does
-not animate. OS theme/high-contrast integration remains qualification work.
+Flat tonal layering and precise boundaries, not decorative shadows. GPUI's
+zero-blur spread paint provides a functional focus outline, not elevation.
+Information and approval dialogs dim the workspace; approval occludes background
+interaction. Folder/discard prompts use platform prompts where supported.
+No invented motion scale: state changes are immediate, and unknown-duration
+activity advances only with real work updates, not a timer-driven animation.
+OS theme/high-contrast behavior remains qualification work.
 
 ## Shapes
 
-Small control corners, slightly larger dialog corners, straight list rules. No
-nested cards or icon-tile grids. There is no shipping icon or raster asset corpus.
+Use small control corners and straight horizontal list rules; status labels are
+slightly tighter. Dialogs share control corners. Draw radio dots, checkbox ticks
+and the timezone chevron with native geometry. No nested decorative card stacks
+or icon-tile dashboard. No shipping visual assets were added for this revamp.
+CAS screenshots are untinted product evidence with provenance—not decorative
+rasters, a fixed image library or synthetic demonstration results.
 
 ## Components
 
-`crates/app/src/ui/controls.rs` supplies action variants, drawn radio choices and
-checkboxes, section headings, status, error, empty, form field, list row, dialog
-and progress. `text_input.rs` is an attributed Apache-2.0 native input, not a web
-field. Primary/secondary/danger/navigation/choice actions share stable 40px-minimum
-targets, 14px medium text and fixed 20px line height. Focus/hover/press refinements
-change paint only. Focus remains distinct from selection and preserves primary
-teal styling. Destructive actions use error ink rather than primary fill.
-Disabled actions lose focus/click
-activation and fade; inputs are read-only during storage work. Actions fit their
-labels instead of stretching to field width; navigation alone fills its column.
-Secondary actions use a cool neutral fill, while editable fields stay white and
-full-width. Choice rows retain full width and balanced 12px insets, including
-below wrapped help. Dismiss is inside its feedback surface; long messages scroll
-within a bounded area rather than consuming the working viewport. These are
-source changes responding to user screenshots, not a native acceptance claim.
-Unknown-duration
-work uses textual progress, never an invented percentage.
+**Actions and choices.** Shared actions have a minimum target height (40px).
+Buttons fit their labels; navigation fills its column; choice/check rows fill
+their available width with balanced `spacing.row` insets even when help wraps.
+Primary keeps its filled blue identity through focus; danger uses error ink and
+surface, never primary fill. Secondary hover uses `action-hover`. Focus is distinct
+from selection: ordinary actions use ink outlines, rail navigation a white outer
+outline with a dark inner border on its selected light surface. Disabled controls
+fade, leave the focus model and reject activation. Shared outlines extend (2px)
+without changing layout or replacing inherited GPUI text refinements.
 
-Tab/Shift-Tab follow the active screen's explicit focus model. Enter/Space
-activate buttons; spaces remain input text. Ctrl/Cmd+N creates/visits setup,
-Ctrl/Cmd+S saves, Ctrl/Cmd+1…5 switches sections, Ctrl/Cmd+Q quits. Clipboard,
-IME, Home/End, anchored Shift selection and pointer selection are scoped to
-fields. Double-click word selection is a basic fallback, not locale-aware
-segmentation. Escape closes the
-information dialog and restores focus; it does not falsely cancel a committed
-SQLite save. Save must be clicked/shortcutted explicitly; Enter in an input does
-not accidentally submit. Unsaved switches request explicit discard confirmation.
+**Fields and timezone.** Native input stays white when focused, with accent focus
+paint and stable action metrics. Disabled fields reject editing and leave focus
+order; storage work locks affected fields. Clipboard, IME composition, pointer
+selection, Home/End and anchored Shift selection belong to fields. Double-click
+word selection is a basic fallback, not locale-aware segmentation. Enter does not
+submit settings; saving is explicit. Timezone is selection-only: search never
+becomes a profile value, legacy imported identifiers remain unchanged until a
+choice is made. The neutral trigger reserves space for its drawn chevron. Its
+bounded popup chooses available space above/below, virtualizes options and keeps
+current selection distinct from keyboard highlight. Arrows/Home/End navigate,
+Enter chooses, Escape dismisses/restores focus; Tab follows the shell order and
+outside dismissal does not steal its target's focus.
+
+**Feedback and progress.** Dismiss belongs inside the feedback surface, centered
+beside the message. Long diagnostics scroll within a bounded area; errors retain
+their red treatment. Known nonzero totals alone produce a clamped completion
+fraction. Unknown/zero totals pair honest text with a patterned activity track;
+discovery shows the actual pages visited. No fabricated percentage or coverage.
+
+**Comparison and approval.** Coverage comes from actual inventory, captures and
+current analysis, including missing and unclassified evidence. Preserve before/
+after origins, screen size, warnings, sensitivity and ignored-area revisions.
+Original screenshots remain untinted; difference, overlay and heatmap are labelled
+analysis modes, not brand treatments of the originals.
+The protected approval dialog has a bounded height (420px) and widths (580px)
+at narrow desktop sizes or (760px) otherwise, capped by its available viewport.
+It states selected references replaced versus inherited references kept, retained
+earlier versions and composite capture times. A virtualized reference list plus
+scrollable exact provenance exposes page/profile, source run, capture time,
+original artifact and requested/final URLs where recorded. Previous/Next supports
+keyboard provenance inspection. Keep reviewing/Escape dismisses without approving;
+Confirm baseline is explicit. Focus is trapped, background mutations are guarded,
+and stale previews are invalidated. Failed/missing/incompatible evidence cannot
+be approved; replacing the whole baseline remains a separate workflow.
+
+**History and keyboard.** Baseline versions and capture/check runs are distinct,
+with active versus retained reference state and composite provenance explained.
+Keep ZIP privacy previews, separate recipient login, storage totals, shared-source
+protections and deliberate deletion; ignored areas are not pixel redaction.
+Tab/Shift-Tab traverse only mounted, enabled controls. Enter/Space activate actions
+without intercepting spaces in inputs. Ctrl/Cmd+N opens new-project setup,
+Ctrl/Cmd+S saves, Ctrl/Cmd+1…5 switches sections and Ctrl/Cmd+Q quits. Dialog
+dismissal restores focus; Escape never pretends to cancel a committed database
+save. Unsaved switches require explicit discard confirmation. Quit-with-unsaved
+edits and real OS input remain qualification obligations.
 
 ## Do's and Don'ts
 
 - **Do** preserve evidence versus settings distinctions and disclose missing work.
-- **Do** use the shared primitives and named semantic tokens for future screens.
+- **Do** use shared native primitives and named semantic tokens for future screens.
 - **Do** keep filesystem, database, process and image I/O off the UI thread.
+- **Do** preserve project context, drafts, approval consequences and retained history.
 - **Don't** present synthetic fixture screenshots as actual project results.
+- **Don't** tint screenshot evidence or replace it with decorative imagery.
 - **Don't** call simulated focus/IME tests a native or screen-reader pass.
-- **Don't** treat this proposal or source contrast checks as human visual approval.
-
-Not canonized: native rendering/input, accessibility semantics, high-contrast /
-dark-theme behavior, resized wrapping and quit-with-unsaved-edit behavior remain
-open. The 2026-10-10 UI sweep's source/test-platform repairs passed independent
-checks, but its isolated X11/software capture was entirely black. No native
-screen/input or hierarchy verdict is invented; the user's working plain launch
-is separate evidence. See `docs/research/ui-sweep-reverification-20261010.md`.
+- **Don't** equate direction approval, source contrast checks or offscreen captures with usability or release approval.

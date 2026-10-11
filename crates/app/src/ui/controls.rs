@@ -18,9 +18,9 @@ fn action_colors(style: ActionStyle) -> (u32, u32, u32, u32) {
         ActionStyle::Danger => (ERROR_SURFACE, ERROR, ERROR, ERROR_SURFACE),
         ActionStyle::Navigation { selected } => (
             if selected { SELECTED } else { RAIL },
-            if selected { ACCENT_HOVER } else { INK },
-            if selected { ACCENT } else { RAIL },
-            SELECTED,
+            if selected { RAIL } else { RAIL_INK },
+            if selected { SELECTED } else { RAIL },
+            if selected { SELECTED } else { RAIL_HOVER },
         ),
         ActionStyle::Choice { selected } => (
             if selected { SELECTED } else { SURFACE },
@@ -53,19 +53,38 @@ fn action_base(style: ActionStyle) -> Div {
         .font_weight(FontWeight::MEDIUM)
 }
 
-fn focus_paint(mut style: StyleRefinement) -> StyleRefinement {
+fn focus_paint(style: StyleRefinement) -> StyleRefinement {
+    focus_outline(style, INK, INK)
+}
+
+pub(super) fn focus_outline(
+    mut style: StyleRefinement,
+    border: u32,
+    outline: u32,
+) -> StyleRefinement {
     // GPUI 0.2.2 replaces Style.text wholesale, rather than recursively merging
     // it. Never set text_color (or any text property) in an interaction state.
     // This is a functional focus outline, not decorative elevation. Its paint
     // extends outside the existing 1px border without changing layout metrics.
-    style = style.border_color(rgb(INK));
+    style = style.border_color(rgb(border));
     style.box_shadow = Some(vec![BoxShadow {
-        color: rgb(INK).into(),
+        color: rgb(outline).into(),
         offset: point(px(0.), px(0.)),
         blur_radius: px(0.),
         spread_radius: px(2.),
     }]);
     style
+}
+
+fn action_focus(style: StyleRefinement, variant: ActionStyle) -> StyleRefinement {
+    match variant {
+        // The white outer outline remains visible against the rail. A dark
+        // inner border also marks the selected light surface independently.
+        ActionStyle::Navigation { selected } => {
+            focus_outline(style, if selected { RAIL } else { RAIL_INK }, RAIL_INK)
+        }
+        _ => focus_paint(style),
+    }
 }
 
 fn hover_paint(style: StyleRefinement, background: u32) -> StyleRefinement {
@@ -104,6 +123,7 @@ pub fn action(
     let action_selector = id.clone();
     let label_selector = id.clone();
     interaction(action_base(style).id(id), focus, enabled, hover_background)
+        .when(enabled, |el| el.focus(move |s| action_focus(s, style)))
         // Actions fit their label; only navigation fills its column. Editable
         // fields and selection rows deliberately retain full-width geometry.
         .when(
@@ -296,7 +316,7 @@ pub enum Tone {
 }
 pub fn status(label: impl Into<SharedString>, tone: Tone) -> Div {
     let (background, ink) = match tone {
-        Tone::Neutral => (RAIL, MUTED),
+        Tone::Neutral => (ACTION_SURFACE, MUTED),
         Tone::Information => (SELECTED, ACCENT_HOVER),
         Tone::Warning => (WARNING_SURFACE, WARNING),
         Tone::Error => (ERROR_SURFACE, ERROR),
@@ -362,11 +382,11 @@ pub fn feedback(
     div()
         .p(px(16.))
         .flex()
-        .items_start()
+        .items_center()
         .gap(px(16.))
         .flex_shrink_0()
-        .bg(rgb(if failed { ERROR_SURFACE } else { SELECTED }))
-        .text_color(rgb(if failed { ERROR } else { ACCENT_HOVER }))
+        .bg(rgb(if failed { ERROR_SURFACE } else { SURFACE }))
+        .text_color(rgb(if failed { ERROR } else { INK }))
         .text_size(px(14.))
         .line_height(px(20.))
         .border_1()
@@ -374,7 +394,9 @@ pub fn feedback(
         .rounded(px(4.))
         .debug_selector(|| "feedback-surface".into())
         .child(copy)
-        .child(dismiss)
+        // Actions deliberately align themselves to the start of form groups.
+        // Wrap this one so the feedback row can center it alongside its copy.
+        .child(div().flex_shrink_0().flex().items_center().child(dismiss))
 }
 pub fn empty(title: &'static str, explanation: &'static str) -> Div {
     div()
@@ -419,25 +441,133 @@ pub fn list_row(id: impl Into<ElementId>) -> Stateful<Div> {
         .items_center()
         .gap_4()
 }
-/// No false percentage for unknown-length operations. Determinate values clamp
-/// to their total; zero-total is unknown, never "100% completed".
-pub fn progress(label: impl Into<SharedString>, completed: u32, total: Option<u32>) -> Div {
-    let fraction = total
-        .filter(|n| *n > 0)
-        .map(|n| completed.min(n) as f32 / n as f32);
+
+/// One continuous list surface; the caller keeps its rows virtualized.
+pub fn page_list(list: impl IntoElement) -> Div {
     div()
+        .debug_selector(|| "page-list".into())
+        .w_full()
+        .border_1()
+        .border_color(rgb(LINE))
+        .rounded(px(4.))
+        .overflow_hidden()
+        .bg(rgb(SURFACE))
+        .child(list)
+}
+
+/// Fixed-height, full-width rows for both discovery and captured targets.
+/// Long addresses/details truncate instead of changing the virtual row height.
+pub fn page_row(
+    id: impl Into<ElementId>,
+    address: impl Into<SharedString>,
+    details: impl Into<SharedString>,
+    selected: bool,
+    enabled: bool,
+) -> Stateful<Div> {
+    let id = id.into();
+    let row_selector = id.clone();
+    let address_selector = id.clone();
+    let details_selector = id.clone();
+    div()
+        .id(id)
+        .debug_selector(move || format!("page-row-{row_selector}"))
+        .w_full()
+        .min_w_0()
+        .h(px(PAGE_ROW_HEIGHT))
+        .px(px(16.))
+        .py(px(8.))
+        .border_b_1()
+        .border_color(rgb(LINE))
+        .bg(rgb(if selected { SELECTED } else { SURFACE }))
+        .flex()
+        .flex_col()
+        .justify_center()
+        .gap(px(4.))
+        .when(enabled, |el| {
+            el.cursor_pointer()
+                .hover(move |style| style.bg(rgb(if selected { SELECTED } else { GROUND })))
+        })
+        .child(
+            div()
+                .debug_selector(move || format!("page-address-{address_selector}"))
+                .w_full()
+                .min_w_0()
+                .text_size(px(14.))
+                .line_height(px(20.))
+                .font_weight(FontWeight::MEDIUM)
+                .text_color(rgb(INK))
+                .text_ellipsis()
+                .child(address.into()),
+        )
+        .child(
+            div()
+                .debug_selector(move || format!("page-details-{details_selector}"))
+                .w_full()
+                .min_w_0()
+                .text_size(px(13.))
+                .line_height(px(18.))
+                .font_weight(FontWeight::NORMAL)
+                .text_color(rgb(if selected { ACCENT_HOVER } else { MUTED }))
+                .text_ellipsis()
+                .child(details.into()),
+        )
+}
+
+fn progress_fraction(completed: u32, total: Option<u32>) -> Option<f32> {
+    total
+        .filter(|n| *n > 0)
+        .map(|n| completed.min(n) as f32 / n as f32)
+}
+
+fn progress_track(completed: u32, total: Option<u32>) -> Div {
+    let fraction = progress_fraction(completed, total);
+    div()
+        .debug_selector(|| "progress-track".into())
+        .w_full()
+        .h(px(4.))
+        .flex_shrink_0()
+        .bg(rgb(LINE))
+        .when_some(fraction, |el, fraction| {
+            el.child(
+                div()
+                    .debug_selector(|| "progress-fill".into())
+                    .h_full()
+                    .w(relative(fraction))
+                    .bg(rgb(ACCENT)),
+            )
+        })
+        .when(fraction.is_none(), |el| {
+            // A patterned activity track, not a guessed completion fraction.
+            // Advance only with real work updates; no perpetual animation or
+            // timer, so the shell remains reduced-motion friendly.
+            let phase = completed % 3;
+            el.child(
+                div()
+                    .debug_selector(|| "progress-indeterminate".into())
+                    .size_full()
+                    .flex()
+                    .gap(px(4.))
+                    .children((0..12).map(|segment| {
+                        div().flex_1().h_full().bg(rgb(if segment % 3 == phase {
+                            ACCENT
+                        } else {
+                            LINE
+                        }))
+                    })),
+            )
+        })
+}
+
+/// No false percentage for unknown-length operations. Determinate values clamp
+/// to their total; zero-total uses the patterned activity track instead.
+pub fn progress(label: impl Into<SharedString>, completed: u32, total: Option<u32>) -> Div {
+    div()
+        .w_full()
         .flex()
         .flex_col()
         .gap_2()
         .child(div().text_color(rgb(MUTED)).child(label.into()))
-        .when_some(fraction, |el, fraction| {
-            el.child(
-                div()
-                    .h(px(4.))
-                    .bg(rgb(LINE))
-                    .child(div().h_full().w(relative(fraction)).bg(rgb(ACCENT))),
-            )
-        })
+        .child(progress_track(completed, total))
 }
 /// Protected information dialog only. Root shell traps/restores focus and Escape.
 pub fn dialog(title: &'static str, body: &'static str, close: AnyElement) -> Div {
@@ -447,7 +577,7 @@ pub fn dialog(title: &'static str, body: &'static str, close: AnyElement) -> Div
         .flex()
         .items_center()
         .justify_center()
-        .bg(rgba(0x18313866))
+        .bg(rgba((INK << 8) | 0x66))
         .child(
             div()
                 .w(px(480.))
@@ -456,7 +586,7 @@ pub fn dialog(title: &'static str, body: &'static str, close: AnyElement) -> Div
                 .bg(rgb(SURFACE))
                 .border_1()
                 .border_color(rgb(CONTROL_LINE))
-                .rounded(px(6.))
+                .rounded(px(4.))
                 .flex()
                 .flex_col()
                 .gap_4()
@@ -559,7 +689,7 @@ mod tests {
                 let mut merged = resting.clone();
                 // Match GPUI's actual order: base -> focus -> hover -> active.
                 if states & 1 != 0 {
-                    merged.refine(&focus_paint(StyleRefinement::default()));
+                    merged.refine(&action_focus(StyleRefinement::default(), variant));
                 }
                 if states & 2 != 0 {
                     merged.refine(&hover_paint(StyleRefinement::default(), hover_background));
@@ -574,7 +704,12 @@ mod tests {
                     px(20.)
                 );
                 if states & 1 != 0 {
-                    assert_eq!(merged.border_color, Some(rgb(INK).into()));
+                    let border = match variant {
+                        ActionStyle::Navigation { selected: true } => RAIL,
+                        ActionStyle::Navigation { selected: false } => RAIL_INK,
+                        _ => INK,
+                    };
+                    assert_eq!(merged.border_color, Some(rgb(border).into()));
                     assert_eq!(merged.box_shadow.len(), 1);
                     assert_eq!(merged.box_shadow[0].spread_radius, px(2.));
                 }
@@ -629,10 +764,43 @@ mod tests {
             Some(rgb(ACTION_SURFACE).into())
         );
         assert_ne!(ACTION_SURFACE, SURFACE);
+        assert_eq!(secondary.border_color, Some(rgb(CONTROL_LINE).into()));
+        assert!(contrast(INK, ACTION_SURFACE) >= 4.5);
+        assert!(contrast(INK, ACTION_HOVER) >= 4.5);
         let selection = merged_base(selection_base(false));
         assert_eq!(selection.padding.top, px(CHOICE_INSET).into());
         assert_eq!(selection.padding.bottom, px(CHOICE_INSET).into());
         assert_eq!(selection.flex_shrink, 0.);
+    }
+
+    #[test]
+    fn navigation_focus_is_visible_on_both_rail_and_selected_surface() {
+        for selected in [false, true] {
+            let variant = ActionStyle::Navigation { selected };
+            let base = merged_base(action_base(variant));
+            let (background, ink, _, hover) = action_colors(variant);
+            assert!(contrast(ink, background) >= 4.5);
+            assert!(contrast(ink, hover) >= 4.5);
+            for hovered in [false, true] {
+                let mut focused = base
+                    .clone()
+                    .refined(action_focus(StyleRefinement::default(), variant));
+                if hovered {
+                    focused.refine(&hover_paint(StyleRefinement::default(), hover));
+                }
+                assert_same_layout(&base, &focused);
+                assert_eq!(inherited_text(&base), inherited_text(&focused));
+                assert_eq!(focused.box_shadow[0].color, rgb(RAIL_INK).into());
+                assert!(contrast(RAIL_INK, RAIL) >= 3.);
+                if selected {
+                    assert_eq!(focused.border_color, Some(rgb(RAIL).into()));
+                    assert!(contrast(RAIL, SELECTED) >= 3.);
+                } else {
+                    assert_eq!(focused.border_color, Some(rgb(RAIL_INK).into()));
+                    assert!(contrast(RAIL_INK, RAIL_HOVER) >= 3.);
+                }
+            }
+        }
     }
 
     #[test]
@@ -653,6 +821,45 @@ mod tests {
         assert!(check_path(bounds).is_ok());
         assert!(check_path(translated).is_ok());
     }
+
+    #[test]
+    fn progress_only_has_a_completion_fraction_for_known_nonzero_totals() {
+        assert_eq!(progress_fraction(0, None), None);
+        assert_eq!(progress_fraction(42, None), None);
+        assert_eq!(progress_fraction(42, Some(0)), None);
+        assert_eq!(progress_fraction(0, Some(100)), Some(0.));
+        assert_eq!(progress_fraction(25, Some(100)), Some(0.25));
+        assert_eq!(progress_fraction(100, Some(100)), Some(1.));
+        assert_eq!(progress_fraction(u32::MAX, Some(100)), Some(1.));
+    }
+
+    #[test]
+    fn informational_feedback_is_distinct_from_selected_navigation() {
+        let notice = merged_base(feedback(
+            None,
+            Some("Settings saved locally.".into()),
+            div().into_any_element(),
+        ));
+        let navigation = merged_base(action_base(ActionStyle::Navigation { selected: true }));
+        assert_eq!(
+            notice.background.as_ref().unwrap().color(),
+            Some(rgb(SURFACE).into())
+        );
+        assert_ne!(notice.background, navigation.background);
+        assert_eq!(inherited_text(&notice).color, rgb(INK).into());
+        assert_eq!(notice.align_items, Some(AlignItems::Center));
+
+        let error = merged_base(feedback(
+            Some("Could not save. Try again.".into()),
+            None,
+            div().into_any_element(),
+        ));
+        assert_eq!(
+            error.background.as_ref().unwrap().color(),
+            Some(rgb(ERROR_SURFACE).into())
+        );
+        assert_eq!(inherited_text(&error).color, rgb(ERROR).into());
+    }
 }
 
 #[cfg(all(test, feature = "ui-tests"))]
@@ -662,6 +869,167 @@ mod ui_tests {
     use gpui::TestAppContext;
 
     const SELECTORS: [&str; 5] = ["primary", "secondary", "danger", "radio", "checkbox"];
+
+    struct NavigationView {
+        focus: FocusHandle,
+        selected: bool,
+    }
+
+    impl Render for NavigationView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().w(px(192.)).p(px(14.)).bg(rgb(RAIL)).child(action(
+                "rail-navigation",
+                "Review changes",
+                &self.focus,
+                ActionStyle::Navigation {
+                    selected: self.selected,
+                },
+                true,
+            ))
+        }
+    }
+
+    #[gpui::test]
+    fn mounted_navigation_geometry_survives_focus_and_light_selection(cx: &mut TestAppContext) {
+        let (view, cx) = cx.add_window_view(|_, cx| NavigationView {
+            focus: cx.focus_handle(),
+            selected: false,
+        });
+        let initial = cx.debug_bounds("action-rail-navigation").unwrap();
+        assert!(initial.size.height >= px(CONTROL_HEIGHT));
+        for selected in [false, true, false] {
+            view.update(cx, |view, cx| {
+                view.selected = selected;
+                cx.notify();
+            });
+            cx.update(|window, cx| view.read(cx).focus.focus(window));
+            cx.run_until_parked();
+            assert_eq!(initial, cx.debug_bounds("action-rail-navigation").unwrap());
+        }
+    }
+
+    struct PageRowsView {
+        width: f32,
+        selected: bool,
+        enabled: bool,
+    }
+
+    impl Render for PageRowsView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            let selected = self.selected;
+            let enabled = self.enabled;
+            div().w(px(self.width)).child(page_list(
+                uniform_list("test-page-rows", 5, move |range, _, _| {
+                    range.map(|index| {
+                        page_row(
+                            SharedString::from(format!("row-{index}")),
+                            if index == 0 { "https://example.test/".into() } else { format!("https://example.test/articles/{}?filter=long-address", "a-long-page-name-".repeat(20)) },
+                            if index == 0 { "Desktop · Captured — analysis not available · 1 attempt" } else { "Mobile · Could not capture: a deliberately long failure description that must remain on one line · 2 attempts" },
+                            selected && index == 0,
+                            enabled,
+                        )
+                    }).collect::<Vec<_>>()
+                }).w_full().h(px(PAGE_ROW_HEIGHT * 5.)),
+            ))
+        }
+    }
+
+    #[gpui::test]
+    fn page_rows_fill_the_list_and_long_copy_never_changes_their_height(cx: &mut TestAppContext) {
+        let (view, cx) = cx.add_window_view(|_, _| PageRowsView {
+            width: 848.,
+            selected: false,
+            enabled: true,
+        });
+        for width in [320., 552., 848.] {
+            for (selected, enabled) in [(false, true), (true, true), (true, false)] {
+                view.update(cx, |view, cx| {
+                    view.width = width;
+                    view.selected = selected;
+                    view.enabled = enabled;
+                    cx.notify();
+                });
+                cx.run_until_parked();
+                let list = cx.debug_bounds("page-list").unwrap();
+                assert_eq!(list.size.width, px(width));
+                let short = cx.debug_bounds("page-row-row-0").unwrap();
+                let long = cx.debug_bounds("page-row-row-1").unwrap();
+                assert_eq!(short.size, size(px(width - 2.), px(PAGE_ROW_HEIGHT)));
+                assert_eq!(short.size, long.size);
+                assert_eq!(short.left(), long.left());
+                assert_eq!(short.bottom(), long.top());
+                for (row, address, details) in [
+                    (short, "page-address-row-0", "page-details-row-0"),
+                    (long, "page-address-row-1", "page-details-row-1"),
+                ] {
+                    let address = cx.debug_bounds(address).unwrap();
+                    let details = cx.debug_bounds(details).unwrap();
+                    assert_eq!(address.left(), row.left() + px(16.));
+                    assert_eq!(address.right(), row.right() - px(16.));
+                    assert_eq!(details.left(), address.left());
+                    assert_eq!(details.right(), address.right());
+                    assert_eq!(address.size.height, px(20.));
+                    assert_eq!(details.size.height, px(18.));
+                    assert!(details.top() >= address.bottom() + px(4.));
+                    assert!(details.bottom() <= row.bottom() - px(8.));
+                }
+            }
+        }
+    }
+
+    struct ProgressView {
+        completed: u32,
+        total: Option<u32>,
+        width: f32,
+    }
+
+    impl Render for ProgressView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().w(px(self.width)).child(progress(
+                "Finding rendered links · 1 page visited — no clicking or forms",
+                self.completed,
+                self.total,
+            ))
+        }
+    }
+
+    #[gpui::test]
+    fn known_and_unknown_progress_keep_a_visible_bounded_track(cx: &mut TestAppContext) {
+        let (view, cx) = cx.add_window_view(|_, _| ProgressView {
+            completed: 1,
+            total: None,
+            width: 320.,
+        });
+        for width in [160., 320., 680.] {
+            for (completed, total) in [
+                (0, None),
+                (1, None),
+                (u32::MAX, Some(0)),
+                (0, Some(100)),
+                (25, Some(100)),
+                (100, Some(100)),
+                (u32::MAX, Some(100)),
+            ] {
+                view.update(cx, |view, cx| {
+                    view.completed = completed;
+                    view.total = total;
+                    view.width = width;
+                    cx.notify();
+                });
+                cx.run_until_parked();
+                let track = cx.debug_bounds("progress-track").unwrap();
+                assert_eq!(track.size, size(px(width), px(4.)));
+                // Pinned GPUI retains old debug selectors between frames;
+                // measure the active mode rather than asserting old ones vanish.
+                if let Some(fraction) = progress_fraction(completed, total) {
+                    let fill = cx.debug_bounds("progress-fill").unwrap();
+                    assert_eq!(fill.size, size(px(width * fraction), px(4.)));
+                } else {
+                    assert_eq!(cx.debug_bounds("progress-indeterminate").unwrap(), track);
+                }
+            }
+        }
+    }
 
     struct ControlsView {
         focus: Vec<FocusHandle>,

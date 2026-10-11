@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Native, selection-only timezone control. Search text is never a profile value.
-use super::{text_input::TextInput, theme::*};
+use super::{controls::focus_outline, text_input::TextInput, theme::*};
 use gpui::{
-    AnyElement, App, AvailableSpace, Bounds, BoxShadow, Context, Entity, FocusHandle, FontWeight,
-    KeyBinding, MouseButton, MouseDownEvent, PathBuilder, Pixels, Point, ScrollStrategy,
-    SharedString, Size, Subscription, UniformListScrollHandle, Window, actions, anchored, canvas,
-    deferred, div, point, prelude::*, px, rgb, uniform_list,
+    AnyElement, App, AvailableSpace, Bounds, Context, Entity, FocusHandle, FontWeight, KeyBinding,
+    MouseButton, MouseDownEvent, PathBuilder, Pixels, Point, ScrollStrategy, SharedString, Size,
+    Subscription, UniformListScrollHandle, Window, actions, anchored, canvas, deferred, div, point,
+    prelude::*, px, rgb, uniform_list,
 };
 use std::sync::OnceLock;
 
@@ -14,7 +14,7 @@ actions!(
     [Toggle, Next, Previous, First, Last, Choose, Close]
 );
 
-const FIELD_TEXT_SIZE: f32 = 16.;
+const FIELD_TEXT_SIZE: f32 = CONTROL_TEXT_SIZE;
 const HEADER_HEIGHT: f32 = 80.;
 const MAX_LIST_HEIGHT: f32 = 320.;
 const POPUP_GAP: f32 = 4.;
@@ -396,10 +396,10 @@ impl TimezoneSelect {
                         .bg(rgb(if current { SELECTED } else { SURFACE }))
                         .text_size(px(FIELD_TEXT_SIZE))
                         .line_height(px(CONTROL_LINE_HEIGHT))
-                        .font_weight(FontWeight::NORMAL)
+                        .font_weight(FontWeight::MEDIUM)
                         .text_color(rgb(if current { ACCENT_HOVER } else { INK }))
                         .cursor_pointer()
-                        .hover(|s| s.bg(rgb(GROUND)))
+                        .hover(move |s| s.bg(rgb(if current { SELECTED } else { GROUND })))
                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                         .on_click(move |_, window, cx| {
                             target.update(cx, |this, cx| this.select_index(index, window, cx));
@@ -577,25 +577,16 @@ impl Render for TimezoneSelect {
                     .border_1()
                     .border_color(rgb(if self.open { ACCENT } else { CONTROL_LINE }))
                     .rounded(px(4.))
-                    .bg(rgb(SURFACE))
+                    .bg(rgb(ACTION_SURFACE))
                     .text_color(rgb(INK))
                     .text_size(px(FIELD_TEXT_SIZE))
                     .line_height(px(CONTROL_LINE_HEIGHT))
-                    .font_weight(FontWeight::NORMAL)
+                    .font_weight(FontWeight::MEDIUM)
                     .when(self.enabled, |el| {
                         el.track_focus(&self.button_focus)
                             .cursor_pointer()
-                            .hover(|s| s.bg(rgb(GROUND)))
-                            .focus(|mut s| {
-                                s = s.border_color(rgb(INK));
-                                s.box_shadow = Some(vec![BoxShadow {
-                                    color: rgb(INK).into(),
-                                    offset: point(px(0.), px(0.)),
-                                    blur_radius: px(0.),
-                                    spread_radius: px(2.),
-                                }]);
-                                s
-                            })
+                            .hover(|s| s.bg(rgb(ACTION_HOVER)))
+                            .focus(|s| focus_outline(s, ACCENT, ACCENT))
                     })
                     .when(!self.enabled, |el| el.opacity(0.5))
                     .on_mouse_down(

@@ -22,9 +22,10 @@ security policies, use `--no-sandbox`, remove quarantine or silently install sys
 Node/npm/browser to make a row pass. Host fonts/libraries/drivers are prerequisites
 until an actual package supplies and qualifies them.
 
-The sleek GPUI working-desk visual system is a proposal, not human-approved.
-Screen-reader semantics/backend coverage must be qualified independently, not
-inferred from textual labels or simulated keyboard actions.
+The user selected the replacement **Clear wayfinding** visual direction and
+guided workflow. This is direction/brief approval, not native input or usability
+qualification. Screen-reader semantics/backend coverage must be qualified
+independently, not inferred from textual labels or simulated keyboard actions.
 
 The 2026-10-10 UI sweep has independently passing focus/layout/action and
 persistence regressions. Its single isolated X11/llvmpipe native attempt mapped

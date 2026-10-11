@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! One blocking storage owner, bounded command/update channels. Terminal replies
 //! are retried (not silently dropped); shutdown breaks backpressure waits.
-use crate::product::Product;
+use crate::{formatting::human_bytes, product::Product};
 use anyhow::Context;
 use regressee_core::domain::{Project, ProjectId};
 use regressee_core::{crawl::DiscoveryPreview, domain::TargetKey};
@@ -786,11 +786,18 @@ fn setup_progress(
                 .max(1);
             let completed = (bytes / scale) as u32;
             let total_units = total.filter(|n| *n > 0).map(|n| n.div_ceil(scale) as u32);
-            let message = match total {
+            let message = match total.filter(|n| *n > 0) {
                 Some(total) => {
-                    format!("Downloading private browser · {bytes} of {total} bytes received")
+                    format!(
+                        "Downloading private browser · {} of {} received",
+                        human_bytes(bytes),
+                        human_bytes(total)
+                    )
                 }
-                None => format!("Downloading private browser · {bytes} bytes received"),
+                None => format!(
+                    "Downloading private browser · {} received",
+                    human_bytes(bytes)
+                ),
             };
             (message, completed, total_units)
         }
@@ -974,16 +981,36 @@ mod tests {
     #[test]
     fn setup_progress_reports_real_bytes_and_only_actual_phases() {
         use regressee_runtime::distribution::InstallProgress;
-        let (_, completed, total) = setup_progress(InstallProgress::Downloading {
+        let (message, completed, total) = setup_progress(InstallProgress::Downloading {
             bytes: 1024,
             total: Some(4096),
         });
+        assert_eq!(
+            message,
+            "Downloading private browser · 1.0 KiB of 4.0 KiB received"
+        );
         assert_eq!((completed, total), (1024, Some(4096)));
-        let (_, completed, total) = setup_progress(InstallProgress::Downloading {
+        let (message, completed, total) = setup_progress(InstallProgress::Downloading {
             bytes: 1024,
             total: None,
         });
+        assert_eq!(message, "Downloading private browser · 1.0 KiB received");
         assert_eq!((completed, total), (1024, None));
+        let (message, completed, total) = setup_progress(InstallProgress::Downloading {
+            bytes: 82_350_444,
+            total: Some(258_433_266),
+        });
+        assert_eq!(
+            message,
+            "Downloading private browser · 78.5 MiB of 246.5 MiB received"
+        );
+        assert_eq!((completed, total), (82_350_444, Some(258_433_266)));
+        let (message, completed, total) = setup_progress(InstallProgress::Downloading {
+            bytes: 0,
+            total: Some(0),
+        });
+        assert_eq!(message, "Downloading private browser · 0 B received");
+        assert_eq!((completed, total), (0, None));
         let (_, completed, total) = setup_progress(InstallProgress::Downloading {
             bytes: u64::MAX / 2,
             total: Some(u64::MAX),

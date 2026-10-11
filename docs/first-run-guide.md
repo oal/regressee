@@ -6,33 +6,52 @@ or terminal configuration. Historical development distributions remain restricte
 to authorized literal-loopback fixtures. See [support matrix](support-matrix.md)
 for the separate platform/clean-machine qualification limits.
 
-1. **Create project** and enter your test website address(es). Saving settings
-   does not start visits. Visits themselves can have effects: use a read-only
-   test account, never an administrative production account.
-2. Choose **Only the starting addresses** or **Find linked pages**.
-   Set the website/section boundaries, exclusions and page limit. Gentle reduces
-   site load; Fast can run four pages at once. Phone/tablet are browser emulation,
-   not actual Safari/iOS hardware.
-   Choose screen sizes with the checkboxes, then select full-page or viewport
-   capture, image mode and a speed preset. These are explicit choices, not
-   buttons that cycle through hidden alternatives. Use **Save settings** in the
-   pinned bottom bar; one save includes website and environment settings. Approve
-   multiple websites in Setup before saving.
-3. If login is needed, select **Login required**, save, then use **Open login
-   browser**, log in/handle consent yourself, then **I'm ready**. An unavailable
-   secure store permits explicit **Only for this app session** login;
-   it does not silently save plaintext. A recipient always sets up their own login.
-4. Use **Find pages**, then inspect the included/excluded list in Results.
-   A page limit is incomplete discovery, not proof you found every page.
-5. Capture, inspect coverage and warnings, then explicitly **Save baseline**.
+1. **Create project**, enter a recognizable name and your test website
+   address(es), then **Save website & continue**. This saves locally without
+   visiting the site. Approve all listed websites when using multiple websites.
+   Visits themselves can have effects: use a read-only test account, never an
+   administrative production account.
+2. In **Website access**, choose **No login required** or **Login required**.
+   For login, **Save settings** first, then use **Open login browser**, finish
+   login/consent yourself, and choose **I'm ready**. An unavailable secure store
+   permits explicit **Only for this app session** login; it never silently saves
+   plaintext. Production/staging sessions remain separate, and ZIP recipients
+   establish their own login. Mapping, language and website-theme options remain
+   available without dominating the first access screen.
+3. **Continue to pages & sizes**. Choose **Only the starting addresses** or
+   **Find linked pages**, website/section boundaries, exclusions and page limit.
+   Choose screen sizes, full-page or visible-screen capture, image mode and speed.
+   Gentle reduces site load; Fast can run four pages at once. Phone/tablet are
+   Chromium emulation, not actual Safari/iOS hardware. Advanced controls remain
+   available. **Save settings** before finding pages.
+4. Use **Find pages & preview**, then inspect the included/excluded inventory in
+   **Pages & baseline** before capturing. A page limit is incomplete discovery,
+   not proof you found every page. An existing baseline remains unchanged.
+5. Capture the reviewed pages, inspect coverage and warnings, then explicitly
+   **Save baseline**.
    A baseline is the approved reference screenshots. Failed or missing targets
    cannot be called unchanged or silently approved.
-6. **Check for changes** revisits only the fixed baseline inventory. Inspect
-   changed screenshots and failed/non-comparable targets. Differences are evidence
+6. **Review changes** → **Run check** revisits only the fixed baseline
+   inventory. Use the coverage summary and searchable queue beside the comparison
+   viewer to inspect changed screenshots and failed/non-comparable targets. Differences are evidence
    to review, not automatic bug verdicts. Other computers/fonts can change pixels.
-7. Sensitivity and ignored rectangles change analysis only. Accepting selected
-   changes creates a new immutable version; other references are inherited.
-   Old versions remain until deliberate manual deletion.
+7. Sensitivity and ignored rectangles change analysis only. Select compatible
+   screenshots, inspect the approval consequences, then explicitly confirm the
+   new baseline version. Other references are inherited, and old versions remain
+   until deliberate manual deletion. **History** distinguishes baseline versions
+   from the capture/check runs that supplied their evidence.
+
+## Choosing and switching projects
+
+Use **View results** in Projects to select a website and enter its workspace
+without opening the editor. **Edit settings** selects that project and opens
+**Project settings**. The blue project rail separates **Review changes**, **Pages
+& baseline**, **History**, and **Project settings** from global **App settings**.
+The header explicitly names the **Selected project** used by Results and History.
+Use **Change project** to switch from either screen. If nothing is selected,
+Results and History show the saved projects to choose from, not an empty review.
+Switching projects does not change saved settings or start a capture; unsaved
+edits require confirmation before switching to a different project.
 
 ## When something goes wrong
 
@@ -87,7 +106,7 @@ configuration. A GPU/backtrace log is not the sanitized diagnostic export.
 
 ### Safe preview checks
 
-Once a window opens, first test Create project → Save settings → Open settings,
+Once a window opens, first test Create project → Save settings → View results,
 keyboard focus and Settings' diagnostic preview/save cancellation. No website
 navigation or browser installation is needed for these actions. To keep these
 checks separate from your real data, set `REGRESSEE_DEV_DATA` to a fresh physical

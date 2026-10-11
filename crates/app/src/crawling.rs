@@ -347,8 +347,11 @@ impl Product {
                 }
             }
             pages.push(page);
+            let page_word = if visited == 1 { "page" } else { "pages" };
             progress(
-                "Finding rendered links — page visits only, no clicking or forms",
+                &format!(
+                    "Finding rendered links · {visited} {page_word} visited — no clicking or forms"
+                ),
                 visited,
                 None,
             );
