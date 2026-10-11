@@ -330,7 +330,7 @@ impl Worker {
         #[cfg(target_os = "linux")]
         let child = pending.child.as_mut().unwrap();
         let input = child.stdin.take().unwrap();
-        let mut stdout = child.stdout.take().unwrap();
+        let stdout = child.stdout.take().unwrap();
         let mut stderr = child.stderr.take().unwrap();
         #[cfg(target_os = "linux")]
         for fd in [&stdout as &dyn std::os::fd::AsRawFd, &stderr] {
@@ -348,6 +348,8 @@ impl Worker {
         let diagnostics_stop = readers_stop.clone();
         let (tx, output) = mpsc::sync_channel(8);
         let parser = std::thread::spawn(move || {
+            #[cfg(target_os = "linux")]
+            let mut stdout = stdout;
             #[cfg(not(target_os = "linux"))]
             let mut reader = BufReader::new(stdout);
             #[cfg(target_os = "linux")]

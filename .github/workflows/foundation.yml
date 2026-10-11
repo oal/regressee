@@ -1,33 +1,34 @@
 name: Foundation checks (not desktop qualification)
 on:
   workflow_dispatch:
+  push:
+    paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.github/**']
+  pull_request:
+    paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.github/**']
 permissions:
   contents: read
 jobs:
   contracts:
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2025, macos-14]
     runs-on: ${{ matrix.os }}
+    env:
+      CARGO_BUILD_JOBS: '4'
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Pinned toolchain
-        shell: bash
-        run: rustup toolchain install 1.98.1 --profile minimal --component rustfmt --component clippy
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
       - run: cargo fmt --all -- --check
-      - run: cargo test --locked --workspace
+      - run: cargo test --locked --workspace --features regressee-app/test-support
       - name: UI-inclusive API and lint check on every target
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
-      - name: Native link and simulated GPUI tests (Windows/macOS)
-        if: runner.os != 'Linux'
+      - name: Native link and simulated GPUI tests (not desktop launch)
         shell: bash
         run: |
           cargo build --locked --workspace --features ui --bins
           cargo test --locked --workspace --all-features
-      - name: Linux native link prerequisites remain an explicit gate
-        if: runner.os == 'Linux'
-        run: cargo build --locked --workspace --features ui --bins
-        # The runner must supply GPUI's native development libraries. This
-        # workflow never installs global packages or weakens sandboxing. Failure
-        # for missing libraries is visible, not skipped or called qualification.

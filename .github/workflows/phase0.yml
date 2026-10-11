@@ -2,25 +2,34 @@ name: Phase 0 executable harness (not runtime qualification)
 on:
   workflow_dispatch:
   push:
-    paths: ['crates/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.github/workflows/phase0.yml']
+    paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.github/**']
+  pull_request:
+    paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.github/**']
 permissions:
   contents: read
 jobs:
   spike:
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-2025, macos-14]
     runs-on: ${{ matrix.os }}
+    env:
+      CARGO_BUILD_JOBS: '4'
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-      - name: Install exact development toolchain
-        shell: bash
-        run: rustup toolchain install 1.98.1 --profile minimal
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
       - name: Rust core tests
-        run: cargo test --locked
+        run: cargo test --locked --workspace --features regressee-app/test-support
       - name: Build local private runtime pack source
         run: python scripts/bootstrap.py
+      - name: Install Linux browser shared-library prerequisites
+        if: runner.os == 'Linux'
+        run: .runtime/source/node/bin/node .runtime/source/worker/node_modules/playwright/cli.js install-deps chromium
       - name: Package, provision and smoke (no system Node)
         shell: bash
         run: |

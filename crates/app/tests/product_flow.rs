@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Actual sandboxed product worker, signed HTTP install, immutable storage, diff.
 //! Explicitly ignored by default: needs the retained verified development pack.
+//! Build with `--features test-support`; no GPUI dependencies are needed.
 use anyhow::{Context, Result, ensure};
 use ed25519_dalek::{Signature, Signer, SigningKey};
 use regressee_app::product::Product;
 use regressee_core::domain::*;
+#[cfg(target_os = "linux")]
+use regressee_runtime::protocol::EventKind;
 use regressee_runtime::{
     distribution::{self, Distribution, Entry, Manifest, Scope},
-    protocol::{Command, EventKind, FailureCode, Request},
+    protocol::{Command, FailureCode, Request},
     supervisor::{ProcessSupervisor, Worker, WorkerFailure},
 };
 use regressee_storage::{AppPaths, Store};
@@ -207,6 +210,25 @@ fn respond(s: &mut TcpStream, status: u32, body: &[u8]) -> std::io::Result<()> {
         body.len()
     )?;
     s.write_all(body)
+}
+fn kill_worker(pid: u32) -> Result<()> {
+    // Kill only the owned worker, not its tree: supervision must clean up after
+    // this deliberately abrupt crash on both Unix and Windows.
+    #[cfg(unix)]
+    ensure!(
+        unsafe { libc::kill(pid as i32, libc::SIGKILL) } == 0,
+        "crash owned worker: {}",
+        std::io::Error::last_os_error()
+    );
+    #[cfg(windows)]
+    ensure!(
+        std::process::Command::new("taskkill")
+            .args(["/F", "/PID", &pid.to_string()])
+            .status()?
+            .success(),
+        "crash owned worker"
+    );
+    Ok(())
 }
 #[test]
 fn phase6_fixture_speculative_connections_do_not_block_ready_requests() -> Result<()> {
@@ -2538,9 +2560,7 @@ fn actual_signed_http_product_flow() -> Result<()> {
     let pid = worker.pid();
     let killer = std::thread::spawn(move || {
         std::thread::sleep(Duration::from_millis(500));
-        unsafe {
-            libc::kill(pid as i32, libc::SIGKILL);
-        }
+        kill_worker(pid)
     });
     let profile = baseline.run.profiles[0].clone();
     let crash = worker
@@ -2561,7 +2581,7 @@ fn actual_signed_http_product_flow() -> Result<()> {
             &mut |_| Ok(()),
         )
         .unwrap_err();
-    killer.join().unwrap();
+    killer.join().unwrap()?;
     assert_eq!(
         crash.downcast_ref::<WorkerFailure>().unwrap().0,
         FailureCode::WorkerStopped

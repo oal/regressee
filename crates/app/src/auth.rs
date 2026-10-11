@@ -129,14 +129,14 @@ fn worker_binding_matches(material: &[u8], approved: &[String]) -> bool {
 impl AuthOwner {
     /// Explicit development-test injection, never selected by project/import/env
     /// configuration. Tests must supply their own provider and owned fixtures.
-    #[cfg(feature = "ui-tests")]
+    #[cfg(feature = "test-support")]
     pub fn with_test_vault(vault: EncryptedSessions) -> Self {
         Self {
             vault: Some(vault),
             ..Default::default()
         }
     }
-    #[cfg(feature = "ui-tests")]
+    #[cfg(feature = "test-support")]
     pub fn save_fixture_session(
         &mut self,
         store: &mut Store,

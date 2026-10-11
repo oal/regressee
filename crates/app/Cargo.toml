@@ -7,7 +7,8 @@ license.workspace = true
 [features]
 default = []
 ui = ["dep:gpui", "dep:image", "dep:log"]
-ui-tests = ["ui", "gpui/test-support"]
+test-support = []
+ui-tests = ["ui", "test-support", "gpui/test-support"]
 ui-inspection = ["ui"]
 ui-renderer-capture = ["ui-tests", "gpui/offscreen-capture"]
 
@@ -33,6 +34,10 @@ zeroize = "=1.9.1"
 ed25519-dalek = "=2.2.0"
 zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
 libc = "=0.2.177"
+
+[[test]]
+name = "product_flow"
+required-features = ["test-support"]
 
 [[bin]]
 name = "regressee"
