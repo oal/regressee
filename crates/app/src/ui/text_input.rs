@@ -41,6 +41,10 @@ pub struct TextInput {
     scroll_x: Pixels,
     pub enabled: bool,
     pub max_bytes: usize,
+    pub validator: Option<fn(&str) -> Option<&'static str>>,
+    pub touched: bool,
+    pub correction: Option<String>,
+    blur_observer: Option<gpui::Subscription>,
 }
 impl TextInput {
     pub fn new(cx: &mut Context<Self>) -> Self {
@@ -59,6 +63,10 @@ impl TextInput {
             scroll_x: px(0.),
             enabled: true,
             max_bytes: 4096,
+            validator: None,
+            touched: false,
+            correction: None,
+            blur_observer: None,
         }
     }
     pub fn set_value(&mut self, value: &str, cx: &mut Context<Self>) {
@@ -69,7 +77,23 @@ impl TextInput {
         self.marked = None;
         self.line = None;
         self.scroll_x = px(0.);
+        self.touched = false;
+        self.correction = None;
         cx.notify();
+    }
+    pub fn validation_error(&self) -> Option<&'static str> {
+        if self.marked.is_some() {
+            return None;
+        }
+        self.validator.and_then(|validate| validate(&self.content))
+    }
+    pub fn composing(&self) -> bool {
+        self.marked.is_some()
+    }
+    /// Last painted input bounds, for form-level keyboard scroll recovery.
+    /// The shell checks mounting before using these retained coordinates.
+    pub fn rendered_bounds(&self) -> Option<Bounds<Pixels>> {
+        self.bounds
     }
     pub fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
@@ -370,6 +394,7 @@ impl EntityInputHandler for TextInput {
         self.selection_reversed = false;
         self.is_selecting = false;
         self.marked = None;
+        self.correction = None;
         cx.notify();
     }
     fn replace_and_mark_text_in_range(
@@ -568,8 +593,14 @@ impl Element for EntryElement {
     }
 }
 impl Render for TextInput {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        input_base()
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.blur_observer.is_none() {
+            self.blur_observer = Some(cx.on_blur(&self.focus, window, |this, _, cx| {
+                this.touched = true;
+                cx.notify();
+            }));
+        }
+        let input = input_base()
             .id("text-input")
             .debug_selector(|| "text-input".into())
             .key_context("TextInput")
@@ -594,7 +625,31 @@ impl Render for TextInput {
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
-            .child(EntryElement(cx.entity()))
+            .child(EntryElement(cx.entity()));
+        let correction = if self.touched && !self.composing() {
+            self.validation_error()
+                .map(str::to_owned)
+                .or_else(|| self.correction.clone())
+        } else {
+            None
+        };
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(input)
+            .when_some(correction, |el, message| {
+                el.child(
+                    div()
+                        .id("field-correction")
+                        .debug_selector(|| "field-correction".into())
+                        .text_size(px(HELP_TEXT_SIZE))
+                        .line_height(px(HELP_LINE_HEIGHT))
+                        .text_color(rgb(ERROR))
+                        .child(message),
+                )
+            })
     }
 }
 
@@ -714,6 +769,32 @@ mod tests {
         })
     }
 
+    #[gpui::test]
+    fn touched_corrections_suppress_ime_and_reset_on_deliberate_value_load(
+        cx: &mut TestAppContext,
+    ) {
+        let (input, cx) = cx.add_window_view(|window, cx| {
+            let mut input = TextInput::with_value("", 0, cx);
+            input.validator = Some(|s| s.is_empty().then_some("Enter a value."));
+            window.focus(&input.focus);
+            input
+        });
+        cx.update(|window, cx| {
+            input.update(cx, |input, cx| {
+                assert!(!input.touched);
+                assert_eq!(input.validation_error(), Some("Enter a value."));
+                input.touched = true;
+                input.replace_and_mark_text_in_range(None, "", None, window, cx);
+                assert!(input.composing());
+                assert!(input.validation_error().is_none());
+                input.unmark_text(window, cx);
+                assert_eq!(input.validation_error(), Some("Enter a value."));
+                input.set_value("restored", cx);
+                assert!(!input.touched);
+                assert!(input.validation_error().is_none());
+            })
+        });
+    }
     #[gpui::test]
     fn shift_selection_retains_anchor_across_direction_changes(cx: &mut TestAppContext) {
         cx.update(bind);

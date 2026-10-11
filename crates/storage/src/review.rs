@@ -2,6 +2,99 @@
 use super::*;
 use crate::capture::{encode, pin};
 use regressee_core::{analysis_engine as engine, evidence::*};
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
+
+// Read-local only: callers supply the authoritative reader, never viewer state.
+fn read_source_once<T>(
+    sources: &mut BTreeMap<RunId, T>,
+    id: RunId,
+    load: impl FnOnce() -> Result<T>,
+) -> Result<&T> {
+    if let Entry::Vacant(entry) = sources.entry(id) {
+        entry.insert(load()?);
+    }
+    Ok(&sources[&id])
+}
+
+// Preserve the existing `.find` semantics for duplicate keys. Duplicate report/
+// failure detection remains separate and must not be weakened by indexing.
+fn first_by_target<'a, T>(
+    values: impl Iterator<Item = (&'a TargetKey, &'a T)>,
+) -> BTreeMap<TargetKey, &'a T> {
+    let mut index = BTreeMap::new();
+    for (key, value) in values {
+        index.entry(key.clone()).or_insert(value);
+    }
+    index
+}
+
+fn capture_descriptors(run: &RunRecord) -> Result<BTreeMap<TargetKey, engine::CaptureDescriptor>> {
+    let captures = first_by_target(
+        run.all_captures()
+            .map(|capture| (&capture.metadata.key, capture)),
+    );
+    captures
+        .into_iter()
+        .map(|(key, capture)| Ok((key, descriptor(run, capture)?)))
+        .collect()
+}
+
+#[cfg(test)]
+mod authoritative_read_index_tests {
+    use super::*;
+
+    #[test]
+    fn analysis_sources_are_read_once_per_distinct_run_and_failures_are_not_cached() -> Result<()> {
+        let ids = [RunId::new(), RunId::new(), RunId::new()];
+        let mut sources = BTreeMap::new();
+        let mut loads = BTreeMap::<RunId, usize>::new();
+        for position in 0..3000 {
+            let id = ids[position % ids.len()];
+            assert_eq!(
+                *read_source_once(&mut sources, id, || {
+                    *loads.entry(id).or_default() += 1;
+                    Ok(id)
+                })?,
+                id
+            );
+        }
+        assert_eq!(sources.len(), 3);
+        assert!(ids.iter().all(|id| loads.get(id) == Some(&1)));
+        let damaged = RunId::new();
+        for _ in 0..2 {
+            assert!(
+                read_source_once(&mut sources, damaged, || {
+                    *loads.entry(damaged).or_default() += 1;
+                    anyhow::bail!("missing/corrupt authoritative evidence")
+                })
+                .is_err()
+            );
+        }
+        assert_eq!(loads[&damaged], 2);
+        assert!(!sources.contains_key(&damaged));
+        Ok(())
+    }
+
+    #[test]
+    fn analysis_indexes_preserve_first_match_without_hiding_later_keys() {
+        let key = TargetKey {
+            page: PageId::new(),
+            profile: ProfileId::new(),
+        };
+        let later = TargetKey {
+            page: PageId::new(),
+            profile: ProfileId::new(),
+        };
+        let values = [(key.clone(), 1), (key.clone(), 2), (later.clone(), 3)];
+        let index = first_by_target(values.iter().map(|(key, value)| (key, value)));
+        assert_eq!(index[&key], &1);
+        assert_eq!(index[&later], &3);
+        assert!(!index.contains_key(&TargetKey {
+            page: PageId::new(),
+            profile: ProfileId::new()
+        }));
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ApprovalContext {
@@ -64,7 +157,34 @@ impl Store {
                     },
                 "stored run/baseline mismatch"
             );
-            let mut keys = std::collections::BTreeSet::new();
+            let references = first_by_target(
+                baseline
+                    .references
+                    .iter()
+                    .map(|reference| (&reference.key, reference)),
+            );
+            let summaries = first_by_target(
+                a.revision
+                    .results
+                    .iter()
+                    .map(|result| (&result.key, result)),
+            );
+            // Failure validation originally used `.any`, not `.find`; preserve
+            // that distinction even if a stored summary contains duplicate keys.
+            let failed_summaries: BTreeSet<_> = a
+                .revision
+                .results
+                .iter()
+                .filter(|result| {
+                    result.classification == Classification::NotComparable
+                        && result.eligible_pixels == 0
+                })
+                .map(|result| result.key.clone())
+                .collect();
+            let after = capture_descriptors(&run)?;
+            let mut sources = BTreeMap::new();
+            sources.insert(run.run.id, after);
+            let mut keys = BTreeSet::new();
             for (key, report) in &p.reports {
                 ensure!(
                     keys.insert(key)
@@ -73,25 +193,25 @@ impl Store {
                     "stored report identity mismatch"
                 );
                 report.request.validate()?;
-                let reference = baseline
-                    .references
-                    .iter()
-                    .find(|r| &r.key == key)
+                let reference = references
+                    .get(key)
                     .context("stored report target missing")?;
-                let old = self.load_run(reference.run)?;
+                let before = read_source_once(&mut sources, reference.run, || {
+                    // Verify every original and derivative before indexing. A
+                    // corrupt later capture must fail even if this report is earlier.
+                    capture_descriptors(&self.load_run(reference.run)?)
+                })?
+                .get(key)
+                .context("stored before missing")?;
+                let before_matches = before == &report.request.before;
+                let after = sources[&run.run.id]
+                    .get(key)
+                    .context("stored after missing")?;
                 ensure!(
-                    descriptor(&old, old.evidence(key).context("stored before missing")?)?
-                        == report.request.before
-                        && descriptor(&run, run.evidence(key).context("stored after missing")?)?
-                            == report.request.after,
+                    before_matches && after == &report.request.after,
                     "stored report capture binding mismatch"
                 );
-                let result = a
-                    .revision
-                    .results
-                    .iter()
-                    .find(|r| &r.key == key)
-                    .context("stored summary missing")?;
+                let result = summaries.get(key).context("stored summary missing")?;
                 ensure!(
                     result.eligible_pixels == report.eligible_pixels
                         && result.changed_pixels == report.changed_pixels
@@ -122,10 +242,7 @@ impl Store {
             }
             for (key, _) in &p.failures {
                 ensure!(
-                    keys.insert(key)
-                        && a.revision.results.iter().any(|r| &r.key == key
-                            && r.classification == Classification::NotComparable
-                            && r.eligible_pixels == 0),
+                    keys.insert(key) && failed_summaries.contains(key),
                     "stored failure cannot be unchanged"
                 );
             }

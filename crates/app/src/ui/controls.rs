@@ -430,6 +430,52 @@ pub fn field(label: &'static str, hint: &'static str, input: AnyElement) -> Div 
         .child(input)
         .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(hint))
 }
+
+/// Compact unknown-duration activity, not a completion bar or a guessed count.
+/// Static native geometry also respects reduced-motion environments.
+pub fn activity(label: impl Into<SharedString>) -> Div {
+    div()
+        .debug_selector(|| "loading-activity".into())
+        .flex()
+        .items_center()
+        .gap(px(8.))
+        .text_size(px(CONTROL_TEXT_SIZE))
+        .line_height(px(CONTROL_LINE_HEIGHT))
+        .text_color(rgb(MUTED))
+        .child(
+            div()
+                .size(px(6.))
+                .rounded(px(3.))
+                .flex_shrink_0()
+                .bg(rgb(ACCENT)),
+        )
+        .child(div().min_w_0().child(label.into()))
+}
+
+pub fn loading(title: &'static str, explanation: &'static str) -> Div {
+    div()
+        .debug_selector(|| "loading-state".into())
+        .w_full()
+        .max_w(px(660.))
+        .py(px(24.))
+        .flex()
+        .flex_col()
+        .gap(px(8.))
+        .child(
+            div()
+                .text_size(px(18.))
+                .line_height(px(24.))
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(title),
+        )
+        .child(
+            div()
+                .text_size(px(14.))
+                .line_height(px(20.))
+                .text_color(rgb(MUTED))
+                .child(explanation),
+        )
+}
 pub fn list_row(id: impl Into<ElementId>) -> Stateful<Div> {
     div()
         .id(id)
@@ -451,6 +497,8 @@ pub fn page_list(list: impl IntoElement) -> Div {
         .border_color(rgb(LINE))
         .rounded(px(4.))
         .overflow_hidden()
+        .flex()
+        .flex_col()
         .bg(rgb(SURFACE))
         .child(list)
 }
@@ -513,6 +561,26 @@ pub fn page_row(
         )
 }
 
+/// History is a selection row, not a label-sized action. Its focus and selected
+/// paint share the complete list width, including the otherwise empty trailing area.
+pub fn history_row(
+    id: impl Into<ElementId>,
+    title: impl Into<SharedString>,
+    details: impl Into<SharedString>,
+    focus: &FocusHandle,
+    selected: bool,
+    enabled: bool,
+) -> Stateful<Div> {
+    interaction(
+        // page_row owns pointer-only hover; interaction owns focus/hover for
+        // keyboard rows. Registering both hover handlers panics in GPUI.
+        page_row(id, title, details, selected, false).flex_shrink_0(),
+        focus,
+        enabled,
+        SELECTED,
+    )
+}
+
 fn progress_fraction(completed: u32, total: Option<u32>) -> Option<f32> {
     total
         .filter(|n| *n > 0)
@@ -572,16 +640,22 @@ pub fn progress(label: impl Into<SharedString>, completed: u32, total: Option<u3
 /// Protected information dialog only. Root shell traps/restores focus and Escape.
 pub fn dialog(title: &'static str, body: &'static str, close: AnyElement) -> Div {
     div()
+        .debug_selector(|| "information-dialog-overlay".into())
+        .occlude()
         .absolute()
         .inset_0()
         .flex()
         .items_center()
         .justify_center()
+        .p_4()
         .bg(rgba((INK << 8) | 0x66))
         .child(
             div()
+                .debug_selector(|| "information-dialog".into())
                 .w(px(480.))
                 .max_w_full()
+                .max_h_full()
+                .min_h_0()
                 .p_6()
                 .bg(rgb(SURFACE))
                 .border_1()
@@ -592,12 +666,29 @@ pub fn dialog(title: &'static str, body: &'static str, close: AnyElement) -> Div
                 .gap_4()
                 .child(
                     div()
+                        .debug_selector(|| "information-dialog-title".into())
+                        .flex_shrink_0()
                         .text_size(px(21.))
                         .font_weight(FontWeight::SEMIBOLD)
                         .child(title),
                 )
-                .child(div().text_color(rgb(MUTED)).child(body))
-                .child(close),
+                .child(
+                    div()
+                        .id("information-dialog-body")
+                        .debug_selector(|| "information-dialog-body".into())
+                        .min_h_0()
+                        .max_h(px(320.))
+                        .overflow_y_scroll()
+                        .text_color(rgb(MUTED))
+                        .text_size(px(14.))
+                        .line_height(px(20.))
+                        .child(
+                            div()
+                                .debug_selector(|| "information-dialog-copy".into())
+                                .child(body),
+                        ),
+                )
+                .child(div().flex_shrink_0().child(close)),
         )
 }
 

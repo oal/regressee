@@ -36,6 +36,9 @@ pub struct HistoryPage {
     pub imported_runs: Vec<RunId>,
     pub page: usize,
     pub more: bool,
+    /// Current saved selection, independently of this page's retained versions.
+    #[serde(default)]
+    pub active_baseline: Option<BaselineId>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RepairPreview {
@@ -208,7 +211,7 @@ fn deletion(
 }
 impl Store {
     pub fn history(&self, project: ProjectId, page: usize) -> Result<HistoryPage> {
-        self.load_project(project)?;
+        let active_baseline = self.load_project(project)?.project.active_baseline;
         ensure!(page <= 15625, "History page exceeds limit");
         let mut q = self.connection.prepare(
             "SELECT id FROM runs WHERE project_id=?1 ORDER BY rowid DESC LIMIT 65 OFFSET ?2",
@@ -249,6 +252,7 @@ impl Store {
             imported_runs,
             page,
             more,
+            active_baseline,
         })
     }
     pub fn is_imported_run(&self, run: RunId) -> Result<bool> {

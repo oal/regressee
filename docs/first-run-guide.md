@@ -29,8 +29,14 @@ for the separate platform/clean-machine qualification limits.
    not proof you found every page. An existing baseline remains unchanged.
 5. Capture the reviewed pages, inspect coverage and warnings, then explicitly
    **Save baseline**.
-   A baseline is the approved reference screenshots. Failed or missing targets
-   cannot be called unchanged or silently approved.
+    A baseline is the approved reference screenshots. Failed or missing targets
+    cannot be called unchanged or silently approved.
+    Saved capture screenshots are not automatically a baseline. If the capture
+    has gaps, **Inspect capture** shows the screenshots on their own and explains
+    why **Save baseline** is unavailable. Use **Filter** → **Gaps** to inspect
+    failures, then **Find pages** to fix or exclude pages in a new preview and
+    capture again. The earlier screenshots remain in History. Once the capture
+    is complete, choose **Save baseline** to establish the comparison reference.
 6. **Review changes** → **Run check** revisits only the fixed baseline
    inventory. Use the coverage summary and searchable queue beside the comparison
    viewer to inspect changed screenshots and failed/non-comparable targets. Differences are evidence
@@ -163,8 +169,65 @@ OS/CPU family and bounded counts; no screenshots, URLs/queries, project names,
 session references, secrets, local paths, private logs or free-form errors.
 Nothing is uploaded. Review and share the local file only if you choose.
 
-Keyboard: Tab/Shift-Tab, Enter/Space for focused buttons, Ctrl/Cmd+N create,
-Ctrl/Cmd+S explicit save, Ctrl/Cmd+1…5 sections, Escape dismiss, Ctrl/Cmd+Q quit.
+Search in the discovery preview and review queue filters as you type; there is
+no separate Search submission. Clear restores the list. If your inspected
+screenshot falls outside the filter, it remains visible with a notice so typing
+does not discard ignored-area edits or replace evidence underneath you.
+
+History separates Runs, Baselines and Storage, with direct selection and live date/type filtering of
+loaded records. Its search scope is labelled; another history page can contain
+additional matches. Storage totals are measured separately and are never shown
+as zero just because measurement has not completed. Refresh history reloads the
+current page; Refresh storage totals requests a separate census. Saved network settings load
+automatically in App settings; saving edits is still explicit.
+
+Review decisions and Save note are available without opening Analysis. Decisions
+apply only to the displayed analysis; they never approve a baseline. Use Select
+for baseline update → Review approval to preview reference changes separately.
+Next unreviewed waits for your drafts to be saved. Hide page queue gives the
+screenshots more room. Drag or scroll in an image to move around; Ctrl+scroll
+(also Cmd+scroll on macOS) zooms around the pointer. Shift+scroll moves sideways.
+The paired images move together. The **Zoom** menu groups **Fit width**, **Actual
+size (100%)**, and percentage presets. The desktop control shows the fit mode and
+resulting percentage; small windows show a compact Zoom label and percentage,
+with the selected mode in the menu. Manually zooming switches to a fixed
+percentage. Fit width resets the view and follows window resizing. With the
+image focused, +/− zoom, arrows and
+Page Up/Down move, 0 fits width, and 1 shows actual size. No navigation buttons
+are shown for a missing screenshot.
+
+Opening projects, reading screenshots and loading History show task-specific
+loading messages, not empty-result messages. Short local reads use a compact
+activity indicator instead of a dashed progress track. Capture feedback remains
+visible, and operations with known totals show measured progress.
+An empty screenshot/history state appears only after the corresponding read
+finishes. Read failures remain distinct from an empty project and offer recovery.
+
+Details shows the page, screen size, readable UTC run time, capture status and
+recovery advice. Exact IDs and source records remain under Technical diagnostics.
+Details and Analysis open a bounded flyout over the viewer, with Close/Escape;
+they never replace the queue or change the underlying image size or position.
+Only comparisons have Analysis; capture-only views do not show editing tools.
+
+For keyboard ignored-area editing, open Analysis → Add by coordinates, edit the
+whole-pixel coordinates, Apply area edit, then Save ignored areas. Invalid or
+all-masked geometry cannot be saved. Original screenshots remain unchanged.
+Draw ignored areas temporarily folds away the flyout so you can draw on either
+original. Finishing a rectangle returns to the inspector; Done drawing or Escape
+also leaves drawing mode. Area edits remain drafts until explicitly saved.
+The queue, ordinary review actions and retained notes stay available.
+
+In History, Open check results uses the recorded reference and saved analysis;
+Open screenshots displays the selected capture. Both are inspection-only and
+leave your active baseline unchanged. Return to latest evidence to do new work.
+Quit/window close offers Cancel, Save and quit, or Discard and quit when drafts
+exist. A failed save or unapplied area edit keeps the window open.
+
+Keyboard: Tab/Shift-Tab, Enter/Space for focused buttons, Ctrl/Cmd+F find in the
+review/discovery queue or History, Ctrl/Cmd+N create, Ctrl/Cmd+S explicit save,
+Ctrl/Cmd+1…5 sections, Escape dismiss, Ctrl/Cmd+Q quit. F1 or App settings →
+Keyboard shortcuts displays help. Go to next correction reveals an invalid
+field without submitting your settings.
 Native/high-DPI and screen-reader acceptance remain unqualified; focus-model tests
 are not a screen-reader pass. Text fields support Shift+arrows/Home/End, mouse
 selection and double-click selection; word handling is a simple fallback, not

@@ -102,6 +102,9 @@ impl SetupStage {
     }
     pub fn mounts(self, control: Control) -> bool {
         use Control::*;
+        if matches!(control, ValidationNext) {
+            return true;
+        }
         match self {
             Self::Settings => true,
             Self::Website => matches!(control, Name | Address | Guided(11) | Save),
@@ -164,6 +167,7 @@ pub enum Control {
     PanRight,
     PanUp,
     PanDown,
+    Viewer,
     Guided(usize),
     CrawlField(usize),
     PauseCapture,
@@ -175,6 +179,14 @@ pub enum Control {
     Environment(usize),
     Details(Detail),
     DismissFeedback,
+    HistorySearch,
+    HistoryClear,
+    HistoryRefresh,
+    HistoryKind(usize),
+    HistoryBaseline(usize),
+    HistoryRun(usize),
+    Shortcuts,
+    ValidationNext,
 }
 #[derive(Debug, Clone)]
 pub struct FocusState {
@@ -199,6 +211,8 @@ pub struct FocusState {
     pub resumable: bool,
     pub pausable: bool,
     pub environments: usize,
+    pub history_baselines: usize,
+    pub history_runs: usize,
 }
 impl Default for FocusState {
     fn default() -> Self {
@@ -224,6 +238,8 @@ impl Default for FocusState {
             resumable: false,
             pausable: false,
             environments: 1,
+            history_baselines: 0,
+            history_runs: 0,
         }
     }
 }
@@ -246,6 +262,7 @@ impl FocusState {
             ];
         }
         let mut controls: Vec<_> = Screen::ALL.into_iter().map(Control::Navigate).collect();
+        controls.push(Control::Shortcuts);
         controls.push(Control::PagesBaseline);
         if !self.busy && self.project_saved && self.screen != Screen::Projects {
             controls.push(if self.choosing_project {
@@ -257,14 +274,7 @@ impl FocusState {
         controls.push(Control::DismissFeedback);
         if self.busy {
             if self.view_loading && self.screen == Screen::Results {
-                controls.extend([
-                    Control::ZoomOut,
-                    Control::ZoomIn,
-                    Control::PanLeft,
-                    Control::PanRight,
-                    Control::PanUp,
-                    Control::PanDown,
-                ]);
+                controls.push(Control::Viewer);
                 controls.extend((0..18).map(Control::Phase5));
                 controls.push(Control::Guided(46));
                 controls.extend((0..9).map(Control::AnalysisField));
@@ -348,6 +358,7 @@ impl FocusState {
                     controls.extend([31, 32, 33, 34, 35, 36].map(Control::Guided));
                 }
                 controls.push(Control::Details(Detail::Capture));
+                controls.push(Control::ValidationNext);
                 controls.push(Control::Save);
                 if self.project_saved {
                     controls.push(Control::Guided(13));
@@ -364,6 +375,7 @@ impl FocusState {
                     Control::Guided(42),
                 ]);
                 controls.push(Control::Details(Detail::Network));
+                controls.push(Control::ValidationNext);
             }
             Screen::Results => {
                 if self.project_saved {
@@ -390,11 +402,12 @@ impl FocusState {
                     controls.push(Control::CrawlField(9));
                     // Analysis controls can be mounted without image panes;
                     // the app filters these candidates by the actual sections.
-                    controls.extend((0..29).map(Control::Phase5));
+                    controls.extend((0..29).chain(32..40).map(Control::Phase5));
                     controls.push(Control::Guided(44));
                     controls.push(Control::Guided(45));
+                    controls.extend([50, 51].map(Control::Guided));
                     controls.push(Control::Details(Detail::Analysis));
-                    controls.extend((0..10).map(Control::AnalysisField));
+                    controls.extend((0..14).map(Control::AnalysisField));
                 }
                 if self.candidate {
                     controls.push(Control::SaveBaseline);
@@ -404,19 +417,20 @@ impl FocusState {
                 }
                 if self.viewer {
                     controls.push(Control::Guided(46));
-                    controls.extend([
-                        Control::ZoomOut,
-                        Control::ZoomIn,
-                        Control::PanLeft,
-                        Control::PanRight,
-                        Control::PanUp,
-                        Control::PanDown,
-                    ]);
+                    controls.push(Control::Viewer);
                 }
             }
             Screen::History if self.project_saved => {
+                controls.extend([
+                    Control::HistorySearch,
+                    Control::HistoryClear,
+                    Control::HistoryRefresh,
+                ]);
+                controls.extend((0..self.history_baselines.min(128)).map(Control::HistoryBaseline));
+                controls.extend((0..4).map(Control::HistoryKind));
+                controls.extend((0..self.history_runs.min(64)).map(Control::HistoryRun));
                 controls.extend((40..43).map(Control::Phase5));
-                controls.extend((0..13).chain(14..16).map(Control::Phase6));
+                controls.extend((0..13).chain(14..20).map(Control::Phase6));
                 controls.push(Control::Details(Detail::History));
             }
             _ => (),
@@ -426,6 +440,7 @@ impl FocusState {
                 matches!(
                     control,
                     Control::Navigate(_)
+                        | Control::Shortcuts
                         | Control::SetupStage(_)
                         | Control::PagesBaseline
                         | Control::ChooseProject
@@ -456,6 +471,29 @@ impl FocusState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn history_rows_are_bounded_distinct_and_modal_safe() {
+        let mut state = FocusState {
+            screen: Screen::History,
+            busy: false,
+            project_saved: true,
+            history_baselines: 128,
+            history_runs: 64,
+            ..Default::default()
+        };
+        assert!(state.can_activate(Control::HistoryBaseline(127)));
+        assert!(state.can_activate(Control::HistoryRun(63)));
+        assert!(!state.can_activate(Control::HistoryBaseline(128)));
+        assert!(!state.can_activate(Control::HistoryRun(64)));
+        assert!(state.can_activate(Control::HistorySearch));
+        assert!(state.can_activate(Control::HistoryRefresh));
+        state.busy = true;
+        assert!(!state.can_activate(Control::HistoryBaseline(0)));
+        assert!(!state.can_activate(Control::HistoryRefresh));
+        state.busy = false;
+        state.dialog = true;
+        assert_eq!(state.controls(), vec![Control::CloseDialog]);
+    }
     #[test]
     fn approval_decision_traps_navigation_and_mutations_until_dismissed() {
         let mut state = FocusState {

@@ -11,3 +11,5 @@ pub mod product;
 pub mod review;
 #[cfg(feature = "ui")]
 pub mod ui;
+#[cfg(feature = "ui")]
+mod viewer_cache;

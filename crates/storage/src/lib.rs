@@ -13,6 +13,7 @@ use std::{
     time::Duration,
 };
 mod capture;
+mod history_inspection;
 pub use capture::{CheckpointWork, RunAppender, TargetCheckpoint};
 mod diagnostics;
 pub use diagnostics::DiagnosticCounts;
@@ -722,6 +723,66 @@ impl Store {
             kind,
         })
     }
+    /// Read-only display input: hash the exact bounded bytes returned to the
+    /// decoder. This is not a trusted-path token or mutation/approval authority.
+    pub fn read_verified_artifact(
+        &self,
+        id: &ArtifactId,
+        maximum: u64,
+    ) -> Result<(Artifact, Vec<u8>)> {
+        let (expected, kind): (u64, String) = self.connection.query_row(
+            "SELECT bytes,kind FROM artifacts WHERE hash=?1",
+            [id.as_str()],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )?;
+        ensure!(
+            expected > 0 && expected <= maximum.min(MAX_ARTIFACT_BYTES),
+            "artifact exceeds display byte budget"
+        );
+        let path = self.paths.artifacts().join(id.as_str());
+        let metadata = fs::symlink_metadata(&path)?;
+        ensure!(
+            metadata.is_file()
+                && regressee_core::platform::ordinary(&metadata)
+                && metadata.len() == expected,
+            "artifact is missing, changed, or unsafe"
+        );
+        let mut bytes = Vec::with_capacity(expected as usize);
+        fs::File::open(path)?
+            .take(expected + 1)
+            .read_to_end(&mut bytes)?;
+        ensure!(
+            bytes.len() as u64 == expected && hex::encode(Sha256::digest(&bytes)) == id.as_str(),
+            "artifact integrity check failed"
+        );
+        let kind = match kind.as_str() {
+            "Screenshot" => ArtifactKind::Screenshot,
+            "Thumbnail" => ArtifactKind::Thumbnail,
+            "Tile" => ArtifactKind::Tile,
+            "Difference" => ArtifactKind::Difference,
+            _ => bail!("unknown artifact kind"),
+        };
+        Ok((
+            Artifact {
+                id: id.clone(),
+                bytes: expected,
+                kind,
+            },
+            bytes,
+        ))
+    }
+    /// Cheap display-cache checkpoint. SQLite data_version detects commits from
+    /// other connections; total_changes detects this owner's writes, including
+    /// checkpoint, mask and analysis-display changes without scanning evidence.
+    /// Deliberately coarse: unrelated writes may invalidate a display session.
+    pub fn viewer_revision(&self) -> Result<(u64, u64)> {
+        Ok((
+            self.connection
+                .pragma_query_value(None, "data_version", |row| row.get(0))?,
+            self.connection
+                .query_row("SELECT total_changes()", [], |row| row.get(0))?,
+        ))
+    }
     pub fn add_reference(&mut self, owner: &ArtifactOwner, id: &ArtifactId) -> Result<()> {
         let tx = self
             .connection
@@ -826,6 +887,35 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let paths = AppPaths::isolated(root.path());
         (root, paths)
+    }
+    #[test]
+    fn display_bytes_are_exact_bounded_and_revision_is_connection_sensitive() {
+        let (_root, paths) = isolated();
+        let mut store = Store::open(paths.clone()).unwrap();
+        let first = store.viewer_revision().unwrap();
+        let artifact = store
+            .put_artifact(&b"verified display bytes"[..], ArtifactKind::Tile)
+            .unwrap();
+        let next = store.viewer_revision().unwrap();
+        assert_ne!(first, next);
+        assert_eq!(
+            store.read_verified_artifact(&artifact.id, 128).unwrap().1,
+            b"verified display bytes"
+        );
+        assert!(store.read_verified_artifact(&artifact.id, 2).is_err());
+        let mut other = Store::open(paths.clone()).unwrap();
+        let project = Project::draft("Other connection".into(), "https://example.test/").unwrap();
+        other.save_project(&project, None).unwrap();
+        assert_ne!(store.viewer_revision().unwrap().0, next.0);
+        assert_eq!(store.viewer_revision().unwrap().1, next.1);
+        fs::write(
+            paths.artifacts().join(artifact.id.as_str()),
+            b"corrupt! display bytes",
+        )
+        .unwrap();
+        assert!(store.read_verified_artifact(&artifact.id, 128).is_err());
+        fs::remove_file(paths.artifacts().join(artifact.id.as_str())).unwrap();
+        assert!(store.read_verified_artifact(&artifact.id, 128).is_err());
     }
     #[test]
     fn coordinated_ui_save_is_atomic_private_and_revision_bound() {

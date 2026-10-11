@@ -861,6 +861,64 @@ impl Store {
             comparison,
         })
     }
+    /// Verified, focused viewer session boundary. Unlike the full workspace
+    /// snapshot this does not load every retained baseline or review decision.
+    /// Warm tiles reuse this metadata; all authoritative APIs remain uncached.
+    pub fn viewer_evidence(
+        &self,
+        project: ProjectId,
+        analysis: Option<AnalysisId>,
+    ) -> Result<ProjectEvidence> {
+        let saved = self.load_project(project)?;
+        let comparison = if let Some(id) = analysis {
+            Some(self.load_analysis(id)?)
+        } else {
+            let id: Option<String> = self.connection.query_row(
+                "SELECT COALESCE((SELECT analysis_id FROM analysis_display WHERE run_id=r.id),(SELECT id FROM analyses WHERE run_id=r.id ORDER BY rowid DESC LIMIT 1)) FROM runs r WHERE project_id=?1 ORDER BY rowid DESC LIMIT 1",
+                [project.to_string()], |row| row.get::<_, Option<String>>(0),
+            ).optional()?.flatten();
+            id.map(|id| self.load_analysis(serde_json::from_value(serde_json::json!(id))?))
+                .transpose()?
+        };
+        let run = if let Some(a) = &comparison {
+            Some(a.revision.run)
+        } else {
+            let id: Option<String> = self
+                .connection
+                .query_row(
+                    "SELECT id FROM runs WHERE project_id=?1 ORDER BY rowid DESC LIMIT 1",
+                    [project.to_string()],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            id.map(|id| serde_json::from_value(serde_json::json!(id)))
+                .transpose()?
+        };
+        let latest = run.map(|id| self.load_run(id)).transpose()?;
+        ensure!(
+            latest.as_ref().is_none_or(|r| r.run.project == project),
+            "viewer analysis belongs to another project"
+        );
+        let baseline = comparison
+            .as_ref()
+            .map(|a| a.revision.baseline)
+            .or(saved.project.active_baseline)
+            .map(|id| self.load_baseline(id))
+            .transpose()?;
+        ensure!(
+            baseline.as_ref().is_none_or(|b| b.project == project),
+            "viewer baseline belongs to another project"
+        );
+        Ok(ProjectEvidence {
+            latest,
+            baseline,
+            before: None,
+            comparison,
+            analyses: vec![],
+            reviews: vec![],
+            baselines: vec![],
+        })
+    }
     /// Called by the exclusive application storage owner on startup; never GC.
     pub fn recover_runs(&mut self) -> Result<u32> {
         let ids: Vec<(String, u32)> = {
@@ -1119,6 +1177,29 @@ mod tests {
         capture.metadata.requested = target.requested.to_string();
         capture.metadata.final_url = target.requested.to_string();
         record.captures.push(capture);
+    }
+    #[test]
+    fn viewer_revision_tracks_target_checkpoints_and_compaction() {
+        let (_root, mut store, mut record, sample) = checkpoint_fixture(1);
+        let mut claim = store.begin_run_append(record.run.id).unwrap();
+        let first = store.viewer_revision().unwrap();
+        add_capture(&mut record, &sample, 0);
+        store
+            .append_run_targets(
+                &mut claim,
+                &[TargetCheckpoint {
+                    index: 0,
+                    target: &record.run.targets[0],
+                    capture: record.captures.last(),
+                }],
+            )
+            .unwrap();
+        let append = store.viewer_revision().unwrap();
+        assert_ne!(first, append);
+        record.run.state = JobState::Completed;
+        record.run.finished_at = Some(2);
+        store.finish_run(&record).unwrap();
+        assert_ne!(append, store.viewer_revision().unwrap());
     }
     #[test]
     #[ignore = "bounded serial checkpoint profile, synthetic CAS fixture not browser coverage"]

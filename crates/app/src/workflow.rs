@@ -151,47 +151,371 @@ impl Coverage {
 }
 
 impl Shell {
+    pub(super) fn capture_is_saved_baseline(&self) -> bool {
+        self.evidence.latest.as_ref().is_some_and(|run| {
+            self.evidence.baseline.as_ref().is_some_and(|baseline| {
+                !baseline.references.is_empty()
+                    && baseline.references.len() == run.run.targets.len()
+                    && baseline
+                        .references
+                        .iter()
+                        .all(|reference| reference.run == run.run.id)
+            })
+        })
+    }
+
+    pub(super) fn review_title(&self) -> &'static str {
+        if self.history_inspection.is_some() {
+            return if self.evidence.comparison.is_some() {
+                "Recorded check · inspection only"
+            } else {
+                "Recorded capture · inspection only"
+            };
+        }
+        if self.focus.review_surface == ReviewSurface::Pages || self.preview.is_some() {
+            "Pages & baseline"
+        } else if self.focus.capturing {
+            "Capture coverage"
+        } else if self.focus.candidate {
+            "Inspect baseline"
+        } else if self.evidence.comparison.is_none() && self.evidence.latest.is_some() {
+            if self.capture_is_saved_baseline() {
+                "Baseline screenshots"
+            } else {
+                "Inspect capture"
+            }
+        } else {
+            "Review changes"
+        }
+    }
+
+    fn capture_next_step(&self) -> Option<&'static str> {
+        if self.history_inspection.is_some() {
+            return None;
+        }
+        if self.evidence.comparison.is_some() || self.preview.is_some() || self.focus.capturing {
+            return None;
+        }
+        let run = self.evidence.latest.as_ref()?;
+        if self.capture_is_saved_baseline() {
+            return Some("Baseline saved · Run check to compare.");
+        }
+        Some(match run.run.intent {
+            RunIntent::NewBaseline => match run.run.state {
+                JobState::Completed if self.evidence.baseline.is_some() => {
+                    "Choose Save baseline to replace the current reference."
+                }
+                JobState::Completed => {
+                    "Choose Save baseline to use these screenshots as your reference."
+                }
+                JobState::CompletedWithErrors if self.evidence.baseline.is_some() => {
+                    "Baseline unchanged · Filter → Gaps, then Find pages to retry."
+                }
+                JobState::CompletedWithErrors => {
+                    "Baseline not saved · Filter → Gaps, then Find pages to retry."
+                }
+                JobState::Paused | JobState::Interrupted => {
+                    "Capture unfinished · Resume or Find pages to start again."
+                }
+                JobState::Cancelled => "Capture stopped · Find pages to start again.",
+                _ => "Capture unfinished · No baseline saved.",
+            },
+            RunIntent::RepresentativePreview => {
+                "Preview only · Capture the full page list before saving a baseline."
+            }
+            RunIntent::Check { .. } => {
+                "No comparison available · Run check to retry; baseline unchanged."
+            }
+        })
+    }
+
+    fn baseline_rail_status(&self) -> String {
+        if self.history_inspection.is_some() {
+            return "Recorded evidence\nActive baseline unchanged".into();
+        }
+        if self.initial_evidence_loading() {
+            return "Loading saved evidence…".into();
+        }
+        if self.initial_evidence_unavailable() {
+            return "Saved evidence unavailable".into();
+        }
+        if let Some(baseline) = &self.evidence.baseline {
+            count_label(
+                baseline.references.len(),
+                "baseline screenshot",
+                "baseline screenshots",
+            )
+        } else if self.evidence_dirty
+            && self
+                .project
+                .as_ref()
+                .is_some_and(|p| p.project.active_baseline.is_some())
+        {
+            "Saved baseline".into()
+        } else if self.focus.candidate {
+            "Ready to save baseline".into()
+        } else if self.evidence.latest.as_ref().is_some_and(|run| {
+            run.run.intent == RunIntent::NewBaseline
+                && run.run.state == JobState::CompletedWithErrors
+        }) {
+            "Incomplete capture\nNo baseline saved".into()
+        } else if self.evidence.latest.is_some() {
+            "Capture only\nNo baseline saved".into()
+        } else {
+            "No saved baseline yet".into()
+        }
+    }
+
+    pub(super) fn captured_target_label(&self, key: &TargetKey) -> &'static str {
+        if self.evidence.latest.as_ref().is_some_and(|run| {
+            self.evidence.baseline.as_ref().is_some_and(|baseline| {
+                baseline
+                    .references
+                    .iter()
+                    .any(|reference| reference.run == run.run.id && reference.key == *key)
+            })
+        }) {
+            "Saved baseline screenshot"
+        } else if self
+            .evidence
+            .latest
+            .as_ref()
+            .is_some_and(|run| run.run.intent == RunIntent::NewBaseline)
+        {
+            "Captured · not yet a baseline"
+        } else {
+            "Captured · not compared"
+        }
+    }
+
+    pub(super) fn viewer_pane_indices(&self) -> &'static [usize] {
+        if self.preview.is_some() || self.evidence.comparison.is_none() {
+            // A first capture has only an original, not a before/after pair.
+            return &[1];
+        }
+        match self.viewer_mode {
+            0 => &[0, 1],
+            1 | 3 => &[2],
+            _ => &[0],
+        }
+    }
+
+    pub(super) fn fitted_viewer_zoom(&self) -> f32 {
+        let pane = self.current_viewer_pane_width();
+        (pane / self.viewer_dimensions().0.max(1) as f32).clamp(0.05, 4.)
+    }
+
+    pub(super) fn current_viewer_pane_width(&self) -> f32 {
+        viewer_pane_width(
+            self.working_width,
+            self.review_queue_width(),
+            self.viewer_pane_indices().len(),
+        )
+    }
+
+    pub(super) fn page_list_workspace(&self) -> bool {
+        self.preview.is_some() || self.focus.review_surface == ReviewSurface::Pages
+    }
+
+    pub(super) fn discovery_image_mounted(&self) -> bool {
+        self.preview.is_some()
+            && self.discovery_preview_visible
+            && self.evidence.comparison.is_none()
+            && self.evidence.latest.as_ref().is_some_and(|r| {
+                r.run.intent == RunIntent::RepresentativePreview
+                    && self
+                        .viewer
+                        .as_ref()
+                        .and_then(|v| v.identity.as_ref())
+                        .is_some_and(|identity| {
+                            identity.run == r.run.id
+                                && self.selected_key.as_ref() == Some(&identity.key)
+                                && self
+                                    .project
+                                    .as_ref()
+                                    .is_some_and(|p| p.project.id == identity.project)
+                        })
+            })
+    }
+
+    pub(super) fn review_queue_width(&self) -> f32 {
+        if self.page_list_workspace() && !self.discovery_image_mounted() {
+            self.working_width
+        } else if self.review_queue_collapsed && !self.page_list_workspace() {
+            0.
+        } else if self.narrow_workspace {
+            200.
+        } else {
+            272.
+        }
+    }
+
+    /// Parent routes Guided(50/51) here and refreshes mounted focus afterwards.
+    pub(super) fn toggle_workspace_presentation(&mut self, control: Control) -> bool {
+        match control {
+            Control::Guided(50) if !self.page_list_workspace() => {
+                self.review_queue_collapsed = !self.review_queue_collapsed;
+                self.presentation_focus = Some(Control::Guided(50));
+                if self.viewer_fit {
+                    self.zoom = self.fitted_viewer_zoom();
+                }
+                true
+            }
+            Control::Guided(51) if self.preview.is_some() => {
+                self.discovery_preview_visible = false;
+                self.presentation_focus = Some(Control::Phase5(30));
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub(super) fn workspace_control_mounted(&self, control: Control) -> bool {
+        if self.focus.screen == Screen::History
+            && self.project.is_some()
+            && self.history.is_none()
+            && self.history_section != 2
+        {
+            return matches!(
+                control,
+                Control::Navigate(_)
+                    | Control::PagesBaseline
+                    | Control::ChooseProject
+                    | Control::DismissFeedback
+                    | Control::HistoryRefresh
+                    | Control::Phase6(16..=18)
+            );
+        }
+        let results = self.focus.screen == Screen::Results && self.project.is_some();
+        if results && self.initial_evidence_loading() {
+            return matches!(
+                control,
+                Control::Navigate(_)
+                    | Control::PagesBaseline
+                    | Control::ChooseProject
+                    | Control::DismissFeedback
+            );
+        }
+        if results && self.initial_evidence_unavailable() {
+            return matches!(
+                control,
+                Control::Navigate(_)
+                    | Control::PagesBaseline
+                    | Control::ChooseProject
+                    | Control::DismissFeedback
+                    | Control::RefreshEvidence
+            );
+        }
+        match control {
+            Control::Phase5(23 | 24) | Control::AnalysisField(_)
+                if results && self.page_list_workspace() =>
+            {
+                false
+            }
+            Control::Phase5(0..=5 | 12..=13 | 15..=19 | 26..=28 | 34..=35)
+            | Control::AnalysisField(0..=8 | 10..=13)
+            | Control::Details(Detail::Analysis)
+                if results && self.mask_draw =>
+            {
+                false
+            }
+            Control::Phase5(8..=9) if results && self.mask_draw && self.narrow_workspace => false,
+            Control::Phase5(0..=22 | 26..=29 | 32..=37)
+            | Control::ZoomIn
+            | Control::ZoomOut
+            | Control::PanLeft
+            | Control::PanRight
+            | Control::PanUp
+            | Control::PanDown
+            | Control::Viewer
+            | Control::Guided(44 | 46 | 52)
+            | Control::Details(Detail::Analysis)
+                if results && self.page_list_workspace() && !self.discovery_image_mounted() =>
+            {
+                false
+            }
+            Control::Guided(19 | 23 | 24 | 45)
+                if results && self.page_list_workspace() && self.preview.is_none() =>
+            {
+                false
+            }
+            Control::Choice(choice)
+                if results
+                    && self.page_list_workspace()
+                    && self.preview.is_none()
+                    && Choice::RESULTS.contains(&choice) =>
+            {
+                false
+            }
+            Control::Choice(choice)
+                if results
+                    && !self.page_list_workspace()
+                    && self.review_queue_collapsed
+                    && Choice::RESULTS.contains(&choice) =>
+            {
+                false
+            }
+            Control::Guided(50) => {
+                results && !self.page_list_workspace() && self.evidence.latest.is_some()
+            }
+            Control::Guided(51) => results && self.discovery_image_mounted(),
+            Control::Guided(16) if self.preview.is_some() => self.result_filters_open,
+            Control::Guided(17 | 19..=24 | 45) | Control::CrawlField(9)
+                if results && !self.page_list_workspace() && self.review_queue_collapsed =>
+            {
+                false
+            }
+            _ => true,
+        }
+    }
+
     /// Offscreen fixtures must call this with their capture width too; the
     /// native render path calls it with the actual desktop viewport width.
     pub(super) fn configure_review_geometry(&mut self, width: f32) {
         self.narrow_workspace = width < 1100.;
-        self.working_width = width - 240.;
+        self.working_width = (width - 240.).max(1.);
         if self.viewer_fit && self.viewer.is_some() {
-            let available = self.working_width - if self.narrow_workspace { 212. } else { 284. };
-            let pane = if self.viewer_mode == 0 {
-                (available - 12.) / 2.
-            } else {
-                available
-            };
-            self.zoom = (pane / self.viewer_dimensions().0.max(1) as f32).clamp(0.05, 4.);
+            self.zoom = self.fitted_viewer_zoom();
         }
     }
     pub(super) fn results(&self, cx: &mut Context<Self>) -> AnyElement {
         if self.project.is_none() {
             return self.project_picker(cx);
         }
+        if self.initial_evidence_loading() || self.initial_evidence_unavailable() {
+            return div()
+                .debug_selector(|| "results-loading".into())
+                .size_full()
+                .min_h_0()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(
+                    div()
+                        .flex()
+                        .flex_wrap()
+                        .items_center()
+                        .justify_between()
+                        .gap_2()
+                        .child(
+                            div()
+                                .text_size(px(if self.narrow_workspace { 21. } else { 24. }))
+                                .font_weight(FontWeight::SEMIBOLD)
+                                .child(self.review_title()),
+                        )
+                        .when(self.initial_evidence_unavailable(), |header| {
+                            header.child(self.button(
+                                Control::RefreshEvidence,
+                                "Refresh",
+                                ActionStyle::Primary,
+                                cx,
+                            ))
+                        }),
+                )
+                .child(self.screenshot_placeholder())
+                .into_any_element();
+        }
         let pages = self.focus.review_surface == ReviewSurface::Pages || self.preview.is_some();
-        let (title, _next) = if self.focus.candidate {
-            (
-                "Inspect baseline",
-                "Inspect the capture, then explicitly save your reference.",
-            )
-        } else if self.focus.review_surface == ReviewSurface::Capture {
-            (
-                "Capture coverage",
-                "Completed evidence is kept; activation remains a separate action.",
-            )
-        } else if pages {
-            (
-                "Pages & baseline",
-                "Review the intended inventory before capturing a replacement.",
-            )
-        } else {
-            (
-                "Review changes",
-                "Inspect changes and gaps; preview intended approvals before saving.",
-            )
-        };
         let mut actions = div().flex().flex_wrap().items_center().gap_2();
         if self.focus.candidate {
             actions = actions.child(self.button(
@@ -205,7 +529,7 @@ impl Shell {
             actions = actions.child(self.button(
                 Control::CheckChanges,
                 "Run check",
-                ActionStyle::Primary,
+                ActionStyle::Secondary,
                 cx,
             ));
         }
@@ -227,17 +551,39 @@ impl Shell {
         if self.preview.is_some() {
             actions = actions.child(self.button(
                 Control::Phase5(30),
-                "Preview page",
+                "Preview first included page…",
                 ActionStyle::Secondary,
                 cx,
             ));
         }
         actions = actions.child(self.button(
             Control::RefreshEvidence,
-            "Refresh",
+            if self.history_inspection.is_some() {
+                if self.narrow_workspace {
+                    "Latest evidence"
+                } else {
+                    "Return to latest evidence"
+                }
+            } else {
+                "Refresh"
+            },
             ActionStyle::Secondary,
             cx,
         ));
+        if !pages && self.evidence.latest.is_some() {
+            actions = actions.child(self.guided_button(
+                50,
+                if self.review_queue_collapsed {
+                    "Show page queue"
+                } else {
+                    "Hide page queue"
+                },
+                cx,
+            ));
+        }
+        if self.discovery_image_mounted() {
+            actions = actions.child(self.guided_button(51, "Hide preview", cx));
+        }
         div()
             .debug_selector(|| "bounded-review".into())
             .size_full()
@@ -245,6 +591,7 @@ impl Shell {
             .flex()
             .flex_col()
             .gap_2()
+            .when(self.narrow_workspace, |workspace| workspace.gap_1())
             .child(
                 div()
                     .flex_shrink_0()
@@ -260,21 +607,44 @@ impl Shell {
                             .gap_2()
                             .child(
                                 div()
-                                    .text_size(px(24.))
+                                    .text_size(px(if self.narrow_workspace { 21. } else { 24. }))
                                     .font_weight(FontWeight::SEMIBOLD)
-                                    .child(title),
+                                    .child(self.review_title()),
                             )
                             .child(actions),
                     )
-                    .child(
-                        div()
-                            .debug_selector(|| "comparison-context".into())
-                            .text_size(px(14.))
-                            .line_height(px(20.))
-                            .child(self.comparison_context()),
-                    ),
+                    .when_some(self.capture_next_step(), |header, next| {
+                        header.child(
+                            div()
+                                .debug_selector(|| "capture-next-step".into())
+                                .text_size(px(14.))
+                                .line_height(px(20.))
+                                .when(
+                                    self.evidence.latest.as_ref().is_some_and(|run| {
+                                        run.run.state == JobState::CompletedWithErrors
+                                    }),
+                                    |notice| {
+                                        notice
+                                            .bg(rgb(WARNING_SURFACE))
+                                            .px_2()
+                                            .py_1()
+                                            .rounded(px(4.))
+                                    },
+                                )
+                                .text_color(rgb(
+                                    if self.evidence.latest.as_ref().is_some_and(|run| {
+                                        run.run.state == JobState::CompletedWithErrors
+                                    }) {
+                                        WARNING
+                                    } else {
+                                        INK
+                                    },
+                                ))
+                                .child(next),
+                        )
+                    }),
             )
-            .child(self.coverage_summary())
+            .when(!pages, |body| body.child(self.coverage_summary()))
             .child(
                 div()
                     .debug_selector(|| "queue-beside-viewer".into())
@@ -284,40 +654,35 @@ impl Shell {
                     .flex()
                     .gap_3()
                     .overflow_hidden()
-                    .child(
-                        div()
-                            .debug_selector(|| "review-queue".into())
-                            .w(px(if self.narrow_workspace { 200. } else { 272. }))
-                            .h_full()
-                            .min_h_0()
-                            .flex_shrink_0()
-                            .child(self.inventory_and_results(cx)),
-                    )
-                    .child(
-                        div()
-                            .debug_selector(|| "review-viewer".into())
-                            .flex_1()
-                            .min_w_0()
-                            .h_full()
-                            .min_h_0()
-                            .flex()
-                            .flex_col()
-                            .gap_2()
-                            .child(self.viewer_section(cx))
-                            .when(self.review_tools, |viewer| {
-                                viewer.child(
-                                    div()
-                                        .id("review-details-scroll")
-                                        .debug_selector(|| "review-details-scroll".into())
-                                        .h(px(100.))
-                                        .flex_shrink_0()
-                                        .overflow_y_scroll()
-                                        .track_scroll(&self.review_details_scroll)
-                                        .child(self.selected_capture_details(cx)),
-                                )
-                            }),
-                    ),
+                    .when(pages || !self.review_queue_collapsed, |workspace| {
+                        workspace.child(
+                            div()
+                                .debug_selector(|| "review-queue".into())
+                                .w(px(self.review_queue_width()))
+                                .h_full()
+                                .min_h_0()
+                                .flex_shrink_0()
+                                .child(self.inventory_and_results(cx)),
+                        )
+                    })
+                    .when(!pages || self.discovery_image_mounted(), |workspace| {
+                        workspace.child(
+                            div()
+                                .debug_selector(|| "review-viewer".into())
+                                .flex_1()
+                                .min_w_0()
+                                .h_full()
+                                .min_h_0()
+                                .flex()
+                                .flex_col()
+                                .gap_2()
+                                .child(self.viewer_section(cx)),
+                        )
+                    }),
             )
+            .when(!pages && self.evidence.comparison.is_some(), |workspace| {
+                workspace.child(self.ordinary_review_bar(cx))
+            })
             .into_any_element()
     }
 
@@ -344,6 +709,22 @@ impl Shell {
     }
 
     pub(super) fn comparison_context(&self) -> String {
+        if let Some(preview) = &self.preview {
+            return discovery_summary(preview);
+        }
+        if self.focus.review_surface == ReviewSurface::Pages {
+            return if self
+                .evidence
+                .latest
+                .as_ref()
+                .zip(self.evidence.baseline.as_ref())
+                .is_some_and(|(r, b)| r.run.inventory.id == b.inventory)
+            {
+                "Saved baseline page list · Checks revisit included pages. Find pages to prepare a replacement.".into()
+            } else {
+                "Latest capture page list · Find pages to prepare a new list; saved baseline unchanged.".into()
+            };
+        }
         let reference = self
             .evidence
             .comparison
@@ -354,31 +735,34 @@ impl Shell {
                     .as_ref()
                     .is_some_and(|p| p.project.active_baseline != Some(a.revision.baseline));
                 format!(
-                    "{}baseline {}",
+                    "{}baseline",
                     if historical {
                         "Historical "
                     } else {
                         "Compared "
-                    },
-                    short_id(a.revision.baseline.to_string())
+                    }
                 )
             })
-            .unwrap_or_else(|| "No comparison reference — capture inspection only".into());
+            .unwrap_or_else(|| {
+                if self.capture_is_saved_baseline() {
+                    format!(
+                        "Saved baseline {}",
+                        short_id(self.evidence.baseline.as_ref().unwrap().id.to_string())
+                    )
+                } else {
+                    "Capture only — no comparison performed".into()
+                }
+            });
         let check = self
             .displayed_run()
             .map(|r| {
                 format!(
-                    "{} {} · {} · {}",
+                    "{} · {}",
                     if matches!(r.run.intent, RunIntent::Check { .. }) {
                         "Check"
                     } else {
                         "Capture"
                     },
-                    short_id(r.run.id.to_string()),
-                    r.run
-                        .finished_at
-                        .map(capture_time)
-                        .unwrap_or_else(|| "not finished".into()),
                     r.run.environment.name
                 )
             })
@@ -409,10 +793,7 @@ impl Shell {
             })
             .map(|p| format!("{} · {} × {} CSS px", p.name, p.width, p.height))
             .unwrap_or_else(|| "Profile record not loaded".into());
-        if pane == 0
-            && let Some(comparison) = &self.evidence.comparison
-        {
-            let id = comparison.revision.baseline;
+        if pane == 0 && self.evidence.comparison.is_some() {
             let reference = self
                 .compared_baseline()
                 .and_then(|b| b.references.iter().find(|r| Some(&r.key) == key));
@@ -424,58 +805,48 @@ impl Shell {
             let capture = source
                 .and_then(|r| key.and_then(|key| r.evidence(key)))
                 .or_else(|| {
-                    self.evidence
-                        .before
-                        .as_ref()
-                        .filter(|c| Some(&c.metadata.key) == key)
+                    self.evidence.before.as_ref().filter(|c| {
+                        Some(&c.metadata.key) == key
+                            && reference.is_some_and(|r| r.artifact == c.image.original)
+                    })
                 });
             let origin = capture
                 .map(|c| capture_origin(&c.metadata.final_url))
                 .unwrap_or_else(|| "Origin record not loaded".into());
-            let environment = source
-                .map(|r| r.run.environment.name.as_str())
+            let environment = self
+                .viewer_reference_environment()
+                .or_else(|| source.map(|r| r.run.environment.name.as_str()))
                 .unwrap_or("environment not loaded");
-            let time = reference
-                .map(|r| capture_time(r.captured_at))
-                .unwrap_or_else(|| "capture time not loaded".into());
             let profile = capture
-                .map(|c| {
-                    format!(
-                        "{} · {} × {} CSS px",
-                        c.metadata.profile.name,
-                        c.metadata.profile.width,
-                        c.metadata.profile.height
-                    )
-                })
-                .unwrap_or(profile);
+                .map(|c| compact_profile(&c.metadata.profile))
+                .unwrap_or_else(|| "Screen size not loaded".into());
             (
-                format!("Baseline {}\n{time}", short_id(id.to_string())),
+                "Before · baseline".into(),
                 format!("{environment}\n{origin}"),
                 profile,
             )
         } else {
             let capture = run.and_then(|r| key.and_then(|key| r.evidence(key)));
-            let label = if pane == 2 {
+            let label = if self.evidence.comparison.is_none() && self.capture_is_saved_baseline() {
+                "Baseline capture"
+            } else if pane == 2 {
                 if self.viewer_mode == 3 {
                     "Heatmap"
                 } else {
                     "Difference"
                 }
             } else {
-                "Capture"
+                if self.evidence.comparison.is_some() {
+                    "After · check"
+                } else {
+                    "Capture"
+                }
             };
-            let title = run
-                .map(|r| {
-                    format!(
-                        "{label} {}\n{}",
-                        short_id(r.run.id.to_string()),
-                        r.run
-                            .finished_at
-                            .map(capture_time)
-                            .unwrap_or_else(|| "unfinished".into())
-                    )
-                })
-                .unwrap_or_else(|| format!("{label} record not loaded"));
+            let title = if run.is_some() {
+                label.to_owned()
+            } else {
+                format!("{label} record not loaded")
+            };
             let origin = capture
                 .map(|c| capture_origin(&c.metadata.final_url))
                 .unwrap_or_else(|| "no saved image".into());
@@ -486,9 +857,33 @@ impl Shell {
                     run.map(|r| r.run.environment.name.as_str())
                         .unwrap_or("environment not loaded")
                 ),
-                profile,
+                capture
+                    .map(|c| compact_profile(&c.metadata.profile))
+                    .unwrap_or(profile),
             )
         }
+    }
+
+    /// Reference context travels with the inspected pair, not with whichever
+    /// History page happened to be opened. Never borrow a previous target's
+    /// environment while a newer image request is in flight.
+    fn viewer_reference_environment(&self) -> Option<&str> {
+        let frame = self.viewer.as_ref()?;
+        let identity = frame.identity.as_ref()?;
+        let run = self
+            .evidence
+            .comparison
+            .as_ref()
+            .map(|a| a.revision.run)
+            .or_else(|| self.evidence.latest.as_ref().map(|r| r.run.id))?;
+        if self.project.as_ref()?.project.id != identity.project
+            || run != identity.run
+            || self.selected_key.as_ref() != Some(&identity.key)
+            || self.evidence.comparison.as_ref().map(|a| a.revision.id) != identity.analysis
+        {
+            return None;
+        }
+        frame.before_environment.as_deref()
     }
 
     pub(super) fn approval_decision(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -563,14 +958,17 @@ impl Shell {
     }
 
     pub(super) fn review_index(&self) -> ReviewIndex {
-        let active =
-            if self.mask_dirty || self.analysis_due.is_some() || self.analysis_pending.is_some() {
-                None
-            } else {
-                self.project
-                    .as_ref()
-                    .and_then(|p| p.project.active_baseline)
-            };
+        let active = if self.history_inspection.is_some()
+            || self.mask_dirty
+            || self.analysis_due.is_some()
+            || self.analysis_pending.is_some()
+        {
+            None
+        } else {
+            self.project
+                .as_ref()
+                .and_then(|p| p.project.active_baseline)
+        };
         ReviewIndex::build(&self.evidence, active)
     }
 
@@ -581,6 +979,109 @@ impl Shell {
                 .approval_selection
                 .iter()
                 .all(|key| index.eligible.contains(key))
+    }
+
+    pub(super) fn approval_unavailable_reason(
+        &self,
+        key: Option<&TargetKey>,
+    ) -> Option<&'static str> {
+        if self.mask_dirty {
+            return Some("Save ignored areas first.");
+        }
+        if self.analysis_due.is_some() || self.analysis_pending.is_some() {
+            return Some("Wait for the updated analysis.");
+        }
+        let Some(comparison) = &self.evidence.comparison else {
+            return Some("A completed comparison is required.");
+        };
+        if self
+            .project
+            .as_ref()
+            .and_then(|p| p.project.active_baseline)
+            != Some(comparison.revision.baseline)
+        {
+            return Some(
+                "This check uses a retained baseline; run a check against the active baseline to update it.",
+            );
+        }
+        let Some(key) = key else {
+            return Some("Inspect a page and screen size first.");
+        };
+        if self.approval_eligible(key) {
+            return None;
+        }
+        let Some(result) = comparison.revision.results.iter().find(|r| &r.key == key) else {
+            return Some("Analysis is not available for this screenshot.");
+        };
+        match result.classification {
+            Classification::CouldNotCapture => Some("Missing capture cannot update the baseline."),
+            Classification::NotComparable => {
+                Some("Incompatible evidence cannot update the baseline.")
+            }
+            _ => Some(
+                "Capture warnings, missing source evidence or incompatible analysis prevent a baseline update.",
+            ),
+        }
+    }
+
+    pub(super) fn ordinary_review_status(&self) -> &'static str {
+        let Some(comparison) = &self.evidence.comparison else {
+            return "Not compared";
+        };
+        let Some(key) = &self.selected_key else {
+            return "Choose a screenshot";
+        };
+        match current_review_state(&self.evidence, comparison.revision.id, key) {
+            regressee_core::domain::ReviewState::Intentional => "Reviewed · intentional",
+            regressee_core::domain::ReviewState::NeedsFix => "Reviewed · needs fix",
+            regressee_core::domain::ReviewState::Unreviewed => "Not reviewed for this analysis",
+        }
+    }
+
+    pub(super) fn review_progress_summary(&self) -> String {
+        let Some(comparison) = &self.evidence.comparison else {
+            return "No comparison to review.".into();
+        };
+        let progress = ReviewProgress::from_evidence(&self.evidence);
+        let baseline_saved = self.evidence.baseline.as_ref().is_some_and(|b| {
+            b.references
+                .iter()
+                .any(|r| r.run == comparison.revision.run)
+        });
+        if self.narrow_workspace {
+            return format!(
+                "{} reviewed · {} left{} · {}",
+                progress.reviewed,
+                progress.remaining,
+                if progress.gaps + progress.awaiting > 0 {
+                    format!(" · {} gaps / awaiting", progress.gaps + progress.awaiting)
+                } else {
+                    String::new()
+                },
+                if baseline_saved {
+                    "Explicit updates saved"
+                } else {
+                    "Baseline unchanged by review"
+                }
+            );
+        }
+        format!(
+            "{} reviewed · {} left · {} need fix · {} gaps{}. {}",
+            progress.reviewed,
+            progress.remaining,
+            progress.needs_fix,
+            progress.gaps,
+            if progress.awaiting > 0 {
+                format!(" · {} awaiting analysis", progress.awaiting)
+            } else {
+                String::new()
+            },
+            if baseline_saved {
+                "Explicitly saved updates included."
+            } else {
+                "Baseline unchanged by review."
+            }
+        )
     }
 
     pub(super) fn approval_bar(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -616,14 +1117,14 @@ impl Shell {
                             .flex_1()
                             .min_w(px(88.))
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child(format!("{eligible} selected")),
+                             .child(format!("{} selected · {eligible} eligible", self.approval_selection.len())),
                     )
                     .child(self.button(
                         Control::Phase5(23),
-                        if selected {
-                            "Deselect target"
-                        } else {
-                            "Select target"
+                         if selected {
+                             if self.narrow_workspace { "Deselect screenshot" } else { "Remove from baseline update" }
+                         } else {
+                             if self.narrow_workspace { "Select for baseline" } else { "Select for baseline update" }
                         },
                         ActionStyle::Choice { selected },
                         cx,
@@ -637,9 +1138,16 @@ impl Shell {
             )
             .child(
                 div().text_size(px(13.)).text_color(rgb(MUTED)).child(
-                    "Preview before confirming. Unselected references and History are kept.",
+                    if self.narrow_workspace { "Baseline changes only after confirmation." }
+                    else { "Review decisions do not approve. Unselected references stay." },
                 ),
             )
+            .when_some(self.approval_unavailable_reason(self.selected_key.as_ref()), |bar, reason| {
+                bar.child(div().text_size(px(13.)).text_color(rgb(WARNING)).child(reason))
+            })
+            .when(!self.approval_selection.is_empty() && !self.approval_selection_eligible(), |bar| {
+                bar.child(div().text_size(px(13.)).text_color(rgb(WARNING)).child("A selected screenshot is no longer eligible. Remove it or refresh valid evidence before approval."))
+            })
             .into_any_element()
     }
 
@@ -810,21 +1318,25 @@ impl Shell {
                                 .text_ellipsis()
                                 .child(self.project.as_ref().unwrap().project.name.clone()),
                         )
-                        .child(div().text_size(px(13.)).text_color(rgb(RAIL_MUTED)).child(
-                            if let Some(baseline) = &self.evidence.baseline {
-                                format!("{} reference screenshots", baseline.references.len())
-                            } else {
-                                "No saved baseline yet".into()
-                            },
-                        )),
+                        .child(
+                            div()
+                                .text_size(px(13.))
+                                .text_color(rgb(RAIL_MUTED))
+                                .child(self.baseline_rail_status()),
+                        ),
                 )
             })
             .child(self.button(
                 Control::Navigate(Screen::Results),
-                "Review changes",
+                if project && !self.focus.baseline && self.evidence.latest.is_some() {
+                    "Inspect capture"
+                } else {
+                    "Review changes"
+                },
                 ActionStyle::Navigation {
                     selected: self.focus.screen == Screen::Results
-                        && self.focus.review_surface == ReviewSurface::Changes,
+                        && self.focus.review_surface != ReviewSurface::Pages
+                        && self.preview.is_none(),
                 },
                 cx,
             ))
@@ -890,47 +1402,226 @@ impl Shell {
             return div().into_any_element();
         };
         let coverage = Coverage::from_run(run, &self.review_index());
-        let profiles = run
-            .run
-            .profiles
-            .iter()
-            .map(|p| p.name.clone())
-            .collect::<Vec<_>>()
-            .join(" + ");
+        let metrics = if self.evidence.comparison.is_none() {
+            let pending = run
+                .run
+                .targets
+                .iter()
+                .filter(|target| matches!(target.outcome, TargetOutcome::Pending))
+                .count();
+            let mut metrics = vec![
+                (
+                    format!("{} / {}", coverage.unclassified, coverage.total),
+                    "captured",
+                    false,
+                ),
+                (
+                    coverage.missing.saturating_sub(pending).to_string(),
+                    "gaps",
+                    coverage.missing > pending,
+                ),
+            ];
+            if pending > 0 {
+                metrics.push((pending.to_string(), "pending", false));
+            }
+            metrics
+        } else {
+            let mut metrics = vec![
+                (coverage.changed.to_string(), "changed", false),
+                (coverage.unchanged.to_string(), "unchanged", false),
+                (coverage.missing.to_string(), "gaps", coverage.missing > 0),
+            ];
+            if coverage.unclassified > 0 {
+                metrics.push((coverage.unclassified.to_string(), "awaiting", false));
+            }
+            metrics
+        };
         let scope = match run.run.inventory.coverage {
-            regressee_core::domain::DiscoveryCoverage::Complete => "bounded discovery",
-            regressee_core::domain::DiscoveryCoverage::Limited { .. } => "limited inventory",
-            regressee_core::domain::DiscoveryCoverage::Interrupted => "interrupted discovery",
+            regressee_core::domain::DiscoveryCoverage::Complete => None,
+            regressee_core::domain::DiscoveryCoverage::Limited { .. } => Some("Limited inventory"),
+            regressee_core::domain::DiscoveryCoverage::Interrupted => Some("Discovery interrupted"),
+        };
+        let kind = if self.evidence.comparison.is_some() {
+            "Comparison"
+        } else if run.run.intent == RunIntent::RepresentativePreview {
+            "Preview only"
+        } else if self.capture_is_saved_baseline() {
+            "Saved baseline"
+        } else {
+            "Not compared"
         };
         div()
             .debug_selector(|| "real-coverage-summary".into())
             .flex_shrink_0()
             .flex()
-            .flex_col()
-            .gap_1()
-            .py_2()
-            .border_y_1()
+            .flex_wrap()
+            .items_center()
+            .gap_3()
+            .py_1()
+            .border_b_1()
             .border_color(rgb(LINE))
-            .text_size(px(14.))
+            .text_size(px(13.))
             .line_height(px(20.))
-            .child(div().font_weight(FontWeight::SEMIBOLD).child(format!(
-                "{} targets · {} changed · {} unchanged · {} gaps · {} awaiting",
-                coverage.total,
-                coverage.changed,
-                coverage.unchanged,
-                coverage.missing,
-                coverage.unclassified
-            )))
-            .child(div().text_color(rgb(MUTED)).text_ellipsis().child(format!(
-                    "{} fixed pages · {profiles} · {scope}; gaps are not unchanged",
-                    run.run
-                        .inventory
-                        .pages
-                        .iter()
-                        .filter(|p| p.included)
-                        .count()
-                )))
+            .child(
+                div()
+                    .px_2()
+                    .bg(rgb(SURFACE))
+                    .border_1()
+                    .border_color(rgb(LINE))
+                    .rounded(px(3.))
+                    .text_color(rgb(MUTED))
+                    .child(kind),
+            )
+            .children(metrics.into_iter().map(|(value, label, warning)| {
+                div()
+                    .flex()
+                    .items_center()
+                    .gap_1()
+                    .text_color(rgb(if warning { WARNING } else { INK }))
+                    .child(
+                        div()
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .text_size(px(15.))
+                            .child(value),
+                    )
+                    .child(label)
+            }))
+            .when(!self.narrow_workspace, |summary| {
+                summary.child(div().text_color(rgb(MUTED)).child(format!(
+                        "{} pages · {} screen sizes",
+                        run.run
+                            .inventory
+                            .pages
+                            .iter()
+                            .filter(|p| p.included)
+                            .count(),
+                        run.run.profiles.len()
+                    )))
+            })
+            .when_some(scope, |summary, scope| {
+                summary.child(div().text_color(rgb(WARNING)).child(scope))
+            })
             .into_any_element()
+    }
+}
+
+pub(super) fn count_label(count: usize, singular: &str, plural: &str) -> String {
+    format!("{count} {}", if count == 1 { singular } else { plural })
+}
+
+fn compact_profile(profile: &regressee_core::domain::CaptureProfile) -> String {
+    format!(
+        "{} · {} × {} CSS px",
+        profile.name, profile.width, profile.height
+    )
+}
+
+fn discovery_summary(preview: &DiscoveryPreview) -> String {
+    format!(
+        "{} included · {} excluded · {} · {}. Review the list before capturing; baseline unchanged.",
+        count_label(preview.included(), "page", "pages"),
+        preview
+            .inventory
+            .pages
+            .len()
+            .saturating_sub(preview.included()),
+        count_label(
+            preview.settings.profiles.len(),
+            "screen size",
+            "screen sizes"
+        ),
+        preview.inventory.coverage.label()
+    )
+}
+
+fn viewer_pane_width(working: f32, queue: f32, panes: usize) -> f32 {
+    let available = working - queue - if queue > 0. { 12. } else { 0. };
+    ((available - if panes == 2 { 12. } else { 0. }) / panes.max(1) as f32).max(1.)
+}
+
+fn current_review_state(
+    evidence: &ProjectEvidence,
+    analysis: regressee_core::domain::AnalysisId,
+    key: &TargetKey,
+) -> regressee_core::domain::ReviewState {
+    evidence
+        .reviews
+        .iter()
+        .filter(|r| r.analysis == analysis && &r.key == key)
+        .max_by_key(|r| r.reviewed_at)
+        .map(|r| r.state)
+        .unwrap_or(regressee_core::domain::ReviewState::Unreviewed)
+}
+
+#[derive(Default, Debug, PartialEq, Eq)]
+struct ReviewProgress {
+    reviewed: usize,
+    remaining: usize,
+    needs_fix: usize,
+    gaps: usize,
+    awaiting: usize,
+}
+impl ReviewProgress {
+    fn from_evidence(evidence: &ProjectEvidence) -> Self {
+        use regressee_core::domain::ReviewState;
+        let Some(comparison) = &evidence.comparison else {
+            return Self::default();
+        };
+        let mut progress = Self::default();
+        let mut decisions: BTreeMap<&TargetKey, &regressee_core::domain::ReviewDecision> =
+            BTreeMap::new();
+        for decision in evidence
+            .reviews
+            .iter()
+            .filter(|r| r.analysis == comparison.revision.id)
+        {
+            if decisions
+                .get(&decision.key)
+                .is_none_or(|old| old.reviewed_at <= decision.reviewed_at)
+            {
+                decisions.insert(&decision.key, decision);
+            }
+        }
+        let analyzed: BTreeSet<_> = comparison.revision.results.iter().map(|r| &r.key).collect();
+        for result in &comparison.revision.results {
+            let state = decisions
+                .get(&result.key)
+                .map(|r| r.state)
+                .unwrap_or(ReviewState::Unreviewed);
+            if state != ReviewState::Unreviewed {
+                progress.reviewed += 1;
+            }
+            if state == ReviewState::NeedsFix {
+                progress.needs_fix += 1;
+            }
+            match result.classification {
+                Classification::Changed if state == ReviewState::Unreviewed => {
+                    progress.remaining += 1
+                }
+                Classification::CouldNotCapture | Classification::NotComparable => {
+                    progress.gaps += 1
+                }
+                _ => {}
+            }
+        }
+        if let Some(run) = evidence
+            .latest
+            .as_ref()
+            .filter(|r| r.run.id == comparison.revision.run)
+        {
+            for target in &run.run.targets {
+                if !analyzed.contains(&target.key) {
+                    if matches!(target.outcome, TargetOutcome::Captured { .. })
+                        && run.evidence(&target.key).is_some()
+                    {
+                        progress.awaiting += 1;
+                    } else {
+                        progress.gaps += 1;
+                    }
+                }
+            }
+        }
+        progress
     }
 }
 
@@ -968,6 +1659,344 @@ fn capture_time(timestamp: i64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "ui-tests")]
+    #[gpui::test]
+    fn history_last_rows_reveal_and_select_at_supported_sizes(cx: &mut gpui::TestAppContext) {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let record = store.load_project(project).unwrap();
+        let mut evidence = store.project_evidence(project).unwrap();
+        let mut history = store.history(project, 0).unwrap();
+        let baseline = evidence.baselines[0].clone();
+        evidence.baselines = (0..128)
+            .map(|i| {
+                let mut version = baseline.clone();
+                if i != 0 {
+                    version.id = regressee_core::domain::BaselineId::new();
+                }
+                version
+            })
+            .collect();
+        let run = history.runs[0].clone();
+        history.runs = (0..64)
+            .map(|i| {
+                let mut record = run.clone();
+                if i != 0 {
+                    record.run.id = regressee_core::domain::RunId::new();
+                }
+                record
+            })
+            .collect();
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, |s, cx| {
+            let startup = s.events.recv_timeout(Duration::from_secs(5)).unwrap();
+            s.apply_update(startup, cx);
+            s.project = Some(record);
+            s.evidence = evidence;
+            s.evidence_dirty = false;
+            s.history = Some(history);
+            s.focus.screen = Screen::History;
+            s.focus.project_saved = true;
+            s.focus.history_baselines = s.evidence.baselines.len();
+            s.focus.history_runs = s.history.as_ref().unwrap().runs.len();
+        });
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            for (control, list, row_selector) in [
+                (
+                    Control::HistoryBaseline(127),
+                    "history-baseline-list",
+                    "history-row-HistoryBaseline(127)",
+                ),
+                (
+                    Control::HistoryRun(63),
+                    "history-run-list",
+                    "history-row-HistoryRun(63)",
+                ),
+            ] {
+                shell.update(cx, |s, cx| {
+                    s.history_section = if matches!(control, Control::HistoryBaseline(_)) {
+                        1
+                    } else {
+                        0
+                    };
+                    s.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    cx.notify();
+                });
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        assert!(s.control_enabled(control, cx));
+                        s.reveal_history_control(control);
+                        window.focus(&s.handle(control, cx));
+                        s.activate_control(control, window, cx);
+                    })
+                });
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                let row = cx.debug_bounds(row_selector).unwrap();
+                let list = cx.debug_bounds(list).unwrap();
+                let viewport = shell.read_with(cx, |s, _| s.screen_scroll.bounds());
+                assert_eq!(row.size.height, px(64.));
+                assert!(
+                    row.top() >= list.top() && row.bottom() <= list.bottom(),
+                    "{width}: {control:?} must be revealed in its list"
+                );
+                assert!(
+                    list.top() >= viewport.top() && list.bottom() <= viewport.bottom(),
+                    "{width}: {control:?} list must be revealed in the screen"
+                );
+                shell.read_with(cx, |s, _| match control {
+                    Control::HistoryBaseline(i) => assert_eq!(s.history_index, i),
+                    Control::HistoryRun(i) => assert_eq!(s.run_history_index, i),
+                    _ => unreachable!(),
+                });
+            }
+        }
+        owned.join_after_ui();
+    }
+
+    #[cfg(feature = "ui-tests")]
+    #[gpui::test]
+    fn reference_environment_loads_with_pair_without_history(cx: &mut gpui::TestAppContext) {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let record = store.load_project(project).unwrap();
+        let mut evidence = store.project_evidence(project).unwrap();
+        let reference = &evidence.baseline.as_ref().unwrap().references[0];
+        let before_environment = store.load_run(reference.run).unwrap().run.environment.name;
+        let key = reference.key.clone();
+        let analysis = evidence.comparison.as_ref().map(|a| a.revision.id);
+        // Today's environment must never supply the historical reference label.
+        evidence.latest.as_mut().unwrap().run.environment.name = "Today's staging".into();
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, |s, cx| {
+            let startup = s.events.recv_timeout(Duration::from_secs(5)).unwrap();
+            s.apply_update(startup, cx);
+            s.project = Some(record);
+            s.evidence = evidence;
+            s.selected_key = Some(key.clone());
+            s.focus.screen = Screen::Results;
+            s.focus.project_saved = true;
+            s.history = None;
+            s.jobs
+                .submit_viewer(Request {
+                    id: 900,
+                    work: Work::Viewer {
+                        project,
+                        tile: 0,
+                        key: Some(key.clone()),
+                        analysis,
+                    },
+                })
+                .unwrap();
+            let reply = s.events.recv_timeout(Duration::from_secs(5)).unwrap();
+            assert_eq!(reply.id, 900);
+            let Reply::Viewer(frame) = reply.reply else {
+                panic!("selected pair must load with recorded reference context");
+            };
+            assert_eq!(
+                frame.before_environment.as_deref(),
+                Some(before_environment.as_str())
+            );
+            s.viewer = Some(*frame);
+            assert!(s.history.is_none());
+            assert_eq!(
+                s.viewer_reference_environment(),
+                Some(before_environment.as_str())
+            );
+            assert!(s.pane_caption(0).1.starts_with(&before_environment));
+            assert!(!s.pane_caption(0).1.contains("Today's staging"));
+
+            // Historical analyses also name their source without a History
+            // visit, even when the latest capture is a different run.
+            s.evidence.latest.as_mut().unwrap().run.id = regressee_core::domain::RunId::new();
+            assert!(s.displayed_run().is_none());
+            assert_eq!(
+                s.viewer_reference_environment(),
+                Some(before_environment.as_str())
+            );
+
+            // A reply for another target/project cannot lend its provenance.
+            s.selected_key.as_mut().unwrap().page = regressee_core::domain::PageId::new();
+            assert!(s.viewer_reference_environment().is_none());
+            s.selected_key = Some(key);
+            s.viewer
+                .as_mut()
+                .unwrap()
+                .identity
+                .as_mut()
+                .unwrap()
+                .project = regressee_core::domain::ProjectId::new();
+            assert!(s.viewer_reference_environment().is_none());
+            assert!(s.pane_caption(0).1.contains("environment not loaded"));
+        });
+        owned.join_after_ui();
+    }
+
+    #[cfg(feature = "ui-tests")]
+    #[gpui::test]
+    fn capture_only_distinguishes_incomplete_ready_and_saved_baselines(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let mut record = store.load_project(project).unwrap();
+        let baseline = store.project_evidence(project).unwrap().baseline.unwrap();
+        let mut evidence = ProjectEvidence {
+            latest: Some(store.load_run(baseline.references[0].run).unwrap()),
+            ..Default::default()
+        };
+        record.project.active_baseline = None;
+        let key = evidence.latest.as_ref().unwrap().run.targets[0].key.clone();
+        let mut failed = evidence.latest.as_ref().unwrap().run.targets[0].clone();
+        failed.key.page = regressee_core::domain::PageId::new();
+        failed.requested = url::Url::parse("http://127.0.0.1:43210/failed").unwrap();
+        failed.outcome = TargetOutcome::Failed {
+            code: regressee_core::domain::CaptureError::Timeout,
+        };
+        let run = evidence.latest.as_mut().unwrap();
+        run.run.targets.push(failed);
+        run.run.state = JobState::CompletedWithErrors;
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, |s, cx| {
+            let update = s.events.recv_timeout(Duration::from_secs(5)).unwrap();
+            s.apply_update(update, cx);
+            s.project = Some(record);
+            s.focus.project_saved = true;
+            s.pending = Some(1000);
+            s.apply_update(
+                Update {
+                    id: 1000,
+                    reply: Reply::Evidence(Box::new(evidence.clone())),
+                },
+                cx,
+            );
+            s.focus.screen = Screen::Results;
+            assert!(!s.focus.candidate && !s.focus.baseline);
+            assert_eq!(s.review_title(), "Inspect capture");
+            assert_eq!(
+                s.baseline_rail_status(),
+                "Incomplete capture\nNo baseline saved"
+            );
+            assert!(s.capture_next_step().unwrap().contains("Filter → Gaps"));
+            assert!(s.comparison_context().contains("no comparison performed"));
+            assert_eq!(
+                s.captured_target_label(&key),
+                "Captured · not yet a baseline"
+            );
+            assert!(!s.control_enabled(Control::SaveBaseline, cx));
+            assert!(!s.control_enabled(Control::CheckChanges, cx));
+            assert!(s.control_enabled(Control::CaptureBaseline, cx));
+            let coverage =
+                Coverage::from_run(s.evidence.latest.as_ref().unwrap(), &s.review_index());
+            assert_eq!(
+                (coverage.total, coverage.unclassified, coverage.missing),
+                (2, 1, 1)
+            );
+            assert_eq!((coverage.changed, coverage.unchanged), (0, 0));
+            // Every previously selected comparison mode still shows the original
+            // capture only, never a blank before pane or a retained heatmap.
+            for mode in 0..4 {
+                s.viewer_mode = mode;
+                assert_eq!(s.viewer_pane_indices(), &[1]);
+            }
+            s.working_width = 1040.;
+            s.narrow_workspace = false;
+            s.viewer = Some(regressee_app::jobs::ViewerFrame {
+                tile: 0,
+                panes: vec![vec![], vec![], vec![]],
+                width: 1440,
+                height: 900,
+                request: None,
+                analysis: None,
+                identity: None,
+                before_environment: None,
+                before_capture: None,
+            });
+            assert!((s.fitted_viewer_zoom() - 756. / 1440.).abs() < 0.0001);
+            s.clear_viewer();
+
+            // A complete capture offers an explicit save, not automatic activation.
+            evidence.latest.as_mut().unwrap().run.targets.pop();
+            evidence.latest.as_mut().unwrap().run.state = JobState::Completed;
+            s.focus.screen = Screen::Projects;
+            s.pending = Some(1001);
+            s.apply_update(
+                Update {
+                    id: 1001,
+                    reply: Reply::Evidence(Box::new(evidence.clone())),
+                },
+                cx,
+            );
+            s.focus.screen = Screen::Results;
+            assert!(s.focus.candidate && !s.focus.baseline);
+            assert_eq!(s.review_title(), "Inspect baseline");
+            assert_eq!(s.baseline_rail_status(), "Ready to save baseline");
+            assert!(
+                s.capture_next_step()
+                    .unwrap()
+                    .contains("Choose Save baseline")
+            );
+            assert!(s.control_enabled(Control::SaveBaseline, cx));
+            assert!(!s.control_enabled(Control::CheckChanges, cx));
+            assert!(
+                s.project
+                    .as_ref()
+                    .unwrap()
+                    .project
+                    .active_baseline
+                    .is_none()
+            );
+
+            evidence.baseline = Some(baseline.clone());
+            s.project.as_mut().unwrap().project.active_baseline = Some(baseline.id);
+            s.focus.screen = Screen::Projects;
+            s.pending = Some(1002);
+            s.apply_update(
+                Update {
+                    id: 1002,
+                    reply: Reply::Evidence(Box::new(evidence)),
+                },
+                cx,
+            );
+            s.focus.screen = Screen::Results;
+            assert!(!s.focus.candidate && s.focus.baseline);
+            assert_eq!(s.review_title(), "Baseline screenshots");
+            assert_eq!(s.captured_target_label(&key), "Saved baseline screenshot");
+            assert!(s.capture_next_step().unwrap().contains("Run check"));
+            assert!(s.comparison_context().contains("Saved baseline"));
+            assert!(!s.control_enabled(Control::SaveBaseline, cx));
+            assert!(s.control_enabled(Control::CheckChanges, cx));
+        });
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            let next = cx.debug_bounds("capture-next-step").unwrap();
+            let queue = cx.debug_bounds("review-queue").unwrap();
+            assert!(next.bottom() <= queue.top());
+            assert!(queue.size.height >= px(PAGE_ROW_HEIGHT));
+        }
+        owned.join_after_ui();
+    }
+
     #[cfg(feature = "ui-tests")]
     fn large_evidence() -> (ProjectRecord, ProjectEvidence) {
         let dir = tempfile::tempdir().unwrap();
@@ -1174,7 +2203,8 @@ mod tests {
             s.focus.screen = Screen::Results;
             s.queue(Work::Load(project), cx);
             for _ in 0..12 {
-                if s.pending.is_some() {
+                if s.pending.is_some() || s.viewer_pending.is_some() || s.storage_pending.is_some()
+                {
                     let update = s.events.recv_timeout(Duration::from_secs(5)).unwrap();
                     s.apply_update(update, cx);
                 }
@@ -1207,7 +2237,7 @@ mod tests {
             assert_eq!(row.size.height, px(PAGE_ROW_HEIGHT));
             assert!(
                 row.top() >= queue.top() && row.bottom() <= queue.bottom(),
-                "{width}: one complete result must open in view"
+                "{width}: one complete result must open in view: row {row:?}, queue {queue:?}"
             );
             assert!(
                 image.size.height >= px(64.),
@@ -1298,13 +2328,14 @@ mod tests {
             );
             let context = s.comparison_context();
             assert!(context.contains("Historical baseline"));
-            assert!(context.contains(&short_id(compared.to_string())));
+            assert!(!context.contains(&short_id(compared.to_string())));
             assert!(!context.contains(&short_id(active.to_string())));
-            assert!(context.contains("UTC") && context.contains(&environment));
+            assert!(context.contains(&environment));
+            assert_eq!(s.pane_caption(0).0, "Before · baseline");
             assert!(
-                s.pane_caption(0)
-                    .0
-                    .contains(&short_id(compared.to_string()))
+                s.approval_unavailable_reason(s.selected_key.as_ref())
+                    .unwrap()
+                    .contains("retained baseline")
             );
         });
         owned.join_after_ui();
@@ -1328,5 +2359,160 @@ mod tests {
                 unclassified: 1
             }
         );
+    }
+
+    #[test]
+    fn responsive_width_uses_the_current_queue_and_pane_count() {
+        assert_eq!(viewer_pane_width(580., 200., 2), 178.);
+        assert_eq!(viewer_pane_width(580., 0., 2), 284.);
+        assert_eq!(viewer_pane_width(1040., 272., 1), 756.);
+        assert_eq!(viewer_pane_width(580., 0., 1), 580.);
+        assert_eq!(viewer_pane_width(1., 272., 2), 1.);
+        assert_eq!(count_label(1, "page", "pages"), "1 page");
+        assert_eq!(
+            count_label(2, "screen size", "screen sizes"),
+            "2 screen sizes"
+        );
+    }
+
+    #[cfg(feature = "ui-tests")]
+    #[gpui::test]
+    fn discovery_owns_its_scope_and_review_preserves_provenance(cx: &mut gpui::TestAppContext) {
+        use regressee_core::domain::{ReviewDecision, ReviewState};
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let record = store.load_project(project).unwrap();
+        let evidence = store.project_evidence(project).unwrap();
+        let history = store.history(project, 0).unwrap();
+        let key = evidence.latest.as_ref().unwrap().run.targets[0].key.clone();
+        let reference = evidence
+            .baseline
+            .as_ref()
+            .unwrap()
+            .references
+            .iter()
+            .find(|r| r.key == key)
+            .unwrap();
+        let original = store.load_run(reference.run).unwrap();
+        let original_profile = original.evidence(&key).unwrap().metadata.profile.clone();
+        let original_environment = original.run.environment.name.clone();
+        let mut inventory = evidence.latest.as_ref().unwrap().run.inventory.clone();
+        let mut second = inventory.pages[0].clone();
+        second.id = regressee_core::domain::PageId::new();
+        second.canonical = url::Url::parse("http://127.0.0.1:43210/new-page").unwrap();
+        second.included = true;
+        inventory.pages.push(second);
+        let preview = DiscoveryPreview {
+            project_revision: record.revision,
+            settings: record.project.clone(),
+            inventory,
+            aliases: vec![],
+            notes: vec![],
+            visited: 2,
+        };
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, |s, cx| {
+            let startup = s.events.recv_timeout(Duration::from_secs(5)).unwrap();
+            s.apply_update(startup, cx);
+            s.project = Some(record);
+            s.evidence = evidence;
+            s.evidence_dirty = false;
+            s.history = Some(history);
+            s.focus.screen = Screen::Results;
+            s.focus.project_saved = true;
+            s.selected_key = Some(key.clone());
+            s.preview = Some(preview);
+            s.focus.preview = true;
+            s.focus.review_surface = ReviewSurface::Pages;
+            s.configure_review_geometry(820.);
+            assert!(s.comparison_context().contains("2 pages included"));
+            assert!(!s.comparison_context().contains("Compared baseline"));
+            assert!(!s.discovery_image_mounted());
+            assert_eq!(s.review_queue_width(), 580.);
+            assert_eq!(s.viewer_pane_indices(), &[1]);
+            assert!(!s.workspace_control_mounted(Control::Guided(16)));
+        });
+        cx.simulate_resize(size(px(820.), px(600.)));
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        let queue = cx.debug_bounds("review-queue").unwrap();
+        assert!(queue.size.width >= px(580.));
+        // The inventory viewport, not merely its containing queue, reserves two rows.
+        let list = cx.debug_bounds("inventory-preview").unwrap();
+        assert!(list.size.height >= px(PAGE_ROW_HEIGHT * 2.));
+        shell.update(cx, |s, _| {
+            s.preview = None;
+            s.focus.preview = false;
+            s.focus.review_surface = ReviewSurface::Changes;
+            s.evidence.latest.as_mut().unwrap().run.profiles[0].width = 999;
+            s.evidence.latest.as_mut().unwrap().run.environment.name = "Today's staging".into();
+            assert_eq!(s.pane_caption(0).0, "Before · baseline");
+            assert!(s.pane_caption(0).1.starts_with(&original_environment));
+            assert_eq!(s.pane_caption(0).2, compact_profile(&original_profile));
+            s.mask_dirty = true;
+            assert_eq!(
+                s.approval_unavailable_reason(Some(&key)),
+                Some("Save ignored areas first.")
+            );
+            s.mask_dirty = false;
+            let classification =
+                s.evidence.comparison.as_ref().unwrap().revision.results[0].classification;
+            s.evidence.comparison.as_mut().unwrap().revision.results[0].classification =
+                Classification::CouldNotCapture;
+            assert_eq!(
+                s.approval_unavailable_reason(Some(&key)),
+                Some("Missing capture cannot update the baseline.")
+            );
+            assert_eq!(ReviewProgress::from_evidence(&s.evidence).gaps, 1);
+            s.evidence.comparison.as_mut().unwrap().revision.results[0].classification =
+                Classification::NotComparable;
+            assert_eq!(
+                s.approval_unavailable_reason(Some(&key)),
+                Some("Incompatible evidence cannot update the baseline.")
+            );
+            s.evidence.comparison.as_mut().unwrap().revision.results[0].classification =
+                classification;
+            let analysis = s.evidence.comparison.as_ref().unwrap().revision.id;
+            s.evidence.reviews.push(ReviewDecision {
+                analysis: regressee_core::domain::AnalysisId::new(),
+                key: key.clone(),
+                state: ReviewState::Intentional,
+                note: String::new(),
+                reviewed_at: 9,
+            });
+            assert_eq!(s.ordinary_review_status(), "Not reviewed for this analysis");
+            assert_eq!(ReviewProgress::from_evidence(&s.evidence).remaining, 1);
+            s.evidence.reviews.push(ReviewDecision {
+                analysis,
+                key: key.clone(),
+                state: ReviewState::Intentional,
+                note: String::new(),
+                reviewed_at: 10,
+            });
+            assert_eq!(ReviewProgress::from_evidence(&s.evidence).reviewed, 1);
+            assert_eq!(ReviewProgress::from_evidence(&s.evidence).remaining, 0);
+            s.evidence.reviews.push(ReviewDecision {
+                analysis,
+                key,
+                state: ReviewState::NeedsFix,
+                note: String::new(),
+                reviewed_at: 11,
+            });
+            assert_eq!(ReviewProgress::from_evidence(&s.evidence).needs_fix, 1);
+            assert!(
+                s.review_progress_summary()
+                    .contains("Baseline unchanged by review")
+            );
+            assert!(s.toggle_workspace_presentation(Control::Guided(50)));
+            assert_eq!(s.review_queue_width(), 0.);
+            assert!(!s.workspace_control_mounted(Control::CrawlField(9)));
+            assert!(s.toggle_workspace_presentation(Control::Guided(50)));
+            assert_eq!(s.review_queue_width(), 200.);
+        });
+        owned.join_after_ui();
     }
 }

@@ -188,13 +188,20 @@ Changing projects preserves the destination and confirms draft discard; reopenin
 the same project must not reload away its draft. Projects separates **View results**
 from **Edit settings** and identifies the selected project with words and paint.
 
-Review remains side by side, including small desktop windows: queue width (200px)
+Comparison review remains side by side, including small desktop windows: queue width (200px)
 below viewport width (1100px), otherwise (272px), separated from the flexible
 viewer by (12px). Do not describe a stacking layout that is not implemented.
-Queue, image pane and viewer tools are independently bounded/scrolled; optional
-capture details have their own bounded scroll region (100px). Review does not
+Queue and image panes are independently bounded. Details and comparison
+adjustments use a bounded, scrollable flyout over the viewer; neither replaces
+the queue nor consumes image height below the evidence. Review does not
 use the ordinary full-screen scrolling form. Project context, coverage and the
 conditional approval bar remain attached to the task.
+Without a comparison, show one untinted capture pane, not an empty before/after
+pair. Distinguish incomplete captures, captures ready for explicit baseline save,
+and saved baseline screenshots. Capture coverage reports captured/not captured/
+pending targets, not changed/unchanged or analysis awaiting a nonexistent check.
+Keep the save requirement and gap-recovery instructions visible above the queue;
+screenshots are never automatically activated as a baseline.
 
 Discovery and captured-target lists use virtualized, full-width rows (64px) with
 aligned horizontal insets (16px). Address and details truncate independently;
@@ -221,6 +228,17 @@ and the timezone chevron with native geometry. No nested decorative card stacks
 or icon-tile dashboard. No shipping visual assets were added for this revamp.
 CAS screenshots are untinted product evidence with provenance—not decorative
 rasters, a fixed image library or synthetic demonstration results.
+
+**Local exploration.** Discovery, review and loaded History records filter as
+text changes, with truthful match counts/scope and Clear. Ctrl/Cmd+F focuses the
+mounted search without escaping a dialog. Filtering never silently changes the
+inspected screenshot or discards ignored-area drafts; an outside-filter notice
+explains why the pair is still shown. Explicit navigation changes the target.
+Viewer reads coalesce independently of mutation work and reject stale identities.
+Historical environment context travels with its reference, not today's settings.
+History rows support direct selection; storage totals load separately and missing
+measurement is not zero. Local syntax/range feedback stays beside touched fields,
+while saving, browser visits, baseline changes, exports and deletion stay explicit.
 
 ## Components
 
@@ -252,6 +270,12 @@ beside the message. Long diagnostics scroll within a bounded area; errors retain
 their red treatment. Known nonzero totals alone produce a clamped completion
 fraction. Unknown/zero totals pair honest text with a patterned activity track;
 discovery shows the actual pages visited. No fabricated percentage or coverage.
+Short local reads use a compact activity label instead of a patterned completion
+track. Every queued operation names its task immediately, before worker updates.
+Projects, screenshots and History distinguish initial loading, authoritative
+empty results and failed reads. Opening a project never announces missing
+screenshots or an absent baseline before its saved evidence is read; refresh
+keeps already loaded evidence visible.
 
 **Comparison and approval.** Coverage comes from actual inventory, captures and
 current analysis, including missing and unclassified evidence. Preserve before/
@@ -269,16 +293,70 @@ Confirm baseline is explicit. Focus is trapped, background mutations are guarded
 and stale previews are invalidated. Failed/missing/incompatible evidence cannot
 be approved; replacing the whole baseline remains a separate workflow.
 
-**History and keyboard.** Baseline versions and capture/check runs are distinct,
+Ordinary review exposes revision-bound decisions, explicit note saving, progress
+and Next unreviewed without opening Analysis. Classification is not approval:
+**Select for baseline update** names reference selection explicitly. Discovery
+owns the current inventory and optionally a matching representative screenshot,
+never an earlier comparison. Narrow review compacts chrome, prioritizes original
+dimensions in two-line captions and can collapse the queue. Details and Analysis
+are mutually exclusive; neither hides ordinary review decisions or discards drafts.
+Capture/review counts form a compact labelled status strip, not prose paragraphs
+or decorative KPI cards. Limited/interrupted inventory and genuine gaps stay
+visible. One concise next action replaces repeated cautions; exact context/URLs
+are disclosed in Details. The default summary names the page, screen size,
+capture status, readable UTC run time and recovery advice. Exact IDs, source
+records and descriptors are opt-in Technical diagnostics, not default copy.
+Single-image captions combine capture identity
+and screen size, with one origin line.
+Keyboard ignored-area creation/editing uses original integer coordinates, explicit
+Apply and Save, and focus-revealing scroll anchors. Unapplied or all-masked areas
+cannot be saved.
+Only comparisons expose Analysis (sensitivity and ignored areas); capture-only
+views have no generic Tools mode. A flyout has an attached Close action and Escape
+restores its trigger. Drawing an ignored area folds away the flyout and returns
+after a completed rectangle, with drafts still requiring explicit save.
+Image navigation is direct: drag or two-axis scroll to pan, Shift+scroll for
+horizontal movement, Ctrl/Cmd+scroll to zoom at the pointer. Before/after stay
+synchronized. A single focus stop provides +/− zoom, arrows/Page Up/Page Down,
+0 for fit width and 1 for actual size. One labelled Zoom menu combines fit width,
+actual size (100%) and percentage presets at both desktop widths. Its desktop
+trigger shows “Zoom: Fit width · 52%” in automatic mode and “Zoom: 75%” after manual zoom;
+a drawn chevron makes the selection affordance explicit. Fit follows resizing;
+fixed percentages do not. Arrows/Home/End navigate the menu, Enter chooses,
+Escape dismisses, and Tab continues the shell order without trapping focus.
+Small windows stack “Zoom” and the scale inside the same compact 40px control;
+the selected mode remains explicit in its menu, without adding toolbar rows.
+Missing images have no useless zoom/pan controls. A hand/crosshair cursor conveys
+the current interaction.
+Compact no-match recovery precedes the search controls, with expanded
+filters scrolling separately.
+
+**History and keyboard.** Runs, Baselines and Storage are separate sections.
+Baseline versions and capture/check runs are distinct,
 with active versus retained reference state and composite provenance explained.
 Keep ZIP privacy previews, separate recipient login, storage totals, shared-source
 protections and deliberate deletion; ignored areas are not pixel redaction.
+Open selected evidence is read-only, uses its original reference/policy/mask and
+does not activate a baseline or write display pointers. Capture-only records show
+only their originals. Missing/corrupt evidence and stale selection/draft replies
+fail closed. History selection and focus use full-width row geometry, confirmed
+at both inspected window sizes.
 Tab/Shift-Tab traverse only mounted, enabled controls. Enter/Space activate actions
 without intercepting spaces in inputs. Ctrl/Cmd+N opens new-project setup,
 Ctrl/Cmd+S saves, Ctrl/Cmd+1…5 switches sections and Ctrl/Cmd+Q quits. Dialog
 dismissal restores focus; Escape never pretends to cancel a committed database
-save. Unsaved switches require explicit discard confirmation. Quit-with-unsaved
-edits and real OS input remain qualification obligations.
+save. Unsaved switches require explicit discard confirmation. Owned window close
+and application Quit use the same Cancel / Save and quit / Discard and quit guard;
+save awaits exact authoritative replies and preserves invalid or newer drafts.
+F1/App settings exposes keyboard help; correction summaries reveal the affected
+form stage/field without submitting. Real OS input, platform termination behavior
+and native accessibility remain qualification obligations.
+
+The user-requested carry-through confirms the previously incomplete History,
+Tools, empty-message/help and capture-only corrections in fresh source-bound
+pixels at 1280×800 and 820×600. See
+`docs/research/ui-carry-through-verification-20261011.md`; this is offscreen-layout
+acceptance, not native input, accessibility or public-release certification.
 
 ## Do's and Don'ts
 

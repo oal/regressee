@@ -494,7 +494,11 @@ pub fn bind(cx: &mut App) {
     TimezoneSelect::bind(cx);
 }
 
-fn chevron(open: bool) -> impl IntoElement {
+pub(super) fn chevron(open: bool) -> impl IntoElement {
+    chevron_sized(open, 16.)
+}
+
+pub(super) fn chevron_sized(open: bool, edge: f32) -> impl IntoElement {
     canvas(
         |_, _, _| (),
         move |bounds, (), window, _| {
@@ -510,7 +514,7 @@ fn chevron(open: bool) -> impl IntoElement {
             }
         },
     )
-    .size(px(16.))
+    .size(px(edge))
     .flex_shrink_0()
 }
 

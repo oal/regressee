@@ -31,7 +31,15 @@ fn output_root() -> Result<PathBuf> {
         std::env::var_os("REGRESSEE_RENDERER_CAPTURE_DIR")
             .context("explicit private renderer capture directory required")?,
     );
-    ensure!(root.is_absolute() && root.starts_with("/path/to/private-tests/opencode"));
+    // Keep the private default, but let an explicitly authorized diagnostic run
+    // supply its physical scratch root without baking a developer's home path
+    // into source. This remains an opt-in test, never a production setting.
+    let approved = PathBuf::from(
+        std::env::var_os("REGRESSEE_RENDERER_APPROVED_ROOT")
+            .unwrap_or_else(|| "/path/to/private-tests/opencode".into()),
+    );
+    ensure!(approved.is_absolute() && fs::canonicalize(&approved)? == approved);
+    ensure!(root.is_absolute() && root.starts_with(&approved));
     ensure!(fs::canonicalize(&root)? == root);
     ensure!(fs::metadata(&root)?.permissions().mode() & 0o777 == 0o700);
     Ok(root)
@@ -239,10 +247,127 @@ fn renderer_capture_proof(cx: &mut TestAppContext) {
     capture(cx, &root, "renderer-proof").unwrap();
 }
 
+#[gpui::test]
+#[ignore = "bounded direct-viewer UX capture; synthetic isolated evidence only"]
+fn renderer_capture_viewer_ux(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("viewer-ux-synthetic-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let original = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        for label in [
+            "review",
+            "analysis",
+            "area-editor",
+            "details",
+            "capture-details",
+            "failed-capture",
+            "failed-details",
+            "help",
+        ] {
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    finish_jobs(s, cx);
+                    s.activate_control(Control::SelectProject(0), window, cx);
+                    finish_jobs(s, cx);
+                    s.navigate(Screen::Results, window, cx);
+                    finish_jobs(s, cx);
+                    s.configure_review_geometry(width);
+                    if label.contains("capture") || label == "failed-details" {
+                        s.navigate(Screen::History, window, cx);
+                        finish_jobs(s, cx);
+                        let source = s.evidence.baseline.as_ref().unwrap().references[0].run;
+                        let index = s
+                            .history
+                            .as_ref()
+                            .unwrap()
+                            .runs
+                            .iter()
+                            .position(|r| r.run.id == source)
+                            .unwrap();
+                        s.activate_control(Control::HistoryRun(index), window, cx);
+                        s.activate_control(Control::Phase6(19), window, cx);
+                        finish_jobs(s, cx);
+                        assert!(s.evidence.comparison.is_none());
+                        if label.starts_with("failed") {
+                            // Presentation-only failed capture; never saved or activated.
+                            s.history_inspection = None;
+                            s.evidence.baseline = None;
+                            s.project.as_mut().unwrap().project.active_baseline = None;
+                            s.focus.baseline = false;
+                            let key = s.selected_key.as_ref().unwrap();
+                            let run = s.evidence.latest.as_mut().unwrap();
+                            run.run
+                                .targets
+                                .iter_mut()
+                                .find(|t| &t.key == key)
+                                .unwrap()
+                                .outcome = TargetOutcome::Failed {
+                                code: regressee_core::domain::CaptureError::ImageLimit,
+                            };
+                            run.run.state = JobState::CompletedWithErrors;
+                            for pane in &mut s.viewer.as_mut().unwrap().panes {
+                                pane.clear();
+                            }
+                        }
+                    }
+                    s.notice = None;
+                    if matches!(label, "analysis" | "area-editor") {
+                        s.activate_control(Control::Guided(44), window, cx);
+                    }
+                    if label.ends_with("details") {
+                        s.activate_control(Control::Phase5(36), window, cx);
+                    }
+                    if label == "help" {
+                        s.show_keyboard_help(window, cx);
+                    }
+                    cx.notify();
+                })
+            });
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+                window.capture_offscreen_frame().unwrap();
+            });
+            if label == "area-editor" {
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        s.activate_control(Control::Phase5(34), window, cx)
+                    })
+                });
+                cx.run_until_parked();
+            }
+            capture(cx, &root, &format!("viewer-{width:.0}x{height:.0}-{label}")).unwrap();
+            owned.join_after_ui();
+        }
+    }
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        original
+    );
+}
+
 fn finish_jobs(shell: &mut Shell, cx: &mut Context<Shell>) {
-    while shell.pending.is_some() {
+    while shell.pending.is_some() || shell.focus.view_loading || shell.storage_pending.is_some() {
         let update = shell.events.recv_timeout(Duration::from_secs(5)).unwrap();
-        assert_eq!(shell.pending, Some(update.id));
         assert!(
             !matches!(update.reply, Reply::Failure(_)),
             "{:?}",
@@ -250,6 +375,113 @@ fn finish_jobs(shell: &mut Shell, cx: &mut Context<Shell>) {
         );
         shell.apply_update(update, cx);
     }
+}
+
+#[gpui::test]
+#[ignore = "bounded zoom/loading renderer batch; isolated synthetic evidence only"]
+fn renderer_capture_zoom_loading(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("zoom-loading-synthetic-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let original = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        for label in [
+            "zoom-fit",
+            "zoom-menu",
+            "zoom-manual",
+            "zoom-area-editor",
+            "loading-project",
+            "loading-screenshot",
+            "loading-history",
+            "empty-screenshots",
+            "failed-load",
+        ] {
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| shell.update(cx, |s, cx| {
+                finish_jobs(s, cx);
+                s.activate_control(Control::SelectProject(0), window, cx);
+                finish_jobs(s, cx);
+                s.configure_review_geometry(width);
+                s.notice = None;
+                match label {
+                    "zoom-manual" => { s.choose_viewer_zoom(ZoomChoice::Percent(75), cx); finish_jobs(s, cx); }
+                    "zoom-area-editor" => {
+                        s.review_tools = true;
+                        s.activate_control(Control::Phase5(34), window, cx);
+                    }
+                    "loading-project" | "empty-screenshots" | "failed-load" => {
+                        s.evidence = ProjectEvidence::default();
+                        s.clear_viewer();
+                        s.focus.viewer = false;
+                        s.focus.candidate = false;
+                        s.focus.baseline = false;
+                        s.evidence_dirty = label != "empty-screenshots";
+                        if label == "loading-project" {
+                            s.pending = Some(u64::MAX);
+                            s.focus.busy = true;
+                            s.progress = Some(("Loading saved screenshots and results…".into(), 0, None));
+                        } else if label == "failed-load" {
+                            s.error = Some("Synthetic disk-read failure. Check the project data folder, then refresh.".into());
+                        }
+                    }
+                    "loading-screenshot" => {
+                        let identity = s.viewer_identity().unwrap();
+                        s.clear_viewer();
+                        s.viewer_pending = Some((u64::MAX, identity, 0));
+                        s.focus.view_loading = true;
+                    }
+                    "loading-history" => {
+                        s.pending = Some(u64::MAX);
+                        s.focus.screen = Screen::History;
+                        s.history = None;
+                        s.focus.busy = true;
+                        s.progress = Some(("Loading capture and baseline history…".into(), 0, None));
+                    }
+                    _ => (),
+                }
+                cx.notify();
+            }));
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            if label == "zoom-menu" {
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        s.activate_control(Control::Guided(46), window, cx)
+                    })
+                });
+            }
+            capture(
+                cx,
+                &root,
+                &format!("zoom-loading-{width:.0}x{height:.0}-{label}"),
+            )
+            .unwrap();
+            owned.join_after_ui();
+        }
+    }
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        original
+    );
 }
 
 // Only the final workflow batch uses these helpers. Older diagnostic tests and
@@ -1109,6 +1341,507 @@ fn renderer_capture_status_progress(cx: &mut TestAppContext) {
         }
     }
     owned.join_after_ui();
+}
+
+#[gpui::test]
+#[ignore = "one bounded local-first UX renderer batch; isolated synthetic evidence and read-only actor commands"]
+fn renderer_capture_local_first_ux(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    cx.update(|cx| {
+        text_input::bind(cx);
+        timezone_select::bind(cx);
+    });
+    let dir = tempfile::Builder::new()
+        .prefix("local-first-synthetic-store-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let original_project = serde_json::to_value(store.load_project(project).unwrap()).unwrap();
+    let original_evidence = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    let mut manifest = Vec::new();
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        for label in [
+            "review",
+            "review-focused-evidence",
+            "review-note",
+            "keyboard-ignored-area",
+            "review-filtered-out-draft",
+            "discovery",
+            "discovery-live-search",
+            "history",
+            "history-baselines",
+            "history-storage",
+            "history-reopened-check",
+            "history-live-filter",
+            "saved-network-settings",
+            "field-validation",
+            "keyboard-help",
+            "capture-gaps",
+            "capture-saved-baseline",
+            "capture-ready",
+        ] {
+            let name = format!("local-first-{width:.0}x{height:.0}-{label}");
+            // Complete an interrupted final batch without recapturing any
+            // existing UI pixels. Only the fixture harness may change.
+            if std::env::var_os("REGRESSEE_RENDERER_COMPLETE_BATCH").as_deref()
+                == Some(std::ffi::OsStr::new("1"))
+                && root.join(format!("{name}.png")).is_file()
+            {
+                let metadata: serde_json::Value =
+                    serde_json::from_slice(&fs::read(root.join(format!("{name}.json"))).unwrap())
+                        .unwrap();
+                assert_eq!(
+                    metadata["png_sha256"],
+                    hex::encode(Sha256::digest(
+                        fs::read(root.join(format!("{name}.png"))).unwrap()
+                    ))
+                );
+                manifest.push(serde_json::json!({"capture": name, "width": width, "height": height, "retained_from_same_final_batch": true, "native_os_input_verified": false}));
+                continue;
+            }
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    finish_jobs(s, cx);
+                    s.activate_control(Control::SelectProject(0), window, cx);
+                    finish_jobs(s, cx);
+                    let screen = match label {
+                        "history"
+                        | "history-baselines"
+                        | "history-storage"
+                        | "history-reopened-check"
+                        | "history-live-filter"
+                        | "capture-gaps"
+                        | "capture-saved-baseline"
+                        | "capture-ready" => Screen::History,
+                        "saved-network-settings" => Screen::Settings,
+                        "field-validation" => Screen::Setup,
+                        _ => Screen::Results,
+                    };
+                    s.navigate(screen, window, cx);
+                    finish_jobs(s, cx);
+                    s.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    s.configure_review_geometry(width);
+                    if matches!(
+                        label,
+                        "capture-gaps" | "capture-saved-baseline" | "capture-ready"
+                    ) {
+                        let baseline = s.evidence.baseline.as_ref().unwrap().clone();
+                        let run = baseline.references[0].run;
+                        let index = s
+                            .history
+                            .as_ref()
+                            .unwrap()
+                            .runs
+                            .iter()
+                            .position(|record| record.run.id == run)
+                            .unwrap();
+                        // Use the actual guarded History route, not an out-of-
+                        // screen receiver invocation that silently keeps a check.
+                        s.activate_control(Control::HistoryRun(index), window, cx);
+                        s.activate_control(Control::Phase6(19), window, cx);
+                        finish_jobs(s, cx);
+                        assert_eq!(s.history_inspection, Some((project, run)));
+                        assert_eq!(s.evidence.latest.as_ref().unwrap().run.id, run);
+                        assert!(s.evidence.comparison.is_none());
+                        assert_eq!(s.viewer_pane_indices(), &[1]);
+                        assert!(s.viewer.as_ref().unwrap().request.is_none());
+                        assert_eq!(
+                            s.viewer.as_ref().unwrap().identity.as_ref().unwrap().run,
+                            run
+                        );
+                        // Presentation-only capture states; the actor never saves
+                        // these synthetic gaps or changes baseline activation.
+                        s.history_inspection = None;
+                        s.focus.baseline = label == "capture-saved-baseline";
+                        s.focus.candidate = label == "capture-ready";
+                        if label == "capture-saved-baseline" {
+                            s.evidence.baseline = Some(baseline);
+                        } else {
+                            s.evidence.baseline = None;
+                            s.project.as_mut().unwrap().project.active_baseline = None;
+                        }
+                        if label == "capture-gaps" {
+                            let record = s.evidence.latest.as_mut().unwrap();
+                            let mut missing = record.run.targets[0].clone();
+                            missing.key.page = regressee_core::domain::PageId::new();
+                            missing.outcome = TargetOutcome::Failed {
+                                code: regressee_core::domain::CaptureError::Timeout,
+                            };
+                            missing.requested =
+                                url::Url::parse("http://127.0.0.1:43210/synthetic-gap").unwrap();
+                            record.run.targets.push(missing);
+                            record.run.state = JobState::CompletedWithErrors;
+                        }
+                        s.notice = None;
+                    }
+                    if matches!(label, "discovery" | "discovery-live-search") {
+                        let mut inventory =
+                            s.evidence.latest.as_ref().unwrap().run.inventory.clone();
+                        inventory.id = regressee_core::domain::InventoryId::new();
+                        let template = inventory.pages[0].clone();
+                        for name in ["fixture-included", "fixture-excluded", "fixture-help"] {
+                            let mut page = template.clone();
+                            page.id = regressee_core::domain::PageId::new();
+                            page.canonical = template.canonical.join(&format!("/{name}/")).unwrap();
+                            page.included = name != "fixture-excluded";
+                            page.reason =
+                                (!page.included).then(|| "Excluded in synthetic preview".into());
+                            inventory.pages.push(page);
+                        }
+                        inventory.validate().unwrap();
+                        let record = s.project.as_ref().unwrap();
+                        s.selected_page = Some(inventory.pages[0].id);
+                        s.preview = Some(DiscoveryPreview {
+                            project_revision: record.revision,
+                            settings: record.project.clone(),
+                            inventory,
+                            aliases: vec![],
+                            notes: vec![
+                                "Synthetic local search fixture; no website was visited.".into(),
+                            ],
+                            visited: 4,
+                        });
+                        s.focus.preview = true;
+                        s.focus.candidate = false;
+                        s.focus.review_surface = ReviewSurface::Pages;
+                    }
+                    if label == "review-focused-evidence" {
+                        s.activate_control(Control::Guided(50), window, cx);
+                    }
+                    if label == "review-note" {
+                        s.activate_control(Control::Phase5(37), window, cx);
+                        s.analysis_fields[9].update(cx, |f, cx| {
+                            f.set_value(
+                                "The heading change is intentional; baseline approval is separate.",
+                                cx,
+                            )
+                        });
+                    }
+                    if label == "keyboard-ignored-area" {
+                        s.activate_control(Control::Guided(44), window, cx);
+                    }
+                    if label == "history-baselines" {
+                        s.activate_control(Control::Phase6(17), window, cx);
+                    }
+                    if label == "history-storage" {
+                        s.activate_control(Control::Phase6(18), window, cx);
+                    }
+                    if label == "history-reopened-check" {
+                        s.activate_control(Control::Phase6(19), window, cx);
+                        finish_jobs(s, cx);
+                        assert!(s.history_inspection.is_some());
+                    }
+                    if label == "keyboard-help" {
+                        s.show_keyboard_help(window, cx);
+                    }
+                    if label == "field-validation" {
+                        s.focus.setup_stage = SetupStage::Website;
+                        s.name.update(cx, |input, cx| input.set_value("", cx));
+                        s.address.update(cx, |input, cx| {
+                            input.set_value("missing-scheme.example", cx)
+                        });
+                        s.activate_control(Control::Save, window, cx);
+                        assert!(s.pending.is_none(), "invalid draft must not reach storage");
+                    }
+                    cx.notify();
+                });
+            });
+            // Flush actual uploads before any subsequent presentation fixture
+            // retires images. This is not an additional inspection screenshot.
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+                window.capture_offscreen_frame().unwrap();
+            });
+            if label == "keyboard-ignored-area" {
+                // As in real input, Tools must have a painted viewport before
+                // creating the area and revealing its initial keyboard focus.
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        s.activate_control(Control::Phase5(34), window, cx)
+                    });
+                });
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                cx.run_until_parked();
+            }
+            if label == "saved-network-settings" {
+                let network = cx.debug_bounds("managed-network-section").unwrap();
+                shell.update(cx, |s, cx| {
+                    assert!(s.network_status.is_some());
+                    assert!(s.field_enabled(17) && s.field_enabled(18));
+                    s.screen_scroll
+                        .set_offset(gpui::point(px(0.), px(150.) - network.top()));
+                    cx.notify();
+                });
+            }
+            let inspected = shell.read_with(cx, |s, _| s.selected_key.clone());
+            shell.update(cx, |s, cx| match label {
+                "review-filtered-out-draft" => {
+                    // Removing the last ignored rectangle is a valid empty but
+                    // dirty draft; typing must not discard that draft or pair.
+                    s.mask_dirty = true;
+                    s.crawl_fields[9].update(cx, |input, cx| {
+                        input.set_value("no-matching-synthetic-page", cx)
+                    });
+                }
+                "discovery-live-search" => {
+                    s.crawl_fields[9]
+                        .update(cx, |input, cx| input.set_value("fixture-included", cx));
+                }
+                "history-live-filter" => {
+                    s.history_search
+                        .update(cx, |input, cx| input.set_value("comparison", cx));
+                    s.history_kind = 1;
+                    cx.notify();
+                }
+                _ => (),
+            });
+            cx.run_until_parked();
+            shell.read_with(cx, |s, _| {
+                if label == "review-filtered-out-draft" {
+                    assert_eq!(s.search, "no-matching-synthetic-page");
+                    assert!(s.result_indices().is_empty());
+                    assert_eq!(s.selected_key, inspected);
+                    assert!(s.mask_dirty && s.viewer.is_some());
+                    assert!(!s.focus.view_loading, "typing must not request new pixels");
+                }
+                if label == "discovery-live-search" {
+                    assert_eq!(s.search, "fixture-included");
+                    assert_eq!(s.preview_page_ids().len(), 1);
+                }
+                if label == "history-live-filter" {
+                    assert_eq!(s.history_query, "comparison");
+                    assert!(!s.history_run_indices().is_empty());
+                    assert!(s.history_run_indices().iter().all(|i| matches!(
+                        s.history.as_ref().unwrap().runs[*i].run.intent,
+                        RunIntent::Check { .. }
+                    )));
+                }
+            });
+            let name = format!("local-first-{width:.0}x{height:.0}-{label}");
+            capture(cx, &root, &name).unwrap();
+            if label == "keyboard-ignored-area" {
+                cx.update(|window, cx| {
+                    shell.read_with(cx, |s, cx| {
+                        assert!(s.mask_dirty && s.mask_selected.is_some());
+                        assert!(s.handle(Control::AnalysisField(10), cx).is_focused(window));
+                        let field = s.analysis_fields[10].read(cx).rendered_bounds().unwrap();
+                        let viewport = s.review_details_scroll.bounds();
+                        assert!(
+                            field.top() >= viewport.top() && field.bottom() <= viewport.bottom()
+                        );
+                    });
+                });
+                for pane in ["phase5-before", "phase5-after"] {
+                    assert!(cx.debug_bounds(pane).unwrap().size.height >= px(96.));
+                }
+            }
+            if matches!(
+                label,
+                "history" | "history-live-filter" | "history-baselines"
+            ) {
+                let (list, row) = shell.read_with(cx, |s, _| {
+                    if label == "history-baselines" {
+                        assert_eq!(s.history_index, 0);
+                        ("history-baseline-list", "history-row-HistoryBaseline(0)")
+                    } else {
+                        assert_eq!(s.run_history_index, 0);
+                        ("history-run-list", "history-row-HistoryRun(0)")
+                    }
+                });
+                assert!(
+                    f32::from(
+                        cx.debug_bounds(list).unwrap().size.width
+                            - cx.debug_bounds(row).unwrap().size.width
+                    )
+                    .abs()
+                        <= 1.
+                );
+            }
+            if label == "review-filtered-out-draft" {
+                assert!(
+                    cx.debug_bounds("review-empty-message").unwrap().bottom()
+                        <= cx.debug_bounds("review-queue").unwrap().bottom()
+                );
+            }
+            if label == "keyboard-help" {
+                assert!(
+                    cx.debug_bounds("information-dialog-copy").unwrap().bottom()
+                        <= cx.debug_bounds("information-dialog-body").unwrap().bottom()
+                );
+            }
+            if label.starts_with("capture-") {
+                assert!(cx.debug_bounds("phase5-before").is_none());
+                assert!(cx.debug_bounds("phase5-difference").is_none());
+                assert!(cx.debug_bounds("ordinary-review-decisions").is_none());
+                assert!(cx.debug_bounds("phase5-after").unwrap().size.height >= px(96.));
+            }
+            manifest.push(serde_json::json!({
+                "capture": name, "width": width, "height": height,
+                "synthetic_project_only": true, "website_visited": false,
+                "mutation_dispatched": false, "input_model_verified": true,
+                "layout_assertions_verified": true,
+                "scrolled_to_inspected_section": label == "saved-network-settings",
+                "native_os_input_verified": false
+            }));
+            owned.join_after_ui();
+        }
+    }
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        original_project,
+        serde_json::to_value(store.load_project(project).unwrap()).unwrap()
+    );
+    assert_eq!(
+        original_evidence,
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap()
+    );
+    assert_eq!(manifest.len(), 36);
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .mode(0o600)
+        .open(root.join("local-first-ux-matrix.json"))
+        .unwrap();
+    serde_json::to_writer_pretty(file, &manifest).unwrap();
+}
+
+#[gpui::test]
+#[ignore = "bounded capture-only baseline-state renderer batch; synthetic local evidence, no website visits or activation"]
+fn renderer_capture_baseline_states(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("synthetic-baseline-states-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let before = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    let record = store.load_project(project).unwrap();
+    let baseline = store.project_evidence(project).unwrap().baseline.unwrap();
+    let run = store.load_run(baseline.references[0].run).unwrap();
+    let image = &run.all_captures().next().unwrap().image;
+    let tiles: Vec<_> = image
+        .tiles
+        .iter()
+        .take(3)
+        .map(|id| regressee_app::images::viewer_tile(&store, id).unwrap())
+        .collect();
+    let dimensions = (image.width, image.height);
+    drop(store);
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, finish_jobs);
+        cx.simulate_resize(size(px(width), px(height)));
+        for label in [
+            "incomplete",
+            "failed-target",
+            "ready-to-save",
+            "saved-baseline",
+        ] {
+            shell.update(cx, |s, cx| {
+                // Presentation clones only. Source pixels are original baseline
+                // tiles, never computed difference/heatmap pixels. No actor
+                // activation, network operation or persisted evidence edit.
+                s.project = Some(record.clone());
+                s.project.as_mut().unwrap().project.active_baseline = None;
+                s.evidence = ProjectEvidence {
+                    latest: Some(run.clone()),
+                    ..Default::default()
+                };
+                s.focus.screen = Screen::Results;
+                s.focus.project_saved = true;
+                s.focus.review_surface = ReviewSurface::Changes;
+                s.focus.baseline = label == "saved-baseline";
+                s.focus.candidate = label == "ready-to-save";
+                s.focus.viewer = true;
+                s.viewer_mode = 2; // Stale overlay mode must not leak into capture-only UI.
+                s.viewer_fit = true;
+                s.selected_key = Some(run.run.targets[0].key.clone());
+                s.viewer = Some(regressee_app::jobs::ViewerFrame {
+                    tile: 0,
+                    panes: vec![vec![], tiles.clone(), vec![]],
+                    width: dimensions.0,
+                    height: dimensions.1,
+                    request: None,
+                    analysis: None,
+                    identity: None,
+                    before_environment: None,
+                    before_capture: None,
+                });
+                if matches!(label, "incomplete" | "failed-target") {
+                    let r = s.evidence.latest.as_mut().unwrap();
+                    let mut failed = r.run.targets[0].clone();
+                    failed.key.page = regressee_core::domain::PageId::new();
+                    failed.requested =
+                        url::Url::parse("http://127.0.0.1:43210/unavailable-page").unwrap();
+                    failed.outcome = TargetOutcome::Failed {
+                        code: regressee_core::domain::CaptureError::Timeout,
+                    };
+                    if label == "failed-target" {
+                        s.selected_key = Some(failed.key.clone());
+                        s.viewer.as_mut().unwrap().panes[1].clear();
+                    }
+                    r.run.targets.push(failed);
+                    r.run.state = JobState::CompletedWithErrors;
+                } else if label == "saved-baseline" {
+                    s.evidence.baseline = Some(baseline.clone());
+                    s.project.as_mut().unwrap().project.active_baseline = Some(baseline.id);
+                }
+                s.notice = None;
+                s.error = None;
+                s.configure_review_geometry(width);
+                cx.notify();
+            });
+            capture(
+                cx,
+                &root,
+                &format!("baseline-{width:.0}x{height:.0}-{label}"),
+            )
+            .unwrap();
+            assert!(cx.debug_bounds("phase5-before").is_none());
+            assert!(cx.debug_bounds("phase5-difference").is_none());
+            assert!(cx.debug_bounds("phase5-after").unwrap().size.height >= px(64.));
+            assert!(
+                cx.debug_bounds("capture-next-step").unwrap().bottom()
+                    <= cx.debug_bounds("review-queue").unwrap().top()
+            );
+            assert!(cx.debug_bounds("review-queue").unwrap().size.height >= px(PAGE_ROW_HEIGHT));
+        }
+        owned.join_after_ui();
+    }
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        before,
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap()
+    );
 }
 
 #[gpui::test]

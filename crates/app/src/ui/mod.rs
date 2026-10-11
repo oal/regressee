@@ -5,3 +5,4 @@ pub mod performance;
 pub mod text_input;
 pub mod theme;
 pub mod timezone_select;
+pub mod zoom_select;

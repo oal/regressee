@@ -52,6 +52,18 @@ pub enum Work {
         project: ProjectId,
         page: usize,
     },
+    ProjectStorage(ProjectId),
+    InspectRun {
+        project: ProjectId,
+        run: RunId,
+    },
+    #[cfg(feature = "ui")]
+    HistoricalViewer {
+        project: ProjectId,
+        run: RunId,
+        tile: usize,
+        key: Option<TargetKey>,
+    },
     DeletePreview {
         project: ProjectId,
         item: regressee_storage::DeleteItem,
@@ -132,6 +144,58 @@ pub enum Work {
         analysis: Option<regressee_core::domain::AnalysisId>,
     },
 }
+impl Work {
+    /// Immediate, honest task feedback before the worker's first progress update.
+    pub fn activity_label(&self) -> &'static str {
+        match self {
+            Self::List { .. } => "Loading projects…",
+            Self::Load(_) => "Opening project…",
+            Self::Save { .. } | Self::SaveReplacement { .. } => "Saving project settings…",
+            Self::InspectStorage | Self::ProjectStorage(_) => "Measuring local storage…",
+            Self::DiagnosticPreview => "Preparing diagnostic preview…",
+            Self::DiagnosticExport { .. } => "Saving diagnostic file…",
+            Self::ExportPreview { .. } => "Preparing baseline ZIP preview…",
+            Self::Export { .. } => "Saving baseline ZIP…",
+            Self::ImportPreview(_) => "Reading baseline ZIP…",
+            Self::Import { .. } => "Importing project and baseline…",
+            Self::History { .. } => "Loading capture and baseline history…",
+            Self::InspectRun { .. } => "Loading recorded evidence…",
+            #[cfg(feature = "ui")]
+            Self::Viewer { .. } | Self::HistoricalViewer { .. } => "Loading screenshot…",
+            Self::DeletePreview { .. } => "Preparing deletion preview…",
+            Self::Delete(_) => "Deleting selected history…",
+            Self::RepairPreview => "Checking local storage…",
+            Self::CleanupTemporaries(_) => "Removing confirmed temporary files…",
+            Self::DeleteUnreferenced(_) => "Removing confirmed unreferenced files…",
+            Self::RuntimeStatus => "Checking installed browser…",
+            Self::NetworkStatus => "Loading network settings…",
+            Self::SaveNetwork(_) => "Saving network settings…",
+            Self::SetupRuntime => "Preparing browser setup…",
+            Self::Evidence(_) => "Loading saved screenshots and results…",
+            Self::Capture { check: true, .. } | Self::CaptureInventory { check: true, .. } => {
+                "Starting website check…"
+            }
+            Self::Capture { .. } | Self::CaptureInventory { .. } => "Starting screenshot capture…",
+            Self::Discover(_) => "Finding website pages…",
+            Self::ExistingInventory(_) => "Loading saved page list…",
+            Self::EnvironmentStatus(_) => "Loading login and environment settings…",
+            Self::SaveEnvironment { .. } => "Saving login and environment settings…",
+            Self::OpenLogin(_) => "Opening login browser…",
+            Self::ConfirmLogin(_) => "Saving login session…",
+            Self::CloseLogin(_) => "Closing login browser…",
+            Self::ForgetLogin(_) => "Removing saved login session…",
+            Self::ProbeEnvironment(_) => "Checking website access…",
+            Self::Activate { .. } | Self::Accept { .. } => "Saving baseline…",
+            Self::Restore { .. } => "Restoring selected baseline…",
+            Self::Reanalyze { .. } => "Updating comparison analysis…",
+            Self::Mask { .. } => "Saving ignored areas…",
+            Self::Review(_) => "Saving review decision…",
+            Self::LoadAnalysis(_) => "Loading saved comparison…",
+            Self::Approval { .. } => "Preparing baseline update preview…",
+            Self::PreviewImages { .. } => "Capturing representative screenshot…",
+        }
+    }
+}
 #[derive(Debug)]
 pub struct Request {
     pub id: u64,
@@ -150,8 +214,8 @@ pub enum Reply {
     Imported(Box<ProjectRecord>),
     History {
         history: Box<regressee_storage::HistoryPage>,
-        storage: regressee_storage::ProjectStorage,
     },
+    ProjectStorage(regressee_storage::ProjectStorage),
     DeletePreview(Box<regressee_storage::DeletionPreview>),
     Deleted,
     RepairPreview(Box<regressee_storage::RepairPreview>),
@@ -165,6 +229,11 @@ pub enum Reply {
         message: String,
     },
     Evidence(Box<ProjectEvidence>),
+    InspectedRun {
+        project: ProjectId,
+        run: RunId,
+        evidence: Box<ProjectEvidence>,
+    },
     Analysis(Box<regressee_core::evidence::ComparisonEvidence>),
     Approval(Box<regressee_storage::ApprovalPreview>),
     SavedReview(Vec<regressee_core::domain::ReviewDecision>),
@@ -180,7 +249,15 @@ pub enum Reply {
     Viewer(Box<ViewerFrame>),
 }
 #[cfg(feature = "ui")]
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ViewerIdentity {
+    pub project: ProjectId,
+    pub run: RunId,
+    pub key: TargetKey,
+    pub analysis: Option<regressee_core::domain::AnalysisId>,
+}
+#[cfg(feature = "ui")]
+#[derive(Debug, Clone)]
 pub struct ViewerFrame {
     pub tile: usize,
     pub panes: Vec<Vec<Arc<gpui::RenderImage>>>,
@@ -188,6 +265,45 @@ pub struct ViewerFrame {
     pub height: u32,
     pub request: Option<crate::analysis_engine::AnalysisRequest>,
     pub analysis: Option<regressee_core::domain::AnalysisId>,
+    pub identity: Option<ViewerIdentity>,
+    pub before_environment: Option<String>,
+    /// Exact immutable source metadata for the selected reference, not today's settings.
+    pub before_capture: Option<regressee_core::evidence::CaptureEvidence>,
+}
+#[cfg(feature = "ui")]
+#[derive(Default)]
+struct ViewerMailbox {
+    generation: u64,
+    latest: Option<(u64, Request)>,
+    prefetch: Option<Work>,
+}
+#[cfg(feature = "ui")]
+impl ViewerMailbox {
+    fn submit(&mut self, request: Request) -> Result<(), &'static str> {
+        if !matches!(
+            &request.work,
+            Work::Viewer { .. } | Work::HistoricalViewer { .. }
+        ) {
+            return Err("Viewer navigation only accepts screenshot reads.");
+        }
+        self.generation = self
+            .generation
+            .checked_add(1)
+            .ok_or("Viewer generation exhausted; restart Regressee.")?;
+        self.latest = Some((self.generation, request));
+        // A new intent invalidates speculative work from the old selection.
+        self.prefetch = None;
+        Ok(())
+    }
+    fn take(&mut self) -> Option<(Request, bool, Option<u64>)> {
+        if let Some((generation, request)) = self.latest.take() {
+            Some((request, false, Some(generation)))
+        } else {
+            self.prefetch
+                .take()
+                .map(|work| (Request { id: 0, work }, true, None))
+        }
+    }
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StorageFailure {
@@ -227,6 +343,8 @@ pub struct Jobs {
     paused: Arc<AtomicBool>,
     analysis_cancel: Mutex<Option<Arc<AtomicBool>>>,
     thread: Mutex<Option<JoinHandle<()>>>,
+    #[cfg(feature = "ui")]
+    viewer: Arc<Mutex<ViewerMailbox>>,
 }
 impl Jobs {
     pub fn start(paths: AppPaths) -> (Arc<Self>, Receiver<Update>) {
@@ -280,6 +398,10 @@ impl Jobs {
         let active = operation_active.clone();
         let paused = Arc::new(AtomicBool::new(false));
         let pause = paused.clone();
+        #[cfg(feature = "ui")]
+        let viewer = Arc::new(Mutex::new(ViewerMailbox::default()));
+        #[cfg(feature = "ui")]
+        let mailbox = viewer.clone();
         let thread = thread::spawn(move || {
             let product = configure(&paths);
             let mut store = Store::open(paths).ok();
@@ -287,16 +409,55 @@ impl Jobs {
                 let _ = s.recover_runs();
                 let _ = s.complete_confirmed_gc();
             }
+            #[cfg(feature = "ui")]
+            let mut viewer_cache = crate::viewer_cache::ViewerCache::default();
             while !stop.load(Ordering::Acquire) {
+                #[cfg(feature = "ui")]
+                let (request, speculative, viewer_generation) =
+                    match next_viewer_work(&rx, &mailbox) {
+                        Some(work) => work,
+                        None => match rx.recv_timeout(Duration::from_millis(20)) {
+                            Ok(request) => (request, false, None),
+                            Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                            Err(_) => break,
+                        },
+                    };
+                #[cfg(not(feature = "ui"))]
                 let request: Request = match rx.recv_timeout(Duration::from_millis(20)) {
                     Ok(r) => r,
                     Err(mpsc::RecvTimeoutError::Timeout) => continue,
                     Err(_) => break,
                 };
                 let is_operation = is_operation(&request.work);
+                #[cfg(feature = "ui")]
+                if invalidates_viewer(&request.work) {
+                    // Before work: even a partly completed/failed operation may
+                    // have committed a checkpoint. Explicit refresh re-reads CAS.
+                    viewer_cache.invalidate();
+                    mailbox.lock().unwrap().prefetch = None;
+                }
                 let reply = match store.as_mut() {
                     None => Reply::Failure(StorageFailure::Unavailable),
                     Some(store) => match request.work {
+                        #[cfg(feature = "ui")]
+                        Work::Viewer { project, tile, key, analysis } => {
+                            let result = if speculative {
+                                viewer_cache.prefetch(store, project, tile, key, analysis)
+                            } else {
+                                viewer_cache.frame(store, project, tile, key, analysis)
+                            };
+                            result.map(|frame| Reply::Viewer(Box::new(frame)))
+                                .unwrap_or_else(|e| Reply::ProductFailure(e.to_string()))
+                        }
+                        #[cfg(feature = "ui")]
+                        Work::HistoricalViewer { project, run, tile, key } => {
+                            crate::viewer_cache::ViewerCache::default().historical_frame(store, project, run, tile, key)
+                                .map(|frame| Reply::Viewer(Box::new(frame)))
+                                .unwrap_or_else(|e| Reply::ProductFailure(e.to_string()))
+                        }
+                        Work::InspectRun { project, run } => store.inspect_run(project, run)
+                            .map(|evidence| Reply::InspectedRun { project, run, evidence: Box::new(evidence) })
+                            .unwrap_or_else(|e| Reply::ProductFailure(e.to_string())),
                         Work::List { page } => store
                             .list_projects(page)
                             .map(Reply::Projects)
@@ -337,7 +498,7 @@ impl Jobs {
                             .summary()
                             .map(Reply::Storage)
                             .unwrap_or(Reply::Failure(StorageFailure::Unavailable)),
-                        work @ (Work::ExportPreview {..} | Work::Export {..} | Work::ImportPreview(_) | Work::Import {..} | Work::History {..} | Work::DeletePreview {..} | Work::Delete(_) | Work::RepairPreview | Work::CleanupTemporaries(_) | Work::DeleteUnreferenced(_)) => storage_work(store,work,&cancel),
+                        work @ (Work::ExportPreview {..} | Work::Export {..} | Work::ImportPreview(_) | Work::Import {..} | Work::History {..} | Work::ProjectStorage(_) | Work::DeletePreview {..} | Work::Delete(_) | Work::RepairPreview | Work::CleanupTemporaries(_) | Work::DeleteUnreferenced(_)) => storage_work(store,work,&cancel),
                         work=>match &product {
                              Err(_) if matches!(&work, Work::RuntimeStatus) => Reply::RuntimeReadiness(crate::product::RuntimeReadiness::invalid_configuration()),
                              Err(_)=>Reply::ProductFailure("Browser distribution configuration is invalid. Keep existing evidence and check its trusted configuration before retrying.".into()),
@@ -347,6 +508,27 @@ impl Jobs {
                 };
                 if is_operation {
                     active.store(false, Ordering::Release);
+                }
+                #[cfg(feature = "ui")]
+                {
+                    if speculative {
+                        continue;
+                    }
+                    if let Some(generation) = viewer_generation {
+                        if !publish_viewer(
+                            &updates,
+                            Update {
+                                id: request.id,
+                                reply,
+                            },
+                            &stop,
+                            &mailbox,
+                            generation,
+                        ) {
+                            break;
+                        }
+                        continue;
+                    }
                 }
                 if !publish(
                     &updates,
@@ -369,12 +551,21 @@ impl Jobs {
                 paused,
                 analysis_cancel: Mutex::new(None),
                 thread: Mutex::new(Some(thread)),
+                #[cfg(feature = "ui")]
+                viewer,
             }),
             results,
         )
     }
     /// UI-safe: no DB/file/process access, blocking send, or thread join.
     pub fn submit(&self, request: Request) -> Result<(), &'static str> {
+        #[cfg(feature = "ui")]
+        if matches!(
+            &request.work,
+            Work::Viewer { .. } | Work::HistoricalViewer { .. }
+        ) {
+            return self.submit_viewer(request);
+        }
         if self.stopped.load(Ordering::Acquire) {
             return Err("Background storage has stopped. Restart Regressee.");
         }
@@ -403,9 +594,39 @@ impl Jobs {
         }
         Ok(())
     }
+    /// Latest intent replaces the single pending screenshot read. Replies keep
+    /// the caller's Update.id generation; mutations retain the reliable queue.
+    #[cfg(feature = "ui")]
+    pub fn submit_viewer(&self, request: Request) -> Result<(), &'static str> {
+        let mut viewer = self.viewer.lock().unwrap();
+        if self.stopped.load(Ordering::Acquire) {
+            return Err("Background storage has stopped. Restart Regressee.");
+        }
+        viewer.submit(request)
+    }
+    /// One adjacent-target speculation, read by the same owner only when the
+    /// command queue and latest-viewer slot are empty. Never publishes a reply.
+    #[cfg(feature = "ui")]
+    pub fn prefetch_viewer(&self, work: Work) -> Result<(), &'static str> {
+        if !matches!(&work, Work::Viewer { .. }) {
+            return Err("Viewer prefetch only accepts screenshot reads.");
+        }
+        let mut viewer = self.viewer.lock().unwrap();
+        if self.stopped.load(Ordering::Acquire) {
+            return Err("Background storage has stopped. Restart Regressee.");
+        }
+        viewer.prefetch = Some(work);
+        Ok(())
+    }
     pub fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
         self.cancelled.store(true, Ordering::Release);
+        #[cfg(feature = "ui")]
+        {
+            let mut viewer = self.viewer.lock().unwrap();
+            viewer.latest = None;
+            viewer.prefetch = None;
+        }
         if let Some(cancel) = self.analysis_cancel.lock().unwrap().as_ref() {
             cancel.store(true, Ordering::Release);
         }
@@ -621,99 +842,12 @@ fn product_work(
                 key,
                 analysis,
             } => {
-                let mut e = store.project_evidence(project)?;
-                if let Some(id) = analysis {
-                    let a = store.load_analysis(id)?;
-                    let run = store.load_run(a.revision.run)?;
-                    anyhow::ensure!(
-                        run.run.project == project,
-                        "viewer analysis belongs to another project"
-                    );
-                    e.latest = Some(run);
-                    e.comparison = Some(a);
-                }
-                let key = key
-                    .or_else(|| e.latest.as_ref().map(|r| r.run.targets[0].key.clone()))
-                    .context("No captured target selected")?;
-                let baseline = e
-                    .comparison
-                    .as_ref()
-                    .map(|a| store.load_baseline(a.revision.baseline))
-                    .transpose()?
-                    .or(e.baseline.clone());
-                let reference = baseline
-                    .as_ref()
-                    .and_then(|b| b.references.iter().find(|r| r.key == key));
-                let before_run = reference.map(|r| store.load_run(r.run)).transpose()?;
-                let before = before_run
-                    .as_ref()
-                    .and_then(|r| r.evidence(&key))
-                    .map(|c| &c.image);
-                let after = e
-                    .latest
-                    .as_ref()
-                    .and_then(|r| r.evidence(&key))
-                    .map(|c| &c.image);
-                let diff = e.comparison.as_ref().and_then(|a| {
-                    a.heatmaps
-                        .iter()
-                        .find(|(k, _)| *k == key)
-                        .map(|(_, h)| h)
-                        .or(a.heatmap.as_ref())
-                });
-                let request = if let (Some(old), Some(run), Some(b), Some(a)) = (
-                    &before_run,
-                    &e.latest,
-                    before_run.as_ref().and_then(|r| r.evidence(&key)),
-                    e.latest.as_ref().and_then(|r| r.evidence(&key)),
-                ) {
-                    Some(
-                        e.comparison
-                            .as_ref()
-                            .and_then(|a| a.perceptual.as_ref())
-                            .and_then(|p| p.reports.iter().find(|(k, _)| *k == key))
-                            .map(|(_, r)| r.request.clone())
-                            .unwrap_or(crate::analysis_engine::AnalysisRequest {
-                                before: regressee_core::evidence::descriptor(old, b)?,
-                                after: regressee_core::evidence::descriptor(run, a)?,
-                                policy: e
-                                    .comparison
-                                    .as_ref()
-                                    .and_then(|a| a.perceptual.as_ref())
-                                    .map(|p| p.policy.clone())
-                                    .unwrap_or_else(|| {
-                                        crate::review::preset(
-                                            crate::analysis_engine::Preset::Balanced,
-                                        )
-                                    }),
-                                mask: store.latest_mask(project, &key)?,
-                            }),
-                    )
-                } else {
-                    None
-                };
-                let mut panes = Vec::new();
-                let mut width = 0;
-                let mut height = 0;
-                for image in [before, after, diff] {
-                    let mut images = Vec::new();
-                    if let Some(image) = image {
-                        width = width.max(image.width);
-                        height = height.max(image.height);
-                        for a in image.tiles.iter().skip(tile).take(3) {
-                            images.push(crate::images::viewer_tile(store, a)?);
-                        }
-                    }
-                    panes.push(images);
-                }
-                Ok(Reply::Viewer(Box::new(ViewerFrame {
-                    tile,
-                    panes,
-                    width,
-                    height,
-                    request,
-                    analysis: e.comparison.as_ref().map(|a| a.revision.id),
-                })))
+                // Direct helper callers get a verified one-shot session; the
+                // Jobs owner intercepts Viewer and retains its bounded cache.
+                Ok(Reply::Viewer(Box::new(
+                    crate::viewer_cache::ViewerCache::default()
+                        .frame(store, project, tile, key, analysis)?,
+                )))
             }
             _ => anyhow::bail!("invalid background product action"),
         }
@@ -825,8 +959,10 @@ fn storage_work(store: &mut Store, work: Work, cancel: &AtomicBool) -> Reply {
             ))),
             Work::History { project, page } => Ok(Reply::History {
                 history: Box::new(store.history(project, page)?),
-                storage: store.project_storage(project)?,
             }),
+            Work::ProjectStorage(project) => {
+                Ok(Reply::ProjectStorage(store.project_storage(project)?))
+            }
             Work::DeletePreview { project, item } => Ok(Reply::DeletePreview(Box::new(
                 store.deletion_preview(project, item)?,
             ))),
@@ -866,6 +1002,66 @@ fn is_operation(work: &Work) -> bool {
             | Work::PreviewImages { .. }
     )
 }
+#[cfg(feature = "ui")]
+fn invalidates_viewer(work: &Work) -> bool {
+    matches!(
+        work,
+        Work::Evidence(_)
+            | Work::Save { .. }
+            | Work::SaveEnvironment { .. }
+            | Work::SaveReplacement { .. }
+            | Work::Activate { .. }
+            | Work::Reanalyze { .. }
+            | Work::Mask { .. }
+            | Work::Review(_)
+            | Work::LoadAnalysis(_)
+            | Work::Accept { .. }
+            | Work::Restore { .. }
+            | Work::Capture { .. }
+            | Work::CaptureInventory { .. }
+            | Work::PreviewImages { .. }
+            | Work::Import { .. }
+            | Work::Delete(_)
+            | Work::CleanupTemporaries(_)
+            | Work::DeleteUnreferenced(_)
+    )
+}
+#[cfg(feature = "ui")]
+fn next_viewer_work(
+    commands: &Receiver<Request>,
+    mailbox: &Mutex<ViewerMailbox>,
+) -> Option<(Request, bool, Option<u64>)> {
+    // Queued commands (particularly mutations) always precede speculation.
+    match commands.try_recv() {
+        Ok(request) => Some((request, false, None)),
+        Err(_) => mailbox.lock().unwrap().take(),
+    }
+}
+#[cfg(feature = "ui")]
+fn publish_viewer(
+    sender: &SyncSender<Update>,
+    mut update: Update,
+    stop: &AtomicBool,
+    mailbox: &Mutex<ViewerMailbox>,
+    generation: u64,
+) -> bool {
+    while !stop.load(Ordering::Acquire) {
+        // Hold the slot lock through try_send: a newer accepted request cannot
+        // race a stale publication. Already-published replies still carry id.
+        let viewer = mailbox.lock().unwrap();
+        if viewer.generation != generation {
+            return true;
+        }
+        match sender.try_send(update) {
+            Ok(()) => return true,
+            Err(TrySendError::Full(value)) => update = value,
+            Err(TrySendError::Disconnected(_)) => return false,
+        }
+        drop(viewer);
+        thread::sleep(Duration::from_millis(10));
+    }
+    false
+}
 impl Drop for Jobs {
     fn drop(&mut self) {
         self.stop();
@@ -887,6 +1083,244 @@ fn publish(sender: &SyncSender<Update>, mut update: Update, stop: &AtomicBool) -
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn history_and_storage_census_are_independent_replies() -> anyhow::Result<()> {
+        let root = tempfile::tempdir()?;
+        let mut store = Store::open(AppPaths::isolated(root.path()))?;
+        let project = Project::draft("History fixture".into(), "https://example.test/")?;
+        store.save_project(&project, None)?;
+        let cancel = AtomicBool::new(false);
+        assert!(
+            matches!(storage_work(&mut store, Work::History { project: project.id, page: 0 }, &cancel), Reply::History { history } if history.runs.is_empty())
+        );
+        assert!(
+            matches!(storage_work(&mut store, Work::ProjectStorage(project.id), &cancel), Reply::ProjectStorage(storage) if storage.project == project.id && storage.bytes == 0)
+        );
+        Ok(())
+    }
+    #[cfg(feature = "ui")]
+    fn viewer_work(project: ProjectId, tile: usize) -> Work {
+        Work::Viewer {
+            project,
+            tile,
+            key: None,
+            analysis: None,
+        }
+    }
+    #[cfg(feature = "ui")]
+    #[test]
+    fn viewer_mailbox_coalesces_and_prioritizes_commands_then_latest_then_prefetch() {
+        let project = ProjectId::new();
+        let mailbox = Mutex::new(ViewerMailbox::default());
+        let (tx, rx) = mpsc::sync_channel(1);
+        assert!(
+            mailbox
+                .lock()
+                .unwrap()
+                .submit(Request {
+                    id: 0,
+                    work: Work::List { page: 0 }
+                })
+                .is_err()
+        );
+        for id in 1..=100 {
+            mailbox
+                .lock()
+                .unwrap()
+                .submit(Request {
+                    id,
+                    work: viewer_work(project, id as usize),
+                })
+                .unwrap();
+        }
+        mailbox.lock().unwrap().prefetch = Some(viewer_work(project, 101));
+        tx.send(Request {
+            id: 200,
+            work: Work::InspectStorage,
+        })
+        .unwrap();
+        let (request, speculative, generation) = next_viewer_work(&rx, &mailbox).unwrap();
+        assert_eq!(request.id, 200);
+        assert!(!speculative && generation.is_none());
+        let (request, speculative, generation) = next_viewer_work(&rx, &mailbox).unwrap();
+        assert_eq!(
+            (request.id, speculative, generation),
+            (100, false, Some(100))
+        );
+        let (_, speculative, generation) = next_viewer_work(&rx, &mailbox).unwrap();
+        assert!(speculative && generation.is_none());
+        assert!(next_viewer_work(&rx, &mailbox).is_none());
+        mailbox.lock().unwrap().prefetch = Some(viewer_work(project, 102));
+        mailbox
+            .lock()
+            .unwrap()
+            .submit(Request {
+                id: 103,
+                work: viewer_work(project, 103),
+            })
+            .unwrap();
+        assert!(mailbox.lock().unwrap().prefetch.is_none());
+    }
+    #[cfg(feature = "ui")]
+    #[test]
+    fn viewer_invalidation_covers_refresh_display_and_mutations_not_browsing() {
+        let project = ProjectId::new();
+        for work in [
+            Work::Evidence(project),
+            Work::LoadAnalysis(regressee_core::domain::AnalysisId::new()),
+            Work::Activate {
+                run: RunId::new(),
+                revision: 1,
+            },
+            Work::Capture {
+                project,
+                check: true,
+            },
+        ] {
+            assert!(invalidates_viewer(&work));
+        }
+        for work in [
+            Work::History { project, page: 0 },
+            Work::ProjectStorage(project),
+            Work::Load(project),
+            Work::List { page: 0 },
+            viewer_work(project, 0),
+        ] {
+            assert!(!invalidates_viewer(&work));
+        }
+    }
+    #[cfg(feature = "ui")]
+    #[test]
+    fn viewer_publication_drops_superseded_backpressure_and_stops() {
+        let (tx, rx) = mpsc::sync_channel(1);
+        tx.send(Update {
+            id: 0,
+            reply: Reply::Failure(StorageFailure::Unavailable),
+        })
+        .unwrap();
+        let mailbox = Arc::new(Mutex::new(ViewerMailbox::default()));
+        mailbox
+            .lock()
+            .unwrap()
+            .submit(Request {
+                id: 1,
+                work: viewer_work(ProjectId::new(), 0),
+            })
+            .unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let m = mailbox.clone();
+        let s = stop.clone();
+        let t = tx.clone();
+        let worker = thread::spawn(move || {
+            publish_viewer(
+                &t,
+                Update {
+                    id: 1,
+                    reply: Reply::Failure(StorageFailure::Unavailable),
+                },
+                &s,
+                &m,
+                1,
+            )
+        });
+        mailbox
+            .lock()
+            .unwrap()
+            .submit(Request {
+                id: 2,
+                work: viewer_work(ProjectId::new(), 0),
+            })
+            .unwrap();
+        assert!(worker.join().unwrap());
+        assert_eq!(rx.recv().unwrap().id, 0);
+        assert!(rx.try_recv().is_err());
+        assert!(publish_viewer(
+            &tx,
+            Update {
+                id: 2,
+                reply: Reply::Failure(StorageFailure::Unavailable)
+            },
+            &stop,
+            &mailbox,
+            2
+        ));
+        stop.store(true, Ordering::Release);
+        assert!(!publish_viewer(
+            &tx,
+            Update {
+                id: 3,
+                reply: Reply::Failure(StorageFailure::Unavailable)
+            },
+            &stop,
+            &mailbox,
+            2
+        ));
+        assert_eq!(rx.recv().unwrap().id, 2);
+    }
+    #[cfg(feature = "ui")]
+    #[test]
+    fn viewer_jobs_normal_submit_is_latest_wins_prefetch_is_silent_and_shutdown_rejects()
+    -> anyhow::Result<()> {
+        let root = tempfile::tempdir()?;
+        let paths = AppPaths::isolated(root.path());
+        let (ready, wait) = mpsc::channel();
+        let (release, gate) = mpsc::channel();
+        let (jobs, events) = Jobs::start_inner(paths, move |paths| {
+            ready.send(()).unwrap();
+            gate.recv().unwrap();
+            Ok(Product {
+                distribution: None,
+                official_runtime: false,
+                runtime_cache: paths.cache.join("product-runtime"),
+                auth: Default::default(),
+            })
+        });
+        wait.recv_timeout(Duration::from_secs(5))?;
+        let project = Project::draft("Latest navigation".into(), "https://example.test/")?;
+        jobs.submit(Request {
+            id: 10,
+            work: Work::Save {
+                project: Box::new(project.clone()),
+                expected_revision: None,
+            },
+        })
+        .unwrap();
+        for id in 1..=100 {
+            jobs.submit(Request {
+                id,
+                work: viewer_work(project.id, 0),
+            })
+            .unwrap();
+        }
+        assert!(
+            jobs.submit_viewer(Request {
+                id: 0,
+                work: Work::InspectStorage
+            })
+            .is_err()
+        );
+        assert!(jobs.prefetch_viewer(Work::InspectStorage).is_err());
+        jobs.prefetch_viewer(viewer_work(project.id, 0)).unwrap();
+        release.send(())?;
+        assert_eq!(events.recv_timeout(Duration::from_secs(5))?.id, 10);
+        // Save invalidates speculative work, but never the latest read intent.
+        assert_eq!(events.recv_timeout(Duration::from_secs(5))?.id, 100);
+        jobs.prefetch_viewer(viewer_work(project.id, 0)).unwrap();
+        assert!(
+            events.recv_timeout(Duration::from_millis(80)).is_err(),
+            "prefetch publishes neither success nor failure"
+        );
+        jobs.join_after_ui();
+        assert!(
+            jobs.submit_viewer(Request {
+                id: 101,
+                work: viewer_work(project.id, 0)
+            })
+            .is_err()
+        );
+        assert!(jobs.prefetch_viewer(viewer_work(project.id, 0)).is_err());
+        Ok(())
+    }
     #[test]
     fn explicit_setup_reports_committed_state_despite_late_cancel() -> anyhow::Result<()> {
         let cancel = AtomicBool::new(false);

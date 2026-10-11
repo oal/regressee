@@ -18,8 +18,8 @@ pub fn budget(w: u32, h: u32) -> Result<()> {
     );
     Ok(())
 }
-struct Rows {
-    reader: png::Reader<BufReader<File>>,
+struct Rows<R: Read + Seek = File> {
+    reader: png::Reader<BufReader<R>>,
     w: u32,
     h: u32,
     color: png::ColorType,
@@ -33,8 +33,15 @@ impl Rows {
                 && meta.len() <= 128 * 1024 * 1024,
             "unsafe image file"
         );
-        let mut f = File::open(path)?;
-        ensure!(meta.len() >= 20, "truncated PNG");
+        Self::read(File::open(path)?, meta.len())
+    }
+}
+impl<R: Read + Seek> Rows<R> {
+    fn read(mut f: R, length: u64) -> Result<Self> {
+        ensure!(
+            (20..=128 * 1024 * 1024).contains(&length),
+            "truncated or oversized PNG"
+        );
         let mut signature = [0; 8];
         f.read_exact(&mut signature)?;
         ensure!(&signature == b"\x89PNG\r\n\x1a\n", "not a PNG screenshot");
@@ -50,13 +57,13 @@ impl Rows {
             ensure!(
                 f.stream_position()?
                     .checked_add(n + 4)
-                    .is_some_and(|end| end <= meta.len()),
+                    .is_some_and(|end| end <= length),
                 "PNG chunk exceeds file bounds"
             );
             f.seek(SeekFrom::Current((n + 4) as i64))?;
             if &header[4..] == b"IEND" {
                 ensure!(
-                    n == 0 && f.stream_position()? == meta.len(),
+                    n == 0 && f.stream_position()? == length,
                     "PNG trailing data or malformed terminator"
                 );
                 break;
@@ -122,11 +129,19 @@ fn encode(path: &Path, w: u32, h: u32, pixels: &[u8], purpose: &str) -> Result<(
 }
 #[cfg(feature = "ui")]
 pub fn viewer_tile(store: &Store, id: &ArtifactId) -> Result<std::sync::Arc<gpui::RenderImage>> {
+    Ok(viewer_tile_with_size(store, id)?.0)
+}
+#[cfg(feature = "ui")]
+pub(crate) fn viewer_tile_with_size(
+    store: &Store,
+    id: &ArtifactId,
+) -> Result<(std::sync::Arc<gpui::RenderImage>, usize)> {
+    let (artifact, bytes) = store.read_verified_artifact(id, 16 * 1024 * 1024)?;
     ensure!(
-        store.verify_artifact(id)?.kind == ArtifactKind::Tile,
+        artifact.kind == ArtifactKind::Tile,
         "viewer only accepts tile derivatives"
     );
-    let mut rows = Rows::open(&store.artifact_path(id)?)?;
+    let mut rows = Rows::read(std::io::Cursor::new(bytes), artifact.bytes)?;
     ensure!(
         rows.h <= TILE_HEIGHT,
         "viewer cannot upload original tall images"
@@ -141,11 +156,13 @@ pub fn viewer_tile(store: &Store, id: &ArtifactId) -> Result<std::sync::Arc<gpui
         pixels.extend_from_slice(&row);
     }
     rows.finish()?;
+    let size = pixels.len();
     let buffer =
         image::RgbaImage::from_raw(rows.w, rows.h, pixels).context("invalid viewer tile pixels")?;
-    Ok(std::sync::Arc::new(gpui::RenderImage::new(vec![
-        image::Frame::new(buffer),
-    ])))
+    Ok((
+        std::sync::Arc::new(gpui::RenderImage::new(vec![image::Frame::new(buffer)])),
+        size,
+    ))
 }
 pub fn ingest(
     store: &mut Store,
@@ -232,6 +249,41 @@ pub fn compare(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "ui")]
+    #[test]
+    fn viewer_tile_exact_bytes_kind_png_and_dimensions_remain_authoritative() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let paths = regressee_storage::AppPaths::isolated(root.path());
+        let mut store = Store::open(paths.clone())?;
+        let path = root.path().join("tile.png");
+        encode(&path, 8, 2, &[255; 8 * 2 * 4], "synthetic viewer tile")?;
+        let bytes = fs::read(&path)?;
+        let tile = store.put_artifact(bytes.as_slice(), ArtifactKind::Tile)?;
+        let (_, size) = viewer_tile_with_size(&store, &tile.id)?;
+        assert_eq!(size, 8 * 2 * 4);
+        let joined = [bytes.as_slice(), bytes.as_slice()].concat();
+        let trailing = store.put_artifact(joined.as_slice(), ArtifactKind::Tile)?;
+        assert!(viewer_tile(&store, &trailing.id).is_err());
+        let large = root.path().join("large.png");
+        encode(
+            &large,
+            8,
+            513,
+            &vec![255; 8 * 513 * 4],
+            "oversized viewer tile",
+        )?;
+        let large = store.put_artifact(fs::File::open(large)?, ArtifactKind::Tile)?;
+        assert!(viewer_tile(&store, &large.id).is_err());
+        let invalid = store.put_artifact(&b"not a PNG"[..], ArtifactKind::Tile)?;
+        assert!(viewer_tile(&store, &invalid.id).is_err());
+        let wrong = store.put_artifact(&b"not a tile"[..], ArtifactKind::Screenshot)?;
+        assert!(viewer_tile(&store, &wrong.id).is_err());
+        let mut damaged = bytes;
+        damaged[20] ^= 1;
+        fs::write(paths.artifacts().join(tile.id.as_str()), damaged)?;
+        assert!(viewer_tile(&store, &tile.id).is_err());
+        Ok(())
+    }
     #[test]
     #[ignore = "read-only interop confirmation against retained actual product browser PNGs"]
     fn retained_product_originals_pass_current_row_gate() -> Result<()> {
