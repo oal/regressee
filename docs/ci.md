@@ -15,8 +15,8 @@ one platform. Relevant pushes and pull requests still check the full matrix.
 For example, to investigate Windows without repeating Linux/macOS:
 
 ```sh
-gh workflow run foundation.yml --ref ci/fix-hosted-workflows -f runner=windows-2025
-gh workflow run phase0.yml --ref ci/fix-hosted-workflows -f runner=windows-2025
+gh workflow run foundation.yml --ref main -f runner=windows-2025
+gh workflow run phase0.yml --ref main -f runner=windows-2025
 ```
 
 All jobs use `.github/actions/setup/action.yml`: Python 3.12, the Rust version
