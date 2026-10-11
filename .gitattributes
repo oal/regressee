@@ -1,0 +1,2 @@
+# Wire fixtures must retain their exact LF-terminated bytes on Windows too.
+*.ndjson text eol=lf

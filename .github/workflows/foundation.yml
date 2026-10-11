@@ -2,9 +2,9 @@ name: Foundation checks (not desktop qualification)
 on:
   workflow_dispatch:
   push:
-    paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.github/**']
+    paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.gitattributes', '.github/**']
   pull_request:
-    paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.github/**']
+    paths: ['crates/**', 'vendor/**', 'worker/**', 'scripts/**', 'Cargo.*', 'rust-toolchain.toml', '.gitattributes', '.github/**']
 permissions:
   contents: read
 jobs:
