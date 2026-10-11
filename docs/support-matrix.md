@@ -1,7 +1,10 @@
 # Private candidate support matrix
 
-No row below is a public-release support claim. All three desktop OS families
-remain required before first release. Build recipes do not establish execution.
+No row below is a production-release support claim. All three desktop OS families
+remain required before first supported release. Build recipes do not establish execution.
+Owner-requested unsigned Linux/Windows testing downloads are available through the
+[preview release workflow](release-building.md#downloadable-test-previews); they do
+not close the desktop/installer/security/accessibility qualification gates below.
 
 Default app-pinned official runtime catalogs now cover Linux/Windows x86_64;
 Node/Playwright/Chromium are privately provisioned without system tooling. macOS

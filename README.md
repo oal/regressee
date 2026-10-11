@@ -43,6 +43,20 @@ Browser installation and repair are also available in **App settings**.
 
 For a walkthrough and troubleshooting, see the [first-run guide](docs/first-run-guide.md).
 
+### Download a test build
+
+Linux and Windows x86_64 preview builds are published to
+[GitHub Releases](https://github.com/oal/regressee/releases) when the
+**Downloadable Linux and Windows previews** workflow is run or a `v*` tag is pushed.
+On Windows, download **`regressee-windows-x86_64.exe`** and run it; no developer
+tools are required. The Windows ZIP includes help and license notices. Linux
+downloads are `.tar.gz` archives for Ubuntu 24.04-compatible systems, not AppImages.
+
+These builds are unsigned and experimental; Windows may show a publisher warning.
+First-run browser setup needs internet access. See the
+[download and release instructions](docs/release-building.md#downloadable-test-previews)
+for requirements, checksums, and how to publish a preview.
+
 ### Running from source
 
 Regressee is built with Rust and GPUI. Install Rust through rustup and your

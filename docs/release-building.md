@@ -1,5 +1,76 @@
 # Private build and release preparation
 
+## Downloadable test previews
+
+`.github/workflows/release-preview.yml` builds the desktop app on Ubuntu 24.04 and
+Windows Server 2025 for Linux/Windows x86_64. It publishes a GitHub **prerelease**
+only after both platforms pass contract tests, native release compilation, and
+dependency inspection. These owner-requested testing downloads are not production
+release qualification. The existing private-check workflow remains separate.
+
+Once the workflow is committed and pushed to the default branch, open
+**Actions → Downloadable Linux and Windows previews → Run workflow**. Choose the
+branch containing the source you want to test. This creates an immutable
+`preview-<run-number>-<short-commit>` release. Alternatively, push a new `v*` tag
+(for example, `v0.1.0-preview.1`) to build and publish under that tag. Both triggers
+currently produce experimental prereleases, never a supported stable release.
+
+The repository must allow Actions and the publishing job's `contents: write`
+permission. No personal access token, signing key, or external hosting is needed;
+only the publishing job receives write access through `GITHUB_TOKEN`. The build
+jobs also retain downloadable Actions artifacts for 14 days. A failed platform
+build prevents release creation; a failed upload can leave a draft. Existing
+releases are not overwritten on reruns: dispatch a new preview, or explicitly
+remove a failed draft before rerunning its publishing job.
+
+### Downloads and requirements
+
+- **Windows 11 x64:** download `regressee-windows-x86_64.exe` and run it as your
+  normal user. No Rust, Visual Studio, Node.js, npm, or Playwright installation is
+  needed. The MSVC runtime is statically linked; GPUI's release shaders are compiled
+  into the executable. The unsigned app may produce a Windows publisher/reputation
+  warning. No signing or security-policy bypass is performed by this workflow.
+  Download `regressee-windows-x86_64.zip` as well for help and dependency notices.
+- **Linux x64:** extract `regressee-linux-x86_64.tar.gz`, then run
+  `./regressee-linux-x86_64/regressee`. Use Ubuntu 24.04 or a compatible glibc-based
+  desktop with a working GPU/graphics backend. Shared libraries remain system
+  prerequisites; this is a portable directory, **not an AppImage or installer**.
+  On Ubuntu 24.04, GPUI's basic runtime prerequisites can be installed with:
+
+  ```sh
+  sudo apt-get install libasound2t64 libfontconfig1 libfreetype6 libvulkan1 \
+    libwayland-client0 libwayland-cursor0 libxcb1 libxkbcommon0 libxkbcommon-x11-0
+  ```
+
+  Browser shared-library and default AppArmor/sandbox compatibility still need
+  native qualification; do not use `--no-sandbox` or disable OS protections.
+- **Both:** first-run browser installation needs internet access. The app embeds
+  its worker and official-runtime catalog and downloads verified Node/Chromium
+  components into its private local storage. The development `.runtime` directory
+  is never included. App data is stored outside the extracted/download directory.
+
+Each platform archive includes `build-info.json` (source commit, compiler, target,
+and binary hash), help, project notices, and cached license texts with a
+target-specific normal/build Cargo dependency inventory. Missing license texts
+and unreviewed entries remain visible; this is not a completed native/transitive
+license audit. `regressee-source.tar.gz` supplies the exact tracked application
+sources, including vendored GPUI, at the same commit. `SHA256SUMS` covers all assets.
+It detects download corruption, not publisher authenticity:
+
+```sh
+sha256sum --ignore-missing --check SHA256SUMS
+```
+
+On Windows, compare `(Get-FileHash .\regressee-windows-x86_64.exe -Algorithm SHA256).Hash`
+with its entry in `SHA256SUMS`.
+
+No macOS build, installer, app signing, or automatic updater is added. Hosted CI
+build success does not establish Windows 11 desktop usability or clean-install,
+accessibility, secure-store, browser-sandbox, or complete license qualification.
+See [the support matrix](support-matrix.md) for those outstanding gates.
+
+## Production release preparation (still pending)
+
 Run serially in a dedicated checkout/image with pre-provisioned prerequisites:
 
 ```sh
@@ -14,7 +85,8 @@ Linux: build in Ubuntu 24.04 userspace, inspect every ELF using `readelf -d` and
 `readelf --version-info`. Reject GLIBC above 2.39; never patch in a host glibc.
 AppImage/FUSE/extract-and-run remains a packaging recipe, not a delivered installer.
 Run the exact packaged default-sandbox browser on default AppArmor/userns policy
-without admin/sandbox bypasses. The current development binary fails the ABI floor.
+without admin/sandbox bypasses. The development-host binary fails the ABI floor;
+the preview workflow instead builds on Ubuntu 24.04 and enforces GLIBC ≤2.39.
 
 Windows: x86_64-pc-windows-msvc on a pre-provisioned SDK. Native conditional tests
 must exercise Job assignment, nested Chromium jobs, owner crash, cancellation,
