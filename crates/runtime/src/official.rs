@@ -831,6 +831,8 @@ pub fn setup_network_with_progress(
         .open(stage.path().join("READY"))?;
     ready.write_all(c.manifest.id.as_bytes())?;
     ready.sync_all()?;
+    // Close the last descendant handle before publishing the directory on Windows.
+    drop(ready);
     #[cfg(unix)]
     File::open(stage.path())?.sync_all()?;
     let root = cache.join(format!("runtime-{}", uuid::Uuid::new_v4()));
@@ -839,11 +841,13 @@ pub fn setup_network_with_progress(
     pointer.as_file().sync_all()?;
     pointer_safe(cache)?;
     distribution::check_cancel(cancel)?;
-    fs::rename(stage.path(), &root)?;
+    fs::rename(stage.path(), &root)
+        .context("Cannot publish verified official runtime generation")?;
     // Once committed, do not report cancellation instead of the successful publication.
     pointer
         .persist(cache.join("current"))
-        .map_err(|e| e.error)?;
+        .map_err(|e| e.error)
+        .context("Cannot publish official runtime pointer")?;
     #[cfg(unix)]
     File::open(cache)?.sync_all()?;
     progress(InstallProgress::Ready);

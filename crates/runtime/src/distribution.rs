@@ -600,8 +600,10 @@ pub fn install_with_progress(
     let mut f = File::options().create_new(true).write(true).open(ready)?;
     f.write_all(m.id.as_bytes())?;
     f.sync_all()?;
+    // Windows cannot rename a directory while a descendant file is open.
+    drop(f);
     let root = cache.join(format!("runtime-{}", uuid::Uuid::new_v4()));
-    fs::rename(stage.path(), &root)?;
+    fs::rename(stage.path(), &root).context("Cannot publish verified runtime generation")?;
     let mut pointer = tempfile::NamedTempFile::new_in(cache)?;
     pointer.write_all(root.file_name().unwrap().as_encoded_bytes())?;
     pointer.as_file().sync_all()?;
@@ -612,7 +614,10 @@ pub fn install_with_progress(
             "unsafe runtime pointer"
         );
     }
-    pointer.persist(&current).map_err(|e| e.error)?;
+    pointer
+        .persist(&current)
+        .map_err(|e| e.error)
+        .context("Cannot publish runtime pointer")?;
     #[cfg(unix)]
     File::open(cache)?.sync_all()?;
     progress(InstallProgress::Ready);
