@@ -13,13 +13,25 @@ runs:
         rustup toolchain install "$channel" --profile minimal --component rustfmt --component clippy
         rustc --version
         cargo --version
+    - name: Use a canonical isolated test temporary directory
+      shell: bash
+      run: |
+        python - <<'PY'
+        import os
+        from pathlib import Path
+        root = Path(os.environ['RUNNER_TEMP']).resolve() / 'regressee-tests'
+        root.mkdir(mode=0o700, exist_ok=True)
+        with open(os.environ['GITHUB_ENV'], 'a') as env:
+            for name in ('TMPDIR', 'TMP', 'TEMP'):
+                env.write(f'{name}={root}\n')
+        PY
     - name: Install Linux native build prerequisites
       if: runner.os == 'Linux'
       shell: bash
       run: |
         sudo apt-get update
         sudo apt-get install --no-install-recommends -y \
-          clang cmake pkg-config libasound2-dev libfontconfig1-dev \
+          apparmor clang cmake pkg-config libasound2-dev libfontconfig1-dev \
           libfreetype6-dev libssl-dev libvulkan-dev libwayland-dev \
           libxcb1-dev libxkbcommon-dev libxkbcommon-x11-dev
     - uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5

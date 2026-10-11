@@ -1414,6 +1414,7 @@ mod tests {
                 )
                 .is_err()
         );
+        #[cfg(target_os = "linux")]
         let original = serde_json::to_vec(&record.captures).unwrap();
         record.run.state = JobState::Paused;
         store.checkpoint_run(&record).unwrap();

@@ -24,12 +24,24 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - name: Rust core tests
-        run: cargo test --locked --workspace --features regressee-app/test-support
+        run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support
       - name: Build local private runtime pack source
         run: python scripts/bootstrap.py
       - name: Install Linux browser shared-library prerequisites
         if: runner.os == 'Linux'
         run: .runtime/source/node/bin/node .runtime/source/worker/node_modules/playwright/cli.js install-deps chromium
+      - name: Permit pinned browser sandbox under hosted AppArmor policy
+        if: runner.os == 'Linux'
+        run: python scripts/ci-linux-browser.py
+      - name: Check private sandboxed browser startup with visible errors
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == Windows ]]; then node=.runtime/source/node/node.exe; else node=.runtime/source/node/bin/node; fi
+          PLAYWRIGHT_BROWSERS_PATH="$GITHUB_WORKSPACE/.runtime/source/browsers" "$node" --input-type=module -e '
+            import { chromium } from "./.runtime/source/worker/node_modules/playwright/index.mjs";
+            const browser = await chromium.launch({ channel: "chromium", headless: true, chromiumSandbox: true });
+            await browser.close();
+          '
       - name: Package, provision and smoke (no system Node)
         shell: bash
         run: |

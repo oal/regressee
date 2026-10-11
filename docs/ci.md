@@ -13,8 +13,16 @@ they do not qualify desktop behavior or publish a release.
 All jobs use `.github/actions/setup/action.yml`: Python 3.12, the Rust version
 from `rust-toolchain.toml`, formatting/lint components and cached Cargo downloads.
 Linux development libraries are installed only on the disposable hosted runner.
+Tests use a canonical temporary directory, avoiding macOS's `/var` symlink. The
+Windows command wrapper sets its own process token's default owner to its user,
+not the elevated runner's Administrators group; existing owners and the product's
+strict private ACL checks are unchanged.
+
 The Phase 0 job installs browser shared-library prerequisites using its private,
-pinned Playwright CLI. No host Node/npm or sandbox-disabling flags are used.
+pinned Playwright CLI. Ubuntu's AppArmor user-namespace restriction is handled by
+an executable-scoped profile for only this job's exact pinned Chromium paths.
+No host Node/npm, global policy/sysctl disablement or sandbox-disabling flags are
+used. This hosted-runner policy is not default-policy desktop qualification.
 
 ## Local checks
 

@@ -24,11 +24,11 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - run: cargo fmt --all -- --check
-      - run: cargo test --locked --workspace --features regressee-app/test-support
+      - run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support
       - name: UI-inclusive API and lint check on every target
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Native link and simulated GPUI tests (not desktop launch)
         shell: bash
         run: |
           cargo build --locked --workspace --features ui --bins
-          cargo test --locked --workspace --all-features
+          python scripts/ci-run.py cargo test --locked --workspace --all-features
