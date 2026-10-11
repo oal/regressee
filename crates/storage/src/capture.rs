@@ -1414,7 +1414,6 @@ mod tests {
                 )
                 .is_err()
         );
-        #[cfg(target_os = "linux")]
         let original = serde_json::to_vec(&record.captures).unwrap();
         record.run.state = JobState::Paused;
         store.checkpoint_run(&record).unwrap();
@@ -1503,7 +1502,6 @@ mod tests {
                 }],
             )
             .unwrap();
-        let original = serde_json::to_vec(&record.captures).unwrap();
         store
             .connection
             .execute(
@@ -1513,6 +1511,7 @@ mod tests {
             .unwrap();
         #[cfg(target_os = "linux")]
         {
+            let original = serde_json::to_vec(&record.captures).unwrap();
             assert_eq!(store.recover_runs().unwrap(), 1);
             let mut recovered = store.load_run(record.run.id).unwrap();
             assert_eq!(recovered.run.state, JobState::Interrupted);
