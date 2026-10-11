@@ -1,225 +1,107 @@
 # Regressee — local visual regression checks
 
-> Privacy: historical machine paths and authorized-site URLs use redacted
-> example placeholders. They are not runnable configuration.
+Regressee is a local-first desktop app for spotting visual changes on websites.
+Capture reference screenshots, check the same pages again, and review differences
+before deciding which changes to accept.
 
-Native Rust + GPUI, MPL-2.0. **Phase 6's bounded local independent gate and
-Phase 7's scoped safety/checkpoint/scale verification passed. Phase 7 remains
-incomplete; not release-qualified.**
-Guided crawling, authenticated capture, separate environment sessions, mapped
-fixed-baseline checks, adjustable analysis, ignored regions, selective baseline
-approvals, ZIP interchange and manual storage cleanup are real services wired to
-GPUI. Current evidence and open qualifications are tracked in the status index.
-Automatic setup now uses app-pinned official Node/Chromium downloads and bundled
-Playwright/worker code. The historical development browser remains
-**owned-loopback-only**; it is not silently promoted to public trust.
+**Regressee is currently a private preview, not a production-ready public release.**
+See [platform availability](#platform-availability) before getting started.
 
-Start with the [first-run guide](docs/first-run-guide.md),
-[private support matrix](docs/support-matrix.md),
-[update/recovery policy](docs/updates-and-recovery.md) and
-[private build/source instructions](docs/release-building.md).
-Read [`docs/phases/07-status.md`](docs/phases/07-status.md),
-the latest [independent repair and scale report](docs/phases/07-guardian-verification.md),
-[`docs/IMPLEMENTATION_STATUS.md`](docs/IMPLEMENTATION_STATUS.md) and
-[`DESIGN.md`](DESIGN.md) and the [approved workflow revamp](docs/workflow-revamp.md).
-The user selected the **Clear wayfinding** replacement direction and guided
-workflow; that approval is not native input, accessibility or release acceptance.
-External OS / clean-machine gates remain open; decision 0005 permits local work.
+## What you can do
 
-## Product foundation (developer commands)
+- **Find and capture pages:** use starting addresses or discover linked pages,
+  review the page list, and capture at your chosen screen sizes.
+- **Check for visual changes:** compare against a saved baseline with synchronized
+  before, after, and diff views.
+- **Fine-tune your review:** adjust sensitivity and mark ignored areas without
+  changing the original screenshots.
+- **Approve selected changes:** create a new baseline version while keeping
+  earlier versions and run history.
+- **Check authenticated sites and environments:** log in through a managed browser
+  and keep production and staging sessions separate.
+- **Share baselines:** export a baseline ZIP or import one as a new local project.
+  Recipients use their own login sessions.
+
+## Getting started
+
+1. Choose **Create project**, enter a name and your website address, then select
+   **Save website & continue**.
+2. Choose whether the site needs a login. If it does, save the settings, open the
+   login browser, finish signing in, and select **I'm ready**.
+3. Choose which pages and screen sizes to capture. Save the settings, then use
+   **Find pages & preview** to review the included pages.
+4. Capture the reviewed pages, inspect screenshots and warnings, and explicitly
+   **Save baseline**. A baseline is your approved set of reference screenshots.
+5. Open **Review changes** and choose **Run check**. The check revisits the fixed
+   baseline page list using the same capture profiles.
+6. Review differences and failures. Select the changes you want to accept and
+   review the approval preview before saving a new baseline version.
+
+The app installs its private browser when needed. Initial setup requires internet
+access, but you do not need to install Node.js, npm, or Playwright yourself.
+Browser installation and repair are also available in **App settings**.
+
+For a walkthrough and troubleshooting, see the [first-run guide](docs/first-run-guide.md).
+
+### Running from source
+
+Regressee is built with Rust and GPUI. Install Rust through rustup and your
+platform's native build dependencies, then run from the repository root:
 
 ```sh
-bash scripts/check-foundation.sh       # locked UI build, format, tests, clippy
 cargo run --locked --features ui --bin regressee
-# On this Linux host, use the built binary after the linker-name helper:
-target/debug/regressee
-cargo run --locked --bin regressee-foundation -- /tmp/opencode/new-foundation-check
-.runtime/installed/node/bin/node --test worker/product/test/protocol.test.mjs
-# Full serial signed HTTP setup + actual product worker + headless loop (~6 min):
-python3 scripts/check-phase2.py --output /tmp/opencode/regressee-phase2-UNIQUE
-# Serial Phase 4 build/tests and fresh signed owned-loopback fixtures (~5 min here):
-python3 scripts/check-phase4.py --output /tmp/opencode/regressee-phase4-UNIQUE
-# Phase 6 serial product/recipient/archive checks; always use a fresh output:
-python3 scripts/check-phase6.py --output /tmp/opencode/regressee-phase6-UNIQUE
 ```
 
-The headless verifier requires a **new** directory and leaves its actual SQLite
-project plus a labeled synthetic storage object there for inspection. It does
-not capture a website. Default product data/cache use OS-local locations, never
-the project cwd. `REGRESSEE_DEV_DATA=/absolute/fresh-test-directory` explicitly
-isolates native developer checks. The app never launches the fixture worker.
-Its product runtime comes through app-embedded official pins or an explicitly
-configured, signature-verified distribution override.
+The repository pins its Rust toolchain in `rust-toolchain.toml`. Linux also needs
+GPUI's native development libraries and a working graphics backend; Cargo does
+not install those prerequisites. See the [build instructions](docs/release-building.md)
+for platform-specific details.
 
-## Guided workflow and setup boundary
+## Privacy and local storage
 
-Create/save a project → **Find pages** → review the inventory → **Capture baseline** → inspect warnings/evidence
-→ explicitly **Save baseline…** → **Check for changes**. Checks create a separate
-run of the same fixed targets/profiles. Before/after/diff panes share zoom/pan and bounded
-viewer tiles; failed capture is never an unchanged verdict. Originals and prior
-records are preserved after cancellation/restart. Sensitivity and ignored regions
-can change after capture while originals and past analysis revisions remain
-intact. Presets are fixture-calibrated, not proven real-site accuracy or automatic
-defect verdicts. Selected compatible changes create a new immutable baseline;
-previous versions remain available until explicitly deleted.
+- Projects, screenshots, baselines, and history are stored locally, outside the
+  repository. Website capture still visits the sites you authorize.
+- Saved login sessions are encrypted using an OS-protected key. If secure storage
+  is unavailable, you must explicitly choose a session-only login; there is no
+  plaintext fallback.
+- **Baseline ZIPs contain original screenshots and page addresses, including URL
+  queries. Ignored areas do not redact exported images.** Inspect the export
+  preview and share only with authorized recipients. Login sessions and secret
+  keys are excluded.
+- Diagnostics are previewed before you explicitly save a local file. They exclude
+  screenshots, URLs, project names, sessions, secrets, local paths, and private
+  logs. Nothing is uploaded automatically.
+- **History** lets you inspect runs, baseline versions, and storage usage. Manual
+  cleanup previews its impact and protects active or shared references.
 
-History supports selected-baseline ZIP export and import as a new local project.
-Login state is excluded; recipients establish their own sessions. **Ignored
-regions do not redact exported screenshots**, and private URL queries remain
-visible. See [portable baseline help](docs/portable-baseline-archive.md) for
-privacy, compatibility, archive limits, and protected manual cleanup.
+See [baseline sharing and storage help](docs/portable-baseline-archive.md) for details.
 
-For login/consent, save an environment, choose **Open browser**, finish normally,
-then choose **I'm ready** to confirm replay on an application page in a fresh
-context. Saved sessions are encrypted using an OS-protected key; unavailable
-secure storage requires explicitly choosing **Ephemeral**, never plaintext.
-Production and staging logins remain separate. Preview/probe changed mappings
-before a full check. See [login and capture help](docs/auth-and-capture.md) for
-read-only-account advice, exact limits and unqualified auth/network cases.
+## Platform availability
 
-New unpinned work automatically installs a genuinely missing private browser.
-The default Linux/Windows x86_64 path downloads exact official archives, verifies
-embedded hashes and the complete file inventory, and runs the existing sandboxed
-screenshot smoke before activation. No Node/npm or end-user configuration is
-required. Settings → **Install browser now / Repair browser** uses the same
-background service. Damaged installations need explicit repair; checks/resumes
-preserve their pinned runtime. Optional `REGRESSEE_DISTRIBUTION` signed-pack
-overrides keep their existing verification and scope restrictions. See
-[`docs/runtime-distribution.md`](docs/runtime-distribution.md) and
-[decision 0011](docs/decisions/0011-app-pinned-official-runtime.md).
+Default browser setup is available for **Linux and Windows x86_64**. Desktop
+compatibility, clean installation, and accessibility are still being validated;
+browser setup availability is not a guarantee of full platform support.
+**macOS capture is currently unavailable.** See the
+[support matrix](docs/support-matrix.md) for current platform requirements and limits.
 
-Windows private Job ownership is implemented but not OS-qualified; macOS setup
-still fails closed because exact owned-tree supervision is an explicit code gap.
-App-pinned default availability is not public-release/native/platform acceptance.
+## Important limitations
 
-Settings → **Preview diagnostic contents** → review the exact sanitized structured
-JSON → **I reviewed this — export locally…** saves only after explicit consent.
-Cancelling the preview or save picker saves nothing; no diagnostic is uploaded.
-Screenshots, URLs/queries, sessions/references/secrets, names, paths and private
-logs are structurally excluded. Tiny-mask outlines now retain exact scaled bounds.
+- Visual differences need human review; they are not automatic bug verdicts.
+  Failed or missing captures are never treated as unchanged pages.
+- Fonts, operating systems, dynamic content, and incomplete page loading can
+  affect comparisons. Review capture warnings before trusting a result.
+- Phone and tablet profiles use Chromium emulation, not actual Safari or iOS
+  devices. Screenshots do not cover every interactive state, hidden tab, or
+  virtualized list, and full-page capture has size limits.
+- Use read-only test accounts and only sites you are authorized to visit. Page
+  visits and scripts can change server data even without clicking or submitting
+  forms. Complex SSO/MFA and enterprise networks are not universally supported.
 
-Phase 7 adds authenticated contained bundle links/file modes, native Windows
-quota/ACL/reparse handling, checked private source/app/runtime-pack helpers and
-target build recipes. Unreviewed/unknown licenses and owner signing remain blocked.
-The current Linux development binary is not an Ubuntu 24.04/AppImage qualification.
-Earlier maximum-scale attempts failed and remain recorded. After incremental
-checkpoint and Linux guardian repairs, independent verification completed
-**1,000 pages × three profiles: 3,000 actual captures and visits**, with preserved
-pause/reopened resume evidence and a separate large-run cancellation. Original
-budgets were unchanged. This is local backend scale evidence, not native UI,
-cross-platform, public-browser, or release qualification.
+See [login and capture help](docs/auth-and-capture.md) for detailed limits, and
+[updates and recovery](docs/updates-and-recovery.md) for runtime repair and data
+preservation.
 
-Native launch on this test display failed during Vulkan swapchain creation;
-see the [owned-window report](docs/research/native-render-on-disk.md). macOS
-supervision and accessibility remain code gaps; Windows integration, Linux
-packaging/ABI, current public runtime, real keychain, human usability and signing/
-licensing gates remain open. The earlier private candidate is stale for corrected
-source and must not be presented as the verified current app.
+## License
 
-Use **Create project**, enter a name and complete http(s) address, then **Save
-website & continue**. Guided access and page/screen-size setup lead to discovery,
-reviewed capture and explicit baseline saving. Projects → **View results** selects
-a project and opens its workspace;
-**Edit settings** selects it and opens setup. Results and History offer a project
-chooser when none is selected. **Selected project** in the header identifies the
-shared selection; **Change project** switches it without opening the editor. The
-project rail separates **Review changes**, **Pages & baseline**, **History** and
-**Project settings** from **App settings**. Ctrl/Cmd+N, S and
-1…5 create/save/switch sections; Tab/Shift-Tab traverse active controls,
-Enter/Space activate buttons, Escape closes the information dialog, Ctrl/Cmd+Q
-quits. Native menu/titlebar/folder/discard prompts are used where supported.
-
-Windows/macOS developer checks: `cargo build --locked --workspace --features ui
---bins`, `cargo test --locked --workspace --all-features` and `cargo clippy --locked
---workspace --all-targets --all-features -- -D warnings`. Linux needs GPUI native
-development libraries; `scripts/build-ui.sh` only creates local linker-name
-symlinks on this existing x64 userspace. It does not install host packages.
-`.github/workflows/foundation.yml` defines checks for all three OSes; those remote
-jobs were **not run** here. CI compilation is not desktop launch qualification.
-
-One optional bounded owned-window probe is available as
-`python3 scripts/phase2-native.py --output /absolute/new-report-directory`.
-It explicitly uses X11/lavapipe, does not force mapping or use a virtual display,
-and stops before input if rendering is unavailable. Its result is not an ordinary
-desktop or hardware-GPU pass. Do not repeat black-window loops.
-
-## Separate Phase 0 feasibility bench
-
-Native Rust + GPUI bench, MPL-2.0. **Phase 0 is not accepted yet.** See
-[`docs/phases/00-status.md`](docs/phases/00-status.md) for real evidence and gates.
-The bench itself does not provide product project management, crawling,
-baselines or comparisons. It remains separate from the maintained foundation.
-
-## Reproduce (developer harness)
-
-Run from the repository root; Python is needed only to build/test the development
-pack. Rust 1.98.1 is pinned. No system Node/npm is used by these commands.
-
-```sh
-cargo test --locked
-python3 scripts/bootstrap.py
-# On THIS unsupported Ubuntu 26.04 userspace only, explicit experimental probe:
-python3 scripts/bootstrap.py --linux-compat ubuntu24.04-x64
-cargo run --locked --bin regressee-spike -- pack
-cargo run --locked --bin regressee-spike -- repair
-cargo run --locked --bin regressee-spike -- smoke --headed
-cargo run --locked --bin regressee-spike -- protocol-test
-.runtime/installed/node/bin/node --test worker/test/fixtures.test.mjs
-.runtime/installed/node/bin/node --test .runtime/installed/worker/test/policy.test.mjs
-python3 scripts/qualify.py --headed  # Linux /proc process/RSS evidence
-cargo run --locked --bin regressee-spike -- tiles artifacts/tall.png
-```
-
-`bootstrap.py` uses exact TLS Node downloads and checksums, private npm `ci`, exact
-Playwright and the matching full Chromium, never a global installation or sudo.
-Only synthetic loopback fixtures are allowed by this spike worker.
-
-## Native window
-
-```sh
-bash scripts/build-ui.sh             # this Linux x64 linker-name workaround
-target/debug/regressee-ui            # normal GPU/display attempt
-# Developer software-renderer probe only; native mapping/input remains unqualified:
-env -u WAYLAND_DISPLAY VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json target/debug/regressee-ui
-python3 scripts/ui-smoke.py          # captures only its own native X11 window
-bash scripts/flatpak-probe.sh        # pinned existing SDK probe; sandbox launch fails here
-```
-
-On Windows/macOS, use `cargo build --locked --features ui --bins` and the resulting
-`regressee-ui` executable. Those targets are **not runtime-qualified here**.
-
-The latest native harness fails window mapping/input in this shared environment.
-The software-renderer command is a probe, not a proven end-user workaround. See
-[`docs/phases/00-reverification.md`](docs/phases/00-reverification.md).
-
-With a prebuilt `.runtime/pack.zip`, choose **Repair runtime**, **Open sign in**,
-click **Sign in** in the managed fixture browser, then **I’m ready**. Enter
-`/private` and choose **Capture address**, or capture `/public` or the tall fixture.
-Open PNG uses the native file dialog. Scroll the preview to page through 512-row
-tiles. Tab/Shift-Tab traverse controls; Enter activates focused buttons;
-Ctrl/Cmd+O opens an image, Escape cancels, Ctrl/Cmd+Q quits. Sessions are ephemeral.
-This is a test bench, not a release installer; no download service is configured.
-
-## Artifacts and limitations
-
-Runtime/cache/build artifacts are ignored. Test screenshots and metadata live in
-`artifacts/`; they are generated synthetic content, not real sessions. Pack signing
-uses a disclosed **development key**, not release authenticity. The historical
-browser pin must be replaced/qualified before accessing real websites.
-Session secrets use bounded private product IPC, never diagnostic output,
-project/evidence JSON or credential export. Saved state files are encrypted.
-
-Core tests cover image limits, row tiling, pack integrity/path safety and failed
-repair preservation. Worker smoke covers stability, replacement geometry,
-cookie/localStorage/IndexedDB/sessionStorage replay and expiry. Headed/headless
-pixel equality is recorded as an investigation, **not assumed or disguised as a
-passing equality assertion**. Qualification also tests live-process cleanup,
-parent crash, runtime corruption and repair. The UI smoke's claims are explicitly
-limited in its JSON result. Full clean-machine, cross-OS, hardware-GPU, credential
-store and screen-reader gates remain separate.
-
-Image replacement does not support source-dependent CSS/scripts. Stable pixels
-can coexist with `ReplacementGeometryChanged` or `ReplacementGeometryNotMeasured`;
-neither is dimension-preserving success. Current replacement pixels/profile use
-`neutral-raster-v2`, incompatible with v1 replacement baselines. See
-[`00-image-corrections.md`](docs/phases/00-image-corrections.md) for focused tests.
+Regressee is licensed under [MPL-2.0](LICENSE). See
+[third-party notices](THIRD_PARTY_NOTICES.md) for dependency information.
