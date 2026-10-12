@@ -83,7 +83,7 @@ impl Task {
         }
         let gaps = &self.result.as_ref()?.capture.as_ref()?.gaps;
         let gap = gaps.get((index - 1) / 2)?;
-        if (index - 1) % 2 == 0 {
+        if (index - 1).is_multiple_of(2) {
             Some(&gap.page)
         } else {
             gap.final_url.as_deref()

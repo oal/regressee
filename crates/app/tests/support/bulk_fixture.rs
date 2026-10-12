@@ -91,7 +91,13 @@ pub fn fixture(path: &Path, pages: usize) -> (Store, ProjectId, RunId, AnalysisI
             let mut pixels = vec![255u8; 96 * 64 * 3];
             // Encode the page number into source pixels so CAS deduplication cannot
             // turn this into the old repeated-image presentation fixture.
-            for (bit, pixel) in pixels.chunks_exact_mut(3).take(16).enumerate() {
+            for (bit, pixel) in pixels
+                .as_chunks_mut::<3>()
+                .0
+                .iter_mut()
+                .take(16)
+                .enumerate()
+            {
                 pixel.copy_from_slice(if i & (1 << bit) == 0 {
                     &[20, 70, 100]
                 } else {

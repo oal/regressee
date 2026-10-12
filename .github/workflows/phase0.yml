@@ -30,7 +30,10 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      - name: Offline CI launcher contracts
+        run: python -B scripts/test_ci_run.py
       - name: Rust core tests
+        timeout-minutes: 30
         run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support
       - name: Build local private runtime pack source
         run: python scripts/bootstrap.py

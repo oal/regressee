@@ -36,7 +36,8 @@ REQUIRED = ROOT_FILES - {".gitignore"}
 TREES = frozenset({"crates", "worker", "scripts", "tests", "third-party"})
 USER_DOCS = frozenset({"auth-and-capture.md", "portable-baseline-archive.md",
                        "runtime-distribution.md", "first-run-guide.md", "support-matrix.md",
-                       "release-building.md", "updates-and-recovery.md"})
+                        "release-building.md", "updates-and-recovery.md",
+                        "preview-release-notes.md"})
 INTERNAL_DOCS = frozenset({"ACTIVE_WORK.md", "IMPLEMENTATION_STATUS.md",
                            "phase0-design.md", "spike-surface.md", "foundation-surface.md",
                            "crawling-surface.md", "auth-and-capture-surface.md",

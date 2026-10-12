@@ -125,6 +125,11 @@ actions!(
         KeyboardHelp
     ]
 );
+type SetupPaintBounds = (
+    Control,
+    std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>,
+);
+
 struct Shell {
     root_focus: FocusHandle,
     handles: Vec<FocusHandle>,
@@ -197,12 +202,7 @@ struct Shell {
         ),
         regressee_storage::LocalLoginSettings,
     >,
-    setup_paint: std::cell::RefCell<
-        Vec<(
-            Control,
-            std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>,
-        )>,
-    >,
+    setup_paint: std::cell::RefCell<Vec<SetupPaintBounds>>,
     environment_draft: Option<regressee_core::domain::EnvironmentId>,
     login_ephemeral: bool,
     show_mapping: bool,
@@ -845,12 +845,12 @@ impl Shell {
                     self.notice = Some(regressee_storage::portability_warning().into());
                 }
                 if let Some(save) = setup_save {
-                    if let Some(next) = save.next {
-                        if next != SetupStage::Pages || self.access_can_continue(cx) {
-                            self.focus.setup_stage = next;
-                            self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
-                            self.presentation_focus = Some(Control::SetupStage(next));
-                        }
+                    if let Some(next) = save.next
+                        && (next != SetupStage::Pages || self.access_can_continue(cx))
+                    {
+                        self.focus.setup_stage = next;
+                        self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                        self.presentation_focus = Some(Control::SetupStage(next));
                     }
                     if save.discover {
                         self.guided(13, cx);

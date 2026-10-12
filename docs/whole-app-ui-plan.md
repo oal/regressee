@@ -98,8 +98,25 @@ task; it does not replace the existing implementation `PLAN.md`.
   subsequent verifier SQLite read-only WAL inspection changes only two volatile
   recipient SHM files, explicitly recorded, not restored or silently refrozen.
   Zero participants; **no full native/accessibility/usability/release acceptance**.
-  **Next:** parent verified commit/push, then user-authorized GitHub pipeline repair
-  and release work with actual runs/assets/limitations; no commit/push/tag here.
+  **Phase 7 committed/pushed:** `b46dff5` (parent-confirmed delivery base).
+- **Post-plan CI/preview delivery independently locally VERIFIED / READY for parent commit/push:** semantic-preserving
+  strict lint repairs, launcher/packaging checks in hosted CI, bounded default bulk
+  tests and source-bound whole-app prerelease notes. See
+  [delivery report](research/whole-app-ui-review-20261012/delivery-report.md).
+  Independent [delivery verification](research/whole-app-ui-review-20261012/delivery-verification.md)
+  passes the full Foundation-equivalent local gates with no patch defects; both
+  complete suites finished (default bulk qualification retained). Hosted outcomes
+  for this unpushed patch and supported-release acceptance are not claimed.
+  Strict all-target/all-feature Clippy, native UI build and formatting pass;
+  complete contracts **178/0/27** and all-features **358/0/45**
+  (passed/failed/ignored) exit 0, both retaining the default distinct 100/1,000-page
+  qualification. Launcher **6**, packaging **8**, source helper **32** tests and
+  Phase 0 smoke/protocol commands pass. Counts overlap, not unique totals.
+  Native/AT/full-release gates remain blocked or untested; no new visual cycle.
+  **Next:** parent verified commit/push, observe Foundation
+  and Phase 0 on all three hosts, then create a fresh preview tag and verify both
+  hosted builds, exact-source archive, checksums and downloadable assets. No
+  implementation-agent commit/push/tag/release or cancellation of external runs.
 - **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the
   complete plan be implemented and validated without clarification questions.
   Use the recommended interaction direction and preserve Clear wayfinding.

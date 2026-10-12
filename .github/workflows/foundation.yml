@@ -30,10 +30,22 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup
       - run: cargo fmt --all -- --check
-      - run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support
+      - name: Offline CI launcher and preview packaging contracts
+        shell: bash
+        run: |
+          python -B scripts/test_ci_run.py
+          python -B scripts/test_package_preview.py
+      - name: Linux-only private source archive contracts
+        if: runner.os == 'Linux'
+        shell: bash
+        run: python -B scripts/test_source_release.py --report "$RUNNER_TEMP/source-release-tests.json"
+      - name: Application contracts including distinct persisted bulk qualification
+        timeout-minutes: 30
+        run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support
       - name: UI-inclusive API and lint check on every target
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Native link and simulated GPUI tests (not desktop launch)
+        timeout-minutes: 30
         shell: bash
         run: |
           cargo build --locked --workspace --features ui --bins

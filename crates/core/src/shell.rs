@@ -488,7 +488,7 @@ impl FocusState {
                 | Control::CloseOptions
                 | Control::DiscoveryDetails => 2,
                 Control::Guided(54) => 3,
-                Control::Phase5(6..=9) | Control::Guided(55 | 56 | 57) => 4,
+                Control::Phase5(6..=9) | Control::Guided(55..=57) => 4,
                 Control::Guided(46)
                 | Control::Phase5(36)
                 | Control::Guided(44)

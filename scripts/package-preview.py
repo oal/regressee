@@ -22,6 +22,7 @@ TARGETS = {
 HELP_FILES = (
     "first-run-guide.md", "auth-and-capture.md", "portable-baseline-archive.md",
     "updates-and-recovery.md", "support-matrix.md", "release-building.md",
+    "preview-release-notes.md",
 )
 
 

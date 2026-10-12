@@ -56,8 +56,12 @@ jobs:
           if (-not $dumpbin) { throw 'dumpbin.exe was not found' }
           "REGRESSEE_DUMPBIN=$($dumpbin.FullName)" >> $env:GITHUB_ENV
       - name: Test preview packaging
-        run: python -B scripts/test_package_preview.py
+        shell: bash
+        run: |
+          python -B scripts/test_ci_run.py
+          python -B scripts/test_package_preview.py
       - name: Run application contract tests
+        timeout-minutes: 30
         run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support --target ${{ matrix.target }}
       - name: Build the desktop application
         run: cargo build --release --locked -p regressee-app --features ui --bin regressee --target ${{ matrix.target }}
@@ -147,6 +151,8 @@ jobs:
 
           Dependency license texts and a target-specific inventory are included in each platform archive. Download the Windows ZIP as well if you use the standalone EXE. See the repository's release-building and support-matrix documents for requirements and known limitations.
           NOTES
+          printf '\n' >> "$RUNNER_TEMP/release-notes.md"
+          cat docs/preview-release-notes.md >> "$RUNNER_TEMP/release-notes.md"
           printf '\nSource commit: `%s`\n' "$GITHUB_SHA" >> "$RUNNER_TEMP/release-notes.md"
           # Never overwrite a published preview. Failed uploads leave a draft,
           # rather than exposing a release with only some of its downloads.

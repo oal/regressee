@@ -54,8 +54,10 @@ and binary hash), help, project notices, and cached license texts with a
 target-specific normal/build Cargo dependency inventory. Missing license texts
 and unreviewed entries remain visible; this is not a completed native/transitive
 license audit. `regressee-source.tar.gz` supplies the exact tracked application
-sources, including vendored GPUI, at the same commit. `SHA256SUMS` covers all assets.
-It detects download corruption, not publisher authenticity:
+sources, including vendored GPUI, at the same commit. The
+[whole-app preview notes](preview-release-notes.md) are included in the platform
+help directories and appended to the GitHub prerelease notes. `SHA256SUMS` covers
+all assets. It detects download corruption, not publisher authenticity:
 
 ```sh
 sha256sum --ignore-missing --check SHA256SUMS

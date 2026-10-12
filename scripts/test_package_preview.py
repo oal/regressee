@@ -57,8 +57,9 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(files[f"{prefix}/notices/fixture/LICENSE"], b"dependency license")
         self.assertIn(f"{prefix}/LICENSE", files)
         for name in preview.HELP_FILES:
-            self.assertIn(f"{prefix}/help/{name}", files)
+            self.assertEqual(files[f"{prefix}/help/{name}"], name.encode())
         self.assertFalse(any("private.key" in name or ".runtime" in name for name in files))
+        self.assertFalse(any(b"not for distribution" in data for data in files.values()))
 
     def test_linux_archive_and_executable_mode(self):
         names = self.build("x86_64-unknown-linux-gnu")
@@ -97,10 +98,14 @@ class PreviewTests(unittest.TestCase):
         self.assertFalse(self.output.exists())
 
     def test_required_help_is_not_silently_omitted(self):
-        (self.root / "docs/first-run-guide.md").unlink()
-        with self.assertRaises(FileNotFoundError):
-            self.build("x86_64-unknown-linux-gnu")
-        self.assertFalse(self.output.exists())
+        for name in ("first-run-guide.md", "preview-release-notes.md"):
+            with self.subTest(name=name):
+                help_file = self.root / "docs" / name
+                help_file.unlink()
+                with self.assertRaises(FileNotFoundError):
+                    self.build("x86_64-unknown-linux-gnu")
+                self.assertFalse(self.output.exists())
+                help_file.write_text(name)
 
     def test_target_specific_cached_and_vendored_notices(self):
         (self.root / "Cargo.lock").write_text('''
