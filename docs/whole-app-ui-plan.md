@@ -52,9 +52,18 @@ task; it does not replace the existing implementation `PLAN.md`.
   [Re-verification verdict](research/whole-app-ui-review-20261012/phase4-reverification.md).
   All substantive Phase 4 gates clear within source/controller/offscreen scope;
   native input, usability and release qualification are not inferred.
-- **Next:** parent reviews and commits/pushes verified Phase 4, then starts Phase 5.
-  This verifier did not commit/push or start Phase 5. Implementation's bounded
-  visual cycle has ended; no further render/polish loop is requested.
+- **Phase 4 committed/pushed:** `2f09a6b`, as confirmed by the Phase 5 parent handoff.
+- **Phase 5 independently re-verified PASS (source/controller/offscreen scope):**
+  independent packages **308 passed, 0 failed, 40 ignored**; serial Phase 5 tests
+  **12 passed**; original external worker probes **2 passed**; strengthened external
+  repair tests **5 passed**, including production-bound timezone selection.
+  V5-1–V5-3 clear: guided correction routing/current-clip focus, newer login drafts
+  and identity-bound save continuations, complete setup capability reachability.
+  Six repair originals inspected; immutable FIX/blocked evidence and 66 source
+  bindings checked. [Verdict](research/whole-app-ui-review-20261012/phase5-reverification.md).
+  Native input, accessibility, usability and release acceptance are not inferred.
+- **Next:** parent reviews and commits/pushes verified Phase 5 before Phase 6.
+  This verifier did not commit/push or start Phase 6.
 - **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the
   complete plan be implemented and validated without clarification questions.
   Use the recommended interaction direction and preserve Clear wayfinding.
@@ -339,7 +348,7 @@ and understand confirmation. Verify drafts, selection outside filters,
 synchronized pan/zoom, collapse/restore and dialog containment. Native input
 remains separately qualified in Phase 7.
 
-### Phase 5 — simplify first baseline setup and discovery **AUTHORIZED; PENDING**
+### Phase 5 — simplify first baseline setup and discovery **VERIFIED PASS (SOURCE/CONTROLLER/OFFSCREEN SCOPE)**
 
 Address S1–S3 across the complete first-use sequence:
 
@@ -495,6 +504,48 @@ or zero-finding certification should be attempted.
    endless polishing. Do not discard unfamiliar working-tree changes.
 
 ### Checkpoint log
+
+**2026-10-12 — independent Phase 5 re-verification: PASS.** Read repaired source,
+tests, report/receipt and actual diff; reran packages 308/0/40, serial Phase 5 tests
+12/0, original exact external probes 2/0, and strengthened external repair tests
+5/0. The last adds cross-stage correction-summary routing, custom replacement
+dimensions and actual timezone change with production keybindings. Inspected all
+six existing repair originals without rendering. Both reproduced defects are
+resolved; newer fields 10–12/retention, absent-status/follow-up hydration, untouched
+initial hydration, Continue/discovery stale/failed/newer/invalid/composing/stage/
+screen/environment/project branches and current-clip capability traversal pass.
+Original FIX/blocked evidence preserved; capture versus final test-only binding
+difference retained. Pre-verification plan hash archived before this checkpoint
+update; production/source bindings unchanged. See
+[verdict](research/whole-app-ui-review-20261012/phase5-reverification.md) for actual
+results and simulated-input/offscreen limitations. No product edit, new renderer,
+polish, commit/push or Phase 6. **Next: parent commits/pushes verified Phase 5.**
+
+**2026-10-12 — Phase 5 finite functional follow-up complete.** V5-1 preserves guided
+validation and reveals border/error/help; V5-2 separates status from hydration and
+preserves newer login-only drafts through actual worker save/read races; V5-3
+qualifies mounted/enabled Tab/reveal/dispatch against current scroll owners at
+1280×800 and 820×600. Packages 308/0/40; Phase 5 tests 12/0; original external probes 2/0;
+six narrow source-bound native pairs inspected once. No broad renders or aesthetic
+correction. Original FIX and blocked report/receipt remain unchanged. Current
+report/receipt bind capture-time tests separately from final strengthened tests.
+**Next: independent re-verification, not acceptance.** No commit/push or Phase 6.
+
+**Historical 2026-10-12 — Phase 5 implementation, BLOCKED handoff.** Based on pushed/verified
+Phase 4 `2f09a6b`; implemented pinned three-stage wayfinding, clean Continue/dirty
+authoritative save continuation, separately explicit private login, Save & find
+pages, finite guided form width/actual-input reveal, sizes-first compact plan,
+mapping-first preview, nearby included-target/coverage/next-step estimate and plain
+bitmap/session-only wording. Existing explicit Settings/advanced controls remain.
+Packages: **303 passed, 0 failed, 40 ignored**. Isolated first complete 38 pairs,
+one correction and one 38-pair confirmation; eight sheets/six originals inspected
+per round. No post-confirmation UI edits. **Unmet:** Access validation changes to
+Settings, hiding guided stages; newer-save/absent-status hydration lacks its race
+probe; chooser bounds are window-level and narrow Mobile needs scrolling although
+chosen dimensions are visible. No acceptance, native/AT/usability/release claim,
+commit/push, delegation or Phase 6. Exact commands/logs/receipt/limits:
+[Phase 5 report](research/whole-app-ui-review-20261012/phase5-report.md).
+**Next: independent verification first; do not advance as verified.**
 
 **2026-10-12 — independent Phase 4 re-verification: PASS.** V4-1/2/3 clear after
 source review, actual inner-input/caret and real Shell regression execution,

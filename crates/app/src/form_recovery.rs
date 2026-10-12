@@ -41,6 +41,66 @@ fn field_label(control: Control) -> &'static str {
 }
 
 impl Shell {
+    pub(super) fn setup_control_bounds(
+        &self,
+        control: Control,
+    ) -> Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>> {
+        if self.focus.screen != Screen::Setup
+            || !matches!(control,Control::Name|Control::Address|Control::CrawlField(_)|Control::Choice(_)|Control::Environment(_)|Control::Guided(1..=12|25|27|31..=38)|Control::Details(Detail::Capture)|Control::CloseMappingPreview)
+            || (self.focus.setup_stage == SetupStage::Access
+                && matches!(control, Control::Guided(31 | 32)))
+        {
+            return None;
+        }
+        if let Some(bounds) = self.options_control_bounds(control) {
+            return Some(bounds);
+        }
+        let mut paint = self.setup_paint.borrow_mut();
+        if let Some((_, bounds)) = paint.iter().find(|(c, _)| *c == control) {
+            return Some(bounds.clone());
+        }
+        let bounds = std::rc::Rc::new(std::cell::Cell::new(None));
+        paint.push((control, bounds.clone()));
+        Some(bounds)
+    }
+    pub(super) fn measured_form_field(&self, control: Control, field: Div) -> Div {
+        field.when_some(self.setup_control_bounds(control), |el, bounds| {
+            el.relative().child(
+                canvas(
+                    |_, _, _| (),
+                    move |painted, _, _, _| bounds.set(Some(painted)),
+                )
+                .absolute()
+                .size_full(),
+            )
+        })
+    }
+    pub(super) fn route_form_correction(&mut self, control: Control) {
+        if self.focus.screen != Screen::Setup {
+            return;
+        }
+        let guided = self.focus.setup_stage != SetupStage::Settings;
+        match control {
+            Control::Name | Control::Address if guided => {
+                self.focus.setup_stage = SetupStage::Website
+            }
+            Control::CrawlField(0..=8) => {
+                if guided {
+                    self.focus.setup_stage = SetupStage::Pages;
+                }
+                if matches!(control, Control::CrawlField(3..=8)) {
+                    self.focus.advanced = true;
+                }
+            }
+            Control::CrawlField(10..=16) => {
+                if guided {
+                    self.focus.setup_stage = SetupStage::Access;
+                }
+                self.focus.advanced = true;
+            }
+            _ => (),
+        }
+    }
     fn form_input(&self, control: Control) -> Option<&Entity<TextInput>> {
         match control {
             Control::Name => Some(&self.name),
@@ -132,28 +192,7 @@ impl Shell {
         let Some(control) = next_correction(&errors, current) else {
             return;
         };
-        if self.focus.screen == Screen::Setup {
-            match control {
-                Control::Name | Control::Address => {
-                    if self.focus.setup_stage != SetupStage::Settings {
-                        self.focus.setup_stage = SetupStage::Website;
-                    }
-                }
-                Control::CrawlField(0..=8) => {
-                    if self.focus.setup_stage != SetupStage::Settings {
-                        self.focus.setup_stage = SetupStage::Pages;
-                    }
-                    if matches!(control, Control::CrawlField(3..=8)) {
-                        self.focus.advanced = true;
-                    }
-                }
-                Control::CrawlField(10..=15) => {
-                    self.focus.setup_stage = SetupStage::Settings;
-                    self.focus.advanced = true;
-                }
-                _ => (),
-            }
-        }
+        self.route_form_correction(control);
         self.last_validation_field = Some(control);
         self.presentation_focus = Some(control);
         self.reveal_form_control(control, true, window, cx);
@@ -168,6 +207,33 @@ impl Shell {
         cx: &mut App,
     ) {
         if !matches!(self.focus.screen, Screen::Setup | Screen::Settings) {
+            return;
+        }
+        if let Some(bounds) = self.setup_control_bounds(control) {
+            let reveal = |b: Bounds<Pixels>, scroll: &gpui::ScrollHandle| {
+                let clip = scroll.bounds();
+                let offset = scroll.offset();
+                let delta = if b.top() < clip.top() + px(8.) {
+                    clip.top() + px(8.) - b.top()
+                } else if b.bottom() > clip.bottom() - px(8.) {
+                    clip.bottom() - px(8.) - b.bottom()
+                } else {
+                    px(0.)
+                };
+                scroll.set_offset(gpui::point(
+                    offset.x,
+                    (offset.y + delta).clamp(-scroll.max_offset().height, px(0.)),
+                ));
+            };
+            if let Some(b) = bounds.get() {
+                reveal(b, &self.screen_scroll);
+            }
+            let scroll = self.screen_scroll.clone();
+            window.on_next_frame(move |_, _| {
+                if let Some(b) = bounds.get() {
+                    reveal(b, &scroll);
+                }
+            });
             return;
         }
         if matches!(
@@ -203,6 +269,21 @@ impl Shell {
                     || bounds.bottom() + px(HELP_LINE_HEIGHT + 4.) > viewport.bottom()
             });
         if force || outside {
+            if let Some(bounds) = self
+                .form_input(control)
+                .and_then(|input| input.read(cx).rendered_bounds())
+            {
+                // Reveal the painted input, with room for its persistent label.
+                // This also works before a host animation-frame callback arrives.
+                let offset = self.screen_scroll.offset();
+                let delta = viewport.top() + px(64.) - bounds.top();
+                self.screen_scroll.set_offset(gpui::point(
+                    offset.x,
+                    (offset.y + delta).clamp(-self.screen_scroll.max_offset().height, px(0.)),
+                ));
+            }
+            // The next frame uses the newly mounted stage's anchor, not cached
+            // geometry from the previous form. Keep focus-reveal correct on validation.
             anchor.scroll_to(window, cx);
         }
     }

@@ -216,7 +216,7 @@ fn mapping_preview_has_bounded_rows_and_a_pinned_close_without_mutations(cx: &mu
         inside(title, panel);
         let body = cx.debug_bounds("mapping-preview-scroll").unwrap();
         assert!(body.size.height >= px(150.));
-        inside(cx.debug_bounds("mapping-preview-scope").unwrap(), body);
+        inside(cx.debug_bounds("mapping-preview-row-0").unwrap(), body);
         inside(close, panel);
         assert!(panel.size.height <= px(280.));
         assert!(cx.debug_bounds("mapping-preview-row-15").is_some());

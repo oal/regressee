@@ -308,7 +308,7 @@ impl Product {
         }
         let message=match saved {
             Some(_) if invalid.is_some()=>invalid.as_ref().unwrap().clone(),
-            Some((s,true)) if auth.ephemeral.contains_key(&s.id)=>"Ephemeral login is ready until Regressee closes. Not saved to disk.".into(),
+            Some((s,true)) if auth.ephemeral.contains_key(&s.id)=>"Login is available only for this app session, until Regressee closes. Not saved to disk.".into(),
             Some((_,true))=>"Ephemeral login ended. Log in again.".into(),
             Some((_,false))=>"Encrypted saved login. Access is confirmed by probes/captures, not by its presence.".into(),
             None if env.access==AccessPolicy::InteractiveLogin=>"Log in before finding or capturing pages.".into(),

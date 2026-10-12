@@ -643,6 +643,9 @@ impl Shell {
                             )
                             .child(actions),
                     )
+                    .when_some(self.preview.as_ref(), |header, preview| {
+                        header.child(div().debug_selector(|| "discovery-capture-plan".into()).w_full().text_size(px(13.)).line_height(px(18.)).text_color(rgb(MUTED)).child(format!("{} included pages × {} sizes = {} screenshots. {} Adjust settings and find pages again to expand this list.", preview.included(), preview.settings.profiles.len(), preview.included() * preview.settings.profiles.len(), preview.inventory.coverage.label())))
+                    })
                     .when_some(self.capture_next_step(), |header, next| {
                         header.child(
                             div()
@@ -1313,7 +1316,7 @@ impl Shell {
             ),
             SetupStage::Access => (
                 "Website access",
-                "No login? Continue to pages. Otherwise save access settings, log in, then confirm you are ready.",
+                "Choose public pages, or save access settings and log in.",
             ),
             SetupStage::Pages => (
                 "Pages & screen sizes",
@@ -1338,14 +1341,19 @@ impl Shell {
                             (SetupStage::Pages, "Pages & sizes"),
                         ]
                         .into_iter()
-                        .filter(|(stage, _)| {
-                            !(self.focus.setup_stage == SetupStage::Access
-                                && *stage == SetupStage::Pages)
-                        })
                         .map(|(stage, label)| {
+                            let state = if self.focus.setup_stage == stage {
+                                "Current"
+                            } else if !self.control_enabled(Control::SetupStage(stage), cx) {
+                                "Unavailable"
+                            } else if stage.index() < self.focus.setup_stage.index() {
+                                "Completed"
+                            } else {
+                                "Next"
+                            };
                             self.button(
                                 Control::SetupStage(stage),
-                                label,
+                                format!("{label} · {state}"),
                                 ActionStyle::Choice {
                                     selected: self.focus.setup_stage == stage,
                                 },
@@ -1370,8 +1378,10 @@ impl Shell {
             .is_some_and(|e| e.access == regressee_core::domain::AccessPolicy::InteractiveLogin);
         match control {
             Control::CrawlField(10..=12)
-            | Control::Guided(31..=34)
-            | Control::Choice(Choice::SaveLogin | Choice::EphemeralLogin) => login,
+            | Control::Choice(Choice::SaveLogin | Choice::EphemeralLogin) => {
+                login || self.focus.advanced
+            }
+            Control::Guided(31..=34) => login,
             Control::CrawlField(13..=16)
             | Control::Guided(37 | 38)
             | Control::Choice(Choice::LightTheme | Choice::DarkTheme) => self.focus.advanced,
@@ -1395,24 +1405,100 @@ impl Shell {
             .child(self.button(
                 Control::Save,
                 if stage == SetupStage::Website {
-                    "Save website & continue"
+                    if self.project.is_some() && !self.unsaved(cx) {
+                        "Continue to access"
+                    } else {
+                        "Save website & continue"
+                    }
+                } else if stage == SetupStage::Access {
+                    if self.access_can_continue(cx) {
+                        "Continue to pages & sizes"
+                    } else if self.unsaved(cx)
+                        && self
+                            .draft_settings
+                            .environments
+                            .iter()
+                            .find(|e| Some(e.id) == self.environment_draft)
+                            .is_some_and(|e| {
+                                e.access == regressee_core::domain::AccessPolicy::InteractiveLogin
+                            })
+                    {
+                        "Save settings first"
+                    } else if self.unsaved(cx) {
+                        "Save & continue"
+                    } else {
+                        "Save settings"
+                    }
                 } else {
                     "Save settings"
                 },
-                ActionStyle::Primary,
+                if stage == SetupStage::Pages
+                    || (stage == SetupStage::Access
+                        && !self.unsaved(cx)
+                        && !self.access_can_continue(cx))
+                {
+                    ActionStyle::Secondary
+                } else {
+                    ActionStyle::Primary
+                },
                 cx,
             ))
-            .when(stage == SetupStage::Access, |body| {
-                body.child(self.button(
-                    Control::SetupStage(SetupStage::Pages),
-                    "Continue to pages & sizes",
-                    ActionStyle::Secondary,
-                    cx,
-                ))
-            })
+            .when(
+                stage == SetupStage::Access
+                    && self
+                        .draft_settings
+                        .environments
+                        .iter()
+                        .find(|e| Some(e.id) == self.environment_draft)
+                        .is_some_and(|e| {
+                            e.access == regressee_core::domain::AccessPolicy::InteractiveLogin
+                        }),
+                |body| {
+                    body.child(self.button(
+                        Control::Guided(31),
+                        "Open login browser",
+                        if !self.unsaved(cx)
+                            && !self.access_can_continue(cx)
+                            && self.environment.as_ref().is_some_and(|e| !e.login_open)
+                        {
+                            ActionStyle::Primary
+                        } else {
+                            ActionStyle::Secondary
+                        },
+                        cx,
+                    ))
+                    .child(self.button(
+                        Control::Guided(32),
+                        "I'm ready",
+                        if !self.unsaved(cx)
+                            && self.environment.as_ref().is_some_and(|e| e.login_open)
+                        {
+                            ActionStyle::Primary
+                        } else {
+                            ActionStyle::Secondary
+                        },
+                        cx,
+                    ))
+                },
+            )
             .when(
                 self.project.is_some() && matches!(stage, SetupStage::Pages | SetupStage::Settings),
-                |body| body.child(self.guided_button(13, "Find pages & preview", cx)),
+                |body| {
+                    body.child(self.button(
+                        Control::Guided(13),
+                        if self.unsaved(cx) {
+                            "Save & find pages"
+                        } else {
+                            "Find pages & preview"
+                        },
+                        if stage == SetupStage::Pages {
+                            ActionStyle::Primary
+                        } else {
+                            ActionStyle::Secondary
+                        },
+                        cx,
+                    ))
+                },
             )
             .child(
                 div()
@@ -1420,7 +1506,21 @@ impl Shell {
                     .min_w(px(180.))
                     .text_size(px(13.))
                     .text_color(rgb(MUTED))
-                    .child(if self.unsaved(cx) {
+                    .child(if stage == SetupStage::Access {
+                        if self.unsaved(cx) {
+                            "Draft access: save first. Login opens separately."
+                        } else if self.environment.as_ref().is_some_and(|e| e.login_open) {
+                            "Saved access · browser open: finish login, then I'm ready."
+                        } else if self.access_can_continue(cx) {
+                            "Saved access: continue. Login status is checked separately."
+                        } else if self.environment.is_none() {
+                            "Loading saved browser status. Access choices are kept."
+                        } else {
+                            "Saved access: open login browser, then I'm ready."
+                        }
+                    } else if self.project.is_none() {
+                        "Save the website locally first. No website is visited."
+                    } else if self.unsaved(cx) {
                         "Save before visiting the website. Existing baseline unchanged."
                     } else {
                         "Settings saved locally. Capture and baseline activation remain explicit."

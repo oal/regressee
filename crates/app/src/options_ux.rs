@@ -2,8 +2,9 @@
 //! Bounded, task-first disclosures. No capture, storage or network work here.
 use super::*;
 
-#[derive(PartialEq)]
+#[derive(Clone, PartialEq)]
 pub(super) struct EnvironmentDraftSignature {
+    pub project: Option<regressee_core::domain::ProjectId>,
     environment: Option<regressee_core::domain::EnvironmentId>,
     ephemeral: bool,
     fields: [String; 3],
@@ -37,6 +38,7 @@ fn help(copy: impl Into<SharedString>) -> Div {
 impl Shell {
     pub(super) fn environment_draft_signature(&self, cx: &App) -> EnvironmentDraftSignature {
         EnvironmentDraftSignature {
+            project: self.project.as_ref().map(|p| p.project.id),
             environment: self.environment_draft,
             ephemeral: self.login_ephemeral,
             fields: std::array::from_fn(|i| self.crawl_fields[10 + i].read(cx).content.to_string()),
@@ -278,12 +280,7 @@ impl Shell {
 
     pub(super) fn mapping_preview(&self, cx: &mut Context<Self>) -> AnyElement {
         let e = self.environment.as_ref().unwrap();
-        let mut body = div().flex_shrink_0().flex().flex_col().gap_4()
-            .child(group("Preview scope")
-                .debug_selector(|| "mapping-preview-scope".into())
-                .child(help(format!("{} · showing first {}", workflow::count_label(e.mapped.len(), "page mapping", "page mappings"), e.mapped.len().min(16))))
-                .child(help("Uses saved environment settings. A probe visits at most 3 pages, not the whole website.")))
-            .child(controls::status(if e.probed { "Representative probe confirmed" } else { "Representative probe not confirmed" }, Tone::Neutral));
+        let mut body = div().w_full().flex_shrink_0().flex().flex_col().gap_4();
         if e.mapped.is_empty() {
             body = body.child(help(
                 "No page mappings available. Find pages or save a baseline, then preview again.",
@@ -313,6 +310,11 @@ impl Shell {
                 },
             ));
         }
+        body = body.child(group("Preview scope")
+            .debug_selector(|| "mapping-preview-scope".into())
+            .child(help(format!("{} · showing first {}", workflow::count_label(e.mapped.len(), "page mapping", "page mappings"), e.mapped.len().min(16))))
+            .child(help("Uses saved environment settings. A probe visits at most 3 pages, not the whole website.")))
+            .child(controls::status(if e.probed { "Representative probe confirmed" } else { "Representative probe not confirmed" }, Tone::Neutral));
         controls::disclosure_panel(
             "mapping-preview",
             "Mapped URL preview",

@@ -260,6 +260,35 @@ while saving, browser visits, baseline changes, exports and deletion stay explic
 
 ## Components
 
+### Guided setup — Phase 5 repaired, independent re-verification pending
+
+Website → Access → Pages & sizes is pinned above the guided scrolling form, with
+Current/Completed/Next/Unavailable state. Public/private choices and the next safe
+action fit the minimum window. Clean guided steps Continue without rewriting;
+dirty steps await authoritative save before advancement. Private login remains
+separate: Save settings first, Open login browser, then I'm ready. The footer
+co-locates draft/saved/browser prerequisites. Saving never implicitly opens login;
+Save & find pages explicitly authorizes discovery after its matching save.
+Existing-project Settings remains explicitly saved with all advanced operations.
+Sizes lead Pages, with selected dimensions, extent and image policy in readable
+plan lines. Mobile/tablet are website emulation, not real devices. Mapping pairs
+lead their scope notes; included-target counts, coverage cause and rediscovery
+next step sit beside Capture pages. Photo/bitmap and session-only wording keeps
+the secure-store and replacement limitations truthful.
+
+The finite V5-1–V5-3 repair preserves guided validation stages versus full Settings,
+reveals whole painted fields with error/help inside the current scroll clip, and
+separates saved-status observation from draft hydration permission. Project-bound
+origin/request snapshots and saved login identities preserve newer URL/provider/
+representative/retention edits across absent-status saves and follow-up reads.
+Both-size mounted/enabled Tab/reveal/dispatch tests cover setup capabilities;
+Mobile remains scroll-reachable rather than forced into the initial narrow view.
+The exact external worker probes pass, as do 308 package tests. Six narrow native
+repair pairs substantiate Access/Pages validation and Mobile reachability; original
+FIX/blocked evidence remains intact. **Not Phase 5 acceptance:** independent
+re-verification and OS-input/AT/usability/release qualification remain pending. See
+`docs/research/whole-app-ui-review-20261012/phase5-report.md`.
+
 **Actions and choices.** Shared actions have a minimum target height (40px).
 Buttons fit their labels; navigation fills its column; choice/check rows fill
 their available width with balanced `spacing.row` insets even when help wraps.

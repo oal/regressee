@@ -389,6 +389,11 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
         "access-public",
         "access-login",
         "access-login-actions",
+        "access-saved-private",
+        "access-browser-open",
+        "access-ready",
+        "access-status-loading",
+        "access-invalid",
         "access-options",
         "mapping-preview",
         "timezone-popup",
@@ -397,6 +402,9 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
         "pages-images",
         "pages-speed",
         "pages-advanced",
+        "pages-advanced-tail",
+        "pages-invalid",
+        "pages-mobile-revealed",
         "project-settings",
         "project-settings-bottom",
         "pages-baseline",
@@ -466,6 +474,44 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
     let mut manifest = Vec::new();
     for (width, height) in [(1280., 800.), (820., 600.)] {
         for label in scenes {
+            let phase5_repair = std::env::var_os("REGRESSEE_RENDERER_PHASE5_REPAIR").is_some();
+            let phase5 = std::env::var_os("REGRESSEE_RENDERER_PHASE5").is_some() || phase5_repair;
+            if phase5_repair
+                && !matches!(
+                    label,
+                    "access-invalid" | "pages-invalid" | "pages-mobile-revealed"
+                )
+            {
+                continue;
+            }
+            if phase5
+                && !matches!(
+                    label,
+                    "new-website"
+                        | "website-validation"
+                        | "access-public"
+                        | "access-login"
+                        | "access-saved-private"
+                        | "access-browser-open"
+                        | "access-ready"
+                        | "access-status-loading"
+                        | "access-invalid"
+                        | "mapping-preview"
+                        | "pages-sizes"
+                        | "pages-images"
+                        | "pages-speed"
+                        | "pages-advanced"
+                        | "pages-advanced-tail"
+                        | "pages-invalid"
+                        | "pages-mobile-revealed"
+                        | "project-settings"
+                        | "project-settings-bottom"
+                        | "discovery"
+                        | "discovery-options"
+                )
+            {
+                continue;
+            }
             let repair = std::env::var_os("REGRESSEE_RENDERER_PHASE4_REPAIR").is_some();
             if repair
                 && !matches!(
@@ -571,7 +617,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     s.focus.setup_stage = if label.starts_with("access") || matches!(label, "mapping-preview" | "timezone-popup") { SetupStage::Access }
                         else if label.starts_with("website") || label == "new-website" { SetupStage::Website }
                         else if label.starts_with("pages-") { SetupStage::Pages } else { SetupStage::Settings };
-                    s.focus.advanced = matches!(label, "pages-advanced" | "access-options" | "mapping-preview" | "timezone-popup");
+                    s.focus.advanced = matches!(label, "pages-advanced" | "pages-advanced-tail" | "access-options" | "mapping-preview" | "timezone-popup");
                 }
                 match label {
                     "projects-empty" => { s.projects.items.clear(); s.project = None; s.projects_dirty = false; },
@@ -594,6 +640,19 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     },
                     "website-validation" => { s.address.update(cx, |f, cx| f.set_value("northline.example", cx)); s.activate_control(Control::Save, window, cx); },
                     "access-login" | "access-login-actions" => { s.choose(Choice::LoginRequired, cx); },
+                    "access-saved-private" | "access-browser-open" | "access-ready" | "access-invalid" => {
+                        s.choose(Choice::LoginRequired, cx);
+                        s.project.as_mut().unwrap().project.environments = s.draft_settings.environments.clone();
+                        if label == "access-browser-open" { s.environment.as_mut().unwrap().login_open = true; }
+                        if label == "access-ready" {
+                            let session=SessionReference {id:SessionId::new(),project,environment:s.environment_draft.unwrap()};
+                            s.draft_settings.environments[0].session=Some(session.clone());
+                            s.project.as_mut().unwrap().project.environments[0].session=Some(session);
+                        }
+                        if label == "access-invalid" { s.crawl_fields[10].update(cx,|f,cx|f.set_value("invalid-login",cx));s.activate_control(Control::Save,window,cx); }
+                    },
+                    "access-status-loading" => { s.environment=None; },
+                    "pages-invalid"=>{s.crawl_fields[4].update(cx,|f,cx|f.set_value("9",cx));s.activate_control(Control::Save,window,cx);assert_eq!(s.focus.setup_stage,SetupStage::Pages);assert!(s.pending.is_none());},
                     "mapping-preview" => { s.show_mapping = true; s.environment.as_mut().unwrap().mapped = (0..40).map(|i| (format!("https://northline.example/products/item-{i}/"), format!("https://staging.northline.example/products/item-{i}/"))).collect(); },
                     "pages-baseline" => { s.focus.review_surface = ReviewSurface::Pages; },
                     "discovery" | "discovery-options" | "discovery-no-matches" => { discovery(s); s.result_filters_open = label != "discovery"; if label.ends_with("no-matches") { s.crawl_fields[9].update(cx, |f, cx| f.set_value("nothing-matches", cx)); } },
@@ -726,6 +785,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                 "pages-images" => Some("section-Images"),
                 "pages-speed" => Some("section-Capture speed"),
                 "pages-advanced" => Some("field-Links away from starting addresses"),
+                "pages-advanced-tail" => Some("field-Retries for temporary failures"),
                 "app-settings-network" => Some("managed-network-section"),
                 "app-settings-diagnostics" | "diagnostic-preview" => {
                     Some("section-Private diagnostics")
@@ -802,6 +862,31 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     cx.notify();
                 });
             }
+            if phase5
+                && matches!(
+                    label,
+                    "website-validation"
+                        | "access-invalid"
+                        | "pages-invalid"
+                        | "pages-mobile-revealed"
+                )
+            {
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        let control = if label == "pages-invalid" {
+                            Control::CrawlField(4)
+                        } else if label == "pages-mobile-revealed" {
+                            Control::Guided(3)
+                        } else if label == "website-validation" {
+                            Control::Address
+                        } else {
+                            Control::CrawlField(10)
+                        };
+                        s.reveal_form_control(control, true, window, cx);
+                        cx.notify();
+                    })
+                });
+            }
             if let Some(anchor) = disclosure_anchor {
                 let bounds = cx.debug_bounds(anchor).expect("disclosed content mounted");
                 shell.update(cx, |s, cx| {
@@ -838,6 +923,100 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                 "review-full-width-after" => &["phase5-after"],
                 _ => &[],
             };
+            if phase5 {
+                let mut controls = vec!["action-Save"];
+                if phase5_repair {
+                    controls.extend([
+                        "action-SetupStage(Website)",
+                        "action-SetupStage(Access)",
+                        "action-SetupStage(Pages)",
+                    ]);
+                    if label == "pages-mobile-revealed" {
+                        controls.push("check-Guided(3)");
+                    }
+                }
+                if matches!(
+                    label,
+                    "access-public"
+                        | "access-login"
+                        | "access-saved-private"
+                        | "access-browser-open"
+                        | "access-ready"
+                        | "access-status-loading"
+                ) {
+                    controls.extend([
+                        "action-SetupStage(Website)",
+                        "action-SetupStage(Access)",
+                        "action-SetupStage(Pages)",
+                        "choice-Choice(PublicAccess)",
+                        "choice-Choice(LoginRequired)",
+                    ]);
+                    if !matches!(label, "access-public" | "access-status-loading") {
+                        controls.extend(["action-Guided(31)", "action-Guided(32)"]);
+                    }
+                }
+                if label == "pages-sizes" {
+                    controls.extend([
+                        "setup-capture-plan",
+                        "check-Guided(1)",
+                        "check-Guided(2)",
+                        "check-Guided(3)",
+                        "action-Guided(13)",
+                    ]);
+                }
+                if label == "mapping-preview" {
+                    controls = vec!["mapping-preview-row-0", "action-CloseMappingPreview"];
+                }
+                if label.starts_with("discovery") {
+                    controls = vec!["discovery-capture-plan", "action-CaptureBaseline"];
+                }
+                for selector in controls {
+                    let b = cx
+                        .debug_bounds(selector)
+                        .unwrap_or_else(|| panic!("{name}: {selector} missing"));
+                    let clip = if selector == "mapping-preview-row-0" {
+                        shell.read_with(cx, |s, _| s.mapping_preview_scroll.bounds())
+                    } else if selector.starts_with("choice-")
+                        || selector.starts_with("check-")
+                        || selector == "setup-capture-plan"
+                    {
+                        shell.read_with(cx, |s, _| s.screen_scroll.bounds())
+                    } else {
+                        viewport
+                    };
+                    let visible = b.size.width > px(0.)
+                        && b.size.height > px(0.)
+                        && b.left() >= clip.left()
+                        && b.right() <= clip.right()
+                        && b.top() >= clip.top()
+                        && b.bottom() <= clip.bottom();
+                    if selector != "check-Guided(3)" || label == "pages-mobile-revealed" {
+                        assert!(
+                            visible,
+                            "{name}: {selector} {b:?} outside actual owner {clip:?}"
+                        );
+                    }
+                    assertions.push(serde_json::json!({"selector":selector,"x":f32::from(b.left()),"y":f32::from(b.top()),"width":f32::from(b.size.width),"height":f32::from(b.size.height),"fully_visible":visible,"requires_scroll":!visible,"clip_x":f32::from(clip.left()),"clip_y":f32::from(clip.top()),"clip_width":f32::from(clip.size.width),"clip_height":f32::from(clip.size.height)}));
+                }
+                let input = match label {
+                    "new-website" => Some(Control::Name),
+                    "website-validation" => Some(Control::Address),
+                    "access-invalid" => Some(Control::CrawlField(10)),
+                    "pages-invalid" => Some(Control::CrawlField(4)),
+                    "pages-advanced" => Some(Control::CrawlField(3)),
+                    "pages-advanced-tail" => Some(Control::CrawlField(6)),
+                    _ => None,
+                };
+                if let Some(control) = input {
+                    shell.read_with(cx,|s,cx|{
+                        let b=match control{Control::Name=>s.name.read(cx).rendered_bounds(),Control::Address=>s.address.read(cx).rendered_bounds(),Control::CrawlField(i)=>s.crawl_fields[i].read(cx).rendered_bounds(),_=>None}.unwrap();
+                        let clip=s.screen_scroll.bounds();
+                        assert!(b.size.width>=px(400.) && b.left()>=clip.left() && b.right()<=clip.right() && b.top()>=clip.top() && b.bottom()<=clip.bottom(),"{name}: actual input {b:?} outside {clip:?}");
+                        if phase5_repair {let field=s.setup_control_bounds(control).unwrap().get().unwrap();assert!(field.left()>=clip.left() && field.right()<=clip.right() && field.top()>=clip.top() && field.bottom()<=clip.bottom(),"{name}: border/error/help {field:?} outside current {clip:?}");assertions.push(serde_json::json!({"painted_field_with_error_help":format!("{control:?}"),"x":f32::from(field.left()),"y":f32::from(field.top()),"width":f32::from(field.size.width),"height":f32::from(field.size.height),"clip_x":f32::from(clip.left()),"clip_y":f32::from(clip.top()),"clip_width":f32::from(clip.size.width),"clip_height":f32::from(clip.size.height),"fully_visible":true}));}
+                        assertions.push(serde_json::json!({"actual_input":format!("{control:?}"),"x":f32::from(b.left()),"y":f32::from(b.top()),"width":f32::from(b.size.width),"height":f32::from(b.size.height),"fully_visible":true}));
+                    });
+                }
+            }
             for selector in selectors {
                 let bounds = cx
                     .debug_bounds(selector)

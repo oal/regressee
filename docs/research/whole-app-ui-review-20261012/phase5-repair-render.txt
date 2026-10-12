@@ -1,0 +1,41 @@
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> vendor/gpui/src/taffy.rs:312:68
+    |
+312 |             unit.map(|count| vec![repeat(count, vec![minmax(length(0.0), fr(1.0))])])
+    |                                                                    ^^^ help: explicitly specify the type as `f32`: `0.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+    = note: `#[warn(float_literal_f32_fallback)]` (part of `#[warn(future_incompatible)]`) on by default
+
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> vendor/gpui/src/taffy.rs:312:77
+    |
+312 |             unit.map(|count| vec![repeat(count, vec![minmax(length(0.0), fr(1.0))])])
+    |                                                                             ^^^ help: explicitly specify the type as `f32`: `1.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+
+warning: `gpui` (lib) generated 2 warnings (run `cargo fix --lib -p gpui` to apply 2 suggestions)
+warning: variable does not need to be mutable
+   --> crates/app/src/phase5_repair_tests.rs:438:17
+    |
+438 |             let mut store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    |                 ----^^^^^
+    |                 |
+    |                 help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `regressee-app` (bin "regressee" test) generated 1 warning (run `cargo fix --bin "regressee" -p regressee-app --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 0.20s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/main.rs (target/debug/deps/regressee-1da6c5ac38997a55)
+
+running 1 test
+test ui_renderer_capture::ui_review_matrix::renderer_capture_whole_app ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 133 filtered out; finished in 31.42s
+

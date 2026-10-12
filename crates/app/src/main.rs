@@ -38,6 +38,7 @@ mod loading_ux;
 mod local_ux;
 mod options_ux;
 mod review_ux;
+mod setup_ux;
 mod task_ux;
 #[cfg(all(feature = "ui-inspection", target_os = "linux"))]
 mod ui_inspection;
@@ -186,6 +187,21 @@ struct Shell {
     approved_origins: std::collections::BTreeSet<String>,
     environment: Option<regressee_app::auth::EnvironmentStatus>,
     environment_read_signature: Option<(u64, options_ux::EnvironmentDraftSignature)>,
+    setup_save: Option<setup_ux::SetupSave>,
+    login_hydration_origin: Option<options_ux::EnvironmentDraftSignature>,
+    saved_login_forms: std::collections::HashMap<
+        (
+            regressee_core::domain::ProjectId,
+            regressee_core::domain::EnvironmentId,
+        ),
+        regressee_storage::LocalLoginSettings,
+    >,
+    setup_paint: std::cell::RefCell<
+        Vec<(
+            Control,
+            std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>,
+        )>,
+    >,
     environment_draft: Option<regressee_core::domain::EnvironmentId>,
     login_ephemeral: bool,
     show_mapping: bool,
@@ -338,6 +354,10 @@ impl Shell {
             approved_origins: std::collections::BTreeSet::new(),
             environment: None,
             environment_read_signature: None,
+            setup_save: None,
+            login_hydration_origin: None,
+            saved_login_forms: Default::default(),
+            setup_paint: Default::default(),
             environment_draft: None,
             login_ephemeral: false,
             show_mapping: false,
@@ -687,6 +707,10 @@ impl Shell {
         self.focus.capturing = false;
         self.progress = None;
         let imported = matches!(&update.reply, Reply::Imported(_));
+        let setup_save = self.setup_save.take().filter(|s| s.request == update.id);
+        let preserve_setup_draft = setup_save
+            .as_ref()
+            .is_some_and(|s| s.signature != self.setup_signature(cx));
         match update.reply {
             Reply::Projects(page) => {
                 self.focus.projects = page.items.len();
@@ -696,6 +720,29 @@ impl Shell {
                 self.projects_dirty = false;
             }
             Reply::Project(record) | Reply::Imported(record) => {
+                if let Some(save) = &setup_save {
+                    if record.project.id != save.submitted_project
+                        || self.project.as_ref().map(|p| p.project.id) != save.project_before
+                    {
+                        self.refresh_visible(cx);
+                        cx.notify();
+                        return;
+                    }
+                    if let (Some(environment), Some(login)) =
+                        (save.environment, save.login.as_ref())
+                    {
+                        self.saved_login_forms
+                            .insert((record.project.id, environment), login.clone());
+                    }
+                }
+                if preserve_setup_draft {
+                    self.project = Some(*record);
+                    self.focus.project_saved = true;
+                    self.notice = Some("Submitted settings saved. Newer edits are kept; save them before continuing or visiting the website.".into());
+                    self.refresh_visible(cx);
+                    cx.notify();
+                    return;
+                }
                 self.history_inspection = None;
                 let selecting_project = self.focus.choosing_project;
                 let first_save = self.project.is_none() && !selecting_project && !imported;
@@ -758,6 +805,10 @@ impl Shell {
                 self.approved_origins = record.project.sources.iter().map(crawl::origin).collect();
                 self.preview = None;
                 self.project = Some(*record);
+                if setup_save.is_none() {
+                    self.environment_draft = None;
+                }
+                self.login_hydration_origin = Some(self.environment_draft_signature(cx));
                 self.environment = None;
                 self.show_mapping = false;
                 self.focus.project_saved = true;
@@ -781,6 +832,18 @@ impl Shell {
                 }
                 if imported {
                     self.notice = Some(regressee_storage::portability_warning().into());
+                }
+                if let Some(save) = setup_save {
+                    if let Some(next) = save.next {
+                        if next != SetupStage::Pages || self.access_can_continue(cx) {
+                            self.focus.setup_stage = next;
+                            self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                            self.presentation_focus = Some(Control::SetupStage(next));
+                        }
+                    }
+                    if save.discover {
+                        self.guided(13, cx);
+                    }
                 }
             }
             Reply::DiagnosticPreview(report) => self.diagnostic_preview = Some(*report),
@@ -918,16 +981,29 @@ impl Shell {
                 }
             }
             Reply::Environment(status) => {
+                let read = self.environment_read_signature.take();
+                if read.as_ref().is_some_and(|(id, draft)| {
+                    *id != update.id || draft.project != self.project.as_ref().map(|p| p.project.id)
+                }) {
+                    self.refresh_visible(cx);
+                    cx.notify();
+                    return;
+                }
                 // A status/URL preview refresh observes saved settings; it never
                 // rehydrates an already loaded draft. Initial hydration is bound
                 // to the exact request and rejected if edits arrived meanwhile.
                 let hydrate = self.environment.is_none()
-                    && self
-                        .environment_read_signature
-                        .take()
-                        .is_some_and(|(id, draft)| {
-                            id == update.id && draft == self.environment_draft_signature(cx)
-                        });
+                    && read.is_some_and(|(id, draft)| {
+                        id == update.id
+                            && draft == self.environment_draft_signature(cx)
+                            && self.login_hydration_origin.as_ref() == Some(&draft)
+                            && (self.environment_draft.is_none()
+                                || self.environment_draft == Some(status.environment))
+                    });
+                if let Some(project) = self.project.as_ref().map(|p| p.project.id) {
+                    self.saved_login_forms
+                        .insert((project, status.environment), status.settings.clone());
+                }
                 if hydrate {
                     self.environment_draft = Some(status.environment);
                     self.login_ephemeral = status.settings.ephemeral;
@@ -965,6 +1041,9 @@ impl Shell {
                     }
                 }
                 self.environment = Some(*status);
+                if hydrate {
+                    self.login_hydration_origin = Some(self.environment_draft_signature(cx));
+                }
             }
             Reply::Evidence(e) => {
                 self.evidence_read_failed = false;
@@ -2651,12 +2730,19 @@ impl Shell {
         }
         self.next_request += 1;
         let activity_label = work.activity_label();
-        self.environment_read_signature =
-            if matches!(&work, Work::EnvironmentStatus(_)) && self.environment.is_none() {
-                Some((self.next_request, self.environment_draft_signature(cx)))
-            } else {
-                None
-            };
+        self.environment_read_signature = if matches!(
+            &work,
+            Work::EnvironmentStatus(_)
+                | Work::OpenLogin(_)
+                | Work::ConfirmLogin(_)
+                | Work::CloseLogin(_)
+                | Work::ForgetLogin(_)
+                | Work::ProbeEnvironment(_)
+        ) {
+            Some((self.next_request, self.environment_draft_signature(cx)))
+        } else {
+            None
+        };
         let task_spec = regressee_app::task::Spec::for_work(&work);
         let incoming_project = match &work {
             Work::Import { preview, .. } => Some(preview.name.clone()),
@@ -2782,7 +2868,7 @@ impl Shell {
     }
     fn save(&mut self, _: &SaveProject, _: &mut Window, cx: &mut Context<Self>) {
         self.last_action = Some(Control::Save);
-        self.save_settings(cx);
+        self.guided_save(false, cx);
     }
     fn local_login_settings(
         &self,
@@ -2853,19 +2939,7 @@ impl Shell {
             }
         }
         if let Some(control) = first_invalid {
-            match control {
-                Control::Name | Control::Address => {
-                    if self.focus.setup_stage != SetupStage::Settings {
-                        self.focus.setup_stage = SetupStage::Website;
-                    }
-                }
-                Control::CrawlField(0..=6) => {
-                    self.focus.setup_stage = SetupStage::Settings;
-                    self.focus.advanced = true;
-                }
-                Control::CrawlField(10..=12) => self.focus.setup_stage = SetupStage::Settings,
-                _ => (),
-            }
+            self.route_form_correction(control);
             self.presentation_focus = Some(control);
             cx.notify();
             return;
@@ -2998,7 +3072,32 @@ impl Shell {
                         expected_revision,
                     }
                 };
+                let signature = self.setup_signature(cx);
+                let project_before = self.project.as_ref().map(|p| p.project.id);
+                let submitted_project = match &work {
+                    Work::Save { project, .. }
+                    | Work::SaveReplacement { project, .. }
+                    | Work::SaveEnvironment { project, .. } => project.id,
+                    _ => unreachable!(),
+                };
+                let environment = self.environment_draft;
+                let login = match &work {
+                    Work::SaveEnvironment { settings, .. } => Some(settings.clone()),
+                    _ => None,
+                };
                 self.queue(work, cx);
+                if let Some(request) = self.pending {
+                    self.setup_save = Some(setup_ux::SetupSave {
+                        request,
+                        signature,
+                        next: None,
+                        discover: false,
+                        project_before,
+                        submitted_project,
+                        environment,
+                        login,
+                    });
+                }
             }
         }
     }
@@ -3256,8 +3355,11 @@ impl Shell {
                 }
             }
             13 => {
+                if self.setup_composing(cx) {
+                    return;
+                }
                 if self.unsaved(cx) {
-                    self.error = Some("Save your settings before finding pages.".into());
+                    self.guided_save(true, cx);
                 } else if let Some(p) = &self.project {
                     self.preview = None;
                     self.queue(Work::Discover(p.project.id), cx);
@@ -3674,16 +3776,20 @@ impl Shell {
             selected,
             enabled,
         )
-        .when_some(self.options_control_bounds(control), |el, bounds| {
-            el.relative().child(
-                canvas(
-                    |_, _, _| (),
-                    move |painted, _, _, _| bounds.set(Some(painted)),
+        .when_some(
+            self.options_control_bounds(control)
+                .or_else(|| self.setup_control_bounds(control)),
+            |el, bounds| {
+                el.relative().child(
+                    canvas(
+                        |_, _, _| (),
+                        move |painted, _, _, _| bounds.set(Some(painted)),
+                    )
+                    .absolute()
+                    .size_full(),
                 )
-                .absolute()
-                .size_full(),
-            )
-        })
+            },
+        )
         .when(enabled, |el| {
             el.on_click(
                 cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
@@ -3708,16 +3814,20 @@ impl Shell {
             enabled,
         )
         .anchor_scroll(self.review_anchor(control))
-        .when_some(self.options_control_bounds(control), |el, bounds| {
-            el.relative().child(
-                canvas(
-                    |_, _, _| (),
-                    move |painted, _, _, _| bounds.set(Some(painted)),
+        .when_some(
+            self.options_control_bounds(control)
+                .or_else(|| self.setup_control_bounds(control)),
+            |el, bounds| {
+                el.relative().child(
+                    canvas(
+                        |_, _, _| (),
+                        move |painted, _, _, _| bounds.set(Some(painted)),
+                    )
+                    .absolute()
+                    .size_full(),
                 )
-                .absolute()
-                .size_full(),
-            )
-        })
+            },
+        )
         .when(enabled, |el| {
             el.on_click(
                 cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
@@ -3731,10 +3841,13 @@ impl Shell {
         label: &'static str,
         help: &'static str,
     ) -> gpui::Stateful<Div> {
-        controls::field(
-            label,
-            help,
-            self.crawl_fields[index].clone().into_any_element(),
+        self.measured_form_field(
+            Control::CrawlField(index),
+            controls::field(
+                label,
+                help,
+                self.crawl_fields[index].clone().into_any_element(),
+            ),
         )
         .id(("form-crawl-field", index))
         .anchor_scroll(self.form_anchor(Control::CrawlField(index)))
@@ -3751,20 +3864,20 @@ impl Shell {
                     .map(crawl::origin)
                     .all(|origin| self.approved_origins.contains(&origin))
             });
-        let mut body=div().w_full().max_w(px(680.)).flex_shrink_0().flex().flex_col().gap_6()
-            .child(self.setup_heading(cx))
+        let mut body=div().w(px(self.working_width.min(680.))).flex_shrink_0().flex().flex_col().gap_4()
+            .when(stage == SetupStage::Settings, |body| body.child(self.setup_heading(cx)))
             .when(!self.form_errors(cx).is_empty(), |body| body.child(self.form_error_summary(cx)))
             .when(website, |body| body.child(controls::section("Website", "Saving settings does not visit your website.")
-                .child(controls::field("Project name","Choose a recognizable name.",self.name.clone().into_any_element()).id("form-project-name").anchor_scroll(self.form_anchor(Control::Name)))
-                .child(controls::field("Starting addresses","Use complete http(s) addresses separated by spaces. Visits stay within the listed websites; subdomains are not added.",self.address.clone().into_any_element()).id("form-starting-addresses").anchor_scroll(self.form_anchor(Control::Address)))
+                 .child(self.measured_form_field(Control::Name, controls::field("Project name","Choose a recognizable name.",self.name.clone().into_any_element())).id("form-project-name").anchor_scroll(self.form_anchor(Control::Name)))
+                 .child(self.measured_form_field(Control::Address, controls::field("Starting addresses","Use complete http(s) addresses separated by spaces. Visits stay within the listed websites; subdomains are not added.",self.address.clone().into_any_element())).id("form-starting-addresses").anchor_scroll(self.form_anchor(Control::Address)))
                 .child(self.check_button(Control::Guided(11), "Approve all listed websites", approved, cx))
-                .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Approval is required when you list more than one website. Adding a different website requires approval again."))))
-            .when(pages, |body| body.child(controls::section("Pages to capture", "Choose how Regressee builds your page list.")
+                .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Approval is required when you list more than one website. Adding a different website requires approval again."))));
+        let page_boundaries = controls::section("Pages to capture", "Choose how Regressee builds your page list.")
                 .child(self.choice_button(Control::Choice(Choice::AddressesOnly), "Only the starting addresses", "Capture exactly the addresses you entered.", d.mode == DiscoveryMode::OnlyAddresses, cx))
                 .child(self.choice_button(Control::Choice(Choice::AddressesAndLinks), "Find linked pages", "Follow rendered links within these websites, up to your page limit.", d.mode == DiscoveryMode::AddressesAndLinks, cx))
                 .child(self.crawl_field(0,"Maximum pages","1–10,000. A page captured at three screen sizes creates three screenshots."))
                 .child(self.crawl_field(1,"Website section (optional)","Use a path such as /docs to stay within that section. Leave blank for the whole listed website."))
-                .child(self.crawl_field(2,"Skip addresses containing (optional)","Separate text exclusions with commas. The preview explains excluded addresses."))));
+                 .child(self.crawl_field(2,"Skip addresses containing (optional)","Separate text exclusions with commas. The preview explains excluded addresses."));
         let mut profiles = div().flex().flex_wrap().gap_2();
         for (index, name, dimensions) in [
             (1, "Desktop", "1440 × 900"),
@@ -3790,12 +3903,16 @@ impl Shell {
             .is_none_or(|p| p.image_mode == regressee_core::domain::ImageMode::Normal);
         if pages {
             body=body.child(controls::section("Screen sizes", "Choose one or more screen sizes. Phone and tablet use Chromium emulation, not real devices.")
+            .child(div().debug_selector(|| "setup-capture-plan".into()).w_full().min_w_0().flex().flex_col().gap_1().text_size(px(13.)).text_color(rgb(MUTED))
+                .children(self.draft_settings.profiles.iter().map(|p| div().w_full().child(format!("{} · {} × {}", p.name, p.width, p.height))))
+                .child(div().w_full().child(format!("{} · {}", if full_page { "Full page" } else { "Visible screen" }, if original_images { "original images" } else { "photos & bitmap images replaced" }))))
             .child(profiles)
             .child(self.choice_button(Control::Choice(Choice::FullPage), "Full page", "Include the page below the fold, within capture limits.", full_page, cx))
             .child(self.choice_button(Control::Choice(Choice::VisibleScreen), "Visible screen only", "Capture one viewport without scrolling.", !full_page, cx)))
+            .child(page_boundaries)
             .child(controls::section("Images", "Choose before capturing a baseline. Later checks keep the baseline's image mode.")
                 .child(self.choice_button(Control::Choice(Choice::OriginalImages), "Keep original images", "Compare the website as it appears.", original_images, cx))
-                .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace raster images", "Use neutral replacements to reduce changing-photo noise. Raster logos may also be replaced.", !original_images, cx)))
+                 .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace photos & bitmap images", "Use neutral replacements to reduce changing-photo noise. Bitmap logos may also be replaced.", !original_images, cx)))
             .child(controls::section("Capture speed", "Use a read-only account: even visiting pages can change website data.")
                 .child(self.choice_button(Control::Choice(Choice::Gentle), "Gentle", "1 page at a time, with 1-second spacing.", d.speed == Speed::Gentle, cx))
                 .child(self.choice_button(Control::Choice(Choice::Balanced), "Balanced", "2 pages at a time, with 350 ms spacing.", d.speed == Speed::Balanced, cx))
@@ -3848,20 +3965,22 @@ impl Shell {
         let login_required = draft.is_some_and(|environment| {
             environment.access == regressee_core::domain::AccessPolicy::InteractiveLogin
         });
-        let login_fields = login_required || self.focus.setup_stage == SetupStage::Settings;
+        let login_fields =
+            login_required || self.focus.advanced || self.focus.setup_stage == SetupStage::Settings;
         let advanced = self.focus.advanced || self.focus.setup_stage == SetupStage::Settings;
-        let mut body=controls::section("Environment & login", "Production and staging keep separate logins. Save your settings before opening a login browser.")
-            .children(self.draft_settings.environments.iter().enumerate().map(|(index, environment)| self.choice_button(Control::Environment(index), environment.name.clone(), "", Some(environment.id) == self.environment_draft, cx)))
-            .child(self.guided_button(27,"Add staging environment",cx))
-            .when(self.environment_unsaved(cx), |el| el.child(controls::status("Unsaved environment edits — Save settings below before choosing another environment.", Tone::Information)))
+        let mut body=(if self.focus.setup_stage == SetupStage::Access { div().w_full().flex_shrink_0().flex().flex_col().gap_3().border_t_1().border_color(rgb(LINE)).pt_3() } else { controls::section("Website access", "Choose whether these pages need login.") })
             .child(self.choice_button(Control::Choice(Choice::PublicAccess), "No login required", "Use this for pages anyone can view.", !login_required, cx))
             .child(self.choice_button(Control::Choice(Choice::LoginRequired), "Login required", "Log in yourself in the app's browser, then confirm you are ready.", login_required, cx))
+            .when(self.focus.setup_stage == SetupStage::Settings, |body| body.child(controls::status(if self.unsaved(cx) { "Draft access — Save settings first. No browser opens when saving." } else if self.environment.is_none() { "Loading saved browser status. Your access choices are kept." } else if self.environment.as_ref().is_some_and(|e| e.login_open) { "Saved access · browser open. Finish login, then choose I'm ready." } else if self.access_can_continue(cx) { "Saved access · continue to pages & sizes." } else { "Saved access · open login browser, then choose I'm ready." }, Tone::Information)))
+            .children(self.draft_settings.environments.iter().enumerate().map(|(index, environment)| self.choice_button(Control::Environment(index), environment.name.clone(), "Separate saved login and page mapping", Some(environment.id) == self.environment_draft, cx)))
+            .child(self.guided_button(27,"Add staging environment",cx))
+            .when(self.environment_unsaved(cx), |el| el.child(controls::status("Unsaved environment edits — Save settings before choosing another environment.", Tone::Information)))
             .when(login_fields, |body| body.child(self.crawl_field(10,"Login / consent page (optional)","Blank opens the representative page. Use a complete URL, without credentials."))
             .child(self.crawl_field(11,"Representative page after login (optional)","Choose a real application page, not a login form. Blank uses the first mapped source. Replay is checked in a fresh isolated context."))
             .child(self.crawl_field(12,"Approved identity-provider origins (optional)","Exact http(s) origins ending in /, separated by spaces. Approve only providers you trust. This does not expand crawl scope."))
             .child(self.choice_button(Control::Choice(Choice::SaveLogin), "Remember login securely", "Use encrypted storage and your operating system's secure store.", !self.login_ephemeral, cx))
             .child(self.choice_button(Control::Choice(Choice::EphemeralLogin), "Only for this app session", "Forget the login when Regressee closes.", self.login_ephemeral, cx))
-            .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("If secure storage is locked or unavailable, unlock it or explicitly choose Ephemeral. There is no plaintext fallback. Screenshots may still contain private website content.")))
+            .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("If secure storage is locked or unavailable, unlock it or choose Only for this app session. There is no plaintext fallback. Screenshots may still contain private website content.")))
             .when(self.focus.setup_stage == SetupStage::Access, |body| body.child(self.guided_button(6, if advanced { "Hide environment options" } else { "Mapping, language & website theme" }, cx)))
             .when(advanced, |body| body.child(div().font_weight(FontWeight::SEMIBOLD).mt_3().child("Production → staging mapping"))
             .child(self.crawl_field(13,"Source origin or section base","For example https://production.example/app. No query or fragment in the base."))
@@ -3875,7 +3994,7 @@ impl Shell {
             }));
         }
         body=body.when(advanced, |body| body.child(self.crawl_field(15,"Capture language / locale","For example en-US or nb-NO. Changing rendering settings requires a replacement baseline."))
-            .child(controls::field("Capture timezone", "Choose a timezone or search by region or city. Changes apply to future baseline captures.", self.timezone.clone().into_any_element()))
+             .child(self.measured_form_field(Control::CrawlField(16),controls::field("Capture timezone", "Choose a timezone or search by region or city. Changes apply to future baseline captures.", self.timezone.clone().into_any_element())))
             .child(self.choice_button(Control::Choice(Choice::LightTheme), "Light website theme", "Capture the website's light color scheme.", self.draft_settings.profiles.first().is_none_or(|profile| !profile.dark), cx))
             .child(self.choice_button(Control::Choice(Choice::DarkTheme), "Dark website theme", "Capture the website's dark color scheme.", self.draft_settings.profiles.first().is_some_and(|profile| profile.dark), cx)))
             .child(self.environment_actions(cx));
@@ -3915,8 +4034,10 @@ impl Shell {
                             .flex()
                             .flex_wrap()
                             .gap_2()
-                            .child(self.guided_button(31, "Open login browser", cx))
-                            .child(self.guided_button(32, "I'm ready", cx))
+                            .when(self.focus.setup_stage == SetupStage::Settings, |row| {
+                                row.child(self.guided_button(31, "Open login browser", cx))
+                                    .child(self.guided_button(32, "I'm ready", cx))
+                            })
                             .child(self.guided_button(33, "Close login browser", cx))
                             .child(self.button(
                                 Control::Guided(34),
@@ -4891,16 +5012,20 @@ impl Shell {
             |el| el.px(px(8.)),
         )
         .anchor_scroll(self.review_anchor(control))
-        .when_some(self.options_control_bounds(control), |el, bounds| {
-            el.relative().child(
-                canvas(
-                    |_, _, _| (),
-                    move |painted, _, _, _| bounds.set(Some(painted)),
+        .when_some(
+            self.options_control_bounds(control)
+                .or_else(|| self.setup_control_bounds(control)),
+            |el, bounds| {
+                el.relative().child(
+                    canvas(
+                        |_, _, _| (),
+                        move |painted, _, _, _| bounds.set(Some(painted)),
+                    )
+                    .absolute()
+                    .size_full(),
                 )
-                .absolute()
-                .size_full(),
-            )
-        })
+            },
+        )
         .when(enabled, |el| {
             el.on_click(
                 cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
@@ -4946,6 +5071,7 @@ impl Shell {
                 !self.focus.busy
                     && (stage == SetupStage::Website || self.project.is_some())
                     && (stage != SetupStage::Pages || !self.unsaved(cx))
+                    && (stage != SetupStage::Pages || self.access_can_continue(cx))
             }
             Control::PagesBaseline => self.project.is_some(),
             Control::HistorySearch => true,
@@ -5010,9 +5136,7 @@ impl Shell {
                             .iter()
                             .any(|profile| profile.name == "Custom"))
             }
-            Control::Guided(13) => {
-                self.focus.screen == Screen::Setup && self.project.is_some() && !self.unsaved(cx)
-            }
+            Control::Guided(13) => self.focus.screen == Screen::Setup && self.project.is_some(),
             Control::Guided(14) => false, // One contextual capture action, not a duplicate ID.
             Control::Guided(16) => self.preview.is_some() || self.evidence.baseline.is_some(),
             Control::Guided(17) => self.preview.is_some() || self.evidence.latest.is_some(),
@@ -5077,9 +5201,12 @@ impl Shell {
             Control::Guided(27) => {
                 self.draft_settings.environments.len() < 16 && !self.environment_unsaved(cx)
             }
-            Control::Guided(31 | 36) => !self.environment_unsaved(cx),
+            Control::Guided(31) => {
+                self.environment.as_ref().is_some_and(|e| !e.login_open) && !self.unsaved(cx)
+            }
+            Control::Guided(36) => self.environment.is_some() && !self.unsaved(cx),
             Control::Guided(32) => {
-                !self.environment_unsaved(cx)
+                !self.unsaved(cx)
                     && self
                         .environment
                         .as_ref()
@@ -6998,6 +7125,19 @@ impl Shell {
         cx.notify();
     }
     fn environment_unsaved(&self, cx: &App) -> bool {
+        if let (Some(p), Some(environment)) = (&self.project, self.environment_draft) {
+            if let Some(saved) = self.saved_login_forms.get(&(p.project.id, environment)) {
+                if self.local_login_settings(cx).as_ref().ok() != Some(saved) {
+                    return true;
+                }
+            } else if self
+                .login_hydration_origin
+                .as_ref()
+                .is_some_and(|origin| origin != &self.environment_draft_signature(cx))
+            {
+                return true;
+            }
+        }
         let (Some(p), Some(e)) = (&self.project, &self.environment) else {
             return false;
         };
@@ -7064,6 +7204,7 @@ impl Shell {
                             .join(" ")
                     || self.draft_settings.discovery != record.project.discovery
                     || self.draft_settings.profiles != record.project.profiles
+                    || self.draft_settings.environments != record.project.environments
                     || self
                         .crawl_fields
                         .iter()
@@ -7424,6 +7565,20 @@ impl Render for Shell {
                     && (self.focus.busy || self.error.is_some() || self.notice.is_some()),
                 |el| el.child(feedback),
             )
+            .when(
+                self.focus.screen == Screen::Setup
+                    && self.focus.setup_stage != SetupStage::Settings
+                    && !self.focus.shows_project_picker(),
+                |body| {
+                    body.child(
+                        div()
+                            .flex_shrink_0()
+                            .px_6()
+                            .py_4()
+                            .child(self.setup_heading(cx)),
+                    )
+                },
+            )
             .child(
                 div()
                     .id("screen-scroll")
@@ -7717,6 +7872,10 @@ mod approval_fixture;
 
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase4_review_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase5_repair_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase5_setup_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod workflow_refinement_tests;
 
