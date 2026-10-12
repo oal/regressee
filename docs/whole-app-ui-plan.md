@@ -28,8 +28,33 @@ task; it does not replace the existing implementation `PLAN.md`.
   capability/safety inventory, concrete owners and Phases 4–7 build/validation order.
   [Implementation report](research/whole-app-ui-review-20261012/phase3-report.md).
   [Independent verdict](research/whole-app-ui-review-20261012/phase3-verification.md).
-- **Next executable step: authorized Phase 4A consequential consent**;
-  parent commits/pushes verified documents before Phase 4A. No Phase 4 started.
+- **Historical Phase 4A and 4B handoff: visual gate BLOCKED** by the inner note input's
+  width at both sizes. Source/storage package tests pass (295; 40 ignored), native
+  confirmation has 38 pairs, but this is not an exit-gate pass. See
+  [Phase 4 report](research/whole-app-ui-review-20261012/phase4-report.md) and
+  [receipt](research/whole-app-ui-review-20261012/phase4-receipt.json).
+  Source handoff also identifies disabled local navigation restoration during
+  initial evidence loading/failed reads; both blockers need correction.
+- **Historical independent Phase 4 verification: FIX.**
+  [Verdict](research/whole-app-ui-review-20261012/phase4-verification.md) confirms
+  both blockers and a third contract gap: selected target path disappears with
+  the queue hidden; narrow Compare omits environment context. Independent package
+  rerun: 295 passed, 0 failed, 40 ignored; required navigation probes: 1 passed,
+  3 failed. Existing evidence inspected without new rendering.
+- **Finite V4 functional repair implemented and independently re-verified PASS:**
+  actual note content/border bounds and caret reveal, real Shell navigation
+  mounted/enabled/Tab/simulated-pointer/dispatch paths, and persistent non-root
+  target/profile/source environments pass at both sizes. Packages: **299 passed,
+  0 failed, 40 ignored**; original independent probe rerun: **4 passed, 0 failed**;
+  separate serial targeted rerun: **8 passed, 0 failed, 0 ignored**. Verifier inspected
+  **22 repair originals and 4 sheets** without rerendering. Integrity: 12 immutable
+  archives, 182 original-root PNGs, 38 blocked + 22 repair pairs. Prior FIX preserved.
+  [Re-verification verdict](research/whole-app-ui-review-20261012/phase4-reverification.md).
+  All substantive Phase 4 gates clear within source/controller/offscreen scope;
+  native input, usability and release qualification are not inferred.
+- **Next:** parent reviews and commits/pushes verified Phase 4, then starts Phase 5.
+  This verifier did not commit/push or start Phase 5. Implementation's bounded
+  visual cycle has ended; no further render/polish loop is requested.
 - **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the
   complete plan be implemented and validated without clarification questions.
   Use the recommended interaction direction and preserve Clear wayfinding.
@@ -283,7 +308,7 @@ Exit gate: record the recommended direction/scope selected under the user's
 explicit delegation of judgement, and verify the capability/safety inventory.
 Read the Impeccable craft floor immediately before the first actual UI edit.
 
-### Phase 4 — fix review and baseline consent **AUTHORIZED; PENDING**
+### Phase 4 — fix review and baseline consent **VERIFIED PASS (SOURCE/OFFSCREEN SCOPE)**
 
 Dependencies: Phases 1–3. Treat the whole inspect→classify→select→confirm sequence
 as one interaction, while implementing in bounded batches.
@@ -470,6 +495,74 @@ or zero-finding certification should be attempted.
    endless polishing. Do not discard unfamiliar working-tree changes.
 
 ### Checkpoint log
+
+**2026-10-12 — independent Phase 4 re-verification: PASS.** V4-1/2/3 clear after
+source review, actual inner-input/caret and real Shell regression execution,
+all-mode historical identity checks at both sizes, and inspection of all 22 repair
+originals/4 sheets. Independent packages: **299 passed, 0 failed, 40 ignored**;
+serial targeted tests: **8 passed, 0 failed, 0 ignored**; external required navigation
+probes: **4 passed, 0 failed, exit 0**. Integrity checker: 12 immutable archives,
+182 original-root PNGs, 38 blocked + 22 repair pairs; 61 capture/62 final source
+bindings validated. Formatting/whitespace checks exit 0. Initial FIX, blocked
+receipt and implementation's PENDING handoff remain unchanged historical evidence.
+[Dated verdict](research/whole-app-ui-review-20261012/phase4-reverification.md)
+records consent/baseline/draft regression scope and OS/AT/usability/release limits.
+No product edit, new render, polish, commit/push or Phase 5 work.
+**Next: parent commits/pushes verified Phase 4, then Phase 5.**
+
+**2026-10-12 — finite Phase 4 functional repair, re-verification pending.**
+V4-1 finite scroll/body width gives actual note border/content 326/300px at both
+sizes, with retained readable draft and caret reveal. V4-2 adds navigation restore
+to both initial-read allowlists and saved Results core busy candidates; real Shell
+pending/failed/dismissed/ready/empty mounted/enabled/Tab/dispatch/simulated-click
+tests preserve requests/storage/drafts and task/modal boundaries. V4-3 keeps
+non-root path/query/fragment, profile and historical environments visible in all
+modes/full-width/capture, with named bounds/source assertions. Packages 299 passed,
+40 ignored; original independent probe rerun 4 passed/0 failed. One focused new
+22-pair capture, four sheets/eight originals inspected; previous blocked evidence
+and FIX untouched. Short narrow viewports and OS/AT/usability limits remain.
+No commit/push/Phase 5. **Next: independent re-verification, not acceptance here.**
+
+**2026-10-12 — independent Phase 4 verification: FIX.** Read full plan/blueprint/
+report/diff/tests/receipt and inspected all eight existing confirmation sheets plus
+20 originals, without a renderer loop. Independently reran all core/storage/app
+packages: 295 passed, 0 failed, 40 ignored. Independent source-bound navigation
+probes: ready candidate passes; busy candidate and both actual initial-loading/
+failed-read workspace allowlists fail (1 passed, 3 failed). Receipt/format/diff
+checks pass. Confirmed unreadable approximately 26px-wide inner note field at both
+sizes; additionally found missing persistent target path after queue collapse and
+suppressed environment captions in narrow Compare. Finite source-owner fixes and
+named regression requirements are in `research/whole-app-ui-review-20261012/phase4-verification.md`.
+Consent one/many/long/tail, mode/shared-transform, ready-state ownership/focus,
+draft/storage/privacy and capture-cap/empty gates pass only in their stated
+source/offscreen scope; overall phase does not. No product edits, new capture,
+commit/push or Phase 5. Native/AT/platform/usability/scale/release limits retained.
+**Next: sole implementation agent `ses_ece6028deffex3GeZBVhFk37aQ` corrects V4-1,
+V4-2 and V4-3 in one finite functional follow-up, then independent re-verification;
+do not advance or commit as verified.**
+
+**2026-10-12 — Phase 4 implementation, both 4A and 4B:** based on `4e48813`, kept
+Clear wayfinding and implemented consequence-first single-flow consent, source
+environment metadata, contained long rows/bounded reference paging, local rail/
+queue collapse, path-first rows/full URL retrieval, all modes via owned chooser,
+explicit synchronized full-width Before/After, disposition/navigation/update
+separation, temporary editor decision guards, capture cap and authoritative empty
+handling. Added four targeted controller/layout/safety tests and updated mounted
+focus paths together. Final packages: 295 passed, 0 failed, 40 ignored; binary
+106 passed, 15 ignored. Fresh isolated first 34-pair batch, one corrective batch,
+one 38-pair confirmation; final 8 sheets/20 originals read. **BLOCKER:** note input
+still paints at padding-only width at both sizes; the editor's outer bounds test
+does not establish inner input readability. Bounded visual loop stopped; no pass
+or Phase 5. Receipt verifies 12 immutable archives, 182 original-root PNGs unchanged
+since Phase 1, 38 source-bound pairs and 62 source hashes, with one explicit
+post-capture Zoom unit-assertion-only change. Format/diff checks pass. Exact report,
+log mirrors, receipt and integrity checker are in `research/whole-app-ui-review-20261012/phase4-*`
+and `scripts/verify-phase4-receipt.py`. No commit/push, nested agent, new browser
+visit/download, capture pixel/schema/approval-semantic change or native/AT/platform/
+usability/release qualification. Source handoff also identifies missing Guided(53)
+loading/failed-read restoration allowlists. **Next: independent Phase 4 verification
+and named note-width/loading-navigation follow-ups; do not mark the phase verified
+or start Phase 5.**
 
 **2026-10-12 — independent Phase 3 verification: PASS.** Reviewed the complete
 plan/blueprint/report/synthesis against PRODUCT/DESIGN/approved workflow and current

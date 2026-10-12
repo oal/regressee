@@ -609,6 +609,7 @@ impl Shell {
                 self.capture_details_open = !self.capture_details_open;
                 self.capture_diagnostics_open = false;
                 if self.capture_details_open {
+                    self.review_note_open = false;
                     self.review_tools = false;
                     self.mask_draw = false;
                 }
@@ -617,17 +618,21 @@ impl Shell {
             39 => {
                 self.presentation_focus = Some(if self.capture_details_open {
                     Control::Phase5(36)
+                } else if self.review_note_open {
+                    Control::Phase5(37)
                 } else {
                     Control::Guided(44)
                 });
                 self.capture_details_open = false;
+                self.review_note_open = false;
                 self.review_tools = false;
                 self.mask_draw = false;
                 self.mask_drag = None;
             }
             37 => {
                 self.review_note_open = !self.review_note_open;
-                if self.narrow_workspace && self.review_note_open {
+                if self.review_note_open {
+                    self.presentation_focus = Some(Control::AnalysisField(9));
                     self.review_tools = false;
                     self.capture_details_open = false;
                     self.mask_draw = false;
@@ -639,6 +644,9 @@ impl Shell {
         cx.notify();
     }
     pub(super) fn ordinary_review_bar(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.viewer_inspector_open() || self.options_panel_open() {
+            return div().text_size(px(13.)).text_color(rgb(MUTED)).child("Temporary editor · return to evidence before making a review or baseline decision.").into_any_element();
+        }
         if self.history_inspection.is_some() {
             return div()
                 .text_size(px(13.))
@@ -683,22 +691,18 @@ impl Shell {
                     "Mark unreviewed"
                 },
             ),
-            (33, "Next unreviewed"),
-            (
-                37,
-                if self.review_note_open {
-                    "Hide note"
-                } else if self.narrow_workspace {
-                    "Note"
-                } else {
-                    "Review note"
-                },
-            ),
         ] {
             actions = actions.child(self.button(
                 Control::Phase5(index),
                 text,
-                ActionStyle::Secondary,
+                ActionStyle::Choice {
+                    selected: matches!(
+                        (index, state),
+                        (21, Some(ReviewState::Intentional))
+                            | (22, Some(ReviewState::NeedsFix))
+                            | (20, None | Some(ReviewState::Unreviewed))
+                    ),
+                },
                 cx,
             ));
         }
@@ -707,10 +711,8 @@ impl Shell {
                 format!("{label} · {}", self.review_progress_summary())
             } else { format!("Current review: {label} · displayed analysis only") }))
             .when(!self.narrow_workspace, |bar| bar.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(self.review_progress_summary())))
-            .child(actions)
-            .when(self.review_note_open, |bar| bar.child(div().flex().gap_2().items_center().child(div().flex_1().min_w_0().child(if self.narrow_workspace {
-                self.analysis_fields[9].clone().into_any_element()
-            } else { controls::field("Review note", "Draft until saved; marking a decision also saves the note.", self.analysis_fields[9].clone().into_any_element()).into_any_element() })).child(self.button(Control::Phase5(32), "Save note", ActionStyle::Secondary, cx))))
+            .child(div().flex().flex_wrap().items_center().justify_between().gap_3().child(actions)
+                .child(div().flex().gap_2().child(self.button(Control::Phase5(37), "Review note", ActionStyle::Secondary, cx)).child(self.button(Control::Phase5(33), "Next unreviewed", ActionStyle::Primary, cx))))
             .when(!self.narrow_workspace && (self.mask_dirty || self.mask_geometry_dirty(cx) || self.review_note_dirty(cx)), |bar| bar.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Save your note and ignored-area drafts before Next unreviewed.")))
             .when(!self.narrow_workspace && !self.review_result_valid(), |bar| bar.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Review decisions need a completed, comparable analysis with eligible pixels and no pending edits.")))
             .into_any_element()

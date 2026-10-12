@@ -245,20 +245,26 @@ struct Shell {
     review_focus_reveal: std::rc::Rc<std::cell::Cell<u8>>,
     approval_provenance_scroll: gpui::ScrollHandle,
     approval_reference_index: usize,
+    approval_exact_open: bool,
     viewer_fit: bool,
     narrow_workspace: bool,
     review_tools: bool,
     review_queue_collapsed: bool,
+    navigation_collapsed: bool,
+    navigation_preference: Option<bool>,
+    viewer_mode_open: bool,
+    full_width_after: bool,
     discovery_preview_visible: bool,
     result_filters_open: bool,
     working_width: f32,
+    viewport_height: f32,
     presentation_focus: Option<Control>,
 }
 impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
             root_focus: cx.focus_handle(),
-            handles: (0..(621 + regressee_app::task::MAX_TASK_LINKS))
+            handles: (0..(626 + regressee_app::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -399,13 +405,19 @@ impl Shell {
             review_focus_reveal: Default::default(),
             approval_provenance_scroll: gpui::ScrollHandle::new(),
             approval_reference_index: 0,
+            approval_exact_open: false,
             viewer_fit: true,
             narrow_workspace: false,
             review_tools: false,
             review_queue_collapsed: false,
+            navigation_collapsed: false,
+            navigation_preference: None,
+            viewer_mode_open: false,
+            full_width_after: false,
             discovery_preview_visible: false,
             result_filters_open: false,
             working_width: 1040.,
+            viewport_height: 800.,
             presentation_focus: None,
         };
         cx.observe(&shell.timezone, |_, _, cx| cx.notify()).detach();
@@ -443,6 +455,9 @@ impl Shell {
         for input in shell.analysis_fields.iter().skip(9) {
             cx.observe(input, |_, _, cx| cx.notify()).detach();
         }
+        shell.analysis_fields[9].update(cx, |input, _| {
+            input.debug_name = Some("review-note-input-border")
+        });
         cx.observe(&shell.crawl_fields[9], |this, input, cx| {
             let query = input.read(cx).content.trim().to_lowercase();
             if this.search != query {
@@ -1653,7 +1668,14 @@ impl Shell {
                 }
                 self.analysis_due = None;
             }
-            6..=9 => self.viewer_mode = index - 6,
+            6..=9 => {
+                self.viewer_mode = index - 6;
+                self.viewer_mode_open = false;
+                self.presentation_focus = Some(Control::Guided(54));
+                if self.viewer_fit {
+                    self.zoom = self.fitted_viewer_zoom();
+                }
+            }
             10 => self.overlay_fraction = (self.overlay_fraction - 0.1).max(0.),
             11 => self.overlay_fraction = (self.overlay_fraction + 0.1).min(1.),
             12 | 13 => {
@@ -2357,6 +2379,7 @@ impl Shell {
             Control::Guided(46) => return self.zoom_select.read(cx).focus_handle(),
             Control::PauseCapture => 88,
             Control::Guided(index @ 50..=52) => 612 + index - 50,
+            Control::Guided(index @ 53..=57) => 621 + index - 53,
             Control::Guided(index) => 90 + index,
             Control::CrawlField(16) => return self.timezone.read(cx).focus_handle(cx),
             Control::CrawlField(index) => return self.crawl_fields[index].read(cx).focus.clone(),
@@ -2385,7 +2408,7 @@ impl Shell {
             Control::CloseOptions => 618,
             Control::DiscoveryDetails => 619,
             Control::CloseMappingPreview => 620,
-            Control::TaskLink(index) => 621 + index,
+            Control::TaskLink(index) => 626 + index,
         };
         self.handles[index].clone()
     }
@@ -2523,6 +2546,10 @@ impl Shell {
             Screen::History => Control::HistorySearch,
             _ => return,
         };
+        if self.focus.screen == Screen::Results && self.review_queue_collapsed {
+            self.toggle_workspace_presentation(Control::Guided(50));
+            cx.notify();
+        }
         if self.control_enabled(control, cx) {
             window.focus(&self.handle(control, cx));
         }
@@ -3002,6 +3029,53 @@ impl Shell {
         }
     }
     fn guided(&mut self, index: usize, cx: &mut Context<Self>) {
+        if matches!(index, 53..=57) {
+            match index {
+                53 => {
+                    self.navigation_collapsed = !self.navigation_collapsed;
+                    self.navigation_preference = Some(self.navigation_collapsed);
+                    self.working_width += if self.navigation_collapsed {
+                        192.
+                    } else {
+                        -192.
+                    };
+                    self.presentation_focus = Some(Control::Guided(53));
+                }
+                54 => {
+                    self.viewer_mode_open = !self.viewer_mode_open;
+                    self.presentation_focus = Some(if self.viewer_mode_open {
+                        if self.viewer_mode == 4 {
+                            Control::Guided(55)
+                        } else {
+                            Control::Phase5(self.viewer_mode + 6)
+                        }
+                    } else {
+                        Control::Guided(54)
+                    });
+                }
+                55 => {
+                    self.viewer_mode = 4;
+                    self.viewer_mode_open = false;
+                    self.presentation_focus = Some(Control::Guided(54));
+                }
+                56 => self.full_width_after = !self.full_width_after,
+                57 => {
+                    self.viewer_mode_open = false;
+                    self.presentation_focus = Some(Control::Guided(54));
+                }
+                _ => unreachable!(),
+            }
+            if self.viewer_fit && index != 56 {
+                self.zoom = self.fitted_viewer_zoom();
+            }
+            cx.notify();
+            return;
+        }
+        if index == 52 {
+            self.approval_exact_open = !self.approval_exact_open;
+            cx.notify();
+            return;
+        }
         if matches!(index, 48 | 49) {
             let count = self
                 .approval
@@ -3037,6 +3111,8 @@ impl Shell {
             self.options_scroll.set_offset(gpui::point(px(0.), px(0.)));
             if self.result_filters_open {
                 self.capture_details_open = false;
+                self.review_note_open = false;
+                self.viewer_mode_open = false;
                 self.review_tools = false;
                 self.mask_draw = false;
                 self.mask_drag = None;
@@ -3048,6 +3124,8 @@ impl Shell {
             self.review_tools = !self.review_tools;
             if self.review_tools {
                 self.capture_details_open = false;
+                self.review_note_open = false;
+                self.viewer_mode_open = false;
             }
             self.mask_draw = false;
             cx.notify();
@@ -3973,6 +4051,10 @@ impl Shell {
             .flex_col()
             .gap_2()
             .when(self.narrow_workspace, |body| body.gap_1())
+            .when(
+                !self.page_list_workspace() && !self.authoritative_empty_capture(),
+                |body| body.child(self.guided_button(50, "Hide results", cx)),
+            )
             .when(!empty_results, |body| {
                 body.child(
                     div()
@@ -4312,7 +4394,7 @@ impl Shell {
                                         TargetOutcome::Cancelled => "Cancelled".into(),
                                     });
                                 let attempt_word = if t.attempts == 1 { "attempt" } else { "attempts" };
-                                controls::page_row(
+                                controls::result_row(
                                     SharedString::from(format!("target-{index}")),
                                     t.requested.to_string(),
                                         format!(
@@ -4767,14 +4849,21 @@ impl Shell {
             self.reveal_form_control(Control::Guided(35), false, window, cx);
             window.focus(&self.handle(Control::Guided(35), cx));
             cx.notify();
-        } else if self.capture_details_open || self.review_tools {
+        } else if self.viewer_mode_open {
+            self.viewer_mode_open = false;
+            window.focus(&self.handle(Control::Guided(54), cx));
+            cx.notify();
+        } else if self.capture_details_open || self.review_tools || self.review_note_open {
             let control = if self.capture_details_open {
                 Control::Phase5(36)
+            } else if self.review_note_open {
+                Control::Phase5(37)
             } else {
                 Control::Guided(44)
             };
             self.capture_details_open = false;
             self.review_tools = false;
+            self.review_note_open = false;
             self.mask_draw = false;
             self.mask_drag = None;
             window.focus(&self.handle(control, cx));
@@ -5135,7 +5224,7 @@ impl Shell {
         let screen = self.focus.screen;
         if self.focus.approval_dialog {
             return match control {
-                Guided(47..=49) => true,
+                Guided(47..=49 | 52) => true,
                 Phase5(25) => self
                     .approval
                     .as_ref()
@@ -5145,6 +5234,21 @@ impl Shell {
         }
         if !self.stage_control_mounted(control) || !self.workspace_control_mounted(control) {
             return false;
+        }
+        if self.focus.screen == Screen::Results {
+            if control == Guided(53) {
+                return true;
+            }
+            if self.navigation_collapsed
+                && matches!(control, Navigate(_) | PagesBaseline | Shortcuts)
+            {
+                return false;
+            }
+            if (self.viewer_inspector_open() || self.options_panel_open() || self.viewer_mode_open)
+                && matches!(control, Phase5(20..=25 | 33 | 37))
+            {
+                return false;
+            }
         }
         if self.history_inspection.is_some()
             && matches!(control,
@@ -5295,6 +5399,10 @@ impl Shell {
             Guided(27 | 31..=38) => setup && project,
             Guided(41) => settings,
             Guided(42) => settings && self.network_status.is_none() && self.pending.is_none(),
+            Guided(54) => viewer && analysis,
+            Guided(55) => viewer && analysis && self.viewer_mode_open,
+            Guided(56) => viewer && analysis && self.viewer_mode == 4,
+            Guided(57) => viewer && analysis && self.viewer_mode_open,
             Guided(_) => false,
             CrawlField(0..=2) => setup,
             CrawlField(3..=8) => setup && self.focus.advanced,
@@ -5311,8 +5419,7 @@ impl Shell {
             Phase5(37) => analysis,
             Phase5(23) => analysis,
             Phase5(24) => analysis,
-            Phase5(6..=7) => viewer && analysis,
-            Phase5(8..=9) => viewer && analysis && (!self.narrow_workspace || self.review_tools),
+            Phase5(6..=9) => viewer && analysis && self.viewer_mode_open,
             Phase5(10 | 11) => viewer && self.viewer_mode == 2,
             Phase5(12 | 13) => {
                 analysis
@@ -5692,26 +5799,6 @@ impl Shell {
     }
     fn selected_capture_details(&self, cx: &mut Context<Self>) -> AnyElement {
         let mut body = div().flex().flex_col().gap_3().child(self.phase5_panel(cx));
-        if self.viewer.is_some() {
-            body = body.child(div().flex().flex_wrap().gap_2().when(
-                self.narrow_workspace && self.evidence.comparison.is_some(),
-                |tools| {
-                    tools
-                        .child(self.button(
-                            Control::Phase5(8),
-                            "Overlay",
-                            ActionStyle::Secondary,
-                            cx,
-                        ))
-                        .child(self.button(
-                            Control::Phase5(9),
-                            "Heatmap",
-                            ActionStyle::Secondary,
-                            cx,
-                        ))
-                },
-            ));
-        }
         if let Some(run) = &self.evidence.latest {
             body = body.child(
                 div()
@@ -5923,6 +6010,32 @@ impl Shell {
             .flex_col()
             .gap_2()
             .when(self.narrow_workspace, |section| section.gap_1());
+        if self.review_queue_collapsed {
+            let (path, context) = self.inspection_identity();
+            section = section.child(
+                div()
+                    .debug_selector(|| "inspected-target-context".into())
+                    .w_full()
+                    .min_w_0()
+                    .flex_shrink_0()
+                    .flex()
+                    .flex_col()
+                    .text_size(px(14.))
+                    .line_height(px(20.))
+                    .child(
+                        div()
+                            .debug_selector(|| "inspected-target-path".into())
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(path),
+                    )
+                    .child(
+                        div()
+                            .debug_selector(|| "inspected-target-profile-environments".into())
+                            .text_color(rgb(MUTED))
+                            .child(context),
+                    ),
+            );
+        }
         let mut view_tools = div()
             .debug_selector(|| "viewer-toolbar".into())
             .flex_shrink_0()
@@ -5931,33 +6044,32 @@ impl Shell {
             .gap_2()
             .when(self.narrow_workspace, |tools| tools.gap_1());
         if self.evidence.comparison.is_some() {
-            view_tools = view_tools.children(
-                [
-                    (6, "Compare"),
-                    (
-                        7,
-                        if self.narrow_workspace {
-                            "Diff"
-                        } else {
-                            "Difference"
-                        },
+            view_tools = view_tools
+                .child(self.guided_button(
+                    54,
+                    format!(
+                        "View: {}",
+                        [
+                            "Compare",
+                            "Difference",
+                            "Overlay",
+                            "Heatmap",
+                            "Before/After (full width)"
+                        ][self.viewer_mode]
                     ),
-                    (8, "Overlay"),
-                    (9, "Heatmap"),
-                ]
-                .into_iter()
-                .filter(|(index, _)| *index <= 7 || !self.narrow_workspace)
-                .map(|(index, label)| {
-                    self.button(
-                        Control::Phase5(index),
-                        label,
-                        ActionStyle::Choice {
-                            selected: self.viewer_mode == index - 6,
+                    cx,
+                ))
+                .when(self.viewer_mode == 4, |modes| {
+                    modes.child(self.guided_button(
+                        56,
+                        if self.full_width_after {
+                            "After · Show Before"
+                        } else {
+                            "Before · Show After"
                         },
                         cx,
-                    )
-                }),
-            );
+                    ))
+                });
         }
         view_tools = view_tools
             .when(self.viewer_has_pixels(), |tools| {
@@ -5991,7 +6103,7 @@ impl Shell {
         }
         section = section.child(view_tools);
         section = section.child(self.viewer_panes_layout(view, true, cx));
-        if self.viewer_has_pixels() && !self.narrow_workspace {
+        if self.viewer_has_pixels() {
             section = section.child(div().flex_shrink_0().text_size(px(13.)).line_height(px(18.)).text_color(rgb(MUTED))
                 .child(if self.mask_draw { "Drag to mark an ignored area · Esc to finish" }
                 else if self.narrow_workspace { "Drag / scroll to move · Ctrl + scroll to zoom" }
@@ -6021,6 +6133,89 @@ impl Shell {
             );
         }
         section
+            .when(self.viewer_mode_open, |section| {
+                let origin = self
+                    .viewer_bounds
+                    .get()
+                    .map(|b| b.origin)
+                    .unwrap_or(gpui::point(
+                        px(24.
+                            + if self.navigation_collapsed { 0. } else { 192. }
+                            + self.review_queue_width()
+                            + 12.),
+                        px(180.),
+                    ));
+                let origin = gpui::point(
+                    origin.x,
+                    origin.y.min(px((self.viewport_height - 320.).max(0.))),
+                );
+                section.child(
+                    gpui::deferred(
+                        gpui::anchored().position(origin).child(
+                            div()
+                                .id("viewer-mode-chooser")
+                                .debug_selector(|| "viewer-mode-chooser".into())
+                                .w(px(280.))
+                                .p_3()
+                                .bg(rgb(SURFACE))
+                                .border_1()
+                                .border_color(rgb(CONTROL_LINE))
+                                .occlude()
+                                .flex()
+                                .flex_col()
+                                .gap_2()
+                                .on_key_down(cx.listener(
+                                    |this, event: &gpui::KeyDownEvent, window, cx| {
+                                        let options = [
+                                            Control::Phase5(6),
+                                            Control::Phase5(7),
+                                            Control::Phase5(8),
+                                            Control::Phase5(9),
+                                            Control::Guided(55),
+                                        ];
+                                        let current = options
+                                            .iter()
+                                            .position(|c| this.handle(*c, cx).is_focused(window))
+                                            .unwrap_or(0);
+                                        let next = match event.keystroke.key.as_str() {
+                                            "down" | "right" => (current + 1) % options.len(),
+                                            "up" | "left" => {
+                                                (current + options.len() - 1) % options.len()
+                                            }
+                                            "home" => 0,
+                                            "end" => options.len() - 1,
+                                            _ => return,
+                                        };
+                                        window.focus(&this.handle(options[next], cx));
+                                        cx.stop_propagation();
+                                    },
+                                ))
+                                .children(
+                                    [
+                                        (6, "Compare"),
+                                        (7, "Difference"),
+                                        (8, "Overlay"),
+                                        (9, "Heatmap"),
+                                    ]
+                                    .into_iter()
+                                    .map(|(index, label)| {
+                                        self.button(
+                                            Control::Phase5(index),
+                                            label,
+                                            ActionStyle::Choice {
+                                                selected: self.viewer_mode == index - 6,
+                                            },
+                                            cx,
+                                        )
+                                    }),
+                                )
+                                .child(self.guided_button(55, "Before/After (full width)", cx))
+                                .child(self.guided_button(57, "Close view chooser", cx)),
+                        ),
+                    )
+                    .with_priority(2),
+                )
+            })
             .when(self.viewer_inspector_open(), |section| {
                 section.child(self.viewer_inspector(cx))
             })
@@ -6622,6 +6817,13 @@ impl Shell {
                         if mode == 2 {
                             title = "Overlay · before + after".into();
                         }
+                        if self.narrow_workspace && indices.len() > 1 {
+                            title = format!(
+                                "{}: {}",
+                                if index == 0 { "Before" } else { "After" },
+                                origin.lines().next().unwrap_or("environment not loaded")
+                            );
+                        }
                         div()
                             .debug_selector(move || format!("evidence-caption-{index}"))
                             .h(px(if indices.len() == 1 {
@@ -7027,6 +7229,7 @@ impl Render for Shell {
         self.focus.history_runs = self.history.as_ref().map_or(0, |h| h.runs.len());
         let render_started = std::time::Instant::now();
         self.configure_review_geometry(f32::from(window.viewport_size().width));
+        self.viewport_height = f32::from(window.viewport_size().height);
         let bounded_review =
             self.focus.screen == Screen::Results && !self.focus.shows_project_picker();
         if self.focus.approval_dialog
@@ -7165,6 +7368,9 @@ impl Render for Shell {
                     .bg(rgb(SURFACE))
                     .border_b_1()
                     .border_color(rgb(LINE))
+                    .when(self.navigation_collapsed, |header| {
+                        header.child(self.guided_button(53, "Show navigation", cx))
+                    })
                     .child(
                         div()
                             .min_w_0()
@@ -7243,6 +7449,8 @@ impl Render for Shell {
             && !self.page_list_workspace()
             && self.history_inspection.is_none()
             && self.evidence.comparison.is_some()
+            && !self.viewer_inspector_open()
+            && !self.options_panel_open()
         {
             content = content.child(self.approval_bar(cx));
         }
@@ -7290,7 +7498,11 @@ impl Render for Shell {
                 shell.child(self.task_workspace(cx))
             })
             .when(!self.task_owns_workspace(), |shell| {
-                shell.child(self.project_rail(cx)).child(content)
+                shell
+                    .when(!self.navigation_collapsed, |shell| {
+                        shell.child(self.project_rail(cx))
+                    })
+                    .child(content)
             })
             .when(self.task.is_none() && self.focus.approval_dialog, |shell| {
                 shell.child(self.approval_decision(cx))
@@ -7503,6 +7715,8 @@ fn main() -> anyhow::Result<()> {
 #[path = "../tests/support/approval_fixture.rs"]
 mod approval_fixture;
 
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase4_review_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod workflow_refinement_tests;
 
@@ -8741,7 +8955,7 @@ mod tests {
             finish_request(s, cx);
             s.focus.screen = Screen::Results;
             s.evidence.analyses = vec![valid, masked];
-            s.review_tools = true;
+            s.review_tools = false;
             s.approval_selection.insert(s.selected_key.clone().unwrap());
         });
         cx.update(|w, cx| {
@@ -8751,6 +8965,7 @@ mod tests {
                 assert_eq!(s.approval.as_ref().unwrap().analysis, valid);
                 assert!(s.focus.approval_dialog);
                 s.activate_control(Control::Guided(47), w, cx);
+                s.review_tools = true;
                 s.activate_control(Control::Phase5(26), w, cx);
                 assert!(s.approval.is_none()); // Invalid at dispatch, before async reply.
                 finish_request(s, cx);
@@ -8768,6 +8983,7 @@ mod tests {
                 s.activate_control(Control::Phase5(26), w, cx);
                 finish_request(s, cx);
                 finish_request(s, cx);
+                s.review_tools = false;
                 s.activate_control(Control::Phase5(24), w, cx);
                 finish_request(s, cx);
                 let preview = s.approval.clone().unwrap();
@@ -8784,6 +9000,7 @@ mod tests {
                 s.analysis_due = None;
                 // Exercise the real async reanalysis slot and completion, not a
                 // fabricated busy flag. The latest saved mask is all-masked.
+                s.review_tools = true;
                 s.activate_control(Control::Phase5(4), w, cx);
                 s.analysis_due = Some(std::time::Instant::now());
                 s.poll_analysis(cx);
@@ -8813,6 +9030,7 @@ mod tests {
                 assert!(s.pending.is_none());
                 s.project.as_mut().unwrap().revision -= 1;
                 s.invalidate_approval();
+                s.review_tools = false;
                 s.activate_control(Control::Phase5(24), w, cx);
                 finish_request(s, cx);
                 s.activate_control(Control::Phase5(25), w, cx);
@@ -9256,6 +9474,8 @@ mod tests {
                 assert_eq!(s.mask_selected, Some(0));
                 s.activate_control(Control::Phase5(16), w, cx);
                 assert!(s.mask_rectangles.is_empty());
+                s.activate_control(Control::Phase5(39), w, cx);
+                s.activate_control(Control::Guided(54), w, cx);
                 s.activate_control(Control::Phase5(8), w, cx);
                 assert_eq!(s.viewer_mode, 2);
                 s.activate_control(Control::Phase5(11), w, cx);
@@ -9268,6 +9488,7 @@ mod tests {
                 assert!(s.focus.view_loading);
                 finish_request(s, cx);
                 assert!(s.mask_dirty);
+                s.activate_control(Control::Guided(44), w, cx);
                 s.activate_control(Control::Phase5(0), w, cx);
                 assert_eq!(s.analysis_policy.pixel_tolerance_delta_e00, 2.);
                 assert!(s.analysis_due.is_none());

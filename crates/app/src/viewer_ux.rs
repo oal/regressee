@@ -33,7 +33,7 @@ impl Shell {
     }
 
     pub(super) fn viewer_inspector_open(&self) -> bool {
-        self.capture_details_open || (self.review_tools && !self.mask_draw)
+        self.review_note_open || self.capture_details_open || (self.review_tools && !self.mask_draw)
     }
 
     fn viewer_input_allowed(&self) -> bool {
@@ -42,6 +42,7 @@ impl Shell {
             && !self.focus.dialog
             && !self.focus.approval_dialog
             && !self.native_prompt
+            && !self.viewer_inspector_open()
             && self.viewer_has_pixels()
     }
 
@@ -172,8 +173,20 @@ impl Shell {
         let scroll = self.review_details_scroll.clone();
         let owner = cx.entity().downgrade();
         let reveal = self.review_focus_reveal.clone();
-        let mut body = div().flex().flex_col().gap_4();
-        if details {
+        // A percentage-width Entity beneath an auto-width scrolling block can
+        // resolve to its padding alone. Give the native field a finite content
+        // measure, then stretch every intermediate flex owner to that measure.
+        let mut body = div()
+            .w(px((available.min(360.) - 34.).max(1.)))
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap_4();
+        if self.review_note_open {
+            body = body.child("Review note · draft until saved. Close returns to evidence without discarding text.")
+                .child(div().w_full().min_w_0().flex().flex_col().child(controls::field("Note", "Draft until saved", self.analysis_fields[9].clone().into_any_element())))
+                .child(self.button(Control::Phase5(32), "Save note", ActionStyle::Primary, cx));
+        } else if details {
             for (label, value) in self.capture_summary() {
                 body = body.child(
                     div()
@@ -232,12 +245,21 @@ impl Shell {
                     .p_3()
                     .border_b_1()
                     .border_color(rgb(LINE))
-                    .child(div().font_weight(FontWeight::SEMIBOLD).child(if details {
-                        "Capture details"
-                    } else {
-                        "Adjust comparison"
-                    }))
-                    .child(self.button(Control::Phase5(39), "Close", ActionStyle::Secondary, cx)),
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child(
+                        if self.review_note_open {
+                            "Review note"
+                        } else if details {
+                            "Capture details"
+                        } else {
+                            "Adjust comparison"
+                        },
+                    ))
+                    .child(self.button(
+                        Control::Phase5(39),
+                        "Return to evidence",
+                        ActionStyle::Secondary,
+                        cx,
+                    )),
             )
             .child(
                 div()
@@ -245,6 +267,10 @@ impl Shell {
                     .debug_selector(|| "review-details-scroll".into())
                     .flex_1()
                     .min_h_0()
+                    .min_w_0()
+                    .w_full()
+                    .flex()
+                    .flex_col()
                     .overflow_y_scroll()
                     .track_scroll(&self.review_details_scroll)
                     .p_4()

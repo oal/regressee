@@ -191,6 +191,15 @@ from **Edit settings** and identifies the selected project with words and paint.
 Comparison review remains side by side, including small desktop windows: queue width (200px)
 below viewport width (1100px), otherwise (272px), separated from the flexible
 viewer by (12px). Do not describe a stacking layout that is not implemented.
+Review now owns local **Hide navigation / Show navigation** and **Hide results /
+Show results** controls. At narrow sizes the project navigation starts collapsed;
+an explicit workspace preference survives resize. Selected project context remains
+visible. Working geometry uses the actual mounted rail width, not a permanent
+192px reservation. Ctrl/Cmd+F restores a hidden queue before focusing its search.
+Compare remains the default at both sizes. **Before/After (full width)** is an
+explicit, untinted one-original alternative with a named current side and shared
+source pan/zoom; switching sides preserves manual scale and target. A separate
+View chooser exposes Compare, Difference, Overlay, Heatmap and this alternative.
 Queue and image panes are independently bounded. Details and comparison
 adjustments use a bounded, scrollable flyout over the viewer; neither replaces
 the queue nor consumes image height below the evidence. Review does not
@@ -209,6 +218,12 @@ selection and hover preserve row height. Lists fill their bounded viewport, not
 a fixed five-row panel. Zero search matches show an explanation, not an empty
 bordered list. Capture profiles describe mobile **web emulation**, tablet and
 desktop websites—not app devices or a mobile product layout.
+Inspection result rows are now 84px, with path/query/fragment first and separate
+profile and status lines. The full URL remains in a native hover hint and the
+selected screenshot's keyboard-accessible Details. Discovery and History keep
+their previous row geometry. Authoritative empty captures reserve no blank queue.
+Automatic capture-only overview fit is capped at 100%; manual enlargement remains
+available. Compact Zoom explicitly distinguishes Fit from Manual.
 
 ## Elevation & Depth
 
@@ -315,13 +330,17 @@ current analysis, including missing and unclassified evidence. Preserve before/
 after origins, screen size, warnings, sensitivity and ignored-area revisions.
 Original screenshots remain untinted; difference, overlay and heatmap are labelled
 analysis modes, not brand treatments of the originals.
-The protected approval dialog has a bounded height (420px) and widths (580px)
+The protected approval dialog has a bounded height (520px) and widths (740px)
 at narrow desktop sizes or (760px) otherwise, capped by its available viewport.
-It states selected references replaced versus inherited references kept, retained
-earlier versions and composite capture times. A virtualized reference list plus
-scrollable exact provenance exposes page/profile, source run, capture time,
-original artifact and requested/final URLs where recorded. Previous/Next supports
-keyboard provenance inspection. Keep reviewing/Escape dismisses without approving;
+It asks “Update the baseline for 1 screenshot?” with correct plural forms, names
+the future-check consequence and retained versions, and distinguishes Replace
+from Keep. One scroll owner contains the inspected path/profile/source environment/
+UTC time, on-demand exact provenance and the reference rows; actions remain pinned.
+Rows grow with long addresses rather than painting separators through text.
+At most 32 reference rows mount on a page. Previous/Next inspects every reference
+and advances the visible page, keeping all unchanged references accessible.
+Exact page/profile IDs, run/artifact identities and requested/final URLs remain
+available, including the technical tail. Keep reviewing/Escape dismisses without approving;
 Confirm baseline is explicit. Focus is trapped, background mutations are guarded,
 and stale previews are invalidated. Failed/missing/incompatible evidence cannot
 be approved; replacing the whole baseline remains a separate workflow.
@@ -363,6 +382,23 @@ Missing images have no useless zoom/pan controls. A hand/crosshair cursor convey
 the current interaction.
 Compact no-match recovery precedes the search controls, with expanded
 filters scrolling separately.
+
+Phase 4 separates the selected disposition group from Review note and the primary
+Next unreviewed action. Baseline selection/preview remains a separate footer.
+Notes now use the owned temporary editor rather than a permanent evidence-height
+row. Details, notes and filters remove or disable review/baseline decisions while
+evidence is occluded; Return to evidence/Escape preserves unsaved note text.
+The finite V4 repair gives the inspector scroll body a finite content width;
+the actual note input is 326px wide (300px inner content), with caret scrolling
+and explicit Save/Return. Saved-project Results loading/failed-read candidates
+now permit local navigation restoration without bypassing task/modal guards.
+When results are hidden, an evidence-owned path/query/fragment and source profile/
+environment heading persists across all modes and capture inspection. Narrow
+Compare names Before/After historical environments above their respective panes.
+The earlier blocked confirmation and independent FIX verdict remain intact.
+The separate 22-pair functional repair evidence is not independent acceptance;
+Phase 4 still awaits re-verification. See
+`docs/research/whole-app-ui-review-20261012/phase4-report.md`.
 
 **History and keyboard.** Runs, Baselines and Storage are separate sections.
 Baseline versions and capture/check runs are distinct,

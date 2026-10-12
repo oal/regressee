@@ -115,6 +115,10 @@ pub struct ApprovalPreview {
     pub selected: Vec<TargetKey>,
     pub inherited: usize,
     pub provenance: Vec<(TargetKey, String, String)>,
+    /// Read-only consent metadata, resolved on the storage worker; no database
+    /// schema or baseline/capture identity changes.
+    #[serde(default)]
+    pub source_environments: Vec<(TargetKey, String)>,
 }
 impl Store {
     pub fn display_analysis(&mut self, id: AnalysisId) -> Result<()> {
@@ -443,8 +447,10 @@ impl Store {
         };
         baseline.validate()?;
         let mut provenance = Vec::new();
+        let mut source_environments = Vec::new();
         for reference in &baseline.references {
             let source = self.load_run(reference.run)?;
+            source_environments.push((reference.key.clone(), source.run.environment.name.clone()));
             let capture = source
                 .evidence(&reference.key)
                 .context("source evidence missing")?;
@@ -469,6 +475,7 @@ impl Store {
             analysis,
             selected: selected.to_vec(),
             provenance,
+            source_environments,
         })
     }
     pub fn accept_selected(

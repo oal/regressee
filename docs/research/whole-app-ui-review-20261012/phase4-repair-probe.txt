@@ -1,0 +1,9 @@
+
+running 4 tests
+test failed_read_workspace_must_mount_restore ... ok
+test loading_restore_must_be_a_core_candidate ... ok
+test loading_workspace_must_mount_restore ... ok
+test ready_restore_is_a_core_candidate ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

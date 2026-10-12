@@ -44,6 +44,7 @@ pub struct TextInput {
     pub validator: Option<fn(&str) -> Option<&'static str>>,
     pub touched: bool,
     pub correction: Option<String>,
+    pub debug_name: Option<&'static str>,
     blur_observer: Option<gpui::Subscription>,
 }
 impl TextInput {
@@ -66,6 +67,7 @@ impl TextInput {
             validator: None,
             touched: false,
             correction: None,
+            debug_name: None,
             blur_observer: None,
         }
     }
@@ -602,7 +604,10 @@ impl Render for TextInput {
         }
         let input = input_base()
             .id("text-input")
-            .debug_selector(|| "text-input".into())
+            .debug_selector({
+                let name = self.debug_name.unwrap_or("text-input");
+                move || name.into()
+            })
             .key_context("TextInput")
             .when(self.enabled, |el| el.track_focus(&self.focus))
             .when(!self.enabled, |el| el.opacity(0.5))

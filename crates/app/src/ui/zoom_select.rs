@@ -282,7 +282,7 @@ impl Render for ZoomSelect {
         div()
             .key_context("ZoomSelect")
             .relative()
-            .w(px(if self.compact { 60. } else { 232. }))
+            .w(px(if self.compact { 112. } else { 232. }))
             .max_w_full()
             .h(px(CONTROL_HEIGHT))
             .flex_shrink_0()
@@ -370,7 +370,11 @@ impl Render for ZoomSelect {
                                 div()
                                     .debug_selector(|| "zoom-scale".into())
                                     .whitespace_nowrap()
-                                    .child(format!("{:.0}%", self.zoom * 100.)),
+                                    .child(format!(
+                                        "{} · {:.0}%",
+                                        if self.fit { "Fit" } else { "Manual" },
+                                        self.zoom * 100.
+                                    )),
                             )
                     } else {
                         div()
@@ -586,7 +590,7 @@ mod tests {
         select.update(cx, |this, cx| this.sync(true, 4., true, true, cx));
         cx.run_until_parked();
         let button = cx.debug_bounds("zoom-select-button").unwrap();
-        assert_eq!(button.size, size(px(60.), px(CONTROL_HEIGHT)));
+        assert_eq!(button.size, size(px(112.), px(CONTROL_HEIGHT)));
         for selector in ["zoom-caption", "zoom-scale"] {
             let line = cx.debug_bounds(selector).unwrap();
             assert_eq!(line.size.height, px(16.));

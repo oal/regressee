@@ -34,7 +34,7 @@ fn fixture(root: &Path, path: &Path) -> (regressee_storage::Store, ProjectId, Ru
             "/products/field-jacket/",
             "/journal/materials-and-care/",
             "/stores/bergen/",
-            "/account/orders/",
+            "/account/orders/customer-service/very-long-retained-page-address-with-release-notes-and-delivery-preferences/?campaign=synthetic-phase4-containment&locale=nb-NO&return=%2Faccount%2Forders%2F",
         ]
         .into_iter()
         .map(|path| InventoryPage {
@@ -422,6 +422,14 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
         "review-approval-selection",
         "review-approval-confirm",
         "review-zoom-menu",
+        "review-full-width-before",
+        "review-full-width-after",
+        "review-mode-chooser",
+        "review-navigation-open",
+        "review-approval-many",
+        "review-approval-last-exact",
+        "review-approval-last-row",
+        "review-approval-exact-tail",
         "capture-gaps",
         "capture-failed",
         "capture-ready",
@@ -430,6 +438,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
         "capture-empty",
         "capture-loading",
         "capture-read-failed",
+        "capture-read-dismissed",
         "history-runs",
         "history-bottom",
         "history-baselines",
@@ -457,6 +466,51 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
     let mut manifest = Vec::new();
     for (width, height) in [(1280., 800.), (820., 600.)] {
         for label in scenes {
+            let repair = std::env::var_os("REGRESSEE_RENDERER_PHASE4_REPAIR").is_some();
+            if repair
+                && !matches!(
+                    label,
+                    "review-note"
+                        | "review-queue-hidden"
+                        | "review-difference"
+                        | "review-overlay"
+                        | "review-heatmap"
+                        | "review-full-width-before"
+                        | "review-full-width-after"
+                        | "capture-mobile"
+                        | "capture-loading"
+                        | "capture-read-failed"
+                        | "capture-read-dismissed"
+                )
+            {
+                continue;
+            }
+            if std::env::var_os("REGRESSEE_RENDERER_PHASE4").is_some()
+                && !matches!(
+                    label,
+                    "review"
+                        | "review-queue-hidden"
+                        | "review-difference"
+                        | "review-overlay"
+                        | "review-heatmap"
+                        | "review-note"
+                        | "review-details"
+                        | "review-no-matches"
+                        | "review-approval-confirm"
+                        | "review-full-width-before"
+                        | "review-full-width-after"
+                        | "review-mode-chooser"
+                        | "review-navigation-open"
+                        | "review-approval-many"
+                        | "review-approval-last-exact"
+                        | "review-approval-last-row"
+                        | "review-approval-exact-tail"
+                        | "capture-mobile"
+                        | "capture-empty"
+                )
+            {
+                continue;
+            }
             let name = format!("all-{width:.0}x{height:.0}-{label}");
             if std::env::var_os("REGRESSEE_RENDERER_COMPLETE_BATCH").as_deref()
                 == Some(std::ffi::OsStr::new("1"))
@@ -546,11 +600,19 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     "review-mobile" => { let key = s.evidence.latest.as_ref().unwrap().run.targets[1].key.clone(); s.selected_key = Some(key); s.reload_viewer(cx); finish_jobs(s, cx); },
                     "review-mixed-148" | "review-failed-target" => { mixed_queue(s); if label == "review-failed-target" { s.selected_key = Some(s.evidence.latest.as_ref().unwrap().run.targets.iter().find(|t| matches!(t.outcome, TargetOutcome::Failed { .. })).unwrap().key.clone()); s.clear_viewer(); s.focus.viewer = false; } },
                     "review-queue-hidden" => { s.activate_control(Control::Guided(50), window, cx); },
+                    "review-navigation-open" => { if s.navigation_collapsed { s.activate_control(Control::Guided(53), window, cx); } },
+                    "review-mode-chooser" => { s.activate_control(Control::Guided(54), window, cx); assert!(s.viewer_mode_open); },
+                    "review-full-width-before" | "review-full-width-after" => {
+                        s.activate_control(Control::Guided(50), window, cx);
+                        s.activate_control(Control::Guided(54), window, cx);
+                        s.activate_control(Control::Guided(55), window, cx);
+                        if label.ends_with("after") { s.activate_control(Control::Guided(56), window, cx); }
+                        assert_eq!(s.viewer_mode, 4);
+                        assert_eq!(s.full_width_after, label.ends_with("after"));
+                    },
                     "review-difference" | "review-overlay" | "review-heatmap" => {
                         let mode = match label { "review-difference" => 7, "review-overlay" => 8, _ => 9 };
-                        if width < 1100. && mode >= 8 {
-                            s.activate_control(Control::Guided(44), window, cx);
-                        }
+                        s.activate_control(Control::Guided(54), window, cx);
                         assert!(s.control_mounted(Control::Phase5(mode)));
                         s.activate_control(Control::Phase5(mode), window, cx);
                         finish_jobs(s, cx);
@@ -576,6 +638,18 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     "review-note" => { s.activate_control(Control::Phase5(37), window, cx); s.analysis_fields[9].update(cx, |f, cx| f.set_value("Autumn headline and CTA are intentional. Product grid needs release-owner confirmation.", cx)); },
                     "review-filters" | "review-no-matches" => { s.result_filters_open = true; if label.ends_with("no-matches") { s.crawl_fields[9].update(cx, |f, cx| f.set_value("nothing-matches", cx)); } },
                     "review-approval-selection" | "review-approval-confirm" => { s.activate_control(Control::Phase5(23), window, cx); if label.ends_with("confirm") { s.activate_control(Control::Phase5(24), window, cx); finish_jobs(s, cx); assert!(s.approval.is_some()); } },
+                    "review-approval-many" | "review-approval-last-exact" | "review-approval-last-row" | "review-approval-exact-tail" => {
+                        if label.ends_with("many") { s.approval_selection = s.evidence.latest.as_ref().unwrap().run.targets.iter().map(|t| t.key.clone()).filter(|k| s.approval_eligible(k)).collect(); }
+                        else { s.activate_control(Control::Phase5(23), window, cx); }
+                        s.activate_control(Control::Phase5(24), window, cx); finish_jobs(s, cx);
+                        assert!(s.approval.is_some());
+                        if label.ends_with("exact") || label.ends_with("tail") {
+                            for _ in 0..11 { s.activate_control(Control::Guided(49), window, cx); }
+                            s.activate_control(Control::Guided(52), window, cx);
+                            assert_eq!(s.approval_reference_index, 11);
+                            assert!(s.approval_exact_open);
+                        }
+                    },
                     "capture-gaps" | "capture-failed" | "capture-ready" | "capture-saved" => { capture_only(s, &store, label.strip_prefix("capture-").unwrap()); },
                     "capture-mobile" => {
                         capture_only(s, &store, "ready");
@@ -585,11 +659,11 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                         let tiles = image.tiles.iter().take(3).map(|id| regressee_app::images::viewer_tile(&store, id).unwrap()).collect();
                         let frame = s.viewer.as_mut().unwrap(); frame.width = image.width; frame.height = image.height; frame.panes[1] = tiles;
                     },
-                    "capture-empty" | "capture-loading" | "capture-read-failed" => {
+                    "capture-empty" | "capture-loading" | "capture-read-failed" | "capture-read-dismissed" => {
                         s.evidence = ProjectEvidence::default(); s.clear_viewer(); s.focus.viewer = false; s.focus.candidate = false; s.focus.baseline = false;
                         s.evidence_dirty = label != "capture-empty";
                         if label == "capture-loading" { s.pending = Some(u64::MAX); s.focus.busy = true; }
-                        else if label == "capture-read-failed" { s.evidence_read_failed = true; s.error = Some("The saved screenshots could not be read. Check the project data folder, then refresh.".into()); }
+                        else if label.starts_with("capture-read-") { s.evidence_read_failed = true; s.error = Some("The saved screenshots could not be read. Check the project data folder, then refresh.".into()); if label.ends_with("dismissed") { s.activate_control(Control::DismissFeedback, window, cx); } }
                     },
                     "history-baselines" | "export-preview" => { s.history_section = 1; if label == "export-preview" { s.export_preview = Some(export.clone()); } },
                     "history-storage" => { s.history_section = 2; },
@@ -604,6 +678,29 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     "keyboard-help" => { s.show_keyboard_help(window, cx); },
                     "about" => { s.activate_control(Control::About, window, cx); },
                     _ => (),
+                }
+                if repair {
+                    // Presentation-only source records; fixture/store remains unchanged.
+                    if let Some(run) = s.evidence.latest.as_mut() {
+                        for target in &mut run.run.targets {
+                            target.requested = "https://northline.example/account/orders/release-notes/?sort=recent&locale=nb-NO#delivery".parse().unwrap();
+                        }
+                        run.run.environment.name = "Historical check".into();
+                    }
+                    if let Some(frame) = s.viewer.as_mut() { frame.before_environment = Some("Historical reference".into()); }
+                    s.navigation_preference = Some(true);
+                    s.configure_review_geometry(width);
+                    if label != "review-note" { s.review_queue_collapsed = true; }
+                    if matches!(label, "capture-loading" | "capture-read-failed" | "capture-read-dismissed") {
+                        assert!(s.control_enabled(Control::Guided(53), cx));
+                        let requests = s.next_request;
+                        s.activate_control(Control::Guided(53), window, cx);
+                        assert!(!s.navigation_collapsed);
+                        assert!(s.control_mounted(Control::Navigate(Screen::History)));
+                        s.activate_control(Control::Guided(53), window, cx);
+                        assert!(s.navigation_collapsed);
+                        assert_eq!(requests, s.next_request);
+                    }
                 }
                 s.configure_review_geometry(width);
                 cx.notify();
@@ -686,18 +783,39 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                 "review-analysis-advanced" => Some("field-Color tolerance (ΔE00)"),
                 _ => None,
             };
+            if label == "review-approval-last-row" {
+                shell.update(cx, |s, cx| {
+                    s.approval_provenance_scroll.set_offset(gpui::point(
+                        px(0.),
+                        -s.approval_provenance_scroll.max_offset().height,
+                    ));
+                    cx.notify();
+                });
+            }
+            if label == "review-approval-exact-tail" {
+                let exact = cx.debug_bounds("approval-exact-provenance").unwrap();
+                shell.update(cx, |s, cx| {
+                    let delta =
+                        s.approval_provenance_scroll.bounds().bottom() - px(8.) - exact.bottom();
+                    s.approval_provenance_scroll
+                        .set_offset(gpui::point(px(0.), delta.min(px(0.))));
+                    cx.notify();
+                });
+            }
             if let Some(anchor) = disclosure_anchor {
                 let bounds = cx.debug_bounds(anchor).expect("disclosed content mounted");
                 shell.update(cx, |s, cx| {
                     let old = s.review_details_scroll.offset();
                     let delta = s.review_details_scroll.bounds().top() + px(8.) - bounds.top();
-                    s.review_details_scroll.set_offset(gpui::point(old.x, (old.y + delta).min(px(0.))));
+                    s.review_details_scroll
+                        .set_offset(gpui::point(old.x, (old.y + delta).min(px(0.))));
                     cx.notify();
                 });
             }
             capture(cx, &root, &name).unwrap();
             let mut assertions = Vec::new();
-            let viewport = gpui::Bounds::new(gpui::point(px(0.), px(0.)), size(px(width), px(height)));
+            let viewport =
+                gpui::Bounds::new(gpui::point(px(0.), px(0.)), size(px(width), px(height)));
             let selectors: &[&str] = match label {
                 "new-website" => &["field-Project name", "field-Starting addresses"],
                 "review-diagnostics" => &["capture-provenance-details"],
@@ -705,22 +823,79 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                 "review-zoom-menu" => &["zoom-popup", "zoom-option-0", "zoom-option-1"],
                 "review-overlay" => &["phase5-before"],
                 "review-heatmap" => &["phase5-difference"],
+                "review-approval-last-row" => &[
+                    "approval-reference-11",
+                    "approval-reference-time-11",
+                    "action-Phase5(25)",
+                ],
+                "review-approval-exact-tail" => &["action-Phase5(25)"],
+                "review-note" => &[
+                    "review-note-input-border",
+                    "action-Phase5(32)",
+                    "action-Phase5(39)",
+                ],
+                "review-full-width-before" => &["phase5-before"],
+                "review-full-width-after" => &["phase5-after"],
                 _ => &[],
             };
             for selector in selectors {
-                let bounds = cx.debug_bounds(selector).unwrap_or_else(|| panic!("{name}: {selector} not mounted"));
+                let bounds = cx
+                    .debug_bounds(selector)
+                    .unwrap_or_else(|| panic!("{name}: {selector} not mounted"));
                 let clip = if disclosure_anchor.is_some() {
                     shell.read_with(cx, |s, _| s.review_details_scroll.bounds())
-                } else { viewport };
+                } else {
+                    viewport
+                };
                 assert!(bounds.size.width > px(0.) && bounds.size.height > px(0.));
-                assert!(bounds.left() >= clip.left() && bounds.right() <= clip.right(), "{name}: {selector} horizontal visibility");
-                assert!(bounds.top() >= clip.top() && bounds.top() < clip.bottom(), "{name}: {selector} starts visibly inside its owner");
+                assert!(
+                    bounds.left() >= clip.left() && bounds.right() <= clip.right(),
+                    "{name}: {selector} horizontal visibility"
+                );
+                assert!(
+                    bounds.top() >= clip.top() && bounds.top() < clip.bottom(),
+                    "{name}: {selector} starts visibly inside its owner"
+                );
                 if *selector != "capture-provenance-details" {
-                    assert!(bounds.bottom() <= clip.bottom(), "{name}: {selector} fully visible");
+                    assert!(
+                        bounds.bottom() <= clip.bottom(),
+                        "{name}: {selector} fully visible"
+                    );
                 }
                 assertions.push(serde_json::json!({"selector":selector,"x":f32::from(bounds.left()),"y":f32::from(bounds.top()),"width":f32::from(bounds.size.width),"height":f32::from(bounds.size.height),"clip_x":f32::from(clip.left()),"clip_y":f32::from(clip.top()),"clip_width":f32::from(clip.size.width),"clip_height":f32::from(clip.size.height),"fully_visible":bounds.bottom() <= clip.bottom()}));
             }
-            let geometry: Vec<_> = ["review-queue", "viewer-toolbar", "phase5-before", "phase5-after", "ordinary-review-decisions", "approval-next-action", "page-list", "history-run-list", "history-baseline-list", "selected-project-context"].into_iter().filter_map(|selector| cx.debug_bounds(selector).map(|b| serde_json::json!({"selector":selector,"x":f32::from(b.left()),"y":f32::from(b.top()),"width":f32::from(b.size.width),"height":f32::from(b.size.height)}))).collect();
+            if repair {
+                let identity_bounds: Vec<_> = [
+                    "inspected-target-path",
+                    "inspected-target-profile-environments",
+                ]
+                .into_iter()
+                .filter_map(|name| cx.debug_bounds(name).map(|b| (name, b)))
+                .collect();
+                shell.read_with(cx, |s, cx| {
+                    if label == "review-note" {
+                        let inner = s.analysis_fields[9].read(cx).rendered_bounds().unwrap();
+                        let clip = s.review_details_scroll.bounds();
+                        assert!(inner.size.width >= px(270.));
+                        assert!(inner.left() >= clip.left() && inner.right() <= clip.right() && inner.top() >= clip.top() && inner.bottom() <= clip.bottom());
+                        assertions.push(serde_json::json!({"selector":"review-note-inner-rendered-bounds","width":f32::from(inner.size.width),"height":f32::from(inner.size.height),"viewport_width":f32::from(clip.size.width),"viewport_height":f32::from(clip.size.height),"draft":s.analysis_fields[9].read(cx).content,"fully_visible":true}));
+                    } else if s.evidence.latest.is_some() {
+                        let (path, context) = s.inspection_identity();
+                        assert_eq!(path, "/account/orders/release-notes/?sort=recent&locale=nb-NO#delivery");
+                        assert!(context.contains("Historical check"));
+                        if s.evidence.comparison.is_some() { assert!(context.contains("Historical reference")); }
+                        assert_eq!(identity_bounds.len(), 2);
+                        for (selector, b) in &identity_bounds {
+                            assert!(b.left() >= viewport.left() && b.right() <= viewport.right() && b.top() >= viewport.top() && b.bottom() <= viewport.bottom());
+                            assertions.push(serde_json::json!({"selector":selector,"text":if selector.ends_with("path") { &path } else { &context },"width":f32::from(b.size.width),"height":f32::from(b.size.height),"fully_visible":true}));
+                        }
+                    } else {
+                        assert!(s.control_enabled(Control::Guided(53), cx));
+                        assertions.push(serde_json::json!({"selector":"action-Guided(53)","mounted":s.control_mounted(Control::Guided(53)),"enabled":true,"loading":s.initial_evidence_loading(),"unavailable":s.initial_evidence_unavailable(),"error_dismissed":s.error.is_none(),"read_failed":s.evidence_read_failed}));
+                    }
+                });
+            }
+            let geometry: Vec<_> = ["review-queue", "viewer-toolbar", "phase5-before", "phase5-after", "ordinary-review-decisions", "approval-next-action", "page-list", "history-run-list", "history-baseline-list", "selected-project-context", "approval-reference-list", "approval-exact-provenance", "approval-reference-11", "approval-reference-time-11", "viewer-inspector"].into_iter().filter_map(|selector| cx.debug_bounds(selector).map(|b| serde_json::json!({"selector":selector,"x":f32::from(b.left()),"y":f32::from(b.top()),"width":f32::from(b.size.width),"height":f32::from(b.size.height)}))).collect();
             manifest.push(serde_json::json!({"capture":name,"state":label,"width":width,"height":height,"synthetic":true,"website_visited":false,"os_input_verified":false,"geometry":geometry,"visibility_assertions":assertions,"harness_sha256":hex::encode(Sha256::digest(include_bytes!("ui_review_matrix.rs")))}));
             owned.join_after_ui();
         }

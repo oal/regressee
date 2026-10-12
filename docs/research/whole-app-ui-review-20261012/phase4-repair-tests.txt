@@ -1,0 +1,453 @@
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> vendor/gpui/src/taffy.rs:312:68
+    |
+312 |             unit.map(|count| vec![repeat(count, vec![minmax(length(0.0), fr(1.0))])])
+    |                                                                    ^^^ help: explicitly specify the type as `f32`: `0.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+    = note: `#[warn(float_literal_f32_fallback)]` (part of `#[warn(future_incompatible)]`) on by default
+
+warning: falling back to `f32` as the trait bound `f32: From<f64>` is not satisfied
+   --> vendor/gpui/src/taffy.rs:312:77
+    |
+312 |             unit.map(|count| vec![repeat(count, vec![minmax(length(0.0), fr(1.0))])])
+    |                                                                             ^^^ help: explicitly specify the type as `f32`: `1.0_f32`
+    |
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #154024 <https://github.com/rust-lang/rust/issues/154024>
+
+warning: `gpui` (lib) generated 2 warnings (run `cargo fix --lib -p gpui` to apply 2 suggestions)
+   Compiling regressee-app v0.1.0 (/var/home/olav/Projects/Regressee/crates/app)
+    Finished `test` profile [unoptimized] target(s) in 1.83s
+warning: the following packages contain code that will be rejected by a future version of Rust: proc-macro-error2 v2.0.1
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 1`
+     Running unittests src/lib.rs (target/debug/deps/regressee_app-5467dd2571e9fa46)
+
+running 97 tests
+test images::tests::retained_product_originals_pass_current_row_gate ... ignored, read-only interop confirmation against retained actual product browser PNGs
+test crawling::tests::loading_and_retry_messages_preserve_actual_visit_counts ... ok
+test formatting::tests::human_size_units_are_bounded_and_unambiguous ... ok
+test crawling::tests::presets_and_space_are_bounded ... ok
+test auth::tests::binding_normalizes_default_ports_case_order_duplicates_but_not_scheme ... ok
+test jobs::tests::first_use_policy_never_installs_for_comparison_or_resume ... ok
+test jobs::tests::explicit_setup_reports_committed_state_despite_late_cancel ... ok
+test jobs::task_reply_tests::acknowledged_cancellation_is_distinct_from_failures_and_committed_success ... ok
+test jobs::tests::setup_progress_reports_real_bytes_and_only_actual_phases ... ok
+test jobs::tests::viewer_invalidation_covers_refresh_display_and_mutations_not_browsing ... ok
+test jobs::tests::viewer_mailbox_coalesces_and_prioritizes_commands_then_latest_then_prefetch ... ok
+test jobs::tests::discovery_startup_status_survives_backpressure_but_stops_on_cancel ... ok
+test jobs::tests::viewer_publication_drops_superseded_backpressure_and_stops ... ok
+test product::automatic_runtime_tests::platform_eligibility_does_not_enable_macos_or_extra_architectures ... ok
+test task::tests::cancellation_and_pause_follow_backend_capabilities_not_capture_wording ... ok
+test product::automatic_runtime_tests::invalid_trust_is_unavailable_without_exposing_its_url ... ok
+test ui::controls::tests::activity_clock_advances_between_worker_updates_and_wraps_seamlessly ... ok
+test ui::controls::tests::actions_and_editable_fields_do_not_share_a_white_surface ... ok
+test product::automatic_runtime_tests::missing_trust_is_build_incompleteness_and_status_never_installs ... ok
+test ui::controls::tests::drawn_check_geometry_is_bounded_and_translates_with_the_canvas ... ok
+test task::tests::bounded_gap_details_prioritize_failures_over_a_large_pending_queue ... ok
+test ui::controls::tests::navigation_focus_is_visible_on_both_rail_and_selected_surface ... ok
+test task::tests::processed_targets_do_not_mean_successful_screenshots_or_distinct_failed_pages ... ok
+test ui::controls::tests::informational_feedback_is_distinct_from_selected_navigation ... ok
+test ui::controls::tests::progress_only_has_a_completion_fraction_for_known_nonzero_totals ... ok
+test ui::controls::tests::all_action_state_combinations_preserve_merged_text_and_layout ... ok
+test ui::controls::tests::pinned_gpui_old_color_only_focus_replaces_the_entire_text_refinement ... ok
+test ui::controls::tests::selection_and_description_metrics_do_not_depend_on_selection_or_focus ... ok
+test ui::gpu_diagnostics::tests::initialization_rejections_are_visible_without_verbose_logging ... ok
+test ui::gpu_diagnostics::tests::unrelated_log_targets_are_not_enabled ... ok
+test ui::controls::tests::moving_activity_segments_stay_inside_narrow_and_wide_tracks ... ok
+test ui::text_input::style_tests::input_focus_keeps_white_editable_surface_and_shared_metrics ... ok
+test ui::status_icon::tests::every_status_mark_has_native_geometry ... ok
+test product::automatic_runtime_tests::supported::dangling_pointer_and_linked_cache_are_not_first_use ... ok
+test ui::controls::ui_tests::mounted_navigation_geometry_survives_focus_and_light_selection ... ok
+test ui::text_input::tests::composition_runs_limits_and_utf16_conversion_are_preserved ... ok
+test ui::text_input::tests::clipboard_keeps_exact_selected_bytes_and_existing_paste_rules ... ok
+test ui::text_input::tests::ime_ranges_are_utf16_and_rejected_composition_keeps_selection ... ok
+test ui::text_input::tests::active_selection_edge_scrolls_without_changing_field_geometry ... ok
+test ui::text_input::tests::touched_corrections_suppress_ime_and_reset_on_deliberate_value_load ... ok
+test ui::theme::tests::wayfinding_and_semantic_text_meet_body_contrast ... ok
+test ui::controls::ui_tests::wrapped_selection_copy_keeps_balanced_insets_and_actions_fit_labels ... ok
+test ui::timezone_select::tests::bundled_canonical_list_is_complete_unique_and_cross_region ... ok
+test ui::timezone_select::tests::dropdown_geometry_is_bounded_and_prefers_the_available_side ... ok
+test ui::text_input::tests::shift_selection_retains_anchor_across_direction_changes ... ok
+test ui::timezone_select::tests::closed_trigger_keeps_chevron_at_right_edge ... ok
+test product::automatic_runtime_tests::explicit_override_is_legacy_only_and_invalid_configuration_never_falls_back ... ok
+test ui::controls::ui_tests::known_and_unknown_progress_keep_a_visible_bounded_track ... ok
+test ui::text_input::tests::mouse_selection_shift_click_word_and_outside_release ... ok
+test ui::web_link::tests::only_complete_credential_free_web_addresses_are_openable ... ok
+test ui::zoom_select::tests::compact_zoom_keeps_both_lines_inside_one_control ... ok
+test ui::controls::ui_tests::actual_control_bounds_survive_focus_selection_and_disabled_states ... ok
+test ui::zoom_select::tests::label_and_selection_distinguish_automatic_fit_from_the_same_scale ... ok
+test ui::zoom_select::tests::menu_geometry_stays_inside_small_windows_and_flips_above ... ok
+test ui::text_input::tests::native_input_actions_and_unicode_selection ... ok
+test ui::controls::ui_tests::page_rows_fill_the_list_and_long_copy_never_changes_their_height ... ok
+test viewer_cache::tests::byte_lru_evicts_least_recent_and_bounds_entries ... ok
+test ui::timezone_select::tests::tab_blur_and_click_outside_close_without_trapping_focus ... ok
+test ui::zoom_select::tests::outside_click_and_disabling_close_without_selecting ... ok
+test ui::timezone_select::tests::unknown_values_are_preserved_and_disabled_controls_cannot_select ... ok
+test ui::zoom_select::tests::pointer_menu_escapes_clip_and_tab_dismisses_without_focus_trap ... ok
+test ui::timezone_select::tests::keyboard_selects_options_without_activating_the_shell ... ok
+test ui::zoom_select::tests::keyboard_selects_fit_actual_size_and_presets_without_shell_activation ... ok
+test ui::timezone_select::tests::pointer_selection_notifies_and_popup_escapes_the_form_clip ... ok
+test viewer_cache::tests::viewer_cold_warm_microprofile ... ignored, serial synthetic viewer microprofile; no native latency acceptance
+test ui::timezone_select::tests::search_is_a_filter_not_a_new_timezone_value ... ok
+test product::automatic_runtime_tests::supported::present_invalid_pointer_and_expired_manifest_never_install ... ok
+test product::automatic_runtime_tests::supported::first_use_installs_once_existing_generation_is_verified_not_redownloaded ... ok
+test product::automatic_runtime_tests::supported::cancel_before_during_and_after_setup_prevents_continuation ... ok
+test product::automatic_runtime_tests::committed_setup_result_does_not_recheck_a_late_cancellation ... ok
+test product::automatic_runtime_tests::default_catalog_first_use_callback_stays_in_request_cancellation_slot ... ok
+test product::automatic_runtime_tests::default_catalog_readiness_is_available_without_downloads_or_cache_io ... ok
+test diagnostics::tests::app_pinned_diagnostics_are_read_only_and_never_copy_catalog_sources ... ok
+test auth::tests::ephemeral_binding_and_current_policy_cannot_fall_back_anonymously ... ok
+test auth::tests::ephemeral_reference_cannot_be_transplanted_between_same_origin_environments ... ok
+test jobs::tests::readiness_and_missing_trust_first_use_use_the_same_owner_request ... ok
+test crawling::tests::discovery_reports_preparation_before_runtime_failure_without_visits ... ok
+test jobs::tests::history_and_storage_census_are_independent_replies ... ok
+test jobs::tests::terminal_updates_survive_backpressure_and_shutdown_is_bounded ... ok
+test product::automatic_runtime_tests::default_catalog_blocks_damaged_pointer_and_cancellation_without_replacement ... ok
+test auth::tests::locked_or_corrupt_forget_preserves_references_and_all_ciphertext ... ok
+test diagnostics::tests::structural_privacy_versions_cancel_and_no_overwrite ... ok
+test auth::tests::encrypted_binding_restart_legacy_wrongbinding_tamper_and_policy_are_closed ... ok
+test images::tests::viewer_tile_exact_bytes_kind_png_and_dimensions_remain_authoritative ... ok
+test jobs::tests::same_actions_as_ui_save_and_reopen_without_fixture_runtime ... ok
+test auth::tests::replacing_sessions_prunes_secrets_and_ephemeral_restart_never_falls_back ... ok
+test auth::tests::forget_authenticates_actual_owner_not_copied_or_forged_reference_claims ... ok
+test jobs::tests::viewer_jobs_normal_submit_is_latest_wins_prefetch_is_silent_and_shutdown_rejects ... ok
+test viewer_cache::tests::filtered_next_target_prefetch_warms_plan_without_changing_foreground ... ok
+test viewer_cache::tests::uncached_reads_fail_closed_but_cached_pixels_are_immutable ... ok
+test viewer_cache::tests::warm_viewer_reuses_metadata_and_decoded_tiles_with_exact_identity ... ok
+test viewer_cache::tests::historical_reopening_is_read_only_and_uses_original_context ... ok
+test viewer_cache::tests::revision_changes_invalidate_metadata_for_local_and_other_windows ... ok
+test viewer_cache::tests::successful_adjacent_prefetch_publishes_no_update ... ok
+test viewer_cache::tests::historical_viewer_uses_saved_mask_and_policy_not_newer_drafts ... ok
+test viewer_cache::tests::historical_inspection_rejects_missing_and_corrupt_after_or_capture_originals ... ok
+test images::tests::tall_diff_missing_band_and_corrupt_stream ... ok
+
+test result: ok. 95 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 0.66s
+
+     Running unittests src/main.rs (target/debug/deps/regressee-1da6c5ac38997a55)
+
+running 125 tests
+test exit_guard::tests::cancel_and_discard_never_start_saves ... ok
+test local_ux::tests::local_numeric_ranges_reject_incomplete_and_out_of_range_values ... ok
+test form_recovery::tests::corrections_cycle_without_a_submission_or_hidden_target ... ok
+test exit_guard::tests::save_requires_confirmation_and_failure_preserves_open_state ... ok
+test exit_guard::tests::exit_rejects_all_masked_union_without_changing_geometry ... ok
+test exit_guard::tests::clean_exit_and_pending_work ... ok
+test exit_guard::tests::exit_never_rebinds_a_stale_mask_implicitly ... ok
+test local_ux::tests::hidden_selection_enters_visible_queue_without_skipping_first_match ... ok
+test phase4_review_tests::result_paths_keep_query_fragment_and_non_web_identity ... ok
+test review_ux::tests::saving_checks_exact_union_coverage_including_overlapping_areas ... ok
+test review_ux::tests::disposition_is_bound_to_exact_target_and_analysis_not_historical_review ... ok
+test review_ux::tests::geometry_rejects_invalid_integer_zero_and_overflow_without_rounding ... ok
+test review_ux::tests::next_refuses_unsaved_drafts_and_never_mutates_them ... ok
+test review_ux::tests::seed_is_bounded_and_not_all_image ... ok
+test exit_guard::controller_tests::unapplied_geometry_and_newer_retained_notes_stay_open ... ok
+test exit_guard::controller_tests::pristine_and_invalid_project_drafts ... ok
+test exit_guard::controller_tests::mask_waits_for_exact_success_and_retains_failed_draft ... ok
+test exit_guard::controller_tests::two_target_notes_save_exact_bindings_and_preserve_disposition ... ok
+test exit_guard::controller_tests::unconfirmed_save_and_newer_edits_cannot_exit ... ok
+test task_ux::tests::incoming_import_has_its_own_identity_and_removed_triggers_get_focus_fallback ... ok
+test task_ux::tests::committed_actions_have_no_fake_cancel_and_escape_does_not_hide_them ... ok
+test task_ux::tests::task_focus_and_stop_do_not_depend_on_the_underlying_destination ... ok
+test tests::browser_setup_actions_use_backend_capability_not_environment_presence ... ok
+test tests::local_discovery_search_3000_pages_keeps_selection_and_excludes_exact_matches ... ok
+test task_ux::tests::late_cancel_does_not_relabel_a_committed_export_or_hide_a_real_failure ... ok
+test tests::filtered_preview_actions_use_visible_ids_and_freeze_exact_selection ... ok
+test tests::phase7_tiny_mask_outline_never_expands_capture_geometry ... ok
+test tests::prepare_native_ui_sweep_fixture ... ignored, explicit private native visual fixture preparation; no browser capture evidence
+test tests::guided_controls_persist_lists_profiles_scope_and_speed ... ok
+test tests::feedback_dismiss_is_attached_and_long_errors_leave_a_working_viewport ... ok
+test tests::local_network_read_is_automatic_once_and_keeps_newer_draft ... ok
+test tests::local_validation_save_focuses_first_invalid_without_global_keystroke_errors ... ok
+test tests::retained_navigation_text_is_exact_and_resettable ... ok
+test tests::guided_first_save_advances_locally_and_hides_irrelevant_controls ... ok
+test tests::projects_import_label_is_contained_at_real_window_sizes ... ok
+test tests::product_actions_use_real_actor_and_unconfigured_runtime_is_not_unchanged ... ok
+test tests::environment_login_mapping_and_network_actions_use_authoritative_actor_state ... ok
+test tests::project_selection_actions_and_long_names_fit_supported_window_sizes ... ok
+test tests::shell_focus_actions_busy_guard_and_dialog_restore ... ok
+test task_ux::tests::details_use_frozen_capture_data_not_repeated_phase_text_or_later_evidence ... ok
+test tests::local_history_filters_guard_item_actions_and_focus_ranges_do_not_collide ... ok
+test tests::local_viewer_replies_reject_wrong_identity_and_tile_before_replacing_pixels ... ok
+test ui_inspection::tests::protocol_has_one_initial_gate_and_a_finite_size_transition ... ok
+test ui_inspection::tests::review_and_binary_digests_are_strict_lowercase_sha256 ... ok
+test ui_renderer_capture::offscreen_extent_limits_without_gpu ... ok
+test ui_renderer_capture::renderer_capture_app_batch ... ignored, bounded synthetic UI renderer batch, only after personal proof-image review
+test ui_renderer_capture::renderer_capture_baseline_states ... ignored, bounded capture-only baseline-state renderer batch; synthetic local evidence, no website visits or activation
+test ui_renderer_capture::renderer_capture_local_first_ux ... ignored, one bounded local-first UX renderer batch; isolated synthetic evidence and read-only actor commands
+test ui_renderer_capture::renderer_capture_options_ux ... ignored, bounded options/filter/mapping capture; synthetic isolated local data only
+test ui_renderer_capture::renderer_capture_project_selection ... ignored, bounded project-selection renderer batch, after personal proof-image review
+test ui_renderer_capture::renderer_capture_proof ... ignored, one explicitly requested offscreen GPU/font/atlas calibration
+test ui_renderer_capture::renderer_capture_results_rows ... ignored, bounded results-list renderer batch using in-memory synthetic targets only
+test ui_renderer_capture::renderer_capture_status_progress ... ignored, bounded status/progress renderer batch, only after personal proof-image review
+test ui_renderer_capture::renderer_capture_task_links ... ignored, bounded task-link renderer batch; synthetic URLs, no OS browser opening
+test ui_renderer_capture::renderer_capture_tasks ... ignored, bounded exclusive-task renderer matrix; synthetic state, no website visits
+test ui_renderer_capture::renderer_capture_viewer_ux ... ignored, bounded direct-viewer UX capture; synthetic isolated evidence only
+test ui_renderer_capture::renderer_capture_workflow_revamp ... ignored, one final bounded 34-image workflow confirmation batch after proof-image review
+test ui_renderer_capture::renderer_capture_zoom_loading ... ignored, bounded zoom/loading renderer batch; isolated synthetic evidence only
+test ui_renderer_capture::ui_review_matrix::renderer_capture_whole_app ... ignored, explicit whole-app screenshot critique; isolated synthetic data only
+test tests::local_compatible_evidence_and_history_refresh_preserve_ids_pan_zoom_and_dirty_masks ... ok
+test tests::local_disabled_windows_preserve_drafts_skip_validation_and_allow_reanalysis ... ok
+test workflow::tests::coverage_never_calls_missing_or_unclassified_captures_clean ... ok
+test options_ux_tests::mapped_url_status_refresh_preserves_dirty_and_newer_environment_drafts ... ok
+test tests::phase7_diagnostic_opt_in_cancel_stale_consent_and_actual_export ... ok
+test phase4_review_tests::capture_overview_is_capped_manual_enlargement_and_empty_owner_remain_available ... ok
+test tests::local_history_refresh_reloads_current_page_baselines_and_preserves_selection_without_census ... ok
+test workflow::tests::responsive_width_uses_the_current_queue_and_pane_count ... ok
+test phase4_review_tests::local_collapse_modes_source_anchor_drafts_and_search_are_presentation_only ... ok
+test tests::local_search_3000_targets_keeps_inspected_evidence_masks_and_approval_selection ... ok
+test tests::changing_projects_preserves_edits_until_confirmed_and_keeps_the_destination ... ok
+test tests::results_project_selection_loads_evidence_without_editing_settings ... ok
+test task_ux::tests::task_links_support_pointer_keyboard_and_guarded_destinations_without_changing_work ... ok
+test options_ux_tests::result_filter_panel_preserves_evidence_and_drafts_and_reveals_keyboard_choices ... ok
+test tests::setup_help_and_timezone_are_contained_in_the_scrolling_form ... ok
+test tests::returning_current_project_enters_workspace_without_reloading_dirty_evidence ... ok
+test options_ux_tests::discovery_options_keep_the_list_and_close_reachable_with_long_notes ... ok
+test phase4_review_tests::consent_one_long_and_bounded_many_rows_keep_exact_data_and_cancel_without_writes ... ok
+test tests::save_task_protects_completion_and_refreshes_real_list_without_losing_draft ... ok
+test tests::phase6_simulated_native_picker_confirmation_and_actual_jobs_dataflow ... ok
+test tests::ui_sweep_focus_handles_and_field_availability_are_independent ... ok
+test tests::ui_sweep_one_save_preserves_website_environment_and_baseline ... ok
+test workflow::tests::capture_only_distinguishes_incomplete_ready_and_saved_baselines ... ok
+test workflow::tests::compared_reference_context_never_substitutes_the_current_active_baseline ... ok
+test phase4_review_tests::repair_v4_2_navigation_real_shell_pending_failed_dismissed_ready_empty_and_guards ... ok
+test tests::ui_sweep_dirty_masks_block_all_analysis_scheduling_and_stale_replies ... ok
+test workflow_refinement_tests::keyboard_help_copy_fits_default_body_with_protected_title_and_close ... ok
+test workflow::tests::discovery_owns_its_scope_and_review_preserves_provenance ... ok
+test workspace_history::tests::baseline_search_retains_state_composite_date_and_full_identifier ... ok
+test workspace_history::tests::history_dates_are_exact_and_explicitly_utc ... ok
+test workspace_history::tests::history_search_combines_terms_without_requiring_display_order ... ok
+test workspace_history::tests::reference_capture_span_uses_actual_times_not_baseline_save_time ... ok
+test workspace_history::tests::run_kind_controls_match_the_pinned_order ... ok
+test workspace_history::tests::run_search_includes_source_environment_timestamps_outcome_and_import_origin ... ok
+test workspace_history::tests::storage_values_keep_exact_bytes ... ok
+test workflow::tests::reference_environment_loads_with_pair_without_history ... ok
+test tests::phase5_approval_actions_refuse_old_preview_after_analysis_switch ... ok
+test phase4_review_tests::repair_v4_1_inner_note_bounds_caret_and_draft_are_usable_at_both_sizes ... ok
+test workflow::tests::indexed_3000_target_coverage_is_exact_and_rejects_stale_revisions ... ok
+test workflow_refinement_tests::capture_details_are_readable_and_missing_images_have_no_navigation_tools ... ok
+test workflow_refinement_tests::collapsed_queue_removes_hidden_tab_targets_and_refits_without_touching_drafts ... ok
+test phase4_review_tests::repair_v4_3_persistent_non_root_identity_historical_environments_all_modes ... ok
+test workflow_refinement_tests::everyday_review_is_revision_bound_and_discovery_excludes_old_comparison ... ok
+test workflow_refinement_tests::dismissing_a_read_error_keeps_recovery_instead_of_an_idle_loading_state ... ok
+test tests::phase5_real_tile_pointer_mask_coordinates_and_synchronized_actions ... ok
+test workflow_refinement_tests::history_inspection_reply_cannot_overwrite_new_review_or_numeric_drafts ... ok
+test workflow_refinement_tests::historical_baseline_capture_shows_only_its_saved_original ... ok
+test workflow::tests::review_first_viewport_contains_complete_rows_and_bounded_images ... ok
+test workflow_refinement_tests::filtered_empty_message_fits_queue_without_rebinding_evidence_or_drafts ... ok
+test workflow_refinement_tests::keyboard_areas_validate_original_pixels_and_save_only_on_explicit_action ... ok
+test workflow_refinement_tests::history_sections_exclude_off_section_controls_from_tab_order ... ok
+test options_ux_tests::mapping_preview_has_bounded_rows_and_a_pinned_close_without_mutations ... ok
+test tests::setup_cpu_render_profile ... ok
+test workflow_refinement_tests::project_loading_never_claims_missing_screenshots_before_evidence_arrives ... ok
+test workflow_refinement_tests::validation_correction_reveals_the_right_stage_without_submission_and_help_restores_focus ... ok
+test workflow_refinement_tests::unified_zoom_menu_preserves_fit_on_resize_and_manual_zoom_is_fixed ... ok
+test workflow_refinement_tests::stale_history_reply_is_rejected_and_recorded_check_is_readonly_with_saved_policy ... ok
+test workflow_refinement_tests::viewer_scroll_zooms_at_pointer_and_keyboard_navigation_needs_no_tools ... ok
+test workflow_refinement_tests::selected_history_rows_fill_the_painted_list_width ... ok
+test workflow_refinement_tests::viewer_disclosures_preserve_queue_image_geometry_and_drafts ... ok
+test workflow_refinement_tests::keyboard_area_focus_reveals_fields_inside_bounded_tools ... ok
+test phase4_review_tests::repair_v4_2_native_shell_pointer_restores_rail_in_every_read_state ... ok
+test workflow::tests::history_last_rows_reveal_and_select_at_supported_sizes ... ok
+test tests::ui_sweep_enabled_candidates_match_actual_mounted_tab_handles ... ok
+test workflow::tests::review_3000_target_cpu_element_construction_benchmark ... ok
+test tests::phase5_saved_pixels_seams_actual_layout_pan_and_mask_actions ... ok
+
+test result: ok. 110 passed; 0 failed; 15 ignored; 0 measured; 0 filtered out; finished in 5.80s
+
+     Running unittests src/flow.rs (target/debug/deps/regressee_flow-b49e77747f2e046f)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running unittests src/foundation.rs (target/debug/deps/regressee_foundation-9a378f0b158cea75)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/analysis_review.rs (target/debug/deps/analysis_review-93ea706fd4f2b3e7)
+
+running 7 tests
+test approval_refuses_material_rendering_missing_artifact_and_preview_mixing ... ok
+test reanalysis_cache_masks_all_area_cancellation_and_review_history ... ok
+test approval_context_refuses_switch_reanalysis_selection_and_stale_baseline ... ok
+test immutable_composite_provenance_restore_failure_guards_and_recheck ... ok
+test phase6_malicious_zip_schema_images_duplicates_and_control_paths_are_atomic ... ok
+test phase6_real_composite_roundtrip_historical_settings_privacy_and_shared_deletion ... ok
+test product_presets_match_annotated_independent_corpus_without_claiming_accuracy ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.64s
+
+     Running tests/authorized_blog_e2e.rs (target/debug/deps/authorized_blog_e2e-8e6b4787fce85b65)
+
+running 1 test
+test authorized_blog_discovery_baseline_fixed_check_analysis_review ... ignored, explicit authorized example.test HTTPS crawl; fresh private output, official sandboxed runtime only
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/automatic_runtime_setup_independent.rs (target/debug/deps/automatic_runtime_setup_independent-a8014a46b8fd2afb)
+
+running 5 tests
+test public_download_progress_uses_actual_fixture_bytes_and_cancels_before_install ... ignored, private inert verifier; requires REGRESSEE_INDEPENDENT_ROOT; no worker/browser
+test public_ensure_reuses_ready_and_refuses_damage_links_and_expiry ... ignored, private inert verifier; requires REGRESSEE_INDEPENDENT_ROOT; no worker/browser
+test public_installer_cancellation_preserves_old_evidence_and_pointer ... ignored, private inert verifier; requires REGRESSEE_INDEPENDENT_ROOT; no worker/browser
+test public_jobs_routes_pinned_work_and_queued_cancel_preserving_cas ... ignored, private inert verifier; requires REGRESSEE_INDEPENDENT_ROOT; no worker/browser
+test readiness_and_refusals_are_read_only_without_network ... ignored, private inert verifier; requires REGRESSEE_INDEPENDENT_ROOT; no worker/browser
+
+test result: ok. 0 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/native_inspection_fixture.rs (target/debug/deps/native_inspection_fixture-93d2aa69e92ad5f4)
+
+running 1 test
+test prepare_owned_native_inspection_fixture ... ignored, prepares only an explicitly authorized private native-inspection fixture
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/official_runtime_first_use.rs (target/debug/deps/official_runtime_first_use-0c658019bef3966c)
+
+running 1 test
+test fresh_default_discovery_installs_and_reopens_verified_browser ... ignored, explicit official HTTPS download and sandboxed owned-fixture first-use check
+
+test result: ok. 0 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running tests/product_flow.rs (target/debug/deps/product_flow-b19335449a72f107)
+
+running 14 tests
+test actual_phase3_active_cancel_and_custom_viewport ... ignored, Actual retained worker3, in-navigation cancellation and exact custom viewport capture
+test actual_phase3_crawl_capture_resume_and_scale ... ignored, Real Phase 3 signed development pack, multi-page/profile capture, crash/resume and 100-page scale. Use a fresh evidence directory.
+test actual_phase3_policy_corrections ... ignored, Focused real signed-worker navigation/robots corrections; fresh evidence root required
+test actual_phase3_resource_corrections ... ignored, Focused signed-worker resource interception regressions; fresh evidence root required
+test actual_phase4_auth_environment_and_capture ... ignored, serial fresh signed Phase 4 fixtures; set REGRESSEE_PHASE4_EVIDENCE to a new output
+test actual_phase5_product_analysis_composite_and_replacement ... ignored, serial Phase 5 check; requires fresh signed Phase 4 cache/distribution and a unique output
+test actual_phase6_composite_zip_fresh_recipient_login_and_fixed_mapped_check ... ignored, serial fresh signed runtime and retained Phase 6 output; no public/native/OS-key qualification
+test actual_phase7_replacement_preview_baseline_check ... ignored, serial current signed worker replacement diagnosis/guard, fresh private output
+test actual_signed_http_product_flow ... ignored, serial private runtime/browser integration; set REGRESSEE_PHASE2_EVIDENCE to a fresh retained directory
+test phase7_actual_1000_page_soak_pause_resume_cancel ... ignored, Real 1000 distinct owned pages x 3 profiles; explicit budget/runtime/evidence required
+test retained_runtime_relative_supervision_smoke ... ignored, serial actual retained signed runtime smoke; no new pack or public-site capture
+test retained_worker_long_and_short_tmpdir_regression ... ignored, serial sandboxed retained runtime; fresh REGRESSEE_PHASE2_CORRECTION_EVIDENCE required
+test worker_scratch_browser_child ... ignored, subprocess helper for retained_worker_long_and_short_tmpdir_regression
+test phase6_fixture_speculative_connections_do_not_block_ready_requests ... ok
+
+test result: ok. 1 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 0.06s
+
+     Running unittests src/lib.rs (target/debug/deps/regressee_core-7ac2597a75674186)
+
+running 51 tests
+test analysis_engine::tests::ciede2000_reference_vectors_and_srgb_d65 ... ok
+test analysis_engine::tests::masked_missing_band_keeps_structural_evidence_and_pair_binding ... ok
+test analysis_engine::tests::local_thresholds_are_inclusive_and_low_coverage_is_excluded ... ok
+test archive::tests::archive_paths_have_no_traversal_or_platform_aliases ... ok
+test analysis_engine::tests::alpha_never_produces_a_trustworthy_clean_or_defect_verdict ... ok
+test analysis_engine::tests::valid_split_idat_empty_chunks_and_post_image_text_are_checked ... ok
+test analysis_engine::tests::capture_failure_integrity_and_rendering_caution_are_separate ... ok
+test analysis_engine::tests::local_windows_match_direct_oracle_with_masks_and_clipped_edges ... ok
+test analysis_engine::tests::complete_png_integrity_checks_have_specific_failure_oracles ... ok
+test analysis_engine::tests::policy_schema_and_safe_mask_geometry_rejections ... ok
+test analysis_engine::tests::crossed_dimensions_do_not_count_absent_corner_as_content ... ok
+test crawl::tests::identity_preserves_behavior ... ok
+test crawl::tests::old_settings_get_safe_defaults ... ok
+test archive::tests::portable_contract_cannot_carry_login_or_local_paths ... ok
+test crawl::tests::robots_wildcards_anchors_literals_queries_and_precedence ... ok
+test analysis_engine::tests::seed_values_match_the_read_only_proposal_not_old_percentage_schema ... ok
+test domain::tests::discovery_coverage_strict_schema_and_all_valid_variants_roundtrip ... ok
+test crawl::tests::boundaries_and_robots_are_explainable ... ok
+test analysis_engine::tests::pixel_strict_boundary_and_inclusive_global_region_thresholds ... ok
+test domain::tests::masks_are_bounded_no_overflow ... ok
+test domain::tests::inventories_and_analysis_do_not_hide_missing_evidence ... ok
+test domain::tests::partial_and_duplicate_baselines_are_not_full_coverage ... ok
+test domain::tests::drafts_are_real_settings_not_ready_runs ... ok
+test analysis_engine::tests::optional_stationary_blend_suppression_does_not_align_layout ... ok
+test domain::tests::restart_does_not_call_active_work_completed ... ok
+test domain::tests::rejects_credentials_schemes_names_and_duplicate_profiles ... ok
+test domain::tests::rejects_session_scope_and_unknown_schema ... ok
+test domain::tests::run_contract_accounts_for_all_fixed_targets ... ok
+test platform::tests::actual_space_and_missing_volume_error ... ok
+test environment::tests::prefix_ordered_queries_hash_and_multi_origin_are_explicit ... ok
+test shell::tests::busy_results_keep_filters_focusable_without_enabling_mutations ... ok
+test environment::tests::sessions_do_not_serialize_and_profiles_have_material_integrity ... ok
+test shell::tests::approval_decision_traps_navigation_and_mutations_until_dismissed ... ok
+test shell::tests::focus_wraps_and_disabled_actions_are_not_activatable ... ok
+test shell::tests::hidden_screen_controls_are_not_focusable ... ok
+test shell::tests::environment_fields_and_timezone_follow_the_visible_form_order ... ok
+test shell::tests::history_rows_are_bounded_distinct_and_modal_safe ... ok
+test shell::tests::guided_stages_only_offer_their_actual_form_controls ... ok
+test shell::tests::modal_traps_focus_and_restores_normal_order ... ok
+test shell::tests::project_picker_replaces_screen_controls_and_locks_selection_during_work ... ok
+test shell::tests::results_and_history_offer_project_selection_without_opening_settings ... ok
+test zip_directory::tests::existing_name_and_physical_range_checks_remain_enforced ... ok
+test zip_directory::tests::non_ascii_names_require_utf8_flag_and_extra_fields_are_strict ... ok
+test shell::tests::screen_focus_candidates_never_duplicate_controls ... ok
+test zip_directory::tests::unicode_path_effective_collision_is_refused_before_decoder_dedup ... ok
+test analysis_engine::tests::png_chunk_metadata_and_geometry_limits_are_not_generic_errors ... ok
+test analysis_engine::tests::independent_png_encoder_all_filters_and_compressions ... ok
+test analysis_engine::tests::cancellation_is_observed_in_envelope_inflate_and_analysis_rows ... ok
+test analysis_engine::tests::streaming_components_match_independent_bfs_exhaustively ... ok
+test analysis_engine::tests::many_components_and_tall_frontier_do_not_accumulate_page_labels ... ok
+test analysis_engine::tests::corpus_exact_oracles_and_seed_interpretations ... ok
+
+test result: ok. 51 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.43s
+
+     Running unittests src/lib.rs (target/debug/deps/regressee_storage-74fed99b901d0c6e)
+
+running 37 tests
+test capture::tests::bounded_checkpoint_profile ... ignored, bounded serial checkpoint profile, synthetic CAS fixture not browser coverage
+test capture::tests::bounded_delta_checkpoint_profile ... ignored, bounded serial delta checkpoint profile, not browser coverage
+test review::authoritative_read_index_tests::analysis_indexes_preserve_first_match_without_hiding_later_keys ... ok
+test review::authoritative_read_index_tests::analysis_sources_are_read_once_per_distinct_run_and_failures_are_not_cached ... ok
+test tests::nonregular_database_and_invalid_directory_layout_fail_closed ... ok
+test tests::storage_rejects_symlink_directories_and_ancestors_before_creation ... ok
+test tests::database_and_sqlite_control_symlinks_fail_before_outside_writes ... ok
+test tests::future_and_failed_migrations_do_not_mutate_schema ... ok
+test history_inspection::tests::repeated_references_load_only_distinct_sources_and_check_each_binding ... ok
+test phase5_migration_tests::version_five_evidence_bytes_survive_multiple_analysis_revisions ... ok
+test phase5_migration_tests::version_six_display_context_migration_preserves_records ... ok
+test phase5_migration_tests::version_eight_target_delta_migration_preserves_historical_bytes ... ok
+test tests::interrupted_stream_does_not_publish_or_leave_temporary ... ok
+test tests::migrates_v1_fixture_without_losing_project_and_is_idempotent ... ok
+test phase_three_migration_preserves_old_project_bytes_and_safe_defaults ... ok
+test tests::saves_reopens_and_checks_revision_conflicts ... ok
+test tests::display_bytes_are_exact_bounded_and_revision_is_connection_sensitive ... ok
+test tests::dangling_artifact_entry_is_not_published_or_collected ... ok
+test tests::symlink_objects_are_never_referenced ... ok
+test tests::content_addressed_dedup_integrity_and_reference_safety ... ok
+test capture::tests::queue_claim_is_exclusive_and_terminal_snapshots_are_immutable ... ok
+test portability::repair_classifies_dead_live_partial_and_valid_objects_and_guards_stale ... ok
+test capture::tests::viewer_revision_tracks_target_checkpoints_and_compaction ... ok
+test tests::coordinated_ui_save_is_atomic_private_and_revision_bound ... ok
+test tests::concurrent_publication_is_deduplicated ... ok
+test capture::tests::interrupted_delta_queue_recovers_and_resumes_without_changing_evidence ... ok
+test portability::explicit_recovery_gc_is_confirmed_and_journal_rechecks_references ... ok
+test capture::tests::delta_claim_pause_reopen_resume_refusal_and_corruption_boundaries ... ok
+test phase6_corrections_tests::phase6_rgb_rgba_originals_supported_and_other_color_depths_safely_refused ... ok
+test tests::pages_are_bounded_and_no_cwd_storage ... ok
+test portability::diskfull_interruption_rollback_and_explicit_orphan_recovery ... ok
+test capture::tests::deltas_equal_full_snapshots_and_refgraph_with_linear_committed_work ... ok
+test phase6_corrections_tests::phase6_legacy_hash_consistent_malformed_original_cannot_activate_restore_or_export ... ok
+test phase6_corrections_tests::phase6_exact_hostile_archives_refuse_specific_causes_atomically_and_valid_roundtrip ... ok
+test capture::tests::compaction_rehashes_old_original_and_derivatives_atomically ... ok
+test tests::oversized_stream_is_bounded_and_not_published ... ok
+test phase6_corrections_tests::phase6_complete_png_stream_gate_agrees_with_core_and_preserves_all_evidence ... ok
+
+test result: ok. 35 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 2.13s
+
+   Doc-tests regressee_app
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests regressee_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+   Doc-tests regressee_storage
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

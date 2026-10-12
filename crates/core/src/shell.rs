@@ -265,6 +265,7 @@ impl FocusState {
                 Control::Guided(47),
                 Control::Guided(48),
                 Control::Guided(49),
+                Control::Guided(52),
                 Control::Phase5(25),
             ];
         }
@@ -279,6 +280,9 @@ impl FocusState {
             });
         }
         controls.push(Control::DismissFeedback);
+        if self.busy && self.screen == Screen::Results && self.project_saved {
+            controls.push(Control::Guided(53));
+        }
         if self.busy {
             if self.screen == Screen::History && self.project_saved {
                 controls.extend([Control::HistorySearch, Control::HistoryClear]);
@@ -423,7 +427,7 @@ impl FocusState {
                     controls.push(Control::Guided(44));
                     controls.push(Control::Guided(45));
                     controls.extend([Control::CloseOptions, Control::DiscoveryDetails]);
-                    controls.extend([50, 51].map(Control::Guided));
+                    controls.extend([50, 51, 53, 54, 55, 56, 57].map(Control::Guided));
                     controls.push(Control::Details(Detail::Analysis));
                     controls.extend((0..14).map(Control::AnalysisField));
                 }
@@ -464,6 +468,31 @@ impl FocusState {
                         | Control::ChooseProject
                         | Control::DismissFeedback
                 ) || self.setup_stage.mounts(*control)
+            });
+        }
+        if self.screen == Screen::Results {
+            controls.sort_by_key(|control| match control {
+                Control::Guided(53) => 0,
+                Control::Navigate(_)
+                | Control::ChooseProject
+                | Control::CancelProjectChoice
+                | Control::PagesBaseline
+                | Control::DismissFeedback => 1,
+                Control::Guided(50 | 51 | 45 | 16..=24)
+                | Control::CrawlField(9)
+                | Control::Choice(_)
+                | Control::CloseOptions
+                | Control::DiscoveryDetails => 2,
+                Control::Guided(54) => 3,
+                Control::Phase5(6..=9) | Control::Guided(55 | 56 | 57) => 4,
+                Control::Guided(46)
+                | Control::Phase5(36)
+                | Control::Guided(44)
+                | Control::Viewer => 5,
+                Control::Phase5(20..=22) => 7,
+                Control::Phase5(37 | 33) => 8,
+                Control::Phase5(23..=25) => 9,
+                _ => 6,
             });
         }
         controls
@@ -531,6 +560,7 @@ mod tests {
                 Control::Guided(47),
                 Control::Guided(48),
                 Control::Guided(49),
+                Control::Guided(52),
                 Control::Phase5(25)
             ]
         );

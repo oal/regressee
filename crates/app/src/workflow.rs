@@ -296,13 +296,21 @@ impl Shell {
         match self.viewer_mode {
             0 => &[0, 1],
             1 | 3 => &[2],
+            4 if self.full_width_after => &[1],
             _ => &[0],
         }
     }
 
     pub(super) fn fitted_viewer_zoom(&self) -> f32 {
         let pane = self.current_viewer_pane_width();
-        (pane / self.viewer_dimensions().0.max(1) as f32).clamp(0.05, 4.)
+        (pane / self.viewer_dimensions().0.max(1) as f32).clamp(
+            0.05,
+            if self.evidence.comparison.is_none() {
+                1.
+            } else {
+                4.
+            },
+        )
     }
 
     pub(super) fn current_viewer_pane_width(&self) -> f32 {
@@ -343,13 +351,27 @@ impl Shell {
             self.working_width - self.options_panel_width() - 12.
         } else if self.page_list_workspace() && !self.discovery_image_mounted() {
             self.working_width
-        } else if self.review_queue_collapsed && !self.page_list_workspace() {
+        } else if (self.review_queue_collapsed || self.authoritative_empty_capture())
+            && !self.page_list_workspace()
+        {
             0.
         } else if self.narrow_workspace {
             200.
         } else {
             272.
         }
+    }
+
+    pub(super) fn authoritative_empty_capture(&self) -> bool {
+        self.preview.is_none()
+            && self.evidence.comparison.is_none()
+            && !self.initial_evidence_loading()
+            && !self.initial_evidence_unavailable()
+            && self
+                .evidence
+                .latest
+                .as_ref()
+                .is_none_or(|r| r.run.targets.is_empty())
     }
 
     /// Parent routes Guided(50/51) here and refreshes mounted focus afterwards.
@@ -393,6 +415,7 @@ impl Shell {
             return matches!(
                 control,
                 Control::Navigate(_)
+                    | Control::Guided(53)
                     | Control::PagesBaseline
                     | Control::ChooseProject
                     | Control::DismissFeedback
@@ -402,6 +425,7 @@ impl Shell {
             return matches!(
                 control,
                 Control::Navigate(_)
+                    | Control::Guided(53)
                     | Control::PagesBaseline
                     | Control::ChooseProject
                     | Control::DismissFeedback
@@ -487,7 +511,10 @@ impl Shell {
     /// native render path calls it with the actual desktop viewport width.
     pub(super) fn configure_review_geometry(&mut self, width: f32) {
         self.narrow_workspace = width < 1100.;
-        self.working_width = (width - 240.).max(1.);
+        self.navigation_collapsed = self.focus.screen == Screen::Results
+            && self.project.is_some()
+            && self.navigation_preference.unwrap_or(self.narrow_workspace);
+        self.working_width = (width - if self.navigation_collapsed { 48. } else { 240. }).max(1.);
         if self.viewer_fit && self.viewer.is_some() {
             self.zoom = self.fitted_viewer_zoom();
         }
@@ -584,17 +611,6 @@ impl Shell {
             ActionStyle::Secondary,
             cx,
         ));
-        if !pages && self.evidence.latest.is_some() {
-            actions = actions.child(self.guided_button(
-                50,
-                if self.review_queue_collapsed {
-                    "Show page queue"
-                } else {
-                    "Hide page queue"
-                },
-                cx,
-            ));
-        }
         if self.discovery_image_mounted() {
             actions = actions.child(self.guided_button(51, "Hide preview", cx));
         }
@@ -669,17 +685,22 @@ impl Shell {
                     .flex()
                     .gap_3()
                     .overflow_hidden()
-                    .when(pages || !self.review_queue_collapsed, |workspace| {
-                        workspace.child(
-                            div()
-                                .debug_selector(|| "review-queue".into())
-                                .w(px(self.review_queue_width()))
-                                .h_full()
-                                .min_h_0()
-                                .flex_shrink_0()
-                                .child(self.inventory_and_results(cx)),
-                        )
-                    })
+                    .when(
+                        pages
+                            || (!self.review_queue_collapsed
+                                && !self.authoritative_empty_capture()),
+                        |workspace| {
+                            workspace.child(
+                                div()
+                                    .debug_selector(|| "review-queue".into())
+                                    .w(px(self.review_queue_width()))
+                                    .h_full()
+                                    .min_h_0()
+                                    .flex_shrink_0()
+                                    .child(self.inventory_and_results(cx)),
+                            )
+                        },
+                    )
                     .when(
                         (!pages || self.discovery_image_mounted())
                             && !(pages && self.options_panel_open()),
@@ -694,6 +715,13 @@ impl Shell {
                                     .flex()
                                     .flex_col()
                                     .gap_2()
+                                    .when(
+                                        self.review_queue_collapsed
+                                            && !self.authoritative_empty_capture(),
+                                        |viewer| {
+                                            viewer.child(self.guided_button(50, "Show results", cx))
+                                        },
+                                    )
                                     .child(self.viewer_section(cx)),
                             )
                         },
@@ -886,6 +914,29 @@ impl Shell {
         }
     }
 
+    /// Persistent evidence identity comes from the inspected run/reference,
+    /// never from today's project/environment settings or a filtered queue.
+    pub(super) fn inspection_identity(&self) -> (String, String) {
+        let run = self.displayed_run();
+        let key = self.selected_key.as_ref();
+        let address = run
+            .and_then(|r| r.run.targets.iter().find(|t| Some(&t.key) == key))
+            .map(|t| t.requested.to_string())
+            .unwrap_or_else(|| "Target record not loaded".into());
+        let (_, after, profile) = self.pane_caption(1);
+        let after_environment = after.lines().next().unwrap_or("environment not loaded");
+        let context = if self.evidence.comparison.is_some() {
+            let (_, before, _) = self.pane_caption(0);
+            format!(
+                "{profile} · Before: {} · After: {after_environment}",
+                before.lines().next().unwrap_or("environment not loaded")
+            )
+        } else {
+            format!("{profile} · Capture: {after_environment}")
+        };
+        (controls::page_path(&address), context)
+    }
+
     /// Reference context travels with the inspected pair, not with whichever
     /// History page happened to be opened. Never borrow a previous target's
     /// environment while a newer image request is in flight.
@@ -917,15 +968,23 @@ impl Shell {
         let provenance: BTreeMap<_, _> = preview
             .provenance
             .iter()
-            .map(|(key, requested, final_url)| (key.clone(), format!("{requested} → {final_url}")))
+            .map(|(key, requested, final_url)| {
+                (
+                    key.clone(),
+                    format!("Requested URL: {requested}\nFinal URL: {final_url}"),
+                )
+            })
             .collect();
         let rows = preview.baseline.references.len();
+        if rows == 0 {
+            return div().into_any_element();
+        }
         let mut order: Vec<_> = (0..rows).collect();
         order.sort_by_key(|i| !selected.contains(&preview.baseline.references[*i].key));
         let inspected = &preview.baseline.references
             [order[self.approval_reference_index.min(rows.saturating_sub(1))]];
         let exact = format!(
-            "Page: {}\nProfile: {}\nSource run: {}\nCaptured: {}\nOriginal: {}\n{}",
+            "Page: {}\nProfile: {}\nSource run: {}\nCaptured: {}\nOriginal: {}\n{}\nPage ID: {}\nProfile ID: {}",
             index
                 .target_labels
                 .get(&inspected.key)
@@ -942,29 +1001,102 @@ impl Shell {
             provenance
                 .get(&inspected.key)
                 .cloned()
-                .unwrap_or_else(|| "Inherited provenance retained in History".into())
+                .unwrap_or_else(|| "Inherited provenance retained in History".into()),
+            inspected.key.page,
+            inspected.key.profile
         );
+        let role = if selected.contains(&inspected.key) {
+            "Replace"
+        } else {
+            "Keep"
+        };
+        let environments: BTreeMap<_, _> = preview.source_environments.iter().cloned().collect();
+        let environment = environments
+            .get(&inspected.key)
+            .cloned()
+            .unwrap_or_else(|| "Source environment recorded in History".into());
+        let mut flow = div().flex().flex_col().gap_3()
+            .child(div().debug_selector(|| "approval-impact-summary".into()).child(format!("{} screenshot{} replaced · {} stay unchanged", preview.selected.len(), if preview.selected.len() == 1 { "" } else { "s" }, preview.inherited)))
+            .child("Future checks will use the selected screenshots. Other baseline screenshots stay unchanged. Earlier versions remain in History.")
+            .child("Capture times may differ; this is not one simultaneous site snapshot.")
+            .child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Inspecting {role} · screenshot {} of {rows}", self.approval_reference_index + 1)))
+            .child(format!("{} · {} · {environment} · {}", index.target_labels.get(&inspected.key).map(|url| controls::page_path(url)).unwrap_or_else(|| inspected.key.page.to_string()), index.profile_labels.get(&inspected.key.profile).cloned().unwrap_or_else(|| inspected.key.profile.to_string()), capture_time(inspected.captured_at)))
+            .child(self.guided_button(52, if self.approval_exact_open { "Hide exact provenance" } else { "Show exact provenance for inspected screenshot" }, cx))
+            .when(self.approval_exact_open, |body| body.child(div().id("approval-exact-provenance").debug_selector(|| "approval-exact-provenance".into()).text_size(px(14.)).line_height(px(20.)).child(exact)));
+        // Bound mounted rows, without dropping any unchanged reference. Previous/
+        // Next visits every reference and switches the visible 32-row page.
+        let start = self.approval_reference_index / 32 * 32;
+        flow = flow.child(format!(
+            "Screenshots {}–{} of {rows} · Previous/Next inspects every screenshot.",
+            start + 1,
+            (start + 32).min(rows)
+        ));
+        for (i, &position) in order.iter().enumerate().skip(start).take(32) {
+            let r = &preview.baseline.references[position];
+            let page = index
+                .target_labels
+                .get(&r.key)
+                .map(|url| controls::page_path(url))
+                .unwrap_or_else(|| format!("Page {}", r.key.page));
+            let profile = index
+                .profile_labels
+                .get(&r.key.profile)
+                .cloned()
+                .unwrap_or_else(|| format!("Profile {}", r.key.profile));
+            flow = flow.child(
+                div()
+                    .id(("approval-reference", i))
+                    .debug_selector(move || format!("approval-reference-{i}"))
+                    .flex_shrink_0()
+                    .py_3()
+                    .px_2()
+                    .border_b_1()
+                    .border_color(rgb(LINE))
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .line_height(px(20.))
+                    .when(i == self.approval_reference_index, |row| {
+                        row.bg(rgb(SELECTED))
+                    })
+                    .child(
+                        div()
+                            .debug_selector(move || format!("approval-reference-title-{i}"))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(format!(
+                                "{} · {page}",
+                                if selected.contains(&r.key) {
+                                    "Replace"
+                                } else {
+                                    "Keep"
+                                }
+                            )),
+                    )
+                    .child(div().text_size(px(14.)).child(profile))
+                    .child(
+                        div()
+                            .debug_selector(move || format!("approval-reference-time-{i}"))
+                            .text_size(px(14.))
+                            .child(format!(
+                                "{} · {}",
+                                environments
+                                    .get(&r.key)
+                                    .map(String::as_str)
+                                    .unwrap_or("Source environment recorded in History"),
+                                capture_time(r.captured_at)
+                            )),
+                    )
+                    .on_click(cx.listener(move |this, _, _, cx| {
+                        this.approval_reference_index = i;
+                        cx.notify();
+                    })),
+            );
+        }
         div().id("approval-modal-backdrop").occlude().absolute().inset_0().bg(rgba(0x183f6588)).flex().items_center().justify_center()
-            .child(div().debug_selector(|| "approval-decision".into()).w(px(if self.narrow_workspace { 580. } else { 760. })).max_w_full().h(px(420.)).max_h_full().p_4().bg(rgb(SURFACE)).border_1().border_color(rgb(LINE)).rounded(px(4.)).flex().flex_col().gap_2()
-                .child(div().text_size(px(22.)).font_weight(FontWeight::SEMIBOLD).child("Confirm selected reference changes"))
-                .child(div().debug_selector(|| "approval-impact-summary".into()).text_size(px(14.)).child(format!("{} selected references replaced · {} inherited references kept", preview.selected.len(), preview.inherited)))
-                .child(div().text_size(px(14.)).child("Composite capture times are not a simultaneous snapshot. Earlier versions remain in History."))
-                .child(uniform_list("approval-reference-list", rows, cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
-                    let Some(p) = &this.approval else { return Vec::new(); };
-                    range.map(|i| {
-                        let r = &p.baseline.references[order[i]];
-                        let page = index.target_labels.get(&r.key).cloned().unwrap_or_else(|| format!("Page {}", r.key.page));
-                        let profile = index.profile_labels.get(&r.key.profile).cloned().unwrap_or_else(|| format!("Profile {}", r.key.profile));
-                        div().id(("approval-reference", i)).debug_selector(move || format!("approval-reference-{i}")).h(px(100.)).py_2().border_b_1().border_color(rgb(LINE)).flex().flex_col().gap_1()
-                            .child(div().font_weight(FontWeight::SEMIBOLD).text_ellipsis().child(format!("{} · {page}", if selected.contains(&r.key) { "Replace" } else { "Keep" })))
-                            .child(div().text_size(px(14.)).text_ellipsis().child(profile))
-                            .child(div().text_size(px(14.)).text_ellipsis().child(format!("Run {} · {} · original {}", r.run, capture_time(r.captured_at), r.artifact.as_str())))
-                            .child(div().text_size(px(14.)).text_ellipsis().child(provenance.get(&r.key).cloned().unwrap_or_else(|| "Inherited source provenance retained in History".into())))
-                            .on_click(cx.listener(move |this, _, _, cx| { this.approval_reference_index = i; this.approval_provenance_scroll.set_offset(gpui::point(px(0.), px(0.))); cx.notify(); }))
-                            .into_any_element()
-                    }).collect::<Vec<_>>()
-                })).debug_selector(|| "approval-reference-list".into()).flex_1().min_h_0().w_full())
-                .child(div().id("approval-exact-provenance").debug_selector(|| "approval-exact-provenance".into()).h(px(100.)).flex_shrink_0().overflow_y_scroll().track_scroll(&self.approval_provenance_scroll).text_size(px(14.)).child(exact))
+            .child(div().debug_selector(|| "approval-decision".into()).w(px(if self.narrow_workspace { 740. } else { 760. })).max_w_full().h(px(520.)).max_h_full().p_4().bg(rgb(SURFACE)).border_1().border_color(rgb(LINE)).rounded(px(4.)).flex().flex_col().gap_2()
+                .child(div().text_size(px(22.)).font_weight(FontWeight::SEMIBOLD).child(format!("Update the baseline for {} screenshot{}?", preview.selected.len(), if preview.selected.len() == 1 { "" } else { "s" })))
+                .child(div().id("approval-reference-list").debug_selector(|| "approval-reference-list".into()).flex_1().min_h_0().w_full().overflow_y_scroll().track_scroll(&self.approval_provenance_scroll).child(flow))
+                .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Scroll for more · exact provenance and all unchanged screenshots remain available."))
                 .child(div().flex().flex_wrap().justify_between().gap_2()
                     .child(self.guided_button(48, "Previous", cx))
                     .child(self.guided_button(49, "Next", cx))
@@ -1146,14 +1278,14 @@ impl Shell {
                          if selected {
                              if self.narrow_workspace { "Deselect screenshot" } else { "Remove from baseline update" }
                          } else {
-                             if self.narrow_workspace { "Select for baseline" } else { "Select for baseline update" }
+                              "Select for baseline update"
                         },
                         ActionStyle::Choice { selected },
                         cx,
                     ))
                     .child(self.button(
                         Control::Phase5(24),
-                        "Review approval…",
+                         "Review baseline update…",
                         ActionStyle::Primary,
                         cx,
                     )),
@@ -1309,6 +1441,9 @@ impl Shell {
             .flex()
             .flex_col()
             .gap_2()
+            .when(self.focus.screen == Screen::Results, |rail| {
+                rail.child(self.guided_button(53, "Hide navigation", cx))
+            })
             .child(
                 div()
                     .px_3()
@@ -2256,7 +2391,7 @@ mod tests {
                 queue.right() < viewer.left(),
                 "{width}: queue must stay beside evidence"
             );
-            assert_eq!(row.size.height, px(PAGE_ROW_HEIGHT));
+            assert_eq!(row.size.height, px(84.));
             assert!(
                 row.top() >= queue.top() && row.bottom() <= queue.bottom(),
                 "{width}: one complete result must open in view: row {row:?}, queue {queue:?}"
@@ -2282,9 +2417,9 @@ mod tests {
         let decision = cx.debug_bounds("approval-decision").unwrap();
         let impact = cx.debug_bounds("approval-impact-summary").unwrap();
         let map = cx.debug_bounds("approval-reference-list").unwrap();
-        let provenance = cx.debug_bounds("approval-exact-provenance").unwrap();
-        assert!(decision.top() <= impact.top() && provenance.bottom() <= decision.bottom());
-        assert!(map.size.height > px(0.) && map.bottom() <= provenance.top());
+        assert!(cx.debug_bounds("approval-exact-provenance").is_none());
+        assert!(decision.top() <= impact.top() && map.bottom() <= decision.bottom());
+        assert!(map.size.height > px(0.));
         cx.update(|window, cx| {
             shell.update(cx, |s, cx| {
                 assert!(s.handle(Control::Phase5(25), cx).is_focused(window));
@@ -2294,6 +2429,9 @@ mod tests {
                 assert_eq!(requests, s.next_request);
                 let handles = [
                     s.handle(Control::Guided(47), cx),
+                    s.handle(Control::Guided(48), cx),
+                    s.handle(Control::Guided(49), cx),
+                    s.handle(Control::Guided(52), cx),
                     s.handle(Control::Phase5(25), cx),
                 ];
                 for _ in 0..4 {
@@ -2453,7 +2591,7 @@ mod tests {
             assert!(s.comparison_context().contains("2 pages included"));
             assert!(!s.comparison_context().contains("Compared baseline"));
             assert!(!s.discovery_image_mounted());
-            assert_eq!(s.review_queue_width(), 580.);
+            assert_eq!(s.review_queue_width(), 772.);
             assert_eq!(s.viewer_pane_indices(), &[1]);
             assert!(!s.workspace_control_mounted(Control::Guided(16)));
         });

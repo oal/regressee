@@ -690,6 +690,34 @@ pub fn page_row(
     selected: bool,
     enabled: bool,
 ) -> Stateful<Div> {
+    target_row(id, address, details, selected, enabled, false)
+}
+
+pub fn result_row(
+    id: impl Into<ElementId>,
+    address: impl Into<SharedString>,
+    details: impl Into<SharedString>,
+    selected: bool,
+    enabled: bool,
+) -> Stateful<Div> {
+    target_row(id, address, details, selected, enabled, true)
+}
+
+fn target_row(
+    id: impl Into<ElementId>,
+    address: impl Into<SharedString>,
+    details: impl Into<SharedString>,
+    selected: bool,
+    enabled: bool,
+    result: bool,
+) -> Stateful<Div> {
+    let address = address.into();
+    let hint = address.clone();
+    let path = page_path(&address);
+    let details = details.into();
+    let (profile, status) = details.split_once(" · ").unwrap_or((&details, ""));
+    let profile = profile.to_owned();
+    let status = status.to_owned();
     let id = id.into();
     let row_selector = id.clone();
     let address_selector = id.clone();
@@ -699,7 +727,7 @@ pub fn page_row(
         .debug_selector(move || format!("page-row-{row_selector}"))
         .w_full()
         .min_w_0()
-        .h(px(PAGE_ROW_HEIGHT))
+        .h(px(if result { 84. } else { PAGE_ROW_HEIGHT }))
         .px(px(16.))
         .py(px(8.))
         .border_b_1()
@@ -711,6 +739,7 @@ pub fn page_row(
         .gap(px(4.))
         .when(enabled, |el| {
             el.cursor_pointer()
+                .tooltip(move |_, cx| cx.new(|_| PageAddressHint(hint.clone())).into())
                 .hover(move |style| style.bg(rgb(if selected { SELECTED } else { GROUND })))
         })
         .child(
@@ -723,7 +752,7 @@ pub fn page_row(
                 .font_weight(FontWeight::MEDIUM)
                 .text_color(rgb(INK))
                 .text_ellipsis()
-                .child(address.into()),
+                .child(if result { path } else { address.to_string() }),
         )
         .child(
             div()
@@ -735,8 +764,55 @@ pub fn page_row(
                 .font_weight(FontWeight::NORMAL)
                 .text_color(rgb(if selected { ACCENT_HOVER } else { MUTED }))
                 .text_ellipsis()
-                .child(details.into()),
+                .child(if result { profile } else { details.to_string() }),
         )
+        .when(result, |row| {
+            row.child(
+                div()
+                    .w_full()
+                    .min_w_0()
+                    .text_size(px(13.))
+                    .line_height(px(18.))
+                    .text_color(rgb(MUTED))
+                    .text_ellipsis()
+                    .child(status),
+            )
+        })
+}
+
+/// Keep query and fragment identity; the full origin remains available in the
+/// native hint and the selected screenshot's keyboard-accessible Details.
+pub fn page_path(address: &str) -> String {
+    url::Url::parse(address)
+        .ok()
+        .filter(|u| matches!(u.scheme(), "http" | "https"))
+        .map(|u| {
+            format!(
+                "{}{}{}",
+                u.path(),
+                u.query().map(|q| format!("?{q}")).unwrap_or_default(),
+                u.fragment().map(|f| format!("#{f}")).unwrap_or_default()
+            )
+        })
+        .unwrap_or_else(|| address.to_owned())
+}
+
+struct PageAddressHint(SharedString);
+impl Render for PageAddressHint {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div()
+            .w(px(480.))
+            .max_w_full()
+            .p_3()
+            .bg(rgb(SURFACE))
+            .border_1()
+            .border_color(rgb(CONTROL_LINE))
+            .text_size(px(14.))
+            .line_height(px(20.))
+            .flex()
+            .flex_col()
+            .child(self.0.clone())
+    }
 }
 
 /// History is a selection row, not a label-sized action. Its focus and selected

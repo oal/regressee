@@ -1,0 +1,709 @@
+{
+  "date": "2026-10-12",
+  "base_commit": "4e48813",
+  "scope": "Phase 4A and 4B implementation; not independently verified",
+  "evidence_root": "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012",
+  "confirmation_root": "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/confirmation",
+  "visual_gate": "BLOCKED: note input width",
+  "first_batch_pairs": 34,
+  "confirmation_pairs": 38,
+  "confirmation_rounds": 1,
+  "personally_read_confirmation_originals": [
+    "all-1280x800-review-note.png",
+    "all-820x600-review-note.png",
+    "all-1280x800-review-approval-confirm.png",
+    "all-820x600-review-approval-confirm.png",
+    "all-1280x800-review-mode-chooser.png",
+    "all-820x600-review-mode-chooser.png",
+    "all-1280x800-review-approval-last-row.png",
+    "all-820x600-review-approval-last-row.png",
+    "all-1280x800-review-approval-exact-tail.png",
+    "all-820x600-review-approval-exact-tail.png",
+    "all-1280x800-review-full-width-before.png",
+    "all-820x600-review-full-width-before.png",
+    "all-1280x800-review-full-width-after.png",
+    "all-820x600-review-full-width-after.png",
+    "all-1280x800-review.png",
+    "all-820x600-review.png",
+    "all-1280x800-capture-mobile.png",
+    "all-820x600-capture-mobile.png",
+    "all-1280x800-capture-empty.png",
+    "all-820x600-capture-empty.png"
+  ],
+  "personally_read_contact_sheets": {
+    "first_batch": 6,
+    "confirmation": 8
+  },
+  "pairs": [
+    {
+      "capture": "all-1280x800-capture-empty",
+      "png_sha256": "59cdfc0cba9d33010f55ccab8b4fdfa8af6742f1c1cf478f3700efa47e4c0123",
+      "metadata_sha256": "7e0abef07d5e19ea24da308d9e4f4b22320a1bedb2fb92317c70e6b31a9a6904"
+    },
+    {
+      "capture": "all-1280x800-capture-mobile",
+      "png_sha256": "443b489e1dffe7d70a3af2f9c567e2c5466246b1387c2595d23a1baf95ce6419",
+      "metadata_sha256": "7f74e616229e4669f561c6a18a4e8f43bc4c0fd41de3c3d70363d441f42b8606"
+    },
+    {
+      "capture": "all-1280x800-review-approval-confirm",
+      "png_sha256": "8fac90690744dcee0eeb3217b41160e75e4fc27eda31b4529c71d6d79c28b057",
+      "metadata_sha256": "b3bc828e841227722960269d18d74215f2a215e3a330b7e08f30b053d77dd693"
+    },
+    {
+      "capture": "all-1280x800-review-approval-exact-tail",
+      "png_sha256": "fbd516329d18664f9cde906b1bc28c9a1f7fc7b255b44486709ca1ed7f0ba073",
+      "metadata_sha256": "765815442da0b4dec643704ce781e7edd36220eb1107dfead50e62953dd1a5f4"
+    },
+    {
+      "capture": "all-1280x800-review-approval-last-exact",
+      "png_sha256": "574bbdf430c3f706483cd0852314c157796e6e76e4d0402f0cb7281108f38a7c",
+      "metadata_sha256": "14a088bef2d70f9dc0476fa36702c26c71f7d6b58709c153066d3a6d8628814d"
+    },
+    {
+      "capture": "all-1280x800-review-approval-last-row",
+      "png_sha256": "7d2bd4aa837c4d2e7659ae101e6c2ae0bbca4f7318eb9202643ce8a797be7fc3",
+      "metadata_sha256": "17d47238522beb70338649be68f385aba90caa90ffb1b5f0a1800e13e5bc01ca"
+    },
+    {
+      "capture": "all-1280x800-review-approval-many",
+      "png_sha256": "7b420f5a55bef0b623036a9ccd61de017eb3e510db72642e8c6415682e554bf5",
+      "metadata_sha256": "fd9a05e0e642d9bd5dbec6867221916418594ebe1a0eb9c37788f91718c64157"
+    },
+    {
+      "capture": "all-1280x800-review-details",
+      "png_sha256": "faf217bb42f341dc170e6aa81a742867b657032db48533a4874da03e6d044bbc",
+      "metadata_sha256": "34bcc673005dab3aac98cea6609ce69a2fe386a8ef9cd17b23794da31c32aa7f"
+    },
+    {
+      "capture": "all-1280x800-review-difference",
+      "png_sha256": "3aa45cb553bf46d0ef5fc10cbb1e71d7042ec09393fb08acf718f2999c7fffd3",
+      "metadata_sha256": "e3edd5cb90528d67443beeebe435e35a21bb295262f87e4aa11dc23667ebd568"
+    },
+    {
+      "capture": "all-1280x800-review-full-width-after",
+      "png_sha256": "87d38c0deed9f9fd9059c650ea443d74a6725fc5cdb9fe168e04e8f2c7cbb674",
+      "metadata_sha256": "0a5cfa453f5111c745c8222681d5f10e38b4770f7eea2114c80fec11443f1ec8"
+    },
+    {
+      "capture": "all-1280x800-review-full-width-before",
+      "png_sha256": "a61bb1847a7226f19bfde9182ae71be8ef252c4af00466311775e5e70e5814fa",
+      "metadata_sha256": "b69a0bfb69178ad2c86947dfaaecedcccb99fc3c973652c27795e24e76b15455"
+    },
+    {
+      "capture": "all-1280x800-review-heatmap",
+      "png_sha256": "37c917e7f175a3307d0d23d4e91a6b5ab14e9b53571b2acfa8283f404432bd88",
+      "metadata_sha256": "bd0d8d21d3816e6a3ae5b23a30260c62cbe52a8121c9776e9ef7a5c8c1df9ad5"
+    },
+    {
+      "capture": "all-1280x800-review-mode-chooser",
+      "png_sha256": "61ccba9543008cc22d8c411b951cb7aec1bd4d405cbe7d0a1ca9dae0dd17d1fa",
+      "metadata_sha256": "c3f55ceb355c8f093284e8f162820e4d6189f11dc4f4d6eb757b8f2b913896e4"
+    },
+    {
+      "capture": "all-1280x800-review-navigation-open",
+      "png_sha256": "6e4c59bcc64a4bd62d687d4ddbf6685f3285c955f00443a1589f53a89cb4d0d9",
+      "metadata_sha256": "0ba1d8d392a18cf464939825e58d75fb1901c88f4f10ebda4014fd3e010306b6"
+    },
+    {
+      "capture": "all-1280x800-review-no-matches",
+      "png_sha256": "1f423a4c8e3e2264e8d6575bb9737295dd4c856846812dfb143d61ed84827c1c",
+      "metadata_sha256": "d39bd1dd82572ad3709e7dd112fb80a6d080f0348d1c8f13e4ba13e18975fe37"
+    },
+    {
+      "capture": "all-1280x800-review-note",
+      "png_sha256": "e7bee702414115973ba1313ab1d5fe55fbc199d56dc3cd7f94ff550b1a6ccc1d",
+      "metadata_sha256": "26bae58d74c08e5be313f7be0efb6de936d384d21a60f15baabadbeaab2df70e"
+    },
+    {
+      "capture": "all-1280x800-review-overlay",
+      "png_sha256": "234aef01c9336c93cd4a954b4ce2c0cf73ca598bd1de21eb74cd75abf1a42ae6",
+      "metadata_sha256": "800cd4a6e7614d2fdd81a4c35270a5066eacef1a403fdb67eeb3bcb8519a5b33"
+    },
+    {
+      "capture": "all-1280x800-review-queue-hidden",
+      "png_sha256": "ab0724602adba14c912add1ffe4332b3cd5de2ae308c563c1b5bc122e99e0f47",
+      "metadata_sha256": "ba1eb17b92d16fc2cc2f29b2c8c64e05f63436b66b9379c530130de62c5fb9d2"
+    },
+    {
+      "capture": "all-1280x800-review",
+      "png_sha256": "6e4c59bcc64a4bd62d687d4ddbf6685f3285c955f00443a1589f53a89cb4d0d9",
+      "metadata_sha256": "462de9c08e8cfc0e7c8f3a6f8223aa52ea5181ac2a3216ad51dcf5e262cb5017"
+    },
+    {
+      "capture": "all-820x600-capture-empty",
+      "png_sha256": "3235e677073136509e5cecd5a866b146b4f7e7258cb50d5225d0b2a6db78756d",
+      "metadata_sha256": "ae9c286c4b530dd16fb1f85c91debf293d6cbec1a34132bfc258721187e8b04e"
+    },
+    {
+      "capture": "all-820x600-capture-mobile",
+      "png_sha256": "457a7a6e29e77ad20a3d755e337155ce0e163a42f4f0ffa8e4d4f43394f310b9",
+      "metadata_sha256": "d2300c13a7053d27f39c71edf8d22d973fe4b440dc66a799a46a41b9c2d579ca"
+    },
+    {
+      "capture": "all-820x600-review-approval-confirm",
+      "png_sha256": "e73892b0432e73830d40f2a3559501b6fa383f348bec8a6f226702dca6e70fda",
+      "metadata_sha256": "1815207f29ad837261d5f195d7d6e1f1f73fd04d7cb112db4f432cc89a638bbd"
+    },
+    {
+      "capture": "all-820x600-review-approval-exact-tail",
+      "png_sha256": "8526b469ba05fbb144a8b6ce59b8874ed45c3a373e62a54c8f8024de46a359fa",
+      "metadata_sha256": "8259708c52278c7ae2871708cf144b01b52c268e59e551c05a8fc24e682b81fa"
+    },
+    {
+      "capture": "all-820x600-review-approval-last-exact",
+      "png_sha256": "4f9c13e8c0bcf655145c196d7b13d6f031aa1e4bc7d965428937056511518186",
+      "metadata_sha256": "4fa9cd487deb78c9e7a9311acfce6ab763237f6bfc1ea0e77456573974566a30"
+    },
+    {
+      "capture": "all-820x600-review-approval-last-row",
+      "png_sha256": "5d35101bf0f4c5655cdc4960f0bbfaaaf06304e6094e095695db11ad0f0acdfa",
+      "metadata_sha256": "a4e36a49853bd61ccfef29e1edd0aa3fc39c0f83684fbd3043ca08e7bf263762"
+    },
+    {
+      "capture": "all-820x600-review-approval-many",
+      "png_sha256": "d5fd9bff03e10462bd94f7de7aac67c1dd1281cbf216f37cd7961066c9042768",
+      "metadata_sha256": "b496966a9919982a8979e548871ea9f5dd3ba1698e173ae72cab9aa179274384"
+    },
+    {
+      "capture": "all-820x600-review-details",
+      "png_sha256": "b3599546fef5edbec926fba4b8921babd9c9a3cc3e7f0a9304d5e6d6d344131c",
+      "metadata_sha256": "ada68d480737441bcc2458849c7e6f9acda98ae2db92c2195f87c3389ede480a"
+    },
+    {
+      "capture": "all-820x600-review-difference",
+      "png_sha256": "2e962109c1410ba5f6223fc32b946a490b96d7c6eebcefae32280f628771bd63",
+      "metadata_sha256": "1248dc68b41626ceb17468a3551e0d67b9588969655370364461e270a2abe392"
+    },
+    {
+      "capture": "all-820x600-review-full-width-after",
+      "png_sha256": "9e30fbea06af42a1ad1844dbf7c9194ee9052d43471955b5c8b7774ccbed99de",
+      "metadata_sha256": "3562e0b779ac99d7f7aea8b4875e1bbbe15ae70bd85da3bc80715bc213f72cff"
+    },
+    {
+      "capture": "all-820x600-review-full-width-before",
+      "png_sha256": "4b35d56bd6f68f05435ff83cee1c1806481f223b930f9c9651bcb51562a011de",
+      "metadata_sha256": "03efadd3c16b407a07c242d984a989d2daca57f9d9759bad26f7cf8a9de211c1"
+    },
+    {
+      "capture": "all-820x600-review-heatmap",
+      "png_sha256": "c7d74b12b0af2cf5700ccc6407f4122a9539397a41c439e8fec0455905207775",
+      "metadata_sha256": "bcae4e097bd6dcb70654db65f1dc21cf16fa83d114f868a603f4695fb65eacf7"
+    },
+    {
+      "capture": "all-820x600-review-mode-chooser",
+      "png_sha256": "a79469d678c4e52c5850881c57b1316d9956cf5610605698b4ee7c4ac85de99e",
+      "metadata_sha256": "ccfc589b932e218b3bda9ec760d06fc15eea133deb20490e1f1439cf48e54593"
+    },
+    {
+      "capture": "all-820x600-review-navigation-open",
+      "png_sha256": "c94738dcbca3757a3845dcbca995a84b5371f3cf1868d881cad2ff78547b4ffa",
+      "metadata_sha256": "e78cbb364a33b679a19e76bbb0fa04622b4bd3afd8193d859d766a28e6470260"
+    },
+    {
+      "capture": "all-820x600-review-no-matches",
+      "png_sha256": "795dcf301862c7bfc43c9d7999866ccb52020e7312943802c76d1800c7b564c9",
+      "metadata_sha256": "a0dc8b2c11c183d81dd982cae414b4a23902384bfa731226f94f81a95f5a5071"
+    },
+    {
+      "capture": "all-820x600-review-note",
+      "png_sha256": "f02019c624b34168d39c9380c28dd0dff251dc24937e4b78194b9aba2abd01df",
+      "metadata_sha256": "b35d2b750f43a435e163bf46cc83fde6e2d2775164e470aa082672bffd306679"
+    },
+    {
+      "capture": "all-820x600-review-overlay",
+      "png_sha256": "126e2e69f1f17b6bb26428748ef55d4d9b7af1f5a779d11e060ce89102cb5b6d",
+      "metadata_sha256": "3d7f7b6a6a6c53f6b145268eae40ef54e9fbb62d35ed7340db7f21f8ce08184a"
+    },
+    {
+      "capture": "all-820x600-review-queue-hidden",
+      "png_sha256": "bdb9af75767176adf0792cf1ed01d78fbc32448da581eacdf11e7183dc8638f9",
+      "metadata_sha256": "1afab1d991fe6ae662e6e2d7045dbaf0f705e24024ffaeebff03eee395c369de"
+    },
+    {
+      "capture": "all-820x600-review",
+      "png_sha256": "4024d1afcd8422377c11e3e3d3001cfe089728ed32f10cff0cfe5788d97174f8",
+      "metadata_sha256": "cb819ecdf1fb364d19c8274de38f69cfa8eab38de89ff35ed5b336810e49a2b7"
+    }
+  ],
+  "capture_source_sha256": {
+    "crates/app/src/analysis_engine.rs": "530590b71dde81492ad35d7f217aa9dfc9118960b262789ec937cc7c8c0aa99a",
+    "crates/app/src/auth.rs": "5bb00b2400bed9697dfd7534048b58283aa0ba34d69b47ef219e0b5cf4a0f6b9",
+    "crates/app/src/crawling.rs": "4def7c6fc0d6e14ed8ae7099d07a080c2c38be0521d4249acad61b75ba7aae8e",
+    "crates/app/src/diagnostics.rs": "eb0b2b4a6b6886abdc6ecfa3a5fc08c3a078d3261841ff61f2aed0fa2d4c0640",
+    "crates/app/src/exit_guard.rs": "909454906163ea288de47182d6d0813c6f3d4406be272cddbc4113506fb4c95e",
+    "crates/app/src/flow.rs": "36a8e0799a0293d40f2b9ed4f80effdc9f40b864e452771d804c5e4adc99c28e",
+    "crates/app/src/form_recovery.rs": "b4b852c7a5d8ed1dbabde3e8b3d8c9419a1f9ad9f6beb79f3ce9a5f856678873",
+    "crates/app/src/formatting.rs": "1bcff931fd53ea65c9a13a36d3797f6f042ae9ffa62e39126b49a2cf94bd443a",
+    "crates/app/src/foundation.rs": "3544d83e0daa9d33ab77bbabea1828e1183b1fb8fa356d537a7e0f935b85aa60",
+    "crates/app/src/images.rs": "a29994f124456aed0d2e69d8da77e9df959da7e5c9a9696315ddf4bfe7ac6a73",
+    "crates/app/src/jobs.rs": "57ed74e61d1848cdd34bc1298a8cc8e85705fdb4bc55dbfc23f0828e797c2c8a",
+    "crates/app/src/lib.rs": "49b4f64e2a4cb99aca96e40b9de04ff0f4ce76da721ab9d79ffd5e90dea18ccc",
+    "crates/app/src/loading_ux.rs": "40ae334d4eca5f41558e7259a575b655be3a2872bc24a06e71ed7787b913bec8",
+    "crates/app/src/local_ux.rs": "02ee8abbafc821ece580ba9f5f9d19f429990b4346b9fd500d6bddd834982927",
+    "crates/app/src/main.rs": "8af500392085c6c04aca3db3a563cd80418c6acdd46de607351b426441073b9e",
+    "crates/app/src/official_catalog.rs": "26aabca049c1b09c8a867cd1bd2ba0f14f488bfa255db03804122b286ffdfd44",
+    "crates/app/src/options_ux.rs": "fe1cdd6a1c2a05e50518ddba112728829f371a52b515820f1f196a188a070e35",
+    "crates/app/src/options_ux_tests.rs": "e3eba68da86ea2ed4b4526d10d301ceb8896b9b6b97f25af05b9dcabb14ed65c",
+    "crates/app/src/phase4_review_tests.rs": "ed13302ebbf1eaa852511bba74a8d7f19a60c4571f44af37d203446b878fa6eb",
+    "crates/app/src/product.rs": "b512518938a3a3d0ce2259e7834547e2e50d3fc945c073ebbdb18df6663c43c6",
+    "crates/app/src/review.rs": "fb19aea72fcf212d407969f02aae6fd0775ca1b6987c38cb7c845be83363a087",
+    "crates/app/src/review_ux.rs": "8a20389179465396389109e1a2d9a1b5e9aa0142cd1ab6ae597de6a43e526b98",
+    "crates/app/src/task.rs": "d675121a3d6048c63363f6b3bbaa296defa9092cd66fbec91fa1bf2e59331e89",
+    "crates/app/src/task_ux.rs": "3ccc64babe9f1d850d5d8982c00310fff4986bea400198e0965723a102ae882f",
+    "crates/app/src/ui/controls.rs": "16365343999d438fb487b77e2b8a2b393344d2d1a4e94ca6b5b5b4d26c0b7a3a",
+    "crates/app/src/ui/gpu_diagnostics.rs": "5e5880ed1adc69cbce4c86e1846e2a2770d39cf31717b25190150f0c824f31fd",
+    "crates/app/src/ui/mod.rs": "3bf5b5e5316fa6769ece569587c3a0ddba674cc5338ba71e81b8a9ebf1aea50e",
+    "crates/app/src/ui/performance.rs": "34d8b2d006146d56208c682d4d13374c34fc2ec212abdbe41f40e487de64d101",
+    "crates/app/src/ui/status_icon.rs": "f65dd6f68700ef68db9efc1b28f5d2ec034a592ebe4645430327a09d3ffaa8f3",
+    "crates/app/src/ui/text_input.rs": "e9a6d192b6e6a129f6c8d7f741cd80803b9742ca5aaefef4de25999df0e61a9f",
+    "crates/app/src/ui/theme.rs": "68f6f1a3955c7bdb5dd5f684c2541d2c1ccd69553d3069209c0c81e0441debf4",
+    "crates/app/src/ui/timezone_select.rs": "3709edfa37d4dcbfe45c76ba4e197c70062ea5c7a9213e6c18bec81e123cb277",
+    "crates/app/src/ui/web_link.rs": "bbdbaa3bfcc1d290e33f46cd99c654587c416be1c8300261ab49a7dbd244dbff",
+    "crates/app/src/ui/zoom_select.rs": "c4aae94aa449400fef7cecb1bce90fd69c5d23818d33c969514ee21137660e7a",
+    "crates/app/src/ui_inspection.rs": "780f5d34f1373e13f9283be75da5b1e8a129a8debf4ba3cb2e17ca502f94032d",
+    "crates/app/src/ui_renderer_capture.rs": "028c6c33a2424154ec09372db63df748b8dd3dae358cb85599b6add277f22980",
+    "crates/app/src/ui_review_matrix.rs": "d896e5d8431abd9090680999cd4de5165d0b151419133771857db3f008411698",
+    "crates/app/src/viewer_cache.rs": "f3e4e44719130343e02f3d6192fd26baea3c2198e74f3f034c782b714f6cc682",
+    "crates/app/src/viewer_ux.rs": "234336c5cafe9705a301395c3cb1342487e7e2781bf2b6155267c766b744c68f",
+    "crates/app/src/workflow.rs": "dc92e32b73e62f89aa1e2894f7973e5a053227855182913ce3ec17086d90c206",
+    "crates/app/src/workflow_refinement_tests.rs": "6b17616c04818c23cdff5c9c536e5aebc59ddb3cc6624316e790405c69156a2e",
+    "crates/app/src/workspace_history.rs": "290156032df06611ffd874e62bb1ee6f564be3a46d4f724e9e8e33d1fdb67a5e",
+    "crates/core/src/analysis_engine.rs": "7c935ab7b7caab5c0ccdc1decc46499ad3dc3d55282dc5d758e3c4efdd89c43a",
+    "crates/core/src/archive.rs": "801301604ceb05d080bbadf67f8796c3ef07316414daeff0f6ba4ff1fe8401db",
+    "crates/core/src/crawl.rs": "724efcddde73c3ac3fed36e7acbf1f00e32a0024bd0fbfc3f29df380263487a8",
+    "crates/core/src/domain.rs": "7cb532d9198fcf3defc998519123b9eb06ae6e4c284a4e724fd0dd6d901e7401",
+    "crates/core/src/environment.rs": "d863d331ea2e5fecb2c5f7f25f69737097ee37e8748a24d68d055afaadf955b2",
+    "crates/core/src/evidence.rs": "abae6c5f33fcd2328019cb9b8abaabd83a436a582d125737c298fa2dd5a9ec02",
+    "crates/core/src/lib.rs": "b0c6419782367c29edc20113291c3426cd6b2b33650466f8a30c59f6b2c64e9f",
+    "crates/core/src/platform/windows.rs": "5c5258acc8a554a08cc5e9867535877bcd31af1acbbd3f31abfdb0cc3bf84679",
+    "crates/core/src/platform.rs": "94719fa3e846c04e2104c8c6db786febe247593b4caa493591dbdbf26ce8827f",
+    "crates/core/src/shell.rs": "fe72d1c5acb2dfb0b04e4bb7d7a509150a526d6a3ca3366aa546cdf49ead1592",
+    "crates/core/src/zip_directory.rs": "79b756da84047103646ca706bb234572644989909f2cba0381f444593c1e5fb8",
+    "crates/storage/src/capture.rs": "08b645a5a6ca61bf6e4499f1b6fc3382ac9e65147b618c7c6d5f41e9c29f5ca8",
+    "crates/storage/src/diagnostics.rs": "1c5c08799792cf0f4f3f42300fc29b2c1463d7bd5de60cf8dd7690b969abe4d8",
+    "crates/storage/src/history_inspection.rs": "8ddee42ce943a84d2af94c6c479ea46b6a352a39a42d344ac0127767ea5d5fb8",
+    "crates/storage/src/images.rs": "d9ed35640e448e861bd5b23c640b21a2676f8b375faeaac3ea9729d06dc74ef8",
+    "crates/storage/src/lib.rs": "c5e64533cfe490b3a027a954b5bf5b3858d0610714a333195a1c4ed0b56d56e7",
+    "crates/storage/src/phase6_corrections_tests.rs": "3dbb185adfe7ef08e39ac09ae456ac68791f67977e42393326506f76489bc776",
+    "crates/storage/src/portability.rs": "7d2865e9b1bab62ab9f0a04f8476cca1edbad0170f908346fc8914e38be73b5a",
+    "crates/storage/src/retention.rs": "6b5df02854a854491e239f00f3883a8f20cc40424443aca658f58a97f25337b3",
+    "crates/storage/src/review.rs": "7fe33b9b04537d3a35b9e3a1cd61df3e73607abf47b163f1eb3db20b376855f1"
+  },
+  "final_source_sha256": {
+    "crates/app/src/analysis_engine.rs": "530590b71dde81492ad35d7f217aa9dfc9118960b262789ec937cc7c8c0aa99a",
+    "crates/app/src/auth.rs": "5bb00b2400bed9697dfd7534048b58283aa0ba34d69b47ef219e0b5cf4a0f6b9",
+    "crates/app/src/crawling.rs": "4def7c6fc0d6e14ed8ae7099d07a080c2c38be0521d4249acad61b75ba7aae8e",
+    "crates/app/src/diagnostics.rs": "eb0b2b4a6b6886abdc6ecfa3a5fc08c3a078d3261841ff61f2aed0fa2d4c0640",
+    "crates/app/src/exit_guard.rs": "909454906163ea288de47182d6d0813c6f3d4406be272cddbc4113506fb4c95e",
+    "crates/app/src/flow.rs": "36a8e0799a0293d40f2b9ed4f80effdc9f40b864e452771d804c5e4adc99c28e",
+    "crates/app/src/form_recovery.rs": "b4b852c7a5d8ed1dbabde3e8b3d8c9419a1f9ad9f6beb79f3ce9a5f856678873",
+    "crates/app/src/formatting.rs": "1bcff931fd53ea65c9a13a36d3797f6f042ae9ffa62e39126b49a2cf94bd443a",
+    "crates/app/src/foundation.rs": "3544d83e0daa9d33ab77bbabea1828e1183b1fb8fa356d537a7e0f935b85aa60",
+    "crates/app/src/images.rs": "a29994f124456aed0d2e69d8da77e9df959da7e5c9a9696315ddf4bfe7ac6a73",
+    "crates/app/src/jobs.rs": "57ed74e61d1848cdd34bc1298a8cc8e85705fdb4bc55dbfc23f0828e797c2c8a",
+    "crates/app/src/lib.rs": "49b4f64e2a4cb99aca96e40b9de04ff0f4ce76da721ab9d79ffd5e90dea18ccc",
+    "crates/app/src/loading_ux.rs": "40ae334d4eca5f41558e7259a575b655be3a2872bc24a06e71ed7787b913bec8",
+    "crates/app/src/local_ux.rs": "02ee8abbafc821ece580ba9f5f9d19f429990b4346b9fd500d6bddd834982927",
+    "crates/app/src/main.rs": "8af500392085c6c04aca3db3a563cd80418c6acdd46de607351b426441073b9e",
+    "crates/app/src/official_catalog.rs": "26aabca049c1b09c8a867cd1bd2ba0f14f488bfa255db03804122b286ffdfd44",
+    "crates/app/src/options_ux.rs": "fe1cdd6a1c2a05e50518ddba112728829f371a52b515820f1f196a188a070e35",
+    "crates/app/src/options_ux_tests.rs": "e3eba68da86ea2ed4b4526d10d301ceb8896b9b6b97f25af05b9dcabb14ed65c",
+    "crates/app/src/phase4_review_tests.rs": "ed13302ebbf1eaa852511bba74a8d7f19a60c4571f44af37d203446b878fa6eb",
+    "crates/app/src/product.rs": "b512518938a3a3d0ce2259e7834547e2e50d3fc945c073ebbdb18df6663c43c6",
+    "crates/app/src/review.rs": "fb19aea72fcf212d407969f02aae6fd0775ca1b6987c38cb7c845be83363a087",
+    "crates/app/src/review_ux.rs": "8a20389179465396389109e1a2d9a1b5e9aa0142cd1ab6ae597de6a43e526b98",
+    "crates/app/src/task.rs": "d675121a3d6048c63363f6b3bbaa296defa9092cd66fbec91fa1bf2e59331e89",
+    "crates/app/src/task_ux.rs": "3ccc64babe9f1d850d5d8982c00310fff4986bea400198e0965723a102ae882f",
+    "crates/app/src/ui/controls.rs": "16365343999d438fb487b77e2b8a2b393344d2d1a4e94ca6b5b5b4d26c0b7a3a",
+    "crates/app/src/ui/gpu_diagnostics.rs": "5e5880ed1adc69cbce4c86e1846e2a2770d39cf31717b25190150f0c824f31fd",
+    "crates/app/src/ui/mod.rs": "3bf5b5e5316fa6769ece569587c3a0ddba674cc5338ba71e81b8a9ebf1aea50e",
+    "crates/app/src/ui/performance.rs": "34d8b2d006146d56208c682d4d13374c34fc2ec212abdbe41f40e487de64d101",
+    "crates/app/src/ui/status_icon.rs": "f65dd6f68700ef68db9efc1b28f5d2ec034a592ebe4645430327a09d3ffaa8f3",
+    "crates/app/src/ui/text_input.rs": "e9a6d192b6e6a129f6c8d7f741cd80803b9742ca5aaefef4de25999df0e61a9f",
+    "crates/app/src/ui/theme.rs": "68f6f1a3955c7bdb5dd5f684c2541d2c1ccd69553d3069209c0c81e0441debf4",
+    "crates/app/src/ui/timezone_select.rs": "3709edfa37d4dcbfe45c76ba4e197c70062ea5c7a9213e6c18bec81e123cb277",
+    "crates/app/src/ui/web_link.rs": "bbdbaa3bfcc1d290e33f46cd99c654587c416be1c8300261ab49a7dbd244dbff",
+    "crates/app/src/ui/zoom_select.rs": "741eecf03fc0e635eb9639599fd34ae9815a912fdb92208024d37c523f013bba",
+    "crates/app/src/ui_inspection.rs": "780f5d34f1373e13f9283be75da5b1e8a129a8debf4ba3cb2e17ca502f94032d",
+    "crates/app/src/ui_renderer_capture.rs": "028c6c33a2424154ec09372db63df748b8dd3dae358cb85599b6add277f22980",
+    "crates/app/src/ui_review_matrix.rs": "d896e5d8431abd9090680999cd4de5165d0b151419133771857db3f008411698",
+    "crates/app/src/viewer_cache.rs": "f3e4e44719130343e02f3d6192fd26baea3c2198e74f3f034c782b714f6cc682",
+    "crates/app/src/viewer_ux.rs": "234336c5cafe9705a301395c3cb1342487e7e2781bf2b6155267c766b744c68f",
+    "crates/app/src/workflow.rs": "dc92e32b73e62f89aa1e2894f7973e5a053227855182913ce3ec17086d90c206",
+    "crates/app/src/workflow_refinement_tests.rs": "6b17616c04818c23cdff5c9c536e5aebc59ddb3cc6624316e790405c69156a2e",
+    "crates/app/src/workspace_history.rs": "290156032df06611ffd874e62bb1ee6f564be3a46d4f724e9e8e33d1fdb67a5e",
+    "crates/core/src/analysis_engine.rs": "7c935ab7b7caab5c0ccdc1decc46499ad3dc3d55282dc5d758e3c4efdd89c43a",
+    "crates/core/src/archive.rs": "801301604ceb05d080bbadf67f8796c3ef07316414daeff0f6ba4ff1fe8401db",
+    "crates/core/src/crawl.rs": "724efcddde73c3ac3fed36e7acbf1f00e32a0024bd0fbfc3f29df380263487a8",
+    "crates/core/src/domain.rs": "7cb532d9198fcf3defc998519123b9eb06ae6e4c284a4e724fd0dd6d901e7401",
+    "crates/core/src/environment.rs": "d863d331ea2e5fecb2c5f7f25f69737097ee37e8748a24d68d055afaadf955b2",
+    "crates/core/src/evidence.rs": "abae6c5f33fcd2328019cb9b8abaabd83a436a582d125737c298fa2dd5a9ec02",
+    "crates/core/src/lib.rs": "b0c6419782367c29edc20113291c3426cd6b2b33650466f8a30c59f6b2c64e9f",
+    "crates/core/src/platform/windows.rs": "5c5258acc8a554a08cc5e9867535877bcd31af1acbbd3f31abfdb0cc3bf84679",
+    "crates/core/src/platform.rs": "94719fa3e846c04e2104c8c6db786febe247593b4caa493591dbdbf26ce8827f",
+    "crates/core/src/shell.rs": "fe72d1c5acb2dfb0b04e4bb7d7a509150a526d6a3ca3366aa546cdf49ead1592",
+    "crates/core/src/zip_directory.rs": "79b756da84047103646ca706bb234572644989909f2cba0381f444593c1e5fb8",
+    "crates/storage/src/capture.rs": "08b645a5a6ca61bf6e4499f1b6fc3382ac9e65147b618c7c6d5f41e9c29f5ca8",
+    "crates/storage/src/diagnostics.rs": "1c5c08799792cf0f4f3f42300fc29b2c1463d7bd5de60cf8dd7690b969abe4d8",
+    "crates/storage/src/history_inspection.rs": "8ddee42ce943a84d2af94c6c479ea46b6a352a39a42d344ac0127767ea5d5fb8",
+    "crates/storage/src/images.rs": "d9ed35640e448e861bd5b23c640b21a2676f8b375faeaac3ea9729d06dc74ef8",
+    "crates/storage/src/lib.rs": "c5e64533cfe490b3a027a954b5bf5b3858d0610714a333195a1c4ed0b56d56e7",
+    "crates/storage/src/phase6_corrections_tests.rs": "3dbb185adfe7ef08e39ac09ae456ac68791f67977e42393326506f76489bc776",
+    "crates/storage/src/portability.rs": "7d2865e9b1bab62ab9f0a04f8476cca1edbad0170f908346fc8914e38be73b5a",
+    "crates/storage/src/retention.rs": "6b5df02854a854491e239f00f3883a8f20cc40424443aca658f58a97f25337b3",
+    "crates/storage/src/review.rs": "7fe33b9b04537d3a35b9e3a1cd61df3e73607abf47b163f1eb3db20b376855f1"
+  },
+  "post_capture_test_only_change": "ui/zoom_select.rs: expected compact button width 60 -> 112 in a unit assertion only; all shipping rendering bodies unchanged",
+  "log_sha256": {
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/render-batch-1.log": "02366b93393dc555b8e629d16c465c3587ef2b4ff86a6091786e0aeb37c04eaa",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/render-batch.log": "5cf7c1de2b4523c65bab5baf52f6224b039ca9381299814cc700f9013ad78d92",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/render-confirmation-isolated.log": "e127f7e0e0537f872508322bc5b83e8b51b0d7768f349e0489cbe18c75d5e31e",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/render-confirmation.log": "586d8072ea0c95be6ad32c6feaaa4d4975ac236729f91aaecd437828b3fbfa4f",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/render-first.log": "85ac08b1e8852e52fb220084edf2632e8b578e261143361a907d0e4ee4082ccc",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/tests-binary-final.log": "5e51c1a4654ffe64cf0c1653e6eb48c1ff97a92ea43415202e6395bcc06f38b0",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/tests-final.log": "34c491fd166426a98f680e1130a6cf5134db578653d4063667955088cdab02f5",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/tests-fourth.log": "e31622e53b042ec328a4578c0e39a3f2f9bf8d614bcdb91bcd0e49dfad8cc541",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/tests-packages-final.log": "6cf4a486a422d69cd86e1c747c2b3e19a2beacdf13de190a73de7005bec738ba",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/tests-safety-packages.log": "52386bdbf9f8b95d71afc9495298a09052a6248fbd57a0e0975b0243cb4f3b89",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/tests-second.log": "ad118f915933c3c0779137957e7043a89ad621875128fd55402165ee8dde28ea",
+    "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/tests-third.log": "f55ff0bdef7e4a9127b11b81af56bb6bbfd31eb8e8773b186b3460d0d8fe4f8c",
+    "/var/home/olav/Data/opencode/tmp/opencode/phase4-build.log": "fafaa0b8d17677cf9ae74563071bd5235c71fa3ca3a8d8e2e002ce6475256999",
+    "/var/home/olav/Data/opencode/tmp/opencode/phase4-tests-first.log": "94bfa3c1bc48dd9a24be3172e73fb1d189fa681fef339c975e51fcf8cc36df19",
+    "/var/home/olav/Projects/Regressee/docs/research/whole-app-ui-review-20261012/phase4-tests.txt": "6cf4a486a422d69cd86e1c747c2b3e19a2beacdf13de190a73de7005bec738ba",
+    "/var/home/olav/Projects/Regressee/docs/research/whole-app-ui-review-20261012/phase4-render.txt": "e127f7e0e0537f872508322bc5b83e8b51b0d7768f349e0489cbe18c75d5e31e"
+  },
+  "checks": {
+    "binary_passed": 106,
+    "binary_ignored": 15,
+    "packages_passed": 295,
+    "packages_ignored": 40,
+    "packages_failed": 0,
+    "native_renderer_passed": 1,
+    "native_renderer_pairs": 38,
+    "fixture_storage_unchanged": true,
+    "native_input": "not tested",
+    "accessibility": "not tested",
+    "windows_macos": "not tested",
+    "usability": "not tested",
+    "release": "not tested"
+  },
+  "source_gate": "BLOCKED: Guided(53) missing during initial evidence loading/failed-read restoration",
+  "functional_repair": {
+    "date": "2026-10-12",
+    "acceptance": "PENDING independent re-verification",
+    "prior_verdict": "FIX preserved unchanged",
+    "blocked_receipt_sha256": "b1ea3bf1f7d1b35dd236b22e07a5670cc94bb4c3d1491ef56fae5ce3df128102",
+    "root": "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete",
+    "scope": [
+      "V4-1",
+      "V4-2",
+      "V4-3"
+    ],
+    "package_tests": {
+      "passed": 299,
+      "failed": 0,
+      "ignored": 40
+    },
+    "independent_probe": {
+      "passed": 4,
+      "failed": 0,
+      "exit": 0
+    },
+    "renderer": {
+      "passed": 1,
+      "pairs": 22,
+      "seconds": 42.91
+    },
+    "personally_read_contact_sheets": 4,
+    "personally_read_originals": [
+      "all-820x600-review-note.png",
+      "all-1280x800-review-note.png",
+      "all-820x600-review-queue-hidden.png",
+      "all-820x600-review-full-width-before.png",
+      "all-1280x800-review-queue-hidden.png",
+      "all-1280x800-capture-loading.png",
+      "all-820x600-capture-read-failed.png",
+      "all-820x600-capture-mobile.png"
+    ],
+    "pairs": [
+      {
+        "capture": "all-1280x800-review-queue-hidden",
+        "png_sha256": "d46decb511479cc1298a45c3c1d7f1f548ef8544f6ac9d839fc710b73d9a3c39",
+        "metadata_sha256": "8cf8ee97d97ba6ab77ecdcd659d9bfb7776d2f97759154365b961b028693a0cc"
+      },
+      {
+        "capture": "all-1280x800-review-difference",
+        "png_sha256": "3e427b99fb27ba034842f1fa98c166cbd78f3bd845bfd50cfb9b81cd4957e0a6",
+        "metadata_sha256": "e3ff7b47caed576381c51705481697de7f43b9108949f6c6900ac09308ccd957"
+      },
+      {
+        "capture": "all-1280x800-review-overlay",
+        "png_sha256": "c3e270ce843dc91d1057e56164d346fe66c1f39b8d4e815bab4e92ef43244354",
+        "metadata_sha256": "9d16f0106366f68d39b972ef039e623f0402dddd7444eae5a40d51f61bc6e851"
+      },
+      {
+        "capture": "all-1280x800-review-heatmap",
+        "png_sha256": "18290acd7738e232415183d29fcfc2999b4355b441e084b70bf43c48837dd33d",
+        "metadata_sha256": "2309e5f847d8651b4b77c15ad59c24322216741ddf882dcb9d979645bc2d4599"
+      },
+      {
+        "capture": "all-1280x800-review-note",
+        "png_sha256": "7dc751274d186759278de669ed2f70ee2f2c4e6cc3612fd616e4bb798efa877c",
+        "metadata_sha256": "894810cac6c711535c34f675e0b373a57b15023c597ffcd165e029168c7ecb29"
+      },
+      {
+        "capture": "all-1280x800-review-full-width-before",
+        "png_sha256": "97af7f5e43f8bd6a6de33153fa6108d44e8ac241d05a90ff6f29a6f209520d00",
+        "metadata_sha256": "dde90eb5b43644d572781817cda05501a010b1981471ad9158aeb0cc76a42811"
+      },
+      {
+        "capture": "all-1280x800-review-full-width-after",
+        "png_sha256": "af9ad9e57d41ede8222996a2709291a3674b44033ef9308c852466f819d021a5",
+        "metadata_sha256": "514d0f24389d8071c00c6a161593ce1583340ec0bdd8001325fb29e7e26646ca"
+      },
+      {
+        "capture": "all-1280x800-capture-mobile",
+        "png_sha256": "18ba1933cb4db5c8e0ccdd110020276f345840e9c2533aabf31a966c7c67013e",
+        "metadata_sha256": "79eaf8d1e1444178893e05a2bf7f2449aec4ff3d42fee87b423bf5b00749108c"
+      },
+      {
+        "capture": "all-1280x800-capture-loading",
+        "png_sha256": "291f3a48ac309e37577d5907281c483f0d86dd7ab69c1c6f1767b782155811bb",
+        "metadata_sha256": "26df23ebcdbf15d64c9fb476558f403df095754ee0810b0a725632f9ee141dc0"
+      },
+      {
+        "capture": "all-1280x800-capture-read-failed",
+        "png_sha256": "787ff127cf12ba16f82755cada1d079263287cdca65dc642559de6dba9de5abe",
+        "metadata_sha256": "00e397e791e99198a90033ed1528508600e19c7418475585709b5ebc12c4a458"
+      },
+      {
+        "capture": "all-1280x800-capture-read-dismissed",
+        "png_sha256": "fab5e2aadeb13b82738a40d601c810071d16fa07b5c37900c327ba5a39eba88c",
+        "metadata_sha256": "1ffdae7fb7a936eeffb025b27673e1f765df7c4092adfe290b0f7f550716a02d"
+      },
+      {
+        "capture": "all-820x600-review-queue-hidden",
+        "png_sha256": "8d7fb06565cff06e02cbc9f63e2050549817fc8af930f67dbe9d8b8ecd18783b",
+        "metadata_sha256": "116288b85b8813986dcf651a905754db4f3a95b08336ece1343da23e550cc1a3"
+      },
+      {
+        "capture": "all-820x600-review-difference",
+        "png_sha256": "e4717021464d109333b168b775896c654311fc5b563f92329f6b17e04844f03f",
+        "metadata_sha256": "d429bd32cc8bd23ac1d66f09672519879c33c1e0c75de900c1a2b436405e4369"
+      },
+      {
+        "capture": "all-820x600-review-overlay",
+        "png_sha256": "87ecec35982a8f1fdcec71314b974c470823e3d4097f126274379e2be49a5218",
+        "metadata_sha256": "7b51040e6be1042cfb7bbbab2ac9228c680dea77c613af1655f0c7186d2c2095"
+      },
+      {
+        "capture": "all-820x600-review-heatmap",
+        "png_sha256": "fa64a28ae1b7188a9a334d3e711fb17802a7b499ad5e6dfafa19acf011077f4f",
+        "metadata_sha256": "53b7515f4b447a5e144262b473a9c553836e79b3bc837304db40c50674840577"
+      },
+      {
+        "capture": "all-820x600-review-note",
+        "png_sha256": "74c27ed003d06a96898d1b7604c4da36f5a95991f52f45f8cd8619a17893d1ee",
+        "metadata_sha256": "2a432f84895fcd7152a32cf0673cae1321d40e94d192dfa98e24ef3b0fa6e6f1"
+      },
+      {
+        "capture": "all-820x600-review-full-width-before",
+        "png_sha256": "028644f353a70ddd29c6f5b95025665ae37c00568acf1cdfe5d045d760565f32",
+        "metadata_sha256": "5b465d8076a1e5e874819ca19cea4eb7763b1ad4f85dfef5a9a0f321df6ddfef"
+      },
+      {
+        "capture": "all-820x600-review-full-width-after",
+        "png_sha256": "4803fef6698b8b6262c001b4ee32daef87a9bc947db85cd3a85a1f4cce641b3b",
+        "metadata_sha256": "c7958ace9c69b8d736f1ce726d415c6b1829ce4c6f9674c3f1cc08289f15e7d0"
+      },
+      {
+        "capture": "all-820x600-capture-mobile",
+        "png_sha256": "8adad727ebcbe131df057bd05ede466bfecc520cd182bc131a2d25cd7ed78ee6",
+        "metadata_sha256": "106ad4477dacf092462338445e0c94be8eb37dbbe68363efcef17ee766bfabf3"
+      },
+      {
+        "capture": "all-820x600-capture-loading",
+        "png_sha256": "236d60d1aa072976e8749145348117955d321914a5050a4e15275bd7602763dd",
+        "metadata_sha256": "d894c9fb80e1f16c25883d2502bd792297d46bece64ff15a4cb17fc4d3641511"
+      },
+      {
+        "capture": "all-820x600-capture-read-failed",
+        "png_sha256": "31e111aa87ba741730beced6ce8fb63138fe443eb77b3e4b0204f461f7c382b7",
+        "metadata_sha256": "a0b3ee66ac454216e6a47f538d74973a1963404fbae468947f8d0be142d30cd7"
+      },
+      {
+        "capture": "all-820x600-capture-read-dismissed",
+        "png_sha256": "df110c62043311bb0e3705cf14df56d956f28c232b804071b781665e9968b27c",
+        "metadata_sha256": "6bcbc7bb5611c3d647d6c4a2aca607976441e49bcefcb9cecf54d3c6f4a68673"
+      }
+    ],
+    "capture_source_sha256": {
+      "crates/app/src/analysis_engine.rs": "530590b71dde81492ad35d7f217aa9dfc9118960b262789ec937cc7c8c0aa99a",
+      "crates/app/src/auth.rs": "5bb00b2400bed9697dfd7534048b58283aa0ba34d69b47ef219e0b5cf4a0f6b9",
+      "crates/app/src/crawling.rs": "4def7c6fc0d6e14ed8ae7099d07a080c2c38be0521d4249acad61b75ba7aae8e",
+      "crates/app/src/diagnostics.rs": "eb0b2b4a6b6886abdc6ecfa3a5fc08c3a078d3261841ff61f2aed0fa2d4c0640",
+      "crates/app/src/exit_guard.rs": "909454906163ea288de47182d6d0813c6f3d4406be272cddbc4113506fb4c95e",
+      "crates/app/src/flow.rs": "36a8e0799a0293d40f2b9ed4f80effdc9f40b864e452771d804c5e4adc99c28e",
+      "crates/app/src/form_recovery.rs": "b4b852c7a5d8ed1dbabde3e8b3d8c9419a1f9ad9f6beb79f3ce9a5f856678873",
+      "crates/app/src/formatting.rs": "1bcff931fd53ea65c9a13a36d3797f6f042ae9ffa62e39126b49a2cf94bd443a",
+      "crates/app/src/foundation.rs": "3544d83e0daa9d33ab77bbabea1828e1183b1fb8fa356d537a7e0f935b85aa60",
+      "crates/app/src/images.rs": "a29994f124456aed0d2e69d8da77e9df959da7e5c9a9696315ddf4bfe7ac6a73",
+      "crates/app/src/jobs.rs": "57ed74e61d1848cdd34bc1298a8cc8e85705fdb4bc55dbfc23f0828e797c2c8a",
+      "crates/app/src/lib.rs": "49b4f64e2a4cb99aca96e40b9de04ff0f4ce76da721ab9d79ffd5e90dea18ccc",
+      "crates/app/src/loading_ux.rs": "40ae334d4eca5f41558e7259a575b655be3a2872bc24a06e71ed7787b913bec8",
+      "crates/app/src/local_ux.rs": "02ee8abbafc821ece580ba9f5f9d19f429990b4346b9fd500d6bddd834982927",
+      "crates/app/src/main.rs": "222088d9402226d198e1b5d7afef9b4ba59ba831e2863625f1a01fad08d10de0",
+      "crates/app/src/official_catalog.rs": "26aabca049c1b09c8a867cd1bd2ba0f14f488bfa255db03804122b286ffdfd44",
+      "crates/app/src/options_ux.rs": "fe1cdd6a1c2a05e50518ddba112728829f371a52b515820f1f196a188a070e35",
+      "crates/app/src/options_ux_tests.rs": "e3eba68da86ea2ed4b4526d10d301ceb8896b9b6b97f25af05b9dcabb14ed65c",
+      "crates/app/src/product.rs": "b512518938a3a3d0ce2259e7834547e2e50d3fc945c073ebbdb18df6663c43c6",
+      "crates/app/src/review.rs": "fb19aea72fcf212d407969f02aae6fd0775ca1b6987c38cb7c845be83363a087",
+      "crates/app/src/review_ux.rs": "8a20389179465396389109e1a2d9a1b5e9aa0142cd1ab6ae597de6a43e526b98",
+      "crates/app/src/task.rs": "d675121a3d6048c63363f6b3bbaa296defa9092cd66fbec91fa1bf2e59331e89",
+      "crates/app/src/task_ux.rs": "3ccc64babe9f1d850d5d8982c00310fff4986bea400198e0965723a102ae882f",
+      "crates/app/src/ui/controls.rs": "16365343999d438fb487b77e2b8a2b393344d2d1a4e94ca6b5b5b4d26c0b7a3a",
+      "crates/app/src/ui/gpu_diagnostics.rs": "5e5880ed1adc69cbce4c86e1846e2a2770d39cf31717b25190150f0c824f31fd",
+      "crates/app/src/ui/mod.rs": "3bf5b5e5316fa6769ece569587c3a0ddba674cc5338ba71e81b8a9ebf1aea50e",
+      "crates/app/src/ui/performance.rs": "34d8b2d006146d56208c682d4d13374c34fc2ec212abdbe41f40e487de64d101",
+      "crates/app/src/ui/status_icon.rs": "f65dd6f68700ef68db9efc1b28f5d2ec034a592ebe4645430327a09d3ffaa8f3",
+      "crates/app/src/ui/text_input.rs": "c5934627ed9aa3aabed349cafaa1ab6b0a03356e9d3eacca98e824e53a9db9bb",
+      "crates/app/src/ui/theme.rs": "68f6f1a3955c7bdb5dd5f684c2541d2c1ccd69553d3069209c0c81e0441debf4",
+      "crates/app/src/ui/timezone_select.rs": "3709edfa37d4dcbfe45c76ba4e197c70062ea5c7a9213e6c18bec81e123cb277",
+      "crates/app/src/ui/web_link.rs": "bbdbaa3bfcc1d290e33f46cd99c654587c416be1c8300261ab49a7dbd244dbff",
+      "crates/app/src/ui/zoom_select.rs": "741eecf03fc0e635eb9639599fd34ae9815a912fdb92208024d37c523f013bba",
+      "crates/app/src/ui_inspection.rs": "780f5d34f1373e13f9283be75da5b1e8a129a8debf4ba3cb2e17ca502f94032d",
+      "crates/app/src/ui_renderer_capture.rs": "028c6c33a2424154ec09372db63df748b8dd3dae358cb85599b6add277f22980",
+      "crates/app/src/ui_review_matrix.rs": "543f1eeec4f6ab303931647bf3b617de33896d475be5c739672f3a9fad6b412f",
+      "crates/app/src/viewer_cache.rs": "f3e4e44719130343e02f3d6192fd26baea3c2198e74f3f034c782b714f6cc682",
+      "crates/app/src/viewer_ux.rs": "7e718af928d843139c703dc96365529a3264a3a927238a8511bba12d52a7be24",
+      "crates/app/src/workflow.rs": "97168834129d5b3f2f1a36332084109cf396f70b50e7ef9f58c227fe8bb81e0a",
+      "crates/app/src/workflow_refinement_tests.rs": "6b17616c04818c23cdff5c9c536e5aebc59ddb3cc6624316e790405c69156a2e",
+      "crates/app/src/workspace_history.rs": "290156032df06611ffd874e62bb1ee6f564be3a46d4f724e9e8e33d1fdb67a5e",
+      "crates/core/src/analysis_engine.rs": "7c935ab7b7caab5c0ccdc1decc46499ad3dc3d55282dc5d758e3c4efdd89c43a",
+      "crates/core/src/archive.rs": "801301604ceb05d080bbadf67f8796c3ef07316414daeff0f6ba4ff1fe8401db",
+      "crates/core/src/crawl.rs": "724efcddde73c3ac3fed36e7acbf1f00e32a0024bd0fbfc3f29df380263487a8",
+      "crates/core/src/domain.rs": "7cb532d9198fcf3defc998519123b9eb06ae6e4c284a4e724fd0dd6d901e7401",
+      "crates/core/src/environment.rs": "d863d331ea2e5fecb2c5f7f25f69737097ee37e8748a24d68d055afaadf955b2",
+      "crates/core/src/evidence.rs": "abae6c5f33fcd2328019cb9b8abaabd83a436a582d125737c298fa2dd5a9ec02",
+      "crates/core/src/lib.rs": "b0c6419782367c29edc20113291c3426cd6b2b33650466f8a30c59f6b2c64e9f",
+      "crates/core/src/platform/windows.rs": "5c5258acc8a554a08cc5e9867535877bcd31af1acbbd3f31abfdb0cc3bf84679",
+      "crates/core/src/platform.rs": "94719fa3e846c04e2104c8c6db786febe247593b4caa493591dbdbf26ce8827f",
+      "crates/core/src/shell.rs": "f3a33f7884ec7434631fb750f9fe7ed62ac59bf8f5852ae36d6e7e54a84f12ec",
+      "crates/core/src/zip_directory.rs": "79b756da84047103646ca706bb234572644989909f2cba0381f444593c1e5fb8",
+      "crates/storage/src/capture.rs": "08b645a5a6ca61bf6e4499f1b6fc3382ac9e65147b618c7c6d5f41e9c29f5ca8",
+      "crates/storage/src/diagnostics.rs": "1c5c08799792cf0f4f3f42300fc29b2c1463d7bd5de60cf8dd7690b969abe4d8",
+      "crates/storage/src/history_inspection.rs": "8ddee42ce943a84d2af94c6c479ea46b6a352a39a42d344ac0127767ea5d5fb8",
+      "crates/storage/src/images.rs": "d9ed35640e448e861bd5b23c640b21a2676f8b375faeaac3ea9729d06dc74ef8",
+      "crates/storage/src/lib.rs": "c5e64533cfe490b3a027a954b5bf5b3858d0610714a333195a1c4ed0b56d56e7",
+      "crates/storage/src/phase6_corrections_tests.rs": "3dbb185adfe7ef08e39ac09ae456ac68791f67977e42393326506f76489bc776",
+      "crates/storage/src/portability.rs": "7d2865e9b1bab62ab9f0a04f8476cca1edbad0170f908346fc8914e38be73b5a",
+      "crates/storage/src/retention.rs": "6b5df02854a854491e239f00f3883a8f20cc40424443aca658f58a97f25337b3",
+      "crates/storage/src/review.rs": "7fe33b9b04537d3a35b9e3a1cd61df3e73607abf47b163f1eb3db20b376855f1"
+    },
+    "final_source_sha256": {
+      "crates/app/src/analysis_engine.rs": "530590b71dde81492ad35d7f217aa9dfc9118960b262789ec937cc7c8c0aa99a",
+      "crates/app/src/auth.rs": "5bb00b2400bed9697dfd7534048b58283aa0ba34d69b47ef219e0b5cf4a0f6b9",
+      "crates/app/src/crawling.rs": "4def7c6fc0d6e14ed8ae7099d07a080c2c38be0521d4249acad61b75ba7aae8e",
+      "crates/app/src/diagnostics.rs": "eb0b2b4a6b6886abdc6ecfa3a5fc08c3a078d3261841ff61f2aed0fa2d4c0640",
+      "crates/app/src/exit_guard.rs": "909454906163ea288de47182d6d0813c6f3d4406be272cddbc4113506fb4c95e",
+      "crates/app/src/flow.rs": "36a8e0799a0293d40f2b9ed4f80effdc9f40b864e452771d804c5e4adc99c28e",
+      "crates/app/src/form_recovery.rs": "b4b852c7a5d8ed1dbabde3e8b3d8c9419a1f9ad9f6beb79f3ce9a5f856678873",
+      "crates/app/src/formatting.rs": "1bcff931fd53ea65c9a13a36d3797f6f042ae9ffa62e39126b49a2cf94bd443a",
+      "crates/app/src/foundation.rs": "3544d83e0daa9d33ab77bbabea1828e1183b1fb8fa356d537a7e0f935b85aa60",
+      "crates/app/src/images.rs": "a29994f124456aed0d2e69d8da77e9df959da7e5c9a9696315ddf4bfe7ac6a73",
+      "crates/app/src/jobs.rs": "57ed74e61d1848cdd34bc1298a8cc8e85705fdb4bc55dbfc23f0828e797c2c8a",
+      "crates/app/src/lib.rs": "49b4f64e2a4cb99aca96e40b9de04ff0f4ce76da721ab9d79ffd5e90dea18ccc",
+      "crates/app/src/loading_ux.rs": "40ae334d4eca5f41558e7259a575b655be3a2872bc24a06e71ed7787b913bec8",
+      "crates/app/src/local_ux.rs": "02ee8abbafc821ece580ba9f5f9d19f429990b4346b9fd500d6bddd834982927",
+      "crates/app/src/main.rs": "222088d9402226d198e1b5d7afef9b4ba59ba831e2863625f1a01fad08d10de0",
+      "crates/app/src/official_catalog.rs": "26aabca049c1b09c8a867cd1bd2ba0f14f488bfa255db03804122b286ffdfd44",
+      "crates/app/src/options_ux.rs": "fe1cdd6a1c2a05e50518ddba112728829f371a52b515820f1f196a188a070e35",
+      "crates/app/src/options_ux_tests.rs": "e3eba68da86ea2ed4b4526d10d301ceb8896b9b6b97f25af05b9dcabb14ed65c",
+      "crates/app/src/phase4_review_tests.rs": "a731fd96019331bd77d752e79d681f8863f2d15826e385c1df8be13042632469",
+      "crates/app/src/product.rs": "b512518938a3a3d0ce2259e7834547e2e50d3fc945c073ebbdb18df6663c43c6",
+      "crates/app/src/review.rs": "fb19aea72fcf212d407969f02aae6fd0775ca1b6987c38cb7c845be83363a087",
+      "crates/app/src/review_ux.rs": "8a20389179465396389109e1a2d9a1b5e9aa0142cd1ab6ae597de6a43e526b98",
+      "crates/app/src/task.rs": "d675121a3d6048c63363f6b3bbaa296defa9092cd66fbec91fa1bf2e59331e89",
+      "crates/app/src/task_ux.rs": "3ccc64babe9f1d850d5d8982c00310fff4986bea400198e0965723a102ae882f",
+      "crates/app/src/ui/controls.rs": "16365343999d438fb487b77e2b8a2b393344d2d1a4e94ca6b5b5b4d26c0b7a3a",
+      "crates/app/src/ui/gpu_diagnostics.rs": "5e5880ed1adc69cbce4c86e1846e2a2770d39cf31717b25190150f0c824f31fd",
+      "crates/app/src/ui/mod.rs": "3bf5b5e5316fa6769ece569587c3a0ddba674cc5338ba71e81b8a9ebf1aea50e",
+      "crates/app/src/ui/performance.rs": "34d8b2d006146d56208c682d4d13374c34fc2ec212abdbe41f40e487de64d101",
+      "crates/app/src/ui/status_icon.rs": "f65dd6f68700ef68db9efc1b28f5d2ec034a592ebe4645430327a09d3ffaa8f3",
+      "crates/app/src/ui/text_input.rs": "c5934627ed9aa3aabed349cafaa1ab6b0a03356e9d3eacca98e824e53a9db9bb",
+      "crates/app/src/ui/theme.rs": "68f6f1a3955c7bdb5dd5f684c2541d2c1ccd69553d3069209c0c81e0441debf4",
+      "crates/app/src/ui/timezone_select.rs": "3709edfa37d4dcbfe45c76ba4e197c70062ea5c7a9213e6c18bec81e123cb277",
+      "crates/app/src/ui/web_link.rs": "bbdbaa3bfcc1d290e33f46cd99c654587c416be1c8300261ab49a7dbd244dbff",
+      "crates/app/src/ui/zoom_select.rs": "741eecf03fc0e635eb9639599fd34ae9815a912fdb92208024d37c523f013bba",
+      "crates/app/src/ui_inspection.rs": "780f5d34f1373e13f9283be75da5b1e8a129a8debf4ba3cb2e17ca502f94032d",
+      "crates/app/src/ui_renderer_capture.rs": "028c6c33a2424154ec09372db63df748b8dd3dae358cb85599b6add277f22980",
+      "crates/app/src/ui_review_matrix.rs": "543f1eeec4f6ab303931647bf3b617de33896d475be5c739672f3a9fad6b412f",
+      "crates/app/src/viewer_cache.rs": "f3e4e44719130343e02f3d6192fd26baea3c2198e74f3f034c782b714f6cc682",
+      "crates/app/src/viewer_ux.rs": "7e718af928d843139c703dc96365529a3264a3a927238a8511bba12d52a7be24",
+      "crates/app/src/workflow.rs": "97168834129d5b3f2f1a36332084109cf396f70b50e7ef9f58c227fe8bb81e0a",
+      "crates/app/src/workflow_refinement_tests.rs": "6b17616c04818c23cdff5c9c536e5aebc59ddb3cc6624316e790405c69156a2e",
+      "crates/app/src/workspace_history.rs": "290156032df06611ffd874e62bb1ee6f564be3a46d4f724e9e8e33d1fdb67a5e",
+      "crates/core/src/analysis_engine.rs": "7c935ab7b7caab5c0ccdc1decc46499ad3dc3d55282dc5d758e3c4efdd89c43a",
+      "crates/core/src/archive.rs": "801301604ceb05d080bbadf67f8796c3ef07316414daeff0f6ba4ff1fe8401db",
+      "crates/core/src/crawl.rs": "724efcddde73c3ac3fed36e7acbf1f00e32a0024bd0fbfc3f29df380263487a8",
+      "crates/core/src/domain.rs": "7cb532d9198fcf3defc998519123b9eb06ae6e4c284a4e724fd0dd6d901e7401",
+      "crates/core/src/environment.rs": "d863d331ea2e5fecb2c5f7f25f69737097ee37e8748a24d68d055afaadf955b2",
+      "crates/core/src/evidence.rs": "abae6c5f33fcd2328019cb9b8abaabd83a436a582d125737c298fa2dd5a9ec02",
+      "crates/core/src/lib.rs": "b0c6419782367c29edc20113291c3426cd6b2b33650466f8a30c59f6b2c64e9f",
+      "crates/core/src/platform/windows.rs": "5c5258acc8a554a08cc5e9867535877bcd31af1acbbd3f31abfdb0cc3bf84679",
+      "crates/core/src/platform.rs": "94719fa3e846c04e2104c8c6db786febe247593b4caa493591dbdbf26ce8827f",
+      "crates/core/src/shell.rs": "f3a33f7884ec7434631fb750f9fe7ed62ac59bf8f5852ae36d6e7e54a84f12ec",
+      "crates/core/src/zip_directory.rs": "79b756da84047103646ca706bb234572644989909f2cba0381f444593c1e5fb8",
+      "crates/storage/src/capture.rs": "08b645a5a6ca61bf6e4499f1b6fc3382ac9e65147b618c7c6d5f41e9c29f5ca8",
+      "crates/storage/src/diagnostics.rs": "1c5c08799792cf0f4f3f42300fc29b2c1463d7bd5de60cf8dd7690b969abe4d8",
+      "crates/storage/src/history_inspection.rs": "8ddee42ce943a84d2af94c6c479ea46b6a352a39a42d344ac0127767ea5d5fb8",
+      "crates/storage/src/images.rs": "d9ed35640e448e861bd5b23c640b21a2676f8b375faeaac3ea9729d06dc74ef8",
+      "crates/storage/src/lib.rs": "c5e64533cfe490b3a027a954b5bf5b3858d0610714a333195a1c4ed0b56d56e7",
+      "crates/storage/src/phase6_corrections_tests.rs": "3dbb185adfe7ef08e39ac09ae456ac68791f67977e42393326506f76489bc776",
+      "crates/storage/src/portability.rs": "7d2865e9b1bab62ab9f0a04f8476cca1edbad0170f908346fc8914e38be73b5a",
+      "crates/storage/src/retention.rs": "6b5df02854a854491e239f00f3883a8f20cc40424443aca658f58a97f25337b3",
+      "crates/storage/src/review.rs": "7fe33b9b04537d3a35b9e3a1cd61df3e73607abf47b163f1eb3db20b376855f1"
+    },
+    "post_capture_changes": [
+      "crates/app/src/phase4_review_tests.rs: test-only caret-range/profile/target/baseline-selection/draft assertion strengthening"
+    ],
+    "files_sha256": {
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-tests-complete.log": "065a6849ff2b26d8160a5f972281211676843b52a6f7066a3a8d90bdac7b3c5f",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-render-complete.log": "caa8a363f23de7377468ae5c3021fb2a8e1961188a13b7ee1dd4c46d4fdc5657",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-tests-qualified.log": "4f5e9609a6edb507dde7b6e3354d504381bcfb4260ed3fc3ec73f0404f061c6d",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-render.log": "23451d5f7b547d460f5f10442b56c32f30d8ba2f3d5e81c5a6cb29a988a574e8",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-render-final.log": "9e901cc00e582333da76ffa4707abd8b7ec176d7380f39abbc9b905620c95382",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-render-capture.log": "296afc02cfa13c374bee23a21100d520d842572f61cfaafdac68ef91f5738e79",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-tests.log": "2dbb35ae52aefeb03d3ad6be892491d78ff7f14f95bc1deef69c4a6dac206d1a",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-tests-final.log": "3f9bcc598f9d3dd6a790900aa087931226795b97120c41adf2dc640439750f6e",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/phase4-independent-probe.log": "0ad096e1d0c17133f3b135a5803119523cb6f6ff4b9ac95eaab773460c92b3de",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/probe-run.log": "9907c080d617a15e331bbc3be7b62c62648cd50bafe41ba7cd2ede6dc2c97da0",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/independent-probe-runner.py": "929905e67dac2df09a0af9c4a496b191f54dc17c85a7ea411fbc150994f2843d",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/phase4-independent-probe.rs": "468d7d7dd161aaeb79f5a578c5ed292b096e458bbbe1238b885cd572f1ce75dd",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/phase4-independent-probe": "dc8be7df9d4380faeabb8b1c770392e23aed07262e16dac96ebffa16a92e0a44",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/whole-app-matrix.json": "865f8e5d6c71e298536d49d589132aa542c4f196217687b6968af37da1587c48",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/gallery-manifest.json": "f4ab0e949d0185aa23549c41033c0b49fff199ed702f0d66b6914a5ad57a5ca9",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/proof-reviewed.json": "f310d37b95c931427ff2e341ab5ca113fae07f46f339327d5857b84589f88987",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/renderer-proof.png": "958c19dbf6f90b30df1f1ba9f7efd7b43dc03fc03edde2d4a3d9e89ac9c60c5d",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/website-fixtures/desktop-before.png": "a730a518741edf72e15a5939c19e0c9a72ee79a2feabe441b532d5d1b4c7c3b5",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/website-fixtures/mobile-after.png": "b940bfbd818429c0cf3ad6e178996d67c6c7008c9144febca20f1169c2e0f0ef",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/website-fixtures/mobile-before.png": "e2e1d7dcf577d6245054a9c0f4787639503458296190f1219da8236b97da017c",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/website-fixtures/desktop-after.png": "fce44d9b2bd6a18c8d9bccc1dfbf9d017be5c904de0910538e44dd7bd1abcd08",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/contact-sheets/all-820-02.png": "0fc7c8ddb048ca9f66989a9cf30a4f648c2842f7b939bcf2acd3cc3b6be7d984",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/contact-sheets/all-820-01.png": "d415824deab31b67e8dbadf38211de1277a7aa59a5e1a815683471f59c1fe102",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/contact-sheets/all-1280-02.png": "bcbdbd1001913d97ad3838b405ff4a8f39121b1aa2dce29815bc140cdd874efb",
+      "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase4-20261012/repair-v4-complete/contact-sheets/all-1280-01.png": "6daaf4ee430dbf03212228f6a3fb1a81cedb752b019fbb1b046acc926560d66a",
+      "/var/home/olav/Projects/Regressee/docs/research/whole-app-ui-review-20261012/phase4-verification.md": "83a85fb7db8c5398baad81320db11c92d61374cd1db36ae7314b4719ead441c2",
+      "/var/home/olav/Projects/Regressee/docs/research/whole-app-ui-review-20261012/phase4-repair-tests.txt": "4f5e9609a6edb507dde7b6e3354d504381bcfb4260ed3fc3ec73f0404f061c6d",
+      "/var/home/olav/Projects/Regressee/docs/research/whole-app-ui-review-20261012/phase4-repair-render.txt": "caa8a363f23de7377468ae5c3021fb2a8e1961188a13b7ee1dd4c46d4fdc5657",
+      "/var/home/olav/Projects/Regressee/docs/research/whole-app-ui-review-20261012/phase4-repair-probe.txt": "0ad096e1d0c17133f3b135a5803119523cb6f6ff4b9ac95eaab773460c92b3de"
+    },
+    "limits": [
+      "GPUI simulated events, not OS input",
+      "No independent acceptance",
+      "Short narrow image viewports require pan/zoom",
+      "No AT/IME/clipboard/OS portability/usability/bulk qualification"
+    ]
+  }
+}
