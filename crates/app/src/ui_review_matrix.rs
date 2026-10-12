@@ -350,6 +350,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
     cx.update(|cx| {
         text_input::bind(cx);
         timezone_select::bind(cx);
+        zoom_select::bind(cx);
     });
     let dir = tempfile::Builder::new()
         .prefix("whole-app-synthetic-")
@@ -449,6 +450,10 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
         "keyboard-help",
         "about",
     ];
+    let previous: Vec<serde_json::Value> = fs::read(root.join("whole-app-matrix.json"))
+        .ok()
+        .map(|bytes| serde_json::from_slice(&bytes).unwrap())
+        .unwrap_or_default();
     let mut manifest = Vec::new();
     for (width, height) in [(1280., 800.), (820., 600.)] {
         for label in scenes {
@@ -466,14 +471,17 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                         fs::read(root.join(format!("{name}.png"))).unwrap()
                     ))
                 );
-                manifest.push(serde_json::json!({"capture":name,"state":label,"width":width,"height":height,"synthetic":true,"retained_from_same_batch":true}));
+                let mut entry = previous.iter().find(|entry| entry["capture"] == name)
+                    .cloned().unwrap_or_else(|| serde_json::json!({"capture":name,"state":label,"width":width,"height":height,"synthetic":true}));
+                entry["retained_from_same_batch"] = true.into();
+                manifest.push(entry);
                 continue;
             }
             let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
             let owned = jobs.clone();
             let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
             cx.simulate_resize(size(px(width), px(height)));
-            let screen = if label.starts_with("projects") {
+            let screen = if label.starts_with("projects") || label == "new-website" {
                 Screen::Projects
             } else if label.starts_with("history")
                 || matches!(label, "export-preview" | "delete-preview")
@@ -519,7 +527,17 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                         else { s.error = Some("Saved projects could not be read. Check the data folder permissions.".into()); }
                     },
                     "project-chooser" => { s.activate_control(Control::ChooseProject, window, cx); finish_jobs(s, cx); },
-                    "new-website" => { s.activate_control(Control::NewProject, window, cx); },
+                    "new-website" => {
+                        assert!(s.control_mounted(Control::NewProject));
+                        s.activate_control(Control::NewProject, window, cx);
+                        assert_eq!(s.focus.screen, Screen::Setup);
+                        assert_eq!(s.focus.setup_stage, SetupStage::Website);
+                        assert!(s.project.is_none());
+                        assert!(!s.focus.project_saved);
+                        assert!(s.name.read(cx).content.is_empty());
+                        assert!(s.address.read(cx).content.is_empty());
+                        assert!(s.evidence.latest.is_none() && s.evidence.baseline.is_none());
+                    },
                     "website-validation" => { s.address.update(cx, |f, cx| f.set_value("northline.example", cx)); s.activate_control(Control::Save, window, cx); },
                     "access-login" | "access-login-actions" => { s.choose(Choice::LoginRequired, cx); },
                     "mapping-preview" => { s.show_mapping = true; s.environment.as_mut().unwrap().mapped = (0..40).map(|i| (format!("https://northline.example/products/item-{i}/"), format!("https://staging.northline.example/products/item-{i}/"))).collect(); },
@@ -528,9 +546,33 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     "review-mobile" => { let key = s.evidence.latest.as_ref().unwrap().run.targets[1].key.clone(); s.selected_key = Some(key); s.reload_viewer(cx); finish_jobs(s, cx); },
                     "review-mixed-148" | "review-failed-target" => { mixed_queue(s); if label == "review-failed-target" { s.selected_key = Some(s.evidence.latest.as_ref().unwrap().run.targets.iter().find(|t| matches!(t.outcome, TargetOutcome::Failed { .. })).unwrap().key.clone()); s.clear_viewer(); s.focus.viewer = false; } },
                     "review-queue-hidden" => { s.activate_control(Control::Guided(50), window, cx); },
-                    "review-difference" | "review-overlay" | "review-heatmap" => { s.activate_control(Control::Phase5(match label { "review-difference" => 7, "review-overlay" => 8, _ => 9 }), window, cx); finish_jobs(s, cx); },
-                    "review-details" | "review-diagnostics" => { s.activate_control(Control::Phase5(36), window, cx); s.capture_diagnostics_open = label == "review-diagnostics"; },
-                    "review-analysis" | "review-analysis-advanced" | "review-ignored-area" => { s.activate_control(Control::Guided(44), window, cx); s.analysis_advanced = label == "review-analysis-advanced"; },
+                    "review-difference" | "review-overlay" | "review-heatmap" => {
+                        let mode = match label { "review-difference" => 7, "review-overlay" => 8, _ => 9 };
+                        if width < 1100. && mode >= 8 {
+                            s.activate_control(Control::Guided(44), window, cx);
+                        }
+                        assert!(s.control_mounted(Control::Phase5(mode)));
+                        s.activate_control(Control::Phase5(mode), window, cx);
+                        finish_jobs(s, cx);
+                        assert_eq!(s.viewer_mode, mode - 6);
+                        if s.review_tools { s.activate_control(Control::Phase5(39), window, cx); }
+                    },
+                    "review-details" | "review-diagnostics" => {
+                        s.activate_control(Control::Phase5(36), window, cx);
+                        if label == "review-diagnostics" {
+                            assert!(s.control_mounted(Control::Phase5(38)));
+                            s.activate_control(Control::Phase5(38), window, cx);
+                            assert!(s.capture_details_open && s.capture_diagnostics_open);
+                        }
+                    },
+                    "review-analysis" | "review-analysis-advanced" | "review-ignored-area" => {
+                        s.activate_control(Control::Guided(44), window, cx);
+                        if label == "review-analysis-advanced" {
+                            assert!(s.control_mounted(Control::Phase5(3)));
+                            s.activate_control(Control::Phase5(3), window, cx);
+                            assert!(s.review_tools && s.analysis_advanced);
+                        }
+                    },
                     "review-note" => { s.activate_control(Control::Phase5(37), window, cx); s.analysis_fields[9].update(cx, |f, cx| f.set_value("Autumn headline and CTA are intentional. Product grid needs release-owner confirmation.", cx)); },
                     "review-filters" | "review-no-matches" => { s.result_filters_open = true; if label.ends_with("no-matches") { s.crawl_fields[9].update(cx, |f, cx| f.set_value("nothing-matches", cx)); } },
                     "review-approval-selection" | "review-approval-confirm" => { s.activate_control(Control::Phase5(23), window, cx); if label.ends_with("confirm") { s.activate_control(Control::Phase5(24), window, cx); finish_jobs(s, cx); assert!(s.approval.is_some()); } },
@@ -639,9 +681,47 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     })
                 });
             }
+            let disclosure_anchor = match label {
+                "review-diagnostics" => Some("capture-provenance-details"),
+                "review-analysis-advanced" => Some("field-Color tolerance (ΔE00)"),
+                _ => None,
+            };
+            if let Some(anchor) = disclosure_anchor {
+                let bounds = cx.debug_bounds(anchor).expect("disclosed content mounted");
+                shell.update(cx, |s, cx| {
+                    let old = s.review_details_scroll.offset();
+                    let delta = s.review_details_scroll.bounds().top() + px(8.) - bounds.top();
+                    s.review_details_scroll.set_offset(gpui::point(old.x, (old.y + delta).min(px(0.))));
+                    cx.notify();
+                });
+            }
             capture(cx, &root, &name).unwrap();
+            let mut assertions = Vec::new();
+            let viewport = gpui::Bounds::new(gpui::point(px(0.), px(0.)), size(px(width), px(height)));
+            let selectors: &[&str] = match label {
+                "new-website" => &["field-Project name", "field-Starting addresses"],
+                "review-diagnostics" => &["capture-provenance-details"],
+                "review-analysis-advanced" => &["field-Color tolerance (ΔE00)"],
+                "review-zoom-menu" => &["zoom-popup", "zoom-option-0", "zoom-option-1"],
+                "review-overlay" => &["phase5-before"],
+                "review-heatmap" => &["phase5-difference"],
+                _ => &[],
+            };
+            for selector in selectors {
+                let bounds = cx.debug_bounds(selector).unwrap_or_else(|| panic!("{name}: {selector} not mounted"));
+                let clip = if disclosure_anchor.is_some() {
+                    shell.read_with(cx, |s, _| s.review_details_scroll.bounds())
+                } else { viewport };
+                assert!(bounds.size.width > px(0.) && bounds.size.height > px(0.));
+                assert!(bounds.left() >= clip.left() && bounds.right() <= clip.right(), "{name}: {selector} horizontal visibility");
+                assert!(bounds.top() >= clip.top() && bounds.top() < clip.bottom(), "{name}: {selector} starts visibly inside its owner");
+                if *selector != "capture-provenance-details" {
+                    assert!(bounds.bottom() <= clip.bottom(), "{name}: {selector} fully visible");
+                }
+                assertions.push(serde_json::json!({"selector":selector,"x":f32::from(bounds.left()),"y":f32::from(bounds.top()),"width":f32::from(bounds.size.width),"height":f32::from(bounds.size.height),"clip_x":f32::from(clip.left()),"clip_y":f32::from(clip.top()),"clip_width":f32::from(clip.size.width),"clip_height":f32::from(clip.size.height),"fully_visible":bounds.bottom() <= clip.bottom()}));
+            }
             let geometry: Vec<_> = ["review-queue", "viewer-toolbar", "phase5-before", "phase5-after", "ordinary-review-decisions", "approval-next-action", "page-list", "history-run-list", "history-baseline-list", "selected-project-context"].into_iter().filter_map(|selector| cx.debug_bounds(selector).map(|b| serde_json::json!({"selector":selector,"x":f32::from(b.left()),"y":f32::from(b.top()),"width":f32::from(b.size.width),"height":f32::from(b.size.height)}))).collect();
-            manifest.push(serde_json::json!({"capture":name,"state":label,"width":width,"height":height,"synthetic":true,"website_visited":false,"os_input_verified":false,"geometry":geometry}));
+            manifest.push(serde_json::json!({"capture":name,"state":label,"width":width,"height":height,"synthetic":true,"website_visited":false,"os_input_verified":false,"geometry":geometry,"visibility_assertions":assertions,"harness_sha256":hex::encode(Sha256::digest(include_bytes!("ui_review_matrix.rs")))}));
             owned.join_after_ui();
         }
     }

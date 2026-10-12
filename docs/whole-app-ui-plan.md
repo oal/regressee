@@ -8,16 +8,24 @@ task; it does not replace the existing implementation `PLAN.md`.
 
 - **Phase 0 complete:** both independent assessments have been read in full and
   copied byte-for-byte into the repository, with an integrity receipt.
-- **Next executable step: Phase 1**, correct misleading capture fixtures only.
-  No fixture corrections or new captures have been performed in this planning
-  continuation.
+- **Phase 1 verified PASS (bounded evidence gate).** Test-only
+  E1–E3 corrections and 10 corrected native pairs are recorded in
+  `research/whole-app-ui-review-20261012/phase1-report.md` and its correction receipt.
+- Independent results: `research/whole-app-ui-review-20261012/phase1-verification.md`.
+  Diagnostics tails and remaining advanced controls are not fully qualified.
+- **Next executable step: parent commit/push of verified Phase 1**, before Phase 2.
+  No production UI changed.
 - **Phase 2 pending:** deliver the complete, evidence-qualified whole-app critique.
-- **Phases 3–7 are proposals, not authorization to implement UI changes.** Stop
-  after the review and obtain confirmation of interaction direction and scope.
+- **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the
+  complete plan be implemented and validated without clarification questions.
+  Use the recommended interaction direction and preserve Clear wayfinding.
+  Each phase has one GPT 6.1 Sol implementation agent followed by a separate
+  verification agent; commit and push verified work before the next phase.
 - No production UI changes, new renders or product tests were performed while
   creating this plan. Archive checks are not app qualification.
-- The working tree contains substantial earlier work. Do not reset, revert,
-  discard, commit or push it without explicit authorization.
+- Earlier work was preserved and pushed with explicit user authorization in
+  `c2685a6`. Runtime files, local configuration, databases, logs and generated
+  pixel evidence remain excluded by `.gitignore`. Never discard unfamiliar work.
 
 ### Original job
 
@@ -166,7 +174,7 @@ Exit gate: reports and plan are readable from the repository without relying on
 conversation memory or a running subagent. PNG storage location and limitations
 are explicit. This gate is met.
 
-### Phase 1 — correct misleading evidence **NEXT; NOT STARTED**
+### Phase 1 — correct misleading evidence **VERIFIED PASS; BOUNDED COVERAGE**
 
 **Scope:** test-only `crates/app/src/ui_review_matrix.rs` and evidence tooling if
 necessary. No production interface redesign. Do not rerender all 182 images just
@@ -225,9 +233,10 @@ The deliverable must contain:
   build/scale/accessibility limitations, and links to this plan.
 
 Exit gate: the user has the detailed critique originally requested, not merely a
-list of proposed edits. **Stop here before production UI implementation.**
+list of proposed edits. Implementation is now authorized by the 2026-10-12
+instruction; proceed through the documented Phase 3 blueprint and verification.
 
-### Phase 3 — confirm the workflow blueprint **PROPOSED; APPROVAL REQUIRED**
+### Phase 3 — confirm the workflow blueprint **AUTHORIZED; PENDING**
 
 Keep the existing Clear wayfinding identity and every product capability. Agree
 the interaction structure in a short document before coding:
@@ -250,10 +259,11 @@ Decisions to confirm: implementation scope, narrow-window policy and priority
 order. Raising the 820×600 minimum is **not** an assumed fix. Do not ask again
 about settled audience, local-only storage, stack or visual identity.
 
-Exit gate: the user confirms direction/scope or gives explicit corrections. Read
-the Impeccable craft floor immediately before the first actual UI edit.
+Exit gate: record the recommended direction/scope selected under the user's
+explicit delegation of judgement, and verify the capability/safety inventory.
+Read the Impeccable craft floor immediately before the first actual UI edit.
 
-### Phase 4 — fix review and baseline consent **PROPOSED**
+### Phase 4 — fix review and baseline consent **AUTHORIZED; PENDING**
 
 Dependencies: Phases 1–3. Treat the whole inspect→classify→select→confirm sequence
 as one interaction, while implementing in bounded batches.
@@ -284,7 +294,7 @@ and understand confirmation. Verify drafts, selection outside filters,
 synchronized pan/zoom, collapse/restore and dialog containment. Native input
 remains separately qualified in Phase 7.
 
-### Phase 5 — simplify first baseline setup and discovery **PROPOSED**
+### Phase 5 — simplify first baseline setup and discovery **AUTHORIZED; PENDING**
 
 Address S1–S3 across the complete first-use sequence:
 
@@ -310,7 +320,7 @@ safe action; screen-size selection is discoverable; validation points to the
 affected input; dirty settings and explicit login/save boundaries are preserved.
 Existing-project settings still expose every confirmed capability.
 
-### Phase 6 — history, sharing, cleanup and recovery **PROPOSED**
+### Phase 6 — history, sharing, cleanup and recovery **AUTHORIZED; PENDING**
 
 Address H1–H3, F1–F2 and remaining M1 across record selection and consequences:
 
@@ -338,7 +348,7 @@ Exit gate: last loaded/retained records are discoverable; deletion names its
 record and consequences; privacy copy remains clear; failure actions match
 implemented recovery; inspection never activates a baseline or rewrites evidence.
 
-### Phase 7 — whole-workflow and native qualification **PROPOSED**
+### Phase 7 — whole-workflow and native qualification **AUTHORIZED; PENDING**
 
 Validate the complete sequence, not just edited components. Use isolated data,
 normal/minimum desktop windows and a declared supported-platform matrix.
@@ -372,6 +382,16 @@ DESIGN.md to describe approved, actually built behavior only. Unavailable runtim
 distributions or OS runners remain named blockers, not implied passes.
 
 ## Execution and recovery notes
+
+### Authorized post-plan delivery
+
+The user additionally requested on 2026-10-12: after all phase changes are
+implemented and pushed, fix the GitHub Actions pipeline and tag a new downloadable
+release for the next working day. Inspect real workflow failures, repair and
+validate CI/release automation, push fixes, then create a fresh version tag and
+verify the published assets. Do not present build availability as native usability
+or cross-platform acceptance. Record workflow run IDs, release URL and any actual
+distribution limitations in the final checkpoint.
 
 ### Known capture commands (reference; not run during planning)
 
@@ -430,6 +450,40 @@ or zero-finding certification should be attempted.
    endless polishing. Do not discard unfamiliar working-tree changes.
 
 ### Checkpoint log
+
+**2026-10-12 — independent Phase 1 verification: PASS.** Independently reran receipt
+checker (10 pairs, eight changed PNGs, 172 unchanged) and binary tests (102 passed,
+0 failed, 15 ignored; 21.13s). Reviewed test-only diff, mounted routes, state/owner
+bounds and stored-project/evidence equality assertions. Supplemental checks confirm
+all original PNG hashes accounted for, matrix/gallery/HTML/pair agreement and
+receipt/artifact/contact-sheet hashes. Read ten corrected originals in one read-only
+verifier batch; no render or polish loop. Diagnostics tail and remaining advanced
+controls stay unresolved coverage, explicitly allowed by this phase's gate. No OS
+input/accessibility/platform/runtime/scale acceptance inferred. Durable verdict:
+`research/whole-app-ui-review-20261012/phase1-verification.md`. **Next: parent
+commit/push before Phase 2. Verifier did not commit, push or start Phase 2.**
+
+**2026-10-12 — Phase 1 implementation:** corrected only the test harness and added
+receipt verification tooling. Preserved 10 original pairs, initial matrix/gallery/
+binding and all contact sheets under the evidence root's
+`superseded-phase1-20261012/`. Corrected creation, visible diagnostics/first advanced
+parameter, narrow Overlay/Heatmap and asserted real zoom popup at both sizes.
+One batched full-resolution inspection of 10 originals; no confirmation batch.
+Renderer: 1 passed; binary tests: 102 passed, 15 ignored; receipt: 12 archive files
+and eight product UI hashes unchanged, 172 unaffected PNGs unchanged, 182 manifest
+entries/unique hashes. Diagnostics/advanced tails remain uninspected; native input,
+accessibility/platform/runtime/scale limits remain. See `phase1-report.md` for exact
+commands, initial assertion failure and logs. **Next: independent Phase 1 verifier;
+parent commits/pushes only after verification. Phase 2 not started.**
+
+**2026-10-12 — execution authorized:** the user requested sequential GPT 6.1 Sol
+implementation and independent verification agents for every phase, no questions,
+and commits/pushes between phases. Preserved all eligible existing changes in
+`c2685a6` and pushed to `origin/main`. The old approval-stop instructions are
+superseded by this explicit authorization. Select the recommended evidence-focus
+minimum-window policy, retain side-by-side and all modes, and report unavailable
+native/platform/usability qualification honestly rather than implying passes.
+**Next: Phase 1 implementation agent, then independent verification.**
 
 **2026-10-12 — plan creation:** read both complete original assessments and key
 narrow review/consent originals; archived 12 evidence files unchanged; recorded
