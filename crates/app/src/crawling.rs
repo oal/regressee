@@ -117,6 +117,7 @@ impl Product {
         cancel: Arc<AtomicBool>,
         progress: &mut dyn FnMut(&str, u32, Option<u32>),
     ) -> Result<DiscoveryPreview> {
+        progress("Checking website boundaries and login settings…", 0, None);
         let saved = store.load_project(project)?;
         let p = saved.project;
         p.validate()?;
@@ -130,6 +131,7 @@ impl Product {
                 .all(|m| m.source == m.destination),
             "Find pages on the source website. Use alternate environment mapping for fixed-baseline checks."
         );
+        progress("Verifying the private browser for page discovery…", 0, None);
         let installed = self.resolve_runtime(&cancel)?;
         ensure!(
             worker_version(&installed)? == regressee_runtime::protocol::WORKER_VERSION,
@@ -139,9 +141,15 @@ impl Product {
             scoped(&installed, u)?;
         }
         let job = RunId::new();
+        progress("Starting the private browser…", 0, None);
         let mut worker = self.spawn_worker(&installed)?;
         worker.handshake(job, cancel.clone())?;
         if let Some(a) = &auth {
+            progress(
+                "Preparing your saved login session in the browser…",
+                0,
+                None,
+            );
             a.install(&mut worker, job, cancel.clone())?;
         }
         let mut id = 1;
@@ -152,6 +160,14 @@ impl Product {
                 policies.entry(origin(source))
             {
                 let policy = if p.discovery.respect_robots {
+                    progress(
+                        &format!(
+                            "Checking website crawl rules (robots.txt) for {}…",
+                            origin(source)
+                        ),
+                        0,
+                        None,
+                    );
                     robots_for(&mut worker, job, &mut id, source, cancel.clone())
                 } else {
                     Ok(Robots::parse(""))
@@ -169,6 +185,13 @@ impl Product {
         let mut visited = 0;
         let mut limited = false;
         let mut last = BTreeMap::new();
+        if p.discovery.mode == DiscoveryMode::OnlyAddresses {
+            progress(
+                "Reviewing the supplied page addresses — no links will be explored…",
+                0,
+                None,
+            );
+        }
         while let Some((raw, depth)) = queue.pop_front() {
             if cancel.load(Ordering::Acquire) {
                 limited = true;
@@ -219,6 +242,13 @@ impl Product {
                         .unwrap_or(0),
                 );
                 if let Some(start) = last.get(&origin(&u)) {
+                    if *start + Duration::from_millis(delay) > Instant::now() {
+                        progress(
+                            "Waiting between page visits to respect website crawl limits…",
+                            visited,
+                            None,
+                        );
+                    }
                     wait(
                         *start + Duration::from_millis(delay),
                         &cancel,
@@ -230,6 +260,7 @@ impl Product {
                 let mut attempts = 0;
                 let result = loop {
                     attempts += 1;
+                    progress(&discovery_loading_message(visited, attempts), visited, None);
                     let result = request(
                         &mut worker,
                         job,
@@ -269,6 +300,14 @@ impl Product {
                         && !cancel.load(Ordering::Acquire)
                     {
                         notes.push(format!("Temporary discovery failure on {u}; retry {attempts} after bounded backoff"));
+                        progress(
+                            &format!(
+                                "The page could not be read. Waiting before retry {attempts} of {}…",
+                                p.discovery.advanced.retries
+                            ),
+                            visited,
+                            None,
+                        );
                         wait(
                             Instant::now() + Duration::from_millis(1000 << attempts),
                             &cancel,
@@ -278,6 +317,11 @@ impl Product {
                             e.downcast_ref::<WorkerFailure>().map(|e| e.0),
                             Some(FailureCode::Timeout | FailureCode::WorkerStopped)
                         ) {
+                            progress(
+                                "Restarting the private browser before retrying the page…",
+                                visited,
+                                None,
+                            );
                             let _ = worker.stop(Instant::now() + Duration::from_secs(2));
                             worker = self.spawn_worker(&installed)?;
                             worker.handshake(job, cancel.clone())?;
@@ -332,6 +376,9 @@ impl Product {
                         }
                     }
                     Err(e) => {
+                        if map_failure(&e) == CaptureError::Cancelled {
+                            notes.push("Discovery cancelled; the preview is incomplete.".into());
+                        }
                         if map_failure(&e) == CaptureError::NeedsLogin {
                             return Err(e).context(
                                 "Log in again. Discovery stopped without adding login pages.",
@@ -347,14 +394,16 @@ impl Product {
                 }
             }
             pages.push(page);
-            let page_word = if visited == 1 { "page" } else { "pages" };
-            progress(
-                &format!(
-                    "Finding rendered links · {visited} {page_word} visited — no clicking or forms"
-                ),
-                visited,
-                None,
-            );
+            if p.discovery.mode == DiscoveryMode::AddressesAndLinks && visited > 0 {
+                let page_word = if visited == 1 { "page" } else { "pages" };
+                progress(
+                    &format!(
+                        "Finding rendered links · {visited} {page_word} visited — no clicking or forms"
+                    ),
+                    visited,
+                    None,
+                );
+            }
         }
         if pages.iter().any(|p| !p.included) {
             limited = true;
@@ -369,6 +418,11 @@ impl Product {
             notes.push("Link depth is bounded; deeper pages may exist.".into());
             limited = true;
         }
+        progress(
+            "Finishing the page list and closing the discovery browser…",
+            visited,
+            None,
+        );
         worker.stop(Instant::now() + Duration::from_secs(5))?;
         Ok(DiscoveryPreview {
             project_revision: saved.revision,
@@ -404,15 +458,53 @@ impl Product {
         progress: &mut dyn FnMut(&str, u32, Option<u32>),
     ) -> Result<RunRecord> {
         self.capture_inventory_inner(
-            store, project, preview, check, resume, cancel, pause, progress, false,
+            store,
+            project,
+            preview,
+            check,
+            resume,
+            cancel,
+            pause,
+            progress,
+            false,
+            &mut |_| {},
+        )
+    }
+    /// Native task presentation consumes real counts and frozen setup without
+    /// changing the public progress API or reading evidence on the UI thread.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn capture_inventory_with_status(
+        &self,
+        store: &mut Store,
+        project: ProjectId,
+        preview: Option<DiscoveryPreview>,
+        check: bool,
+        resume: Option<RunId>,
+        cancel: Arc<AtomicBool>,
+        pause: Arc<AtomicBool>,
+        progress: &mut dyn FnMut(&str, u32, Option<u32>),
+        status: &mut dyn FnMut(&CaptureRun),
+    ) -> Result<RunRecord> {
+        self.capture_inventory_inner(
+            store, project, preview, check, resume, cancel, pause, progress, false, status,
         )
     }
     pub fn preview_images(
         &self,
         store: &mut Store,
         project: ProjectId,
+        preview: DiscoveryPreview,
+        cancel: Arc<AtomicBool>,
+    ) -> Result<RunRecord> {
+        self.preview_images_with_progress(store, project, preview, cancel, &mut |_, _, _| {})
+    }
+    pub fn preview_images_with_progress(
+        &self,
+        store: &mut Store,
+        project: ProjectId,
         mut preview: DiscoveryPreview,
         cancel: Arc<AtomicBool>,
+        progress: &mut dyn FnMut(&str, u32, Option<u32>),
     ) -> Result<RunRecord> {
         let first = preview
             .inventory
@@ -433,8 +525,9 @@ impl Product {
             None,
             cancel,
             Arc::new(AtomicBool::new(false)),
-            &mut |_, _, _| {},
+            progress,
             true,
+            &mut |_| {},
         )
     }
     #[allow(clippy::too_many_arguments)]
@@ -449,6 +542,7 @@ impl Product {
         pause: Arc<AtomicBool>,
         progress: &mut dyn FnMut(&str, u32, Option<u32>),
         preview_only: bool,
+        status: &mut dyn FnMut(&CaptureRun),
     ) -> Result<RunRecord> {
         let installed = self.resolve_runtime(&cancel)?;
         ensure!(
@@ -700,6 +794,7 @@ impl Product {
             cancel.clone(),
             pause.clone(),
             progress,
+            status,
         );
         if let Err(e) = result {
             // Persist the stopped queue, never relabel missing evidence unchanged.
@@ -730,6 +825,7 @@ impl Product {
         Ok(record)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute_queue(
         &self,
         store: &mut Store,
@@ -738,15 +834,17 @@ impl Product {
         cancel: Arc<AtomicBool>,
         pause: Arc<AtomicBool>,
         progress: &mut dyn FnMut(&str, u32, Option<u32>),
+        status: &mut dyn FnMut(&CaptureRun),
     ) -> Result<()> {
         let settings = record.queue.as_ref().unwrap().discovery.clone();
         let auth = self.auth_state(store, record.run.project, &record.run.environment)?;
         let (parallel, spacing) = speed(&settings);
         progress(
-            "Starting the private browser pool for the frozen screenshot targets",
-            0,
+            "Preparing the browser for the selected pages…",
+            crate::task::CaptureStatus::from_run(&record.run).processed(),
             Some(record.run.targets.len() as u32),
         );
+        status(&record.run);
         let mut workers = Vec::new();
         for _ in 0..parallel.min(record.run.targets.len()) {
             if pause.load(Ordering::Acquire) || cancel.load(Ordering::Acquire) {
@@ -922,7 +1020,7 @@ impl Product {
                 .filter(|t| !matches!(t.outcome, TargetOutcome::Pending))
                 .count();
             progress(
-                "Capturing the next bounded batch",
+                "Capturing screenshots…",
                 accounted as u32,
                 Some(record.run.targets.len() as u32),
             );
@@ -1041,21 +1139,12 @@ impl Product {
                 )?;
             }
             let counts = TargetCounts::from_run(&record.run);
-            let pages = record
-                .run
-                .inventory
-                .pages
-                .iter()
-                .filter(|p| p.included)
-                .count();
             progress(
-                &format!(
-                    "Capturing {pages} pages · {} screenshots saved · {} failed · {} skipped · {} pending",
-                    counts.captured, counts.failed, counts.skipped, counts.pending
-                ),
+                "Capturing screenshots…",
                 (record.run.targets.len() - counts.pending) as u32,
                 Some(record.run.targets.len() as u32),
             );
+            status(&record.run);
             if backoff > 0 {
                 wait(
                     Instant::now() + Duration::from_millis(backoff),
@@ -1094,6 +1183,16 @@ impl Product {
             cancel,
         )?;
         Ok(())
+    }
+}
+fn discovery_loading_message(visited: u32, attempt: u8) -> String {
+    let page_word = if visited == 1 { "page" } else { "pages" };
+    if attempt > 1 {
+        format!("Retrying the page and looking for links · {visited} {page_word} visited…")
+    } else if visited == 0 {
+        "Loading the first page and looking for links…".into()
+    } else {
+        format!("Loading the next page and looking for links · {visited} {page_word} visited…")
     }
 }
 fn preflight(store: &Store, targets: usize, initial: bool) -> Result<()> {
@@ -1223,6 +1322,70 @@ fn capture_one(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn discovery_reports_preparation_before_runtime_failure_without_visits() -> Result<()> {
+        let dir = tempfile::tempdir()?;
+        let paths = regressee_storage::AppPaths::isolated(dir.path());
+        let mut store = Store::open(paths.clone())?;
+        let project = Project::draft("Discovery startup fixture".into(), "https://example.test")?;
+        let saved = store.save_project(&project, None)?;
+        let product = Product {
+            distribution: None,
+            runtime_cache: paths.cache.join("absent-browser"),
+            official_runtime: false,
+            auth: Default::default(),
+        };
+        let mut phases = Vec::new();
+        let result = product.discover(
+            &store,
+            project.id,
+            Arc::new(AtomicBool::new(false)),
+            &mut |message, completed, total| phases.push((message.to_owned(), completed, total)),
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            phases,
+            vec![
+                (
+                    "Checking website boundaries and login settings…".into(),
+                    0,
+                    None
+                ),
+                (
+                    "Verifying the private browser for page discovery…".into(),
+                    0,
+                    None
+                ),
+            ]
+        );
+        assert_eq!(
+            serde_json::to_value(store.load_project(project.id)?)?,
+            serde_json::to_value(saved)?
+        );
+        assert!(!product.runtime_cache.exists());
+        Ok(())
+    }
+
+    #[test]
+    fn loading_and_retry_messages_preserve_actual_visit_counts() {
+        assert_eq!(
+            discovery_loading_message(0, 1),
+            "Loading the first page and looking for links…"
+        );
+        assert_eq!(
+            discovery_loading_message(1, 1),
+            "Loading the next page and looking for links · 1 page visited…"
+        );
+        assert_eq!(
+            discovery_loading_message(23, 1),
+            "Loading the next page and looking for links · 23 pages visited…"
+        );
+        assert_eq!(
+            discovery_loading_message(0, 2),
+            "Retrying the page and looking for links · 0 pages visited…"
+        );
+    }
+
     #[test]
     fn presets_and_space_are_bounded() {
         let mut s = DiscoverySettings::default();

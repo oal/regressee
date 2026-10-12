@@ -1,0 +1,3793 @@
+[
+  {
+    "capture": "all-1280x800-projects",
+    "state": "projects",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "fc752ac4feb303c6abfd669043893b974632f17518bf2c21ff46446b0a7794b4",
+    "number": 1
+  },
+  {
+    "capture": "all-1280x800-projects-empty",
+    "state": "projects-empty",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "dcf20b9be0e493e12f89077d67470efb82d4a04362d6f29f15c0a78b4f530e3e",
+    "number": 2
+  },
+  {
+    "capture": "all-1280x800-projects-loading",
+    "state": "projects-loading",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "56bf8c6973ea19e3881f45582ec059bc5e7af89b5e06ac27b19caf4765b467ff",
+    "number": 3
+  },
+  {
+    "capture": "all-1280x800-projects-failed",
+    "state": "projects-failed",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "a62f0b44d335012f797b38788b135a1b5bfe301efeb8c94c8faef1d4676e001c",
+    "number": 4
+  },
+  {
+    "capture": "all-1280x800-project-chooser",
+    "state": "project-chooser",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "5440495708e98f24108c1fcbd18d0d2112a4b0974e0be1cdfb6a0e5ff7e58746",
+    "number": 5
+  },
+  {
+    "capture": "all-1280x800-new-website",
+    "state": "new-website",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "ca5bcf6806eb2aa4edf75d673894dc8349164c20af8eeb7ff28b965a0348e728",
+    "number": 6
+  },
+  {
+    "capture": "all-1280x800-website",
+    "state": "website",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "ca5bcf6806eb2aa4edf75d673894dc8349164c20af8eeb7ff28b965a0348e728",
+    "number": 7
+  },
+  {
+    "capture": "all-1280x800-website-validation",
+    "state": "website-validation",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "f26fb3f2e7340d754f0296655c5eb739dffc67f06062c9dff91b48fc894add52",
+    "number": 8
+  },
+  {
+    "capture": "all-1280x800-access-public",
+    "state": "access-public",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "03f873e2e40a5f542273129ad61a5c4cf7b1fbda4269fbb38bc4bec1535cfced",
+    "number": 9
+  },
+  {
+    "capture": "all-1280x800-access-login",
+    "state": "access-login",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "2ccde81042cbfaa04e01e92d129c900922216c5c7038c70a4ca482be5ae962db",
+    "number": 10
+  },
+  {
+    "capture": "all-1280x800-access-login-actions",
+    "state": "access-login-actions",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "3695b4295cc43c478cb9b1955e7e98adacfd682943ca93dae7d897d2f9d76d5c",
+    "number": 11
+  },
+  {
+    "capture": "all-1280x800-access-options",
+    "state": "access-options",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "6bc35d2d07819de282e4d98128d397d647cc4d5cd119d5ac14356824e180bf90",
+    "number": 12
+  },
+  {
+    "capture": "all-1280x800-mapping-preview",
+    "state": "mapping-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "fc2d161f800ba8a1cdec95cdb8b0a82b648625634abe6b18e7f3d98f7cce6fa5",
+    "number": 13
+  },
+  {
+    "capture": "all-1280x800-timezone-popup",
+    "state": "timezone-popup",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "f6349b70dd657a6e738e901347a041772d9b9000cfa56c94a6e89d40145d69fa",
+    "number": 14
+  },
+  {
+    "capture": "all-1280x800-pages-sizes",
+    "state": "pages-sizes",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "b411abc4f2e9fcb2dc512725bb9cf2527546b68e47d13508c567e8595307a1d6",
+    "number": 15
+  },
+  {
+    "capture": "all-1280x800-pages-screen-sizes",
+    "state": "pages-screen-sizes",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "a257842e36aad1003a861fc47c79cd7c3cf8b5613ccda3b223a9864365b8341d",
+    "number": 16
+  },
+  {
+    "capture": "all-1280x800-pages-images",
+    "state": "pages-images",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "c694cdb19af25fd4b378c562c5d5ae0d2bc1765b099aefe312402b683ce79e78",
+    "number": 17
+  },
+  {
+    "capture": "all-1280x800-pages-speed",
+    "state": "pages-speed",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "a3aa36fb280e5fe7ee77a5a14259c821e4bc2985e00accd9835d741ff7ffd36f",
+    "number": 18
+  },
+  {
+    "capture": "all-1280x800-pages-advanced",
+    "state": "pages-advanced",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "bd5221e9c3af457b47716819f5d7c9936ae8dc04674864e20d2cc9385899bcef",
+    "number": 19
+  },
+  {
+    "capture": "all-1280x800-project-settings",
+    "state": "project-settings",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "9dcddb5490d665cf803ca73365665193df3bbb4272e307cacd96dd28f8a033c6",
+    "number": 20
+  },
+  {
+    "capture": "all-1280x800-project-settings-bottom",
+    "state": "project-settings-bottom",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "e1ec4b31343b234add21db8e6e634fa14d8d55f5f6db1d4c953f438e33b0a053",
+    "number": 21
+  },
+  {
+    "capture": "all-1280x800-pages-baseline",
+    "state": "pages-baseline",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "51a5bdfa8d3a2304a6b87edf04ebff6b0d431f985653ad7ae96fb7be1eb87471",
+    "number": 22
+  },
+  {
+    "capture": "all-1280x800-discovery",
+    "state": "discovery",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "e9363ba1dfd1f19d6e20511e18eb20a453a931200ad881bfe9a591b0b0098c0f",
+    "number": 23
+  },
+  {
+    "capture": "all-1280x800-discovery-options",
+    "state": "discovery-options",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "fe53ee2832743beb7f027f9eebae534d6d460de07496ab76eb56fac3e8578b8d",
+    "number": 24
+  },
+  {
+    "capture": "all-1280x800-discovery-no-matches",
+    "state": "discovery-no-matches",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "4218dcd849f6f003babbc50e7aa7a4cc6f5209da62bcb1c6f7da5205409167b7",
+    "number": 25
+  },
+  {
+    "capture": "all-1280x800-review",
+    "state": "review",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "882ed9665825bbbf75b9c25a1c5b1f4244b2416b2b03c5b2a5a8f746490ead24",
+    "number": 26
+  },
+  {
+    "capture": "all-1280x800-review-mobile",
+    "state": "review-mobile",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "93923e439f7c744252d25cec0325b7198043ef64afc3a881d76052da73bcdda9",
+    "number": 27
+  },
+  {
+    "capture": "all-1280x800-review-mixed-148",
+    "state": "review-mixed-148",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 152.0,
+        "width": 272.0,
+        "height": 463.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 500.0,
+        "y": 152.0,
+        "width": 756.0,
+        "height": 88.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 500.0,
+        "y": 316.0,
+        "width": 372.0,
+        "height": 273.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 884.0,
+        "y": 316.0,
+        "width": 372.0,
+        "height": 273.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 623.0,
+        "width": 1040.0,
+        "height": 87.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 718.0,
+        "width": 1088.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 272.0,
+        "height": 307.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 895.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "702fecd98f332f18246a4062d91ceafe253f29402633e097060fbd3997905334",
+    "number": 28
+  },
+  {
+    "capture": "all-1280x800-review-failed-target",
+    "state": "review-failed-target",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 152.0,
+        "width": 272.0,
+        "height": 413.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 573.0,
+        "width": 1040.0,
+        "height": 112.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 693.0,
+        "width": 1088.0,
+        "height": 107.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 272.0,
+        "height": 257.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 895.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "cd20918a37d4e0c56b981eed30993c8d7cb64ec858772d303963829bf17a880d",
+    "number": 29
+  },
+  {
+    "capture": "all-1280x800-review-queue-hidden",
+    "state": "review-queue-hidden",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "bfefc562c0a57ea1794d24c5d03325ce931e529365716cd2116a23e022ae9660",
+    "number": 30
+  },
+  {
+    "capture": "all-1280x800-review-difference",
+    "state": "review-difference",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "d49d18a490374a01aeb3b326d2d793f4f695f6439b5b6ecfd40eb542119ed240",
+    "number": 31
+  },
+  {
+    "capture": "all-1280x800-review-overlay",
+    "state": "review-overlay",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "9a00408b7cf99a157d9747af92bcdbd04632a432faa3fc42a23550bbb199480d",
+    "number": 32
+  },
+  {
+    "capture": "all-1280x800-review-heatmap",
+    "state": "review-heatmap",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "ffaedb58eeb4fad13460cd5f12d3402ce34c148c128609f998448411d924f63c",
+    "number": 33
+  },
+  {
+    "capture": "all-1280x800-review-details",
+    "state": "review-details",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "db3d553910003d2d30330492afb6a0aefad13e7352b7e6ef8d4a568e25493cf5",
+    "number": 34
+  },
+  {
+    "capture": "all-1280x800-review-diagnostics",
+    "state": "review-diagnostics",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "db3d553910003d2d30330492afb6a0aefad13e7352b7e6ef8d4a568e25493cf5",
+    "number": 35
+  },
+  {
+    "capture": "all-1280x800-review-analysis",
+    "state": "review-analysis",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "2541f80a96413d1b82822a67f96af485eac09bf96f3d9af980e49ddee0b51838",
+    "number": 36
+  },
+  {
+    "capture": "all-1280x800-review-analysis-advanced",
+    "state": "review-analysis-advanced",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "2541f80a96413d1b82822a67f96af485eac09bf96f3d9af980e49ddee0b51838",
+    "number": 37
+  },
+  {
+    "capture": "all-1280x800-review-ignored-area",
+    "state": "review-ignored-area",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "0acda0963fde4dd97488a167629c3f4c9bfbd538d436c552073627a409751fcb",
+    "number": 38
+  },
+  {
+    "capture": "all-1280x800-review-note",
+    "state": "review-note",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "7cb40a0792f90907fe2a7c4de425aac0b3c5a4a376fa3cf0febad53f0524ce66",
+    "number": 39
+  },
+  {
+    "capture": "all-1280x800-review-filters",
+    "state": "review-filters",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "fa715a24df594a89fa62a6f1e34a409f87e324cd5a8d1e894b8daffbcc7c8888",
+    "number": 40
+  },
+  {
+    "capture": "all-1280x800-review-no-matches",
+    "state": "review-no-matches",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "6f6cabbbdd7a5cbe5a41801250b4bbcf7f464c5a824c7aeef99e4696208c62d1",
+    "number": 41
+  },
+  {
+    "capture": "all-1280x800-review-approval-selection",
+    "state": "review-approval-selection",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "e89a818ef7e7bf42652c7680ddb8dde07a0ae857c8d7473010acced8997e6639",
+    "number": 42
+  },
+  {
+    "capture": "all-1280x800-review-approval-confirm",
+    "state": "review-approval-confirm",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "34758cb6e2233d7f19216edbca7d09073e1895d53d57f4a2d0726ad3b170c25b",
+    "number": 43
+  },
+  {
+    "capture": "all-1280x800-review-zoom-menu",
+    "state": "review-zoom-menu",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 152.0,
+        "width": 272.0,
+        "height": 463.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 500.0,
+        "y": 152.0,
+        "width": 756.0,
+        "height": 88.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 500.0,
+        "y": 316.0,
+        "width": 372.0,
+        "height": 273.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 884.0,
+        "y": 316.0,
+        "width": 372.0,
+        "height": 273.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 623.0,
+        "width": 1040.0,
+        "height": 87.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 718.0,
+        "width": 1088.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 272.0,
+        "height": 307.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 895.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "d3c6b0f2836e6b7eb92d9f2f9fb70d38ab3581609afe4a63eaa8b3c0bd29c7df",
+    "number": 44
+  },
+  {
+    "capture": "all-1280x800-capture-gaps",
+    "state": "capture-gaps",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "13ffc6477908a8c0aa0cd5728409a07f2724b85fb8e3bc001494df6f7f664e3c",
+    "number": 45
+  },
+  {
+    "capture": "all-1280x800-capture-failed",
+    "state": "capture-failed",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "4b4e4dd137fab33d41afdf8ae1e8a2cd93a4e0cb29fbaada9dd20ded20351980",
+    "number": 46
+  },
+  {
+    "capture": "all-1280x800-capture-ready",
+    "state": "capture-ready",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "2b7e8ffef535229c800dd0d48cc87a8427741d490197609d16683ca1a555ea7b",
+    "number": 47
+  },
+  {
+    "capture": "all-1280x800-capture-mobile",
+    "state": "capture-mobile",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 176.0,
+        "width": 272.0,
+        "height": 616.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 500.0,
+        "y": 176.0,
+        "width": 756.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 500.0,
+        "y": 272.0,
+        "width": 756.0,
+        "height": 494.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 332.0,
+        "width": 272.0,
+        "height": 460.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 895.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "525250f2c6dd8aae410358076275ac3a9ede95ef88a59421e63df13c58d316b1",
+    "number": 48
+  },
+  {
+    "capture": "all-1280x800-capture-saved",
+    "state": "capture-saved",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "292c4b03b42bb55b2d461906ad72d873f3facce2f6c9116f3b82ee34b65c481e",
+    "number": 49
+  },
+  {
+    "capture": "all-1280x800-capture-empty",
+    "state": "capture-empty",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "771434921770cee10cdaf86c23dc8f632d925f9afed45695c4114ed9a007b6ef",
+    "number": 50
+  },
+  {
+    "capture": "all-1280x800-capture-loading",
+    "state": "capture-loading",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "2de69a8874e2d6fece4c053443ad8e0f118aad2f50cc48f5ede76596c42fd18c",
+    "number": 51
+  },
+  {
+    "capture": "all-1280x800-capture-read-failed",
+    "state": "capture-read-failed",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "c898f1e90413080f406e34944ad2975d5b1705e0f5f99a3267e8371a7c98c812",
+    "number": 52
+  },
+  {
+    "capture": "all-1280x800-history-runs",
+    "state": "history-runs",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "68e10c19c1d640eb25cd2d0f9e20b0479875a845b744a1fce1d21f194b8635bb",
+    "number": 53
+  },
+  {
+    "capture": "all-1280x800-history-bottom",
+    "state": "history-bottom",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "30cbb927b2ec50d83543c990074f649025e5564c16761b75859422ec829fed7c",
+    "number": 54
+  },
+  {
+    "capture": "all-1280x800-history-baselines",
+    "state": "history-baselines",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "e9bc5844e51f5b67561d1df876d86b8376a297379329b5248f01f0a6a17107c2",
+    "number": 55
+  },
+  {
+    "capture": "all-1280x800-history-storage",
+    "state": "history-storage",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "fbb294ecf885b7f510b5ec4669f06ea1e71b73cea6d6068563c160b9a69b9a1a",
+    "number": 56
+  },
+  {
+    "capture": "all-1280x800-history-empty",
+    "state": "history-empty",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "a4fe5b5479b39c0882a7bac72f1aa1802a55491c1561387f5afd5f0a39235d63",
+    "number": 57
+  },
+  {
+    "capture": "all-1280x800-history-no-matches",
+    "state": "history-no-matches",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "c95d06f7d00b90a34efad2b3ffa85ec666520ffdbcc9b5ee5cfcba0256a2e81d",
+    "number": 58
+  },
+  {
+    "capture": "all-1280x800-history-recorded-check",
+    "state": "history-recorded-check",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "51a1b83fec2f104c37be3010ba22786ddc48cdd6d128425300e7cd02adf48284",
+    "number": 59
+  },
+  {
+    "capture": "all-1280x800-history-recorded-capture",
+    "state": "history-recorded-capture",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "bba4111a198d4fd50572419723ff3da332561eb3dfcea5ed8f64681b48556ca7",
+    "number": 60
+  },
+  {
+    "capture": "all-1280x800-history-provenance",
+    "state": "history-provenance",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "cb753fb177f3252493722375e89a768d320bad266799c1a0ddf6cabce93fad9e",
+    "number": 61
+  },
+  {
+    "capture": "all-1280x800-export-preview",
+    "state": "export-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "12ce886265a18d39ec7f3b6327b94595d148fb2784673e4c62fc81fc889daec5",
+    "number": 62
+  },
+  {
+    "capture": "all-1280x800-import-preview",
+    "state": "import-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "9158cdc3337aa5bbc55dd88d928a5ac255cd4a1d0077b213f1998b6fcf1956ae",
+    "number": 63
+  },
+  {
+    "capture": "all-1280x800-delete-preview",
+    "state": "delete-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "88de192875db56ce224736d757690756d807ed4ab4d6df3c192da698f12f9f11",
+    "number": 64
+  },
+  {
+    "capture": "all-1280x800-app-settings",
+    "state": "app-settings",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "ee1864e2a0977a75669fbce0092ef23c0c0ff65b50b5ee94e349f4dc46bbcb53",
+    "number": 65
+  },
+  {
+    "capture": "all-1280x800-app-settings-network",
+    "state": "app-settings-network",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "7303334814384c6aa72075b0dcdeab9f36fd9085a7c9d2d2ff6a096cd2d80874",
+    "number": 66
+  },
+  {
+    "capture": "all-1280x800-app-settings-diagnostics",
+    "state": "app-settings-diagnostics",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "3b0a7ab19170b5a1b3039f20cc31aa065f46133e38a0ef63d0d318cf7adbeb63",
+    "number": 67
+  },
+  {
+    "capture": "all-1280x800-diagnostic-preview",
+    "state": "diagnostic-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "5f129d8782fde2fe60995149abf17bbef89f0d0dbb9f6428326cfcc5eb75a80b",
+    "number": 68
+  },
+  {
+    "capture": "all-1280x800-integrity-preview",
+    "state": "integrity-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "ef012a777f96444ec597c79ddaa4ccf86d7f3d336cb0318476a6485ceb1c1b1c",
+    "number": 69
+  },
+  {
+    "capture": "all-1280x800-keyboard-help",
+    "state": "keyboard-help",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "074b9e494c7fd2c03bf558fd49a919e07b0247b3d0c3d6bed1d339ca21ce164d",
+    "number": 70
+  },
+  {
+    "capture": "all-1280x800-about",
+    "state": "about",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "eae2b1fc057d83a009a4386f485070b15bce5254d43712947698484b09bd9853",
+    "number": 71
+  },
+  {
+    "capture": "all-820x600-projects",
+    "state": "projects",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "7a9c89bcc84856146ea35746fc5b45615cba4d23ef99c070d102e88246768faf",
+    "number": 72
+  },
+  {
+    "capture": "all-820x600-projects-empty",
+    "state": "projects-empty",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "6365a0dd9c21be98aef15a7783f1dec5349ecc03785ffe9df829e0eeb22d594f",
+    "number": 73
+  },
+  {
+    "capture": "all-820x600-projects-loading",
+    "state": "projects-loading",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "2602070d3777bb59a643f69c9ce0f1f41df54cb82a0138597c415b3350b35ecb",
+    "number": 74
+  },
+  {
+    "capture": "all-820x600-projects-failed",
+    "state": "projects-failed",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "aba72b694c5cd6d635a43d3010627265b3f4d5abfe4dd49eae613ddb437d335c",
+    "number": 75
+  },
+  {
+    "capture": "all-820x600-project-chooser",
+    "state": "project-chooser",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "880e904ea554a9ebeb63b9b4e1b628d1058f96a93c3be446f7948683b83bea9d",
+    "number": 76
+  },
+  {
+    "capture": "all-820x600-new-website",
+    "state": "new-website",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "892ad09936aa0854b7f02fbe5cdaa9029360cabebaf50763461eb35f9c3b8823",
+    "number": 77
+  },
+  {
+    "capture": "all-820x600-website",
+    "state": "website",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "892ad09936aa0854b7f02fbe5cdaa9029360cabebaf50763461eb35f9c3b8823",
+    "number": 78
+  },
+  {
+    "capture": "all-820x600-website-validation",
+    "state": "website-validation",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "ebd2f82c232ee4ca9043b923c2692bfd309fc7a77bbd39c2a0a808f34f404d0c",
+    "number": 79
+  },
+  {
+    "capture": "all-820x600-access-public",
+    "state": "access-public",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "1e3285ef89c7245e5b5e8cbd3e4570b07f923db8a3d963f3d2b74222b3664d3e",
+    "number": 80
+  },
+  {
+    "capture": "all-820x600-access-login",
+    "state": "access-login",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "615779a3b317939e9dea20e22caba4eb8de9153967b133961e394b5369be4a04",
+    "number": 81
+  },
+  {
+    "capture": "all-820x600-access-login-actions",
+    "state": "access-login-actions",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "caf7e5f0a950aa728c27134aeaebd68db6ec2df71bc300315fdd0afb08df7e3a",
+    "number": 82
+  },
+  {
+    "capture": "all-820x600-access-options",
+    "state": "access-options",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "c3497f444e8a872cf12f44f1c0794d13b896d8aeee8fb04663a7f18bf9813dd7",
+    "number": 83
+  },
+  {
+    "capture": "all-820x600-mapping-preview",
+    "state": "mapping-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "a59ad8a94dde5deb795eefb7862b9a87e9089d690099004671ab560857a423ad",
+    "number": 84
+  },
+  {
+    "capture": "all-820x600-timezone-popup",
+    "state": "timezone-popup",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "80c25503f6382f63b1b56d568719d9470d266eb1aa0c9dd5db1a374aaa53afd3",
+    "number": 85
+  },
+  {
+    "capture": "all-820x600-pages-sizes",
+    "state": "pages-sizes",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "c5c305baaf31ca43a8c17d3504129c3640b3fc056f790e47c87ea974f916f8b2",
+    "number": 86
+  },
+  {
+    "capture": "all-820x600-pages-screen-sizes",
+    "state": "pages-screen-sizes",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true,
+    "sha256": "54f7cb38f44aec94efc14c479a91cb5595000870a29de3a591d5446513384387",
+    "number": 87
+  },
+  {
+    "capture": "all-820x600-pages-images",
+    "state": "pages-images",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "5f5c1fe4e44a88fe83d680d8c225618675bcf89630657b195cfdb0838b18206e",
+    "number": 88
+  },
+  {
+    "capture": "all-820x600-pages-speed",
+    "state": "pages-speed",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "180ce82136d10845972dc33c10b076c8e28514b806aa2a71a0a6c172f2f52e53",
+    "number": 89
+  },
+  {
+    "capture": "all-820x600-pages-advanced",
+    "state": "pages-advanced",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "25c9c47c87cdae211c6442de880dd8122caf9b328e40578c00c1dac5ef85a265",
+    "number": 90
+  },
+  {
+    "capture": "all-820x600-project-settings",
+    "state": "project-settings",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "c2fdfb2588e4b6c02a0fb652d9bdf7cfb0d2e9340d4b4b6a0c491745cdc68ef3",
+    "number": 91
+  },
+  {
+    "capture": "all-820x600-project-settings-bottom",
+    "state": "project-settings-bottom",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "16fe08af69fa0301df1b312321df1c68cea807f747439df295d30a29a90a3faa",
+    "number": 92
+  },
+  {
+    "capture": "all-820x600-pages-baseline",
+    "state": "pages-baseline",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 109.0,
+        "width": 580.0,
+        "height": 483.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 205.0,
+        "width": 580.0,
+        "height": 387.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "01853b5e4a167d12b9cdecf9c5b4f470801291956ed501cb973a21ec7bf04458",
+    "number": 93
+  },
+  {
+    "capture": "all-820x600-discovery",
+    "state": "discovery",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 151.0,
+        "width": 580.0,
+        "height": 441.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 313.0,
+        "width": 580.0,
+        "height": 279.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "42f2e2547185b3238fcac5367d508505d6daf45df202b18fec5d39f0ae4cd8fa",
+    "number": 94
+  },
+  {
+    "capture": "all-820x600-discovery-options",
+    "state": "discovery-options",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 151.0,
+        "width": 248.0,
+        "height": 441.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 331.0,
+        "width": 248.0,
+        "height": 261.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "d71b5907451ff8ec97b9e874bed0ad06644ac7b22fa9b79aac81250704fe1e8c",
+    "number": 95
+  },
+  {
+    "capture": "all-820x600-discovery-no-matches",
+    "state": "discovery-no-matches",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 151.0,
+        "width": 248.0,
+        "height": 441.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "5a1defc09d903a2e0fa8cb6798e0e7e6f0550ec1d10f19fafda76104c987e51c",
+    "number": 96
+  },
+  {
+    "capture": "all-820x600-review",
+    "state": "review",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "77b633472f380c462b8b1ec56ed54d66a7ad50b789171946755c2df01b89f234",
+    "number": 97
+  },
+  {
+    "capture": "all-820x600-review-mobile",
+    "state": "review-mobile",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "99f0478b08507970c95e6642d4abc88c142fe0c5b8a31f4429924c66bfd47891",
+    "number": 98
+  },
+  {
+    "capture": "all-820x600-review-mixed-148",
+    "state": "review-mixed-148",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "63ca35a777ec11131050156003fcf22e102146e35b9ddf864fef85d959a0c4bf",
+    "number": 99
+  },
+  {
+    "capture": "all-820x600-review-failed-target",
+    "state": "review-failed-target",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 275.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 423.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 493.0,
+        "width": 628.0,
+        "height": 107.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 135.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "a88e4c76a1e03d323b8df3db1f09b5fca1e579106da2c82505b12d2466d398b3",
+    "number": 100
+  },
+  {
+    "capture": "all-820x600-review-queue-hidden",
+    "state": "review-queue-hidden",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "viewer-toolbar",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 580.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 216.0,
+        "y": 228.0,
+        "width": 284.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 512.0,
+        "y": 228.0,
+        "width": 284.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "3414c46d7a83c30927b5d7fbb328ba7e6eecabad10337f45362142701d2fe847",
+    "number": 101
+  },
+  {
+    "capture": "all-820x600-review-difference",
+    "state": "review-difference",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "e1486ed312f4a2930bb0bebf2c1e6e19b9a5f6a8608b2ce59e4258280a567734",
+    "number": 102
+  },
+  {
+    "capture": "all-820x600-review-overlay",
+    "state": "review-overlay",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "77b633472f380c462b8b1ec56ed54d66a7ad50b789171946755c2df01b89f234",
+    "number": 103
+  },
+  {
+    "capture": "all-820x600-review-heatmap",
+    "state": "review-heatmap",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "77b633472f380c462b8b1ec56ed54d66a7ad50b789171946755c2df01b89f234",
+    "number": 104
+  },
+  {
+    "capture": "all-820x600-review-details",
+    "state": "review-details",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "a3bca3a820007735256bd006f0509f8486cf18acdaf686462b4a9fd4e2b6125b",
+    "number": 105
+  },
+  {
+    "capture": "all-820x600-review-diagnostics",
+    "state": "review-diagnostics",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "a3bca3a820007735256bd006f0509f8486cf18acdaf686462b4a9fd4e2b6125b",
+    "number": 106
+  },
+  {
+    "capture": "all-820x600-review-analysis",
+    "state": "review-analysis",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "84f7abf1d4fc655c500f9328db30d9882b095aeca58c6fb66cd6e282d1aeff4f",
+    "number": 107
+  },
+  {
+    "capture": "all-820x600-review-analysis-advanced",
+    "state": "review-analysis-advanced",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "84f7abf1d4fc655c500f9328db30d9882b095aeca58c6fb66cd6e282d1aeff4f",
+    "number": 108
+  },
+  {
+    "capture": "all-820x600-review-ignored-area",
+    "state": "review-ignored-area",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 275.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 191.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 191.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 423.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 493.0,
+        "width": 628.0,
+        "height": 107.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 135.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "fd87d7bf3b3611411c69455c771b76e447c57b5de71d8d6748699109661368ce",
+    "number": 109
+  },
+  {
+    "capture": "all-820x600-review-note",
+    "state": "review-note",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 256.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 172.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 172.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 404.0,
+        "width": 580.0,
+        "height": 106.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 116.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "56694c1af9a640cfae279b2727d233598b1a05e2f9033279bc45ad8664ce4ab5",
+    "number": 110
+  },
+  {
+    "capture": "all-820x600-review-filters",
+    "state": "review-filters",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "85f8958144d45db045066516564a109966b1fc710bd1eaac653d3d5130a4cbcf",
+    "number": 111
+  },
+  {
+    "capture": "all-820x600-review-no-matches",
+    "state": "review-no-matches",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "56cc72e883c5259fd0b93a6362b0171bca7e99cd8c4064b9daa5613ecc54b3cf",
+    "number": 112
+  },
+  {
+    "capture": "all-820x600-review-approval-selection",
+    "state": "review-approval-selection",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "0984cd8e278a8c8cbe72c66c9f58143ca2ebbdf1f734f8b51197e4fe2f596c54",
+    "number": 113
+  },
+  {
+    "capture": "all-820x600-review-approval-confirm",
+    "state": "review-approval-confirm",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "dda40ac47ac64d36d1777ecf69564823a6f085d22908c7326ca8bfc3d6ee0b44",
+    "number": 114
+  },
+  {
+    "capture": "all-820x600-review-zoom-menu",
+    "state": "review-zoom-menu",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "daf03047d7219d7fd7331611153aa70fdaba02c8b39bca2ec74eae2f621099f8",
+    "number": 115
+  },
+  {
+    "capture": "all-820x600-capture-gaps",
+    "state": "capture-gaps",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 176.0,
+        "width": 200.0,
+        "height": 416.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 176.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 264.0,
+        "width": 368.0,
+        "height": 328.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 316.0,
+        "width": 200.0,
+        "height": 276.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "713ce326c1b70e99f191533e510649dfde5495f3afe8addcd049998fad304e37",
+    "number": 116
+  },
+  {
+    "capture": "all-820x600-capture-failed",
+    "state": "capture-failed",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 176.0,
+        "width": 200.0,
+        "height": 416.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 176.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 264.0,
+        "width": 368.0,
+        "height": 328.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 316.0,
+        "width": 200.0,
+        "height": 276.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "de57bcec31dfcf9913bb70c9e19d8d688234e92d325c8fc70b9c1d80a8d1a569",
+    "number": 117
+  },
+  {
+    "capture": "all-820x600-capture-ready",
+    "state": "capture-ready",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 168.0,
+        "width": 200.0,
+        "height": 424.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 168.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 256.0,
+        "width": 368.0,
+        "height": 336.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 200.0,
+        "height": 284.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "1769054063876a69a831b62b760893265dfba03658565702f52be3bea002a95f",
+    "number": 118
+  },
+  {
+    "capture": "all-820x600-capture-mobile",
+    "state": "capture-mobile",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 168.0,
+        "width": 200.0,
+        "height": 424.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 168.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 256.0,
+        "width": 368.0,
+        "height": 336.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 200.0,
+        "height": 284.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "1a67e3f52c9419737c3b3022419b05d1ff9ddfc0bcebf287b8c68cb1556ea440",
+    "number": 119
+  },
+  {
+    "capture": "all-820x600-capture-saved",
+    "state": "capture-saved",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 168.0,
+        "width": 200.0,
+        "height": 424.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 168.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 256.0,
+        "width": 368.0,
+        "height": 336.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 200.0,
+        "height": 284.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "f29db4ccee3b12e1606c09358ccd56d01228fcae883e67083d53167633f264ef",
+    "number": 120
+  },
+  {
+    "capture": "all-820x600-capture-empty",
+    "state": "capture-empty",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 113.0,
+        "width": 200.0,
+        "height": 479.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "34abba3f1a99e151793914447d24bac93dfd0e7b129261dc619b6ce03a762066",
+    "number": 121
+  },
+  {
+    "capture": "all-820x600-capture-loading",
+    "state": "capture-loading",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "384515a8851cb1cbff82cc01a5e63e4ea5e2701acdd7499e2402a7858dbb1647",
+    "number": 122
+  },
+  {
+    "capture": "all-820x600-capture-read-failed",
+    "state": "capture-read-failed",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "eb0c93ded91a63cdc35c9b3b09bd414568cde9a51bc9cdd67ffe6734c153685d",
+    "number": 123
+  },
+  {
+    "capture": "all-820x600-history-runs",
+    "state": "history-runs",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 463.0,
+        "width": 580.0,
+        "height": 130.0
+      },
+      {
+        "selector": "history-run-list",
+        "x": 217.0,
+        "y": 464.0,
+        "width": 578.0,
+        "height": 128.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "f7a295ad07cbae49067b5d26ae7a9670e76893e050b3b496e39911845f0c33f7",
+    "number": 124
+  },
+  {
+    "capture": "all-820x600-history-bottom",
+    "state": "history-bottom",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 55.0,
+        "width": 580.0,
+        "height": 130.0
+      },
+      {
+        "selector": "history-run-list",
+        "x": 217.0,
+        "y": 56.0,
+        "width": 578.0,
+        "height": 128.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "b0170c7ca5e38ca6d26d34512f3df1f4eccae0c7b6d7640cf7b3cc99b6f7fb63",
+    "number": 125
+  },
+  {
+    "capture": "all-820x600-history-baselines",
+    "state": "history-baselines",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 514.0,
+        "width": 580.0,
+        "height": 66.0
+      },
+      {
+        "selector": "history-baseline-list",
+        "x": 217.0,
+        "y": 515.0,
+        "width": 578.0,
+        "height": 64.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "1b8f85c27e500a5a93c626579316422e7de5d9683a12f31b9a45f79b75a42efc",
+    "number": 126
+  },
+  {
+    "capture": "all-820x600-history-storage",
+    "state": "history-storage",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "007810b9ff1a93560899237a7f3786f6c2f6cd47d65bd296647625861cfde0d5",
+    "number": 127
+  },
+  {
+    "capture": "all-820x600-history-empty",
+    "state": "history-empty",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "60bfbf4f7866349feecb38c58b716c76d8793ed5e3bdeac35efb50563082ec86",
+    "number": 128
+  },
+  {
+    "capture": "all-820x600-history-no-matches",
+    "state": "history-no-matches",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "a08e2f2acb8ec27687782dd64dd1c1135066f5b95efcb8b73ef18cbf231922ca",
+    "number": 129
+  },
+  {
+    "capture": "all-820x600-history-recorded-check",
+    "state": "history-recorded-check",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 276.0,
+        "width": 200.0,
+        "height": 291.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 276.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 360.0,
+        "width": 178.0,
+        "height": 207.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 360.0,
+        "width": 178.0,
+        "height": 207.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 416.0,
+        "width": 200.0,
+        "height": 151.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "a14f35c0ad884097e8ed8bd71b9d75f4f9f94df2b646dd2c7b261b3f9a4552a9",
+    "number": 130
+  },
+  {
+    "capture": "all-820x600-history-recorded-capture",
+    "state": "history-recorded-capture",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 276.0,
+        "width": 200.0,
+        "height": 316.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 276.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 364.0,
+        "width": 368.0,
+        "height": 228.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 416.0,
+        "width": 200.0,
+        "height": 176.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "052dab40c0e92965f30c8e1814ff97af31e062b833d5029ddc6326238a0808de",
+    "number": 131
+  },
+  {
+    "capture": "all-820x600-history-provenance",
+    "state": "history-provenance",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": -420.0,
+        "width": 580.0,
+        "height": 130.0
+      },
+      {
+        "selector": "history-run-list",
+        "x": 217.0,
+        "y": -419.0,
+        "width": 578.0,
+        "height": 128.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "8c176984050f9b14730a443e1bfb4f1cf849c860beb45a3aec19e52384e83055",
+    "number": 132
+  },
+  {
+    "capture": "all-820x600-export-preview",
+    "state": "export-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": -314.0,
+        "width": 580.0,
+        "height": 66.0
+      },
+      {
+        "selector": "history-baseline-list",
+        "x": 217.0,
+        "y": -313.0,
+        "width": 578.0,
+        "height": 64.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "1639925b00d740b2db1a0293d4aa2b7ce3c85b31e515dc1e8bec52b5583c5124",
+    "number": 133
+  },
+  {
+    "capture": "all-820x600-import-preview",
+    "state": "import-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 10.0,
+        "width": 395.0,
+        "height": 25.0
+      }
+    ],
+    "sha256": "6cd614cee4e439e59af24ac08d9466483ca8253f7bef062ad7678496ffb9f120",
+    "number": 134
+  },
+  {
+    "capture": "all-820x600-delete-preview",
+    "state": "delete-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": -190.0,
+        "width": 580.0,
+        "height": 130.0
+      },
+      {
+        "selector": "history-run-list",
+        "x": 217.0,
+        "y": -189.0,
+        "width": 578.0,
+        "height": 128.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "0448998f75f87854a5c5897b0241e3bd06077c14c480156975aa3366fdafceb6",
+    "number": 135
+  },
+  {
+    "capture": "all-820x600-app-settings",
+    "state": "app-settings",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "f8d09b47052466ce338e4668fa66fb26b8d0e25a74d8a142bcc8acbcce8e6344",
+    "number": 136
+  },
+  {
+    "capture": "all-820x600-app-settings-network",
+    "state": "app-settings-network",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "f226171fa79293967cb352e7e8902888ecfad675ea196ef65601cef180c054cc",
+    "number": 137
+  },
+  {
+    "capture": "all-820x600-app-settings-diagnostics",
+    "state": "app-settings-diagnostics",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "004506a4eead97f46229593f10d219f0bdc8ca4f32175d5da0ba06a49b221a96",
+    "number": 138
+  },
+  {
+    "capture": "all-820x600-diagnostic-preview",
+    "state": "diagnostic-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "b1abb7fd96275fb7cec1eddda343687a06cbc28f08ae76dc9dcc4f59f5474f42",
+    "number": 139
+  },
+  {
+    "capture": "all-820x600-integrity-preview",
+    "state": "integrity-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "95cf1e73d4c447ded0c296d5d735a8424b6bcdff89faa5a9141857e388376a65",
+    "number": 140
+  },
+  {
+    "capture": "all-820x600-keyboard-help",
+    "state": "keyboard-help",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "b78b87690e6bc6ed19e1d88cf28363c8813ad58203d0f3598a4291da748cabd1",
+    "number": 141
+  },
+  {
+    "capture": "all-820x600-about",
+    "state": "about",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ],
+    "sha256": "f806f09f99ae8e7984bb6a172e1db0e18cffc47f7c86aa5458e3da5380ad75f0",
+    "number": 142
+  },
+  {
+    "capture": "task-1280x800-baseline-finishing",
+    "state": "baseline-finishing",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "2a033aab519bb7402477740ff0e487ac752a806fc1c2d5861eae7b9ec9904089",
+    "number": 143
+  },
+  {
+    "capture": "task-1280x800-capture-attention",
+    "state": "capture-attention",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "9edb426882e79753843cd2a932782e1aab7b2bed101b59c1f8118e79aea61617",
+    "number": 144
+  },
+  {
+    "capture": "task-1280x800-capture-complete",
+    "state": "capture-complete",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "d92f5e954448362d60c42a85d77a6cd6637ba6ca6efa065ee0f928d1694bd3a0",
+    "number": 145
+  },
+  {
+    "capture": "task-1280x800-capture-gap-details",
+    "state": "capture-gap-details",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "90093d86a7ab9c882b79a98c627fb58f087c1642d71e464c6f3d62e004d6e193",
+    "number": 146
+  },
+  {
+    "capture": "task-1280x800-capture-paused",
+    "state": "capture-paused",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "e6dc8753e5d8183167768718adea2e3df4e84c62371accf85e87d75458364f78",
+    "number": 147
+  },
+  {
+    "capture": "task-1280x800-capture-pausing",
+    "state": "capture-pausing",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "f6a20645a6d6c263fe557839b520bbba9f298f99a5b0d68ceadfcb211f462272",
+    "number": 148
+  },
+  {
+    "capture": "task-1280x800-capture-progress",
+    "state": "capture-progress",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "2737b9680413238acc060fd7f6f9a157bab305416bd67ece618ae75f947bef82",
+    "number": 149
+  },
+  {
+    "capture": "task-1280x800-capture-setup-details",
+    "state": "capture-setup-details",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "1a89b49fe20426c357210a8c17a28d679db9893f1a8566b0185ed0fab31fb0e7",
+    "number": 150
+  },
+  {
+    "capture": "task-1280x800-discovery-browser-check",
+    "state": "discovery-browser-check",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "c09d3148974c8c50adfe744ccdf50185893a89e4047aaf2187791b1ff5ab9991",
+    "number": 151
+  },
+  {
+    "capture": "task-1280x800-discovery-crawl-rules",
+    "state": "discovery-crawl-rules",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "f5fc63b37d39b29144edf6316cee3dbb53ac8c0ecf51a5cccc6adc7132b231eb",
+    "number": 152
+  },
+  {
+    "capture": "task-1280x800-discovery-first-page",
+    "state": "discovery-first-page",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "668d5822eac2170b2655aa26fe89762e3438d9c055f1098b1609c7a6c671a61b",
+    "number": 153
+  },
+  {
+    "capture": "task-1280x800-discovery-first-retry",
+    "state": "discovery-first-retry",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "ba3c585f952837a514d6afcc85fda6ef7d74b12f3140108eb4d3e3eb337ccd39",
+    "number": 154
+  },
+  {
+    "capture": "task-1280x800-discovery-stopping",
+    "state": "discovery-stopping",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "f3c9cab1ccf10d1f4cb5d60ebe46ca9e46981f93d61da58bd06451957be6dcea",
+    "number": 155
+  },
+  {
+    "capture": "task-1280x800-discovery",
+    "state": "discovery",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "7ff6a74ec78da23395b8e50a830a2377604d74854fdc585ddd5616afb64f85f4",
+    "number": 156
+  },
+  {
+    "capture": "task-1280x800-export-late-success",
+    "state": "export-late-success",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "65b2523c30f1aff277e91b6e4a1746db6134943e8c76aef547f718e3a30d7d8d",
+    "number": 157
+  },
+  {
+    "capture": "task-1280x800-failed-task",
+    "state": "failed-task",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "ecc6e0f82b6c142a0c8eeb94df25078c0c19eb8698f2bf8c80fc2b8e20badf18",
+    "number": 158
+  },
+  {
+    "capture": "task-1280x800-partial-discovery",
+    "state": "partial-discovery",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "37f92a3c9ef9eff86544a8724ebbe6d3a62a18c3b02f51d41f319d4dcc39d1fd",
+    "number": 159
+  },
+  {
+    "capture": "task-1280x800-setup-download",
+    "state": "setup-download",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "93470056a2d3c993169c9360db0ec48a7d1289d069eab420042689f110edcd8a",
+    "number": 160
+  },
+  {
+    "capture": "task-1280x800-zip-export-stopping",
+    "state": "zip-export-stopping",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "6387b2be40219083adc7e980f5e58abdad192fc0263a9f533c56b034519f33fb",
+    "number": 161
+  },
+  {
+    "capture": "task-1280x800-zip-import",
+    "state": "zip-import",
+    "width": 1280,
+    "height": 800,
+    "synthetic": true,
+    "sha256": "cb8d8e04b8e2c2b75b0245bb095ad6ae5cb8951908f9cf400f4f285c0f168201",
+    "number": 162
+  },
+  {
+    "capture": "task-820x600-baseline-finishing",
+    "state": "baseline-finishing",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "e87ee2b84fea4395ab025b5443f1272307f364117d3186b182a62aaf4092fa54",
+    "number": 163
+  },
+  {
+    "capture": "task-820x600-capture-attention",
+    "state": "capture-attention",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "0cc40fd125e26316846583ba6747cb15ba0e16f12a230bf6820a72ad66a60e3c",
+    "number": 164
+  },
+  {
+    "capture": "task-820x600-capture-complete",
+    "state": "capture-complete",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "5bf24c57e62337de903f6e25681a347f4e30f8067d3dd72d67d3431fabf76a95",
+    "number": 165
+  },
+  {
+    "capture": "task-820x600-capture-gap-details",
+    "state": "capture-gap-details",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "5c5f2bc79ef091011d08d8696627afd202ffd373788b33aa144872c0e2a2d325",
+    "number": 166
+  },
+  {
+    "capture": "task-820x600-capture-paused",
+    "state": "capture-paused",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "2d2b8de12ec8ecd2ea2efbfd06ddbadec871cfd2f452d49d091cf99595ecf915",
+    "number": 167
+  },
+  {
+    "capture": "task-820x600-capture-pausing",
+    "state": "capture-pausing",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "470e1130f1af9ebaa1fa5a9e417da7d70cde3b1aae5e37e54b82ee747c425f20",
+    "number": 168
+  },
+  {
+    "capture": "task-820x600-capture-progress",
+    "state": "capture-progress",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "dd276d626f2ddbe2f08aa48b611bd12cfc66a03aeed369de2f2ced228c4befc8",
+    "number": 169
+  },
+  {
+    "capture": "task-820x600-capture-setup-details",
+    "state": "capture-setup-details",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "24bf660949d8350c9c51301455187c1f974244e7510020fe2a76218479d3cb28",
+    "number": 170
+  },
+  {
+    "capture": "task-820x600-discovery-browser-check",
+    "state": "discovery-browser-check",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "21258ca52f10823f6d0b842f26baedff0bf8b0f92bc92db4f8495594fc58e8a9",
+    "number": 171
+  },
+  {
+    "capture": "task-820x600-discovery-crawl-rules",
+    "state": "discovery-crawl-rules",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "afaefa8222668591d2403be3fa7664ab3fe1ad3426ed1fcb54a10d68a3b1bb0b",
+    "number": 172
+  },
+  {
+    "capture": "task-820x600-discovery-first-page",
+    "state": "discovery-first-page",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "9a18a152b44d631d93b6e368bc05e84972c8d7c167743ce342922b1b00414f65",
+    "number": 173
+  },
+  {
+    "capture": "task-820x600-discovery-first-retry",
+    "state": "discovery-first-retry",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "280a47cd2da8868e159772332a79397f6c6739fccb01a2a0c1ccac13693dd0dd",
+    "number": 174
+  },
+  {
+    "capture": "task-820x600-discovery-stopping",
+    "state": "discovery-stopping",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "9151f750325a161b15a2f9e8841b93544c58f80a90d207c3f26c64ce14dbe0d1",
+    "number": 175
+  },
+  {
+    "capture": "task-820x600-discovery",
+    "state": "discovery",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "4ad0cb2abd149e38dbcc8075b2acdc41a74f4b3949230fc3e85c2d4b533d9219",
+    "number": 176
+  },
+  {
+    "capture": "task-820x600-export-late-success",
+    "state": "export-late-success",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "afe49cda77f743f5c624b981db011abdc1669b108c10055b69b82e9b65388e44",
+    "number": 177
+  },
+  {
+    "capture": "task-820x600-failed-task",
+    "state": "failed-task",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "8eeaac94082983125e362778807d9bb9e131eb4c69c55182aa6d8a8f01b65600",
+    "number": 178
+  },
+  {
+    "capture": "task-820x600-partial-discovery",
+    "state": "partial-discovery",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "cd3da5540253fa499c5500c87c9ee8d3d06d204ff9f6d17bae23dee4ec37128e",
+    "number": 179
+  },
+  {
+    "capture": "task-820x600-setup-download",
+    "state": "setup-download",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "7b3f6dca438e8718732cf5b0a7da4649473415ce3cae53c3be2c0b84fd3be9a4",
+    "number": 180
+  },
+  {
+    "capture": "task-820x600-zip-export-stopping",
+    "state": "zip-export-stopping",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "5ae16bd009d9034949267f6da29602240057b6977d053ab63b44a3868df4d899",
+    "number": 181
+  },
+  {
+    "capture": "task-820x600-zip-import",
+    "state": "zip-import",
+    "width": 820,
+    "height": 600,
+    "synthetic": true,
+    "sha256": "c8a61c1b57dbf56ec7a8908dc7186e27e0be5448162a9705f5588e146e3aa984",
+    "number": 182
+  }
+]

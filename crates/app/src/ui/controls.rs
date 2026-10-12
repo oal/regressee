@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: MPL-2.0
+use super::status_icon::{StatusIcon, status_icon};
 use super::theme::*;
 use gpui::{prelude::*, *};
+use std::time::{Duration, Instant};
+
+/// GPUI does not expose the OS motion preference. The app supplies an explicit
+/// reduced-motion override at startup; it never changes completion counters.
+#[derive(Default)]
+pub struct ReducedMotion(pub bool);
+impl Global for ReducedMotion {}
 
 #[derive(Clone, Copy)]
 pub enum ActionStyle {
@@ -314,6 +322,88 @@ pub enum Tone {
     Warning,
     Error,
 }
+
+/// A bounded disclosure: its title and Close never scroll with the content.
+/// The caller supplies the height/placement and owns focus and dismissal.
+pub fn disclosure_panel(
+    id: &'static str,
+    title: &'static str,
+    close: AnyElement,
+    body: AnyElement,
+    scroll: &ScrollHandle,
+) -> Stateful<Div> {
+    let scrollbar = scroll.clone();
+    div()
+        .id(id)
+        .debug_selector(move || id.into())
+        .w_full()
+        .h_full()
+        .min_h_0()
+        .min_w_0()
+        .flex()
+        .flex_col()
+        .bg(rgb(SURFACE))
+        .border_1()
+        .border_color(rgb(CONTROL_LINE))
+        .child(
+            div()
+                .flex_shrink_0()
+                .flex()
+                .items_center()
+                .justify_between()
+                .gap_2()
+                .p_3()
+                .border_b_1()
+                .border_color(rgb(LINE))
+                .child(
+                    div()
+                        .debug_selector(move || format!("{id}-title"))
+                        .flex_1()
+                        .min_w_0()
+                        .text_size(px(18.))
+                        .line_height(px(24.))
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child(title),
+                )
+                .child(close),
+        )
+        .child(
+            div()
+                .id(SharedString::from(format!("{id}-scroll")))
+                .debug_selector(move || format!("{id}-scroll"))
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .track_scroll(scroll)
+                .p_4()
+                .child(body),
+        )
+        .child(
+            canvas(
+                |_, _, _| (),
+                move |_, _, window, _| {
+                    let viewport = scrollbar.bounds();
+                    let overflow = f32::from(scrollbar.max_offset().height);
+                    let height = f32::from(viewport.size.height) - 8.;
+                    if overflow <= 0. || height <= 0. {
+                        return;
+                    }
+                    let thumb = (height * height / (height + overflow)).max(24.).min(height);
+                    let progress = (-f32::from(scrollbar.offset().y) / overflow).clamp(0., 1.);
+                    let bounds = Bounds::new(
+                        point(
+                            viewport.right() - px(6.),
+                            viewport.top() + px(4. + progress * (height - thumb)),
+                        ),
+                        size(px(4.), px(thumb)),
+                    );
+                    window.paint_quad(fill(bounds, rgb(CONTROL_LINE)));
+                },
+            )
+            .h(px(0.))
+            .w_full(),
+        )
+}
 pub fn status(label: impl Into<SharedString>, tone: Tone) -> Div {
     let (background, ink) = match tone {
         Tone::Neutral => (ACTION_SURFACE, MUTED),
@@ -329,6 +419,94 @@ pub fn status(label: impl Into<SharedString>, tone: Tone) -> Div {
         .text_color(rgb(ink))
         .text_size(px(13.))
         .child(label.into())
+}
+
+/// A labelled explanation, not a decorative card. Information stays white;
+/// warning/error surfaces are reserved for their actual consequences.
+pub fn note(title: impl Into<SharedString>, message: impl Into<SharedString>, tone: Tone) -> Div {
+    let (icon, ink, background, border) = match tone {
+        Tone::Neutral | Tone::Information => (StatusIcon::Information, INK, SURFACE, LINE),
+        Tone::Warning => (StatusIcon::Warning, WARNING, WARNING_SURFACE, LINE),
+        Tone::Error => (StatusIcon::Error, ERROR, ERROR_SURFACE, ERROR),
+    };
+    div()
+        .debug_selector(|| "task-note".into())
+        .w(px(560.))
+        .max_w_full()
+        .flex_shrink_0()
+        .p_4()
+        .border_1()
+        .border_color(rgb(border))
+        .rounded(px(4.))
+        .bg(rgb(background))
+        .flex()
+        .items_start()
+        .gap_3()
+        .child(
+            div()
+                .w(px(18.))
+                .flex_shrink_0()
+                .pt(px(1.))
+                .child(status_icon(icon, ink, 18.)),
+        )
+        .child(
+            div()
+                .min_w_0()
+                .flex_1()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .text_size(px(14.))
+                .line_height(px(20.))
+                .text_color(rgb(ink))
+                .child(
+                    div()
+                        .debug_selector(|| "task-note-title".into())
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .font_weight(FontWeight::MEDIUM)
+                        .child(title.into()),
+                )
+                .child(
+                    div()
+                        .debug_selector(|| "task-note-copy".into())
+                        .w_full()
+                        .flex()
+                        .flex_col()
+                        .child(message.into()),
+                ),
+        )
+}
+
+/// A small count with a semantic icon and complete textual meaning. Whole
+/// items wrap together; counts never float away from their labels.
+pub fn labelled_count(count: usize, label: &'static str, icon: StatusIcon, ink: u32) -> Div {
+    div()
+        .w(px(248.))
+        .max_w_full()
+        .flex_shrink_0()
+        .flex()
+        .items_start()
+        .gap_2()
+        .text_size(px(15.))
+        .line_height(px(22.))
+        .text_color(rgb(ink))
+        .child(
+            div()
+                .flex_shrink_0()
+                .pt(px(2.))
+                .child(status_icon(icon, ink, 18.)),
+        )
+        .child(
+            div()
+                .debug_selector(move || format!("task-count-label-{label}"))
+                .min_w_0()
+                .flex_1()
+                .flex()
+                .flex_col()
+                .child(format!("{count} {label}")),
+        )
 }
 pub fn error(message: impl Into<SharedString>) -> Div {
     div()
@@ -587,6 +765,74 @@ fn progress_fraction(completed: u32, total: Option<u32>) -> Option<f32> {
         .map(|n| completed.min(n) as f32 / n as f32)
 }
 
+const ACTIVITY_PERIOD: Duration = Duration::from_millis(1200);
+
+fn activity_phase(elapsed: Duration) -> f32 {
+    (elapsed.as_secs_f64() / ACTIVITY_PERIOD.as_secs_f64()).fract() as f32
+}
+
+fn activity_segments(bounds: Bounds<Pixels>, phase: f32) -> [Bounds<Pixels>; 5] {
+    // Four repetitions, plus the one entering from the left. Moving one repeat
+    // per cycle makes the wrap seamless; clipping keeps every painted quad in
+    // the existing track without relaying out the label or surrounding controls.
+    let stride = bounds.size.width / 4.;
+    let segment_width = stride / 3.;
+    let offset = stride * phase.rem_euclid(1.);
+    std::array::from_fn(|index| {
+        let start = stride * (index as f32 - 1.) + offset;
+        let left = start.clamp(px(0.), bounds.size.width);
+        let right = (start + segment_width).clamp(px(0.), bounds.size.width);
+        Bounds::new(
+            bounds.origin + point(left, px(0.)),
+            size(right - left, bounds.size.height),
+        )
+    })
+}
+
+fn indeterminate_track() -> Div {
+    div()
+        .debug_selector(|| "progress-indeterminate".into())
+        .size_full()
+        .child(
+            canvas(
+                |_, window, cx| {
+                    let animate = !cx
+                        .try_global::<ReducedMotion>()
+                        .is_some_and(|motion| motion.0);
+                    let phase = if animate {
+                        // A stable element-local clock survives worker updates.
+                        // Neither message changes nor page counts restart motion.
+                        let clock =
+                            window.use_keyed_state("progress-activity-clock", cx, |_, _| {
+                                Instant::now()
+                            });
+                        activity_phase(clock.read(cx).elapsed())
+                    } else {
+                        0.
+                    };
+                    (phase, animate)
+                },
+                |bounds, (phase, animate), window, _| {
+                    if bounds.intersect(&window.content_mask().bounds).is_empty() {
+                        return;
+                    }
+                    for segment in activity_segments(bounds, phase) {
+                        if !segment.is_empty() {
+                            window.paint_quad(fill(segment, rgb(ACCENT)));
+                        }
+                    }
+                    if animate {
+                        // Native frame scheduling, not the worker's sparse
+                        // progress reports or a polling timer. No frames are
+                        // requested after unmounting, clipping, or reducing motion.
+                        window.request_animation_frame();
+                    }
+                },
+            )
+            .size_full(),
+        )
+}
+
 fn progress_track(completed: u32, total: Option<u32>) -> Div {
     let fraction = progress_fraction(completed, total);
     div()
@@ -605,24 +851,9 @@ fn progress_track(completed: u32, total: Option<u32>) -> Div {
             )
         })
         .when(fraction.is_none(), |el| {
-            // A patterned activity track, not a guessed completion fraction.
-            // Advance only with real work updates; no perpetual animation or
-            // timer, so the shell remains reduced-motion friendly.
-            let phase = completed % 3;
-            el.child(
-                div()
-                    .debug_selector(|| "progress-indeterminate".into())
-                    .size_full()
-                    .flex()
-                    .gap(px(4.))
-                    .children((0..12).map(|segment| {
-                        div().flex_1().h_full().bg(rgb(if segment % 3 == phase {
-                            ACCENT
-                        } else {
-                            LINE
-                        }))
-                    })),
-            )
+            // Activity is independent of actual work counts. Only known totals
+            // above render a completion fraction.
+            el.child(indeterminate_track())
         })
 }
 
@@ -631,10 +862,17 @@ fn progress_track(completed: u32, total: Option<u32>) -> Div {
 pub fn progress(label: impl Into<SharedString>, completed: u32, total: Option<u32>) -> Div {
     div()
         .w_full()
+        .flex_shrink_0()
         .flex()
         .flex_col()
         .gap_2()
-        .child(div().text_color(rgb(MUTED)).child(label.into()))
+        .child(
+            div()
+                .flex_shrink_0()
+                .text_color(rgb(INK))
+                .font_weight(FontWeight::MEDIUM)
+                .child(label.into()),
+        )
         .child(progress_track(completed, total))
 }
 /// Protected information dialog only. Root shell traps/restores focus and Escape.
@@ -922,6 +1160,38 @@ mod tests {
         assert_eq!(progress_fraction(25, Some(100)), Some(0.25));
         assert_eq!(progress_fraction(100, Some(100)), Some(1.));
         assert_eq!(progress_fraction(u32::MAX, Some(100)), Some(1.));
+    }
+
+    #[test]
+    fn activity_clock_advances_between_worker_updates_and_wraps_seamlessly() {
+        assert_eq!(activity_phase(Duration::ZERO), 0.);
+        assert_eq!(activity_phase(ACTIVITY_PERIOD), 0.);
+        assert_eq!(activity_phase(Duration::from_millis(300)), 0.25);
+        assert_eq!(activity_phase(Duration::from_millis(1500)), 0.25);
+
+        let bounds = Bounds::new(point(px(10.), px(20.)), size(px(320.), px(4.)));
+        let first = activity_segments(bounds, activity_phase(Duration::ZERO));
+        let next = activity_segments(bounds, activity_phase(Duration::from_millis(16)));
+        let displacement = next[2].left() - first[2].left();
+        assert!(displacement > px(0.) && displacement < px(2.));
+        assert_eq!(first[2].size, next[2].size);
+        assert_eq!(first, activity_segments(bounds, 1.));
+    }
+
+    #[test]
+    fn moving_activity_segments_stay_inside_narrow_and_wide_tracks() {
+        for width in [0., 1., 160., 320., 680.] {
+            let bounds = Bounds::new(point(px(10.), px(20.)), size(px(width), px(4.)));
+            for frame in 0..=120 {
+                for segment in activity_segments(bounds, frame as f32 / 120.) {
+                    assert!(segment.left() >= bounds.left());
+                    assert!(segment.right() <= bounds.right());
+                    assert!(segment.size.width >= px(0.));
+                    assert_eq!(segment.top(), bounds.top());
+                    assert_eq!(segment.size.height, bounds.size.height);
+                }
+            }
+        }
     }
 
     #[test]

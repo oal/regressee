@@ -170,6 +170,27 @@ impl Shell {
         if !matches!(self.focus.screen, Screen::Setup | Screen::Settings) {
             return;
         }
+        if matches!(
+            control,
+            Control::CloseMappingPreview | Control::Guided(35 | 36)
+        ) && self.control_mounted(control)
+            && let Some(bounds) = self
+                .options_control_bounds(control)
+                .and_then(|bounds| bounds.get())
+        {
+            let viewport = self.screen_scroll.bounds();
+            let delta = if bounds.top() < viewport.top() + px(8.) {
+                viewport.top() + px(8.) - bounds.top()
+            } else if bounds.bottom() > viewport.bottom() - px(8.) {
+                viewport.bottom() - px(8.) - bounds.bottom()
+            } else {
+                px(0.)
+            };
+            let offset = self.screen_scroll.offset();
+            self.screen_scroll
+                .set_offset(gpui::point(offset.x, offset.y + delta));
+            return;
+        }
         let Some(anchor) = self.form_anchor(control) else {
             return;
         };
@@ -187,7 +208,11 @@ impl Shell {
     }
 
     pub(super) fn show_keyboard_help(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.native_prompt || self.focus.dialog || self.focus.approval_dialog {
+        if self.task.is_some()
+            || self.native_prompt
+            || self.focus.dialog
+            || self.focus.approval_dialog
+        {
             return;
         }
         self.restore_focus = self.focused(window, cx);

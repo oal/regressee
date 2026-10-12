@@ -120,6 +120,7 @@ fn terminal(
                     phases.push(phase);
                 }
             }
+            Reply::CaptureStatus(_) => (),
             Reply::ProductFailure(message) => anyhow::bail!("{message}"),
             Reply::Failure(failure) => anyhow::bail!("{}", failure.message()),
             reply => return Ok(reply),

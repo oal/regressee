@@ -1,0 +1,3149 @@
+[
+  {
+    "capture": "all-1280x800-projects",
+    "state": "projects",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-projects-empty",
+    "state": "projects-empty",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-projects-loading",
+    "state": "projects-loading",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-projects-failed",
+    "state": "projects-failed",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-project-chooser",
+    "state": "project-chooser",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-new-website",
+    "state": "new-website",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-website",
+    "state": "website",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-website-validation",
+    "state": "website-validation",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-access-public",
+    "state": "access-public",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-access-login",
+    "state": "access-login",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-access-login-actions",
+    "state": "access-login-actions",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-access-options",
+    "state": "access-options",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-mapping-preview",
+    "state": "mapping-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-timezone-popup",
+    "state": "timezone-popup",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-pages-sizes",
+    "state": "pages-sizes",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-pages-screen-sizes",
+    "state": "pages-screen-sizes",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-pages-images",
+    "state": "pages-images",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-pages-speed",
+    "state": "pages-speed",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-pages-advanced",
+    "state": "pages-advanced",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-project-settings",
+    "state": "project-settings",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-project-settings-bottom",
+    "state": "project-settings-bottom",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-pages-baseline",
+    "state": "pages-baseline",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-discovery",
+    "state": "discovery",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-discovery-options",
+    "state": "discovery-options",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-discovery-no-matches",
+    "state": "discovery-no-matches",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review",
+    "state": "review",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-mobile",
+    "state": "review-mobile",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-mixed-148",
+    "state": "review-mixed-148",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 152.0,
+        "width": 272.0,
+        "height": 463.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 500.0,
+        "y": 152.0,
+        "width": 756.0,
+        "height": 88.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 500.0,
+        "y": 316.0,
+        "width": 372.0,
+        "height": 273.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 884.0,
+        "y": 316.0,
+        "width": 372.0,
+        "height": 273.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 623.0,
+        "width": 1040.0,
+        "height": 87.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 718.0,
+        "width": 1088.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 272.0,
+        "height": 307.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 895.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-1280x800-review-failed-target",
+    "state": "review-failed-target",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 152.0,
+        "width": 272.0,
+        "height": 413.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 573.0,
+        "width": 1040.0,
+        "height": 112.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 693.0,
+        "width": 1088.0,
+        "height": 107.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 272.0,
+        "height": 257.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 895.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-1280x800-review-queue-hidden",
+    "state": "review-queue-hidden",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-difference",
+    "state": "review-difference",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-overlay",
+    "state": "review-overlay",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-heatmap",
+    "state": "review-heatmap",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-details",
+    "state": "review-details",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-diagnostics",
+    "state": "review-diagnostics",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-analysis",
+    "state": "review-analysis",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-analysis-advanced",
+    "state": "review-analysis-advanced",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-ignored-area",
+    "state": "review-ignored-area",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-note",
+    "state": "review-note",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-filters",
+    "state": "review-filters",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-no-matches",
+    "state": "review-no-matches",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-approval-selection",
+    "state": "review-approval-selection",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-approval-confirm",
+    "state": "review-approval-confirm",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-review-zoom-menu",
+    "state": "review-zoom-menu",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 152.0,
+        "width": 272.0,
+        "height": 463.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 500.0,
+        "y": 152.0,
+        "width": 756.0,
+        "height": 88.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 500.0,
+        "y": 316.0,
+        "width": 372.0,
+        "height": 273.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 884.0,
+        "y": 316.0,
+        "width": 372.0,
+        "height": 273.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 623.0,
+        "width": 1040.0,
+        "height": 87.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 718.0,
+        "width": 1088.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 272.0,
+        "height": 307.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 895.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-1280x800-capture-gaps",
+    "state": "capture-gaps",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-capture-failed",
+    "state": "capture-failed",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-capture-ready",
+    "state": "capture-ready",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-capture-mobile",
+    "state": "capture-mobile",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 176.0,
+        "width": 272.0,
+        "height": 616.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 500.0,
+        "y": 176.0,
+        "width": 756.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 500.0,
+        "y": 272.0,
+        "width": 756.0,
+        "height": 494.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 332.0,
+        "width": 272.0,
+        "height": 460.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 895.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-1280x800-capture-saved",
+    "state": "capture-saved",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-capture-empty",
+    "state": "capture-empty",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-capture-loading",
+    "state": "capture-loading",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-capture-read-failed",
+    "state": "capture-read-failed",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-runs",
+    "state": "history-runs",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-bottom",
+    "state": "history-bottom",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-baselines",
+    "state": "history-baselines",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-storage",
+    "state": "history-storage",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-empty",
+    "state": "history-empty",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-no-matches",
+    "state": "history-no-matches",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-recorded-check",
+    "state": "history-recorded-check",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-recorded-capture",
+    "state": "history-recorded-capture",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-history-provenance",
+    "state": "history-provenance",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-export-preview",
+    "state": "export-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-import-preview",
+    "state": "import-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-delete-preview",
+    "state": "delete-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-app-settings",
+    "state": "app-settings",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-app-settings-network",
+    "state": "app-settings-network",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-app-settings-diagnostics",
+    "state": "app-settings-diagnostics",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-diagnostic-preview",
+    "state": "diagnostic-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-integrity-preview",
+    "state": "integrity-preview",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-keyboard-help",
+    "state": "keyboard-help",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-1280x800-about",
+    "state": "about",
+    "width": 1280.0,
+    "height": 800.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-projects",
+    "state": "projects",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-projects-empty",
+    "state": "projects-empty",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-projects-loading",
+    "state": "projects-loading",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-projects-failed",
+    "state": "projects-failed",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-project-chooser",
+    "state": "project-chooser",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-new-website",
+    "state": "new-website",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-website",
+    "state": "website",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-website-validation",
+    "state": "website-validation",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-access-public",
+    "state": "access-public",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-access-login",
+    "state": "access-login",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-access-login-actions",
+    "state": "access-login-actions",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-access-options",
+    "state": "access-options",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-mapping-preview",
+    "state": "mapping-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-timezone-popup",
+    "state": "timezone-popup",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-pages-sizes",
+    "state": "pages-sizes",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-pages-screen-sizes",
+    "state": "pages-screen-sizes",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "retained_from_same_batch": true
+  },
+  {
+    "capture": "all-820x600-pages-images",
+    "state": "pages-images",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-pages-speed",
+    "state": "pages-speed",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-pages-advanced",
+    "state": "pages-advanced",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-project-settings",
+    "state": "project-settings",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-project-settings-bottom",
+    "state": "project-settings-bottom",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-pages-baseline",
+    "state": "pages-baseline",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 109.0,
+        "width": 580.0,
+        "height": 483.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 205.0,
+        "width": 580.0,
+        "height": 387.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-discovery",
+    "state": "discovery",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 151.0,
+        "width": 580.0,
+        "height": 441.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 313.0,
+        "width": 580.0,
+        "height": 279.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-discovery-options",
+    "state": "discovery-options",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 151.0,
+        "width": 248.0,
+        "height": 441.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 331.0,
+        "width": 248.0,
+        "height": 261.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-discovery-no-matches",
+    "state": "discovery-no-matches",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 151.0,
+        "width": 248.0,
+        "height": 441.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review",
+    "state": "review",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-mobile",
+    "state": "review-mobile",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-mixed-148",
+    "state": "review-mixed-148",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-failed-target",
+    "state": "review-failed-target",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 275.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 423.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 493.0,
+        "width": 628.0,
+        "height": 107.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 135.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-queue-hidden",
+    "state": "review-queue-hidden",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "viewer-toolbar",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 580.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 216.0,
+        "y": 228.0,
+        "width": 284.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 512.0,
+        "y": 228.0,
+        "width": 284.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-difference",
+    "state": "review-difference",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-overlay",
+    "state": "review-overlay",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-heatmap",
+    "state": "review-heatmap",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-details",
+    "state": "review-details",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-diagnostics",
+    "state": "review-diagnostics",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-analysis",
+    "state": "review-analysis",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-analysis-advanced",
+    "state": "review-analysis-advanced",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-ignored-area",
+    "state": "review-ignored-area",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 275.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 191.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 191.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 423.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 493.0,
+        "width": 628.0,
+        "height": 107.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 135.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-note",
+    "state": "review-note",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 256.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 172.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 172.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 404.0,
+        "width": 580.0,
+        "height": 106.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 116.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-filters",
+    "state": "review-filters",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-no-matches",
+    "state": "review-no-matches",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-approval-selection",
+    "state": "review-approval-selection",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-approval-confirm",
+    "state": "review-approval-confirm",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-review-zoom-menu",
+    "state": "review-zoom-menu",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-capture-gaps",
+    "state": "capture-gaps",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 176.0,
+        "width": 200.0,
+        "height": 416.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 176.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 264.0,
+        "width": 368.0,
+        "height": 328.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 316.0,
+        "width": 200.0,
+        "height": 276.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-capture-failed",
+    "state": "capture-failed",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 176.0,
+        "width": 200.0,
+        "height": 416.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 176.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 264.0,
+        "width": 368.0,
+        "height": 328.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 316.0,
+        "width": 200.0,
+        "height": 276.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-capture-ready",
+    "state": "capture-ready",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 168.0,
+        "width": 200.0,
+        "height": 424.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 168.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 256.0,
+        "width": 368.0,
+        "height": 336.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 200.0,
+        "height": 284.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-capture-mobile",
+    "state": "capture-mobile",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 168.0,
+        "width": 200.0,
+        "height": 424.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 168.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 256.0,
+        "width": 368.0,
+        "height": 336.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 200.0,
+        "height": 284.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-capture-saved",
+    "state": "capture-saved",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 168.0,
+        "width": 200.0,
+        "height": 424.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 168.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 256.0,
+        "width": 368.0,
+        "height": 336.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 308.0,
+        "width": 200.0,
+        "height": 284.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-capture-empty",
+    "state": "capture-empty",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 113.0,
+        "width": 200.0,
+        "height": 479.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-capture-loading",
+    "state": "capture-loading",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-capture-read-failed",
+    "state": "capture-read-failed",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-runs",
+    "state": "history-runs",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 463.0,
+        "width": 580.0,
+        "height": 130.0
+      },
+      {
+        "selector": "history-run-list",
+        "x": 217.0,
+        "y": 464.0,
+        "width": 578.0,
+        "height": 128.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-bottom",
+    "state": "history-bottom",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 55.0,
+        "width": 580.0,
+        "height": 130.0
+      },
+      {
+        "selector": "history-run-list",
+        "x": 217.0,
+        "y": 56.0,
+        "width": 578.0,
+        "height": 128.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-baselines",
+    "state": "history-baselines",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 514.0,
+        "width": 580.0,
+        "height": 66.0
+      },
+      {
+        "selector": "history-baseline-list",
+        "x": 217.0,
+        "y": 515.0,
+        "width": 578.0,
+        "height": 64.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-storage",
+    "state": "history-storage",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-empty",
+    "state": "history-empty",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-no-matches",
+    "state": "history-no-matches",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-recorded-check",
+    "state": "history-recorded-check",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 276.0,
+        "width": 200.0,
+        "height": 291.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 276.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 360.0,
+        "width": 178.0,
+        "height": 207.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 360.0,
+        "width": 178.0,
+        "height": 207.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 416.0,
+        "width": 200.0,
+        "height": 151.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-recorded-capture",
+    "state": "history-recorded-capture",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 276.0,
+        "width": 200.0,
+        "height": 316.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 276.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 428.0,
+        "y": 364.0,
+        "width": 368.0,
+        "height": 228.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 416.0,
+        "width": 200.0,
+        "height": 176.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-history-provenance",
+    "state": "history-provenance",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": -420.0,
+        "width": 580.0,
+        "height": 130.0
+      },
+      {
+        "selector": "history-run-list",
+        "x": 217.0,
+        "y": -419.0,
+        "width": 578.0,
+        "height": 128.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-export-preview",
+    "state": "export-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": -314.0,
+        "width": 580.0,
+        "height": 66.0
+      },
+      {
+        "selector": "history-baseline-list",
+        "x": 217.0,
+        "y": -313.0,
+        "width": 578.0,
+        "height": 64.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-import-preview",
+    "state": "import-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 10.0,
+        "width": 395.0,
+        "height": 25.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-delete-preview",
+    "state": "delete-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": -190.0,
+        "width": 580.0,
+        "height": 130.0
+      },
+      {
+        "selector": "history-run-list",
+        "x": 217.0,
+        "y": -189.0,
+        "width": 578.0,
+        "height": 128.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-app-settings",
+    "state": "app-settings",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-app-settings-network",
+    "state": "app-settings-network",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-app-settings-diagnostics",
+    "state": "app-settings-diagnostics",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-diagnostic-preview",
+    "state": "diagnostic-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-integrity-preview",
+    "state": "integrity-preview",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-keyboard-help",
+    "state": "keyboard-help",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "review-queue",
+        "x": 216.0,
+        "y": 144.0,
+        "width": 200.0,
+        "height": 300.0
+      },
+      {
+        "selector": "viewer-toolbar",
+        "x": 428.0,
+        "y": 144.0,
+        "width": 368.0,
+        "height": 40.0
+      },
+      {
+        "selector": "phase5-before",
+        "x": 428.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "phase5-after",
+        "x": 618.0,
+        "y": 228.0,
+        "width": 178.0,
+        "height": 216.0
+      },
+      {
+        "selector": "ordinary-review-decisions",
+        "x": 216.0,
+        "y": 448.0,
+        "width": 580.0,
+        "height": 62.0
+      },
+      {
+        "selector": "approval-next-action",
+        "x": 192.0,
+        "y": 518.0,
+        "width": 628.0,
+        "height": 82.0
+      },
+      {
+        "selector": "page-list",
+        "x": 216.0,
+        "y": 284.0,
+        "width": 200.0,
+        "height": 160.0
+      },
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 443.0,
+        "height": 24.0
+      }
+    ]
+  },
+  {
+    "capture": "all-820x600-about",
+    "state": "about",
+    "width": 820.0,
+    "height": 600.0,
+    "synthetic": true,
+    "website_visited": false,
+    "os_input_verified": false,
+    "geometry": [
+      {
+        "selector": "selected-project-context",
+        "x": 216.0,
+        "y": 16.0,
+        "width": 250.0,
+        "height": 24.0
+      }
+    ]
+  }
+]

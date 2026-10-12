@@ -10,6 +10,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "ui_review_matrix.rs"]
+mod ui_review_matrix;
+
 #[test]
 fn offscreen_extent_limits_without_gpu() {
     for (width, height) in [(640, 440), (1120, 800), (820, 600), (4096, 4096)] {
@@ -91,7 +94,13 @@ fn write_frame(
             "cpu_draw_ms": cpu_draw_ms, "gpu_draw_readback_wait_ms": gpu_capture_ms,
             "real_gpui_blade_offscreen": true, "real_linux_fonts": true,
             "os_presentation_verified": false, "os_input_verified": false,
-            "synthetic_project_only": true
+            "synthetic_project_only": true,
+            "task_source_sha256": hex::encode(Sha256::digest(include_bytes!("task_ux.rs"))),
+            "task_policy_source_sha256": hex::encode(Sha256::digest(include_bytes!("task.rs"))),
+            "task_controls_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/controls.rs"))),
+            "task_icons_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/status_icon.rs"))),
+            "web_link_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/web_link.rs"))),
+            "main_source_sha256": hex::encode(Sha256::digest(include_bytes!("main.rs")))
         });
         let file = fs::OpenOptions::new()
             .write(true)
@@ -365,6 +374,159 @@ fn renderer_capture_viewer_ux(cx: &mut TestAppContext) {
     );
 }
 
+#[gpui::test]
+#[ignore = "bounded options/filter/mapping capture; synthetic isolated local data only"]
+fn renderer_capture_options_ux(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    cx.update(|cx| {
+        text_input::bind(cx);
+        timezone_select::bind(cx);
+    });
+    let dir = tempfile::Builder::new()
+        .prefix("options-synthetic-store-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let before_project = serde_json::to_value(store.load_project(project).unwrap()).unwrap();
+    let before_evidence = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        for label in [
+            "discovery",
+            "page-options",
+            "discovery-details",
+            "options-no-matches",
+            "result-filters",
+            "filters-no-matches",
+            "mapping-preview",
+            "mapping-empty",
+            "mapping-lower-rows",
+            "filters-lower-controls",
+        ] {
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            cx.simulate_resize(size(px(width), px(height)));
+            shell.update(cx, |s, cx| {
+                crate::workflow_refinement_tests::load_review(s, project, cx);
+                if matches!(
+                    label,
+                    "discovery" | "page-options" | "discovery-details" | "options-no-matches"
+                ) {
+                    crate::options_ux::fixture_discovery(s);
+                    s.result_filters_open = label != "discovery";
+                    s.discovery_details_open = label == "discovery-details";
+                } else if label.starts_with("mapping") {
+                    s.focus.screen = Screen::Setup;
+                    s.focus.setup_stage = SetupStage::Access;
+                    s.show_mapping = true;
+                    s.environment.as_mut().unwrap().mapped = if label == "mapping-empty" {
+                        vec![]
+                    } else {
+                        (0..40)
+                            .map(|i| {
+                                (
+                                    format!("https://example.test/pages/{i}/"),
+                                    format!("https://staging.example.test/pages/{i}/"),
+                                )
+                            })
+                            .collect()
+                    };
+                } else {
+                    s.result_filters_open = true;
+                }
+                if label.ends_with("no-matches") {
+                    s.crawl_fields[9]
+                        .update(cx, |f, cx| f.set_value("no-matching-synthetic-page", cx));
+                }
+                s.configure_review_geometry(width);
+                s.notice = None;
+                s.error = None;
+                cx.notify();
+            });
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            if label == "discovery-details" || label == "filters-lower-controls" {
+                shell.update(cx, |s, cx| {
+                    s.options_scroll
+                        .set_offset(gpui::point(px(0.), -s.options_scroll.max_offset().height));
+                    cx.notify();
+                });
+            }
+            if label.starts_with("mapping") {
+                let panel = cx.debug_bounds("mapping-preview").unwrap();
+                shell.update(cx, |s, cx| {
+                    let delta = s.screen_scroll.bounds().top() + px(8.) - panel.top();
+                    let offset = s.screen_scroll.offset();
+                    s.screen_scroll
+                        .set_offset(gpui::point(offset.x, offset.y + delta));
+                    cx.notify();
+                });
+                if label == "mapping-lower-rows" {
+                    shell.update(cx, |s, cx| {
+                        s.mapping_preview_scroll.set_offset(gpui::point(
+                            px(0.),
+                            -s.mapping_preview_scroll.max_offset().height,
+                        ));
+                        cx.notify();
+                    });
+                }
+            }
+            let name = format!("options-{width:.0}x{height:.0}-{label}");
+            capture(cx, &root, &name).unwrap();
+            if label.starts_with("mapping") {
+                workflow_visible_bounds(cx, "mapping-preview", width, height);
+                workflow_visible_action(cx, Control::CloseMappingPreview, width, height);
+                let title = cx.debug_bounds("mapping-preview-title").unwrap();
+                assert!(title.size.height <= px(24.) && title.size.width >= px(240.));
+                assert!(
+                    cx.debug_bounds("mapping-preview-scroll")
+                        .unwrap()
+                        .size
+                        .height
+                        >= px(150.)
+                );
+                if label == "mapping-empty" {
+                    workflow_visible_bounds(cx, "mapping-preview-empty", width, height);
+                }
+            } else if label != "discovery" {
+                workflow_visible_bounds(cx, "page-options-panel", width, height);
+                workflow_visible_action(cx, Control::CloseOptions, width, height);
+                if shell.read_with(cx, |s, _| s.preview.is_some()) {
+                    workflow_visible_action(cx, Control::Guided(16), width, height);
+                }
+                if label == "filters-lower-controls" {
+                    workflow_visible_bounds(cx, "check-Guided(19)", width, height);
+                }
+                if label == "filters-no-matches" {
+                    workflow_visible_bounds(cx, "empty-retained-evidence", width, height);
+                }
+            }
+            owned.join_after_ui();
+        }
+    }
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.load_project(project).unwrap()).unwrap(),
+        before_project
+    );
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        before_evidence
+    );
+}
+
 fn finish_jobs(shell: &mut Shell, cx: &mut Context<Shell>) {
     while shell.pending.is_some() || shell.focus.view_loading || shell.storage_pending.is_some() {
         let update = shell.events.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -375,6 +537,79 @@ fn finish_jobs(shell: &mut Shell, cx: &mut Context<Shell>) {
         );
         shell.apply_update(update, cx);
     }
+}
+
+/// Presentation-only count/gap fixtures, never dispatched or saved as captures.
+fn task_capture_evidence(
+    shell: &Shell,
+    total: usize,
+    processed: usize,
+    failures: usize,
+    state: JobState,
+) -> ProjectEvidence {
+    use regressee_core::domain::{CaptureError, CaptureTarget, InventoryPage, PageId};
+    let mut evidence = shell.evidence.clone();
+    let run = &mut evidence.latest.as_mut().unwrap().run;
+    let template = run.targets[0].clone();
+    let mut desktop = run.profiles[0].clone();
+    desktop.name = "Desktop fixture".into();
+    desktop.width = 1280;
+    desktop.height = 800;
+    let mut mobile = CaptureProfile::mobile();
+    mobile.runtime = desktop.runtime.clone();
+    mobile.name = "Mobile fixture".into();
+    run.profiles = vec![desktop, mobile];
+    run.inventory.pages = (0..total / 2)
+        .map(|index| InventoryPage {
+            id: PageId::new(),
+            canonical: template
+                .requested
+                .join(&format!("/synthetic-task-page-{index}/"))
+                .unwrap(),
+            included: true,
+            reason: None,
+        })
+        .collect();
+    run.targets = run
+        .inventory
+        .pages
+        .iter()
+        .flat_map(|page| {
+            run.profiles.iter().map(move |profile| CaptureTarget {
+                key: TargetKey {
+                    page: page.id,
+                    profile: profile.id,
+                },
+                requested: page.canonical.clone(),
+                final_url: None,
+                attempts: 0,
+                outcome: TargetOutcome::Pending,
+                warnings: vec![],
+            })
+        })
+        .collect();
+    for (index, target) in run.targets.iter_mut().enumerate().take(processed) {
+        target.attempts = if index >= processed - failures { 2 } else { 1 };
+        target.outcome = if index >= processed - failures {
+            TargetOutcome::Failed {
+                code: if index % 2 == 0 {
+                    CaptureError::Timeout
+                } else {
+                    CaptureError::ServerError
+                },
+            }
+        } else {
+            template.outcome.clone()
+        };
+        if matches!(target.outcome, TargetOutcome::Captured { .. }) {
+            target.final_url = Some(target.requested.clone());
+        }
+    }
+    run.state = state;
+    if state == JobState::Running {
+        run.finished_at = None;
+    }
+    evidence
 }
 
 #[gpui::test]
@@ -481,6 +716,446 @@ fn renderer_capture_zoom_loading(cx: &mut TestAppContext) {
     assert_eq!(
         serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
         original
+    );
+}
+
+#[gpui::test]
+#[ignore = "bounded exclusive-task renderer matrix; synthetic state, no website visits"]
+fn renderer_capture_tasks(cx: &mut TestAppContext) {
+    use regressee_app::task::{Kind, Spec, State};
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("synthetic-task-store-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, run, _, _) = crate::approval_fixture::fixture(dir.path());
+    let original = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    let baseline = store
+        .load_project(project)
+        .unwrap()
+        .project
+        .active_baseline
+        .unwrap();
+    let export = store.export_preview(project, baseline).unwrap();
+    let archive = dir.path().join("fixture.zip");
+    store
+        .export_archive(
+            &export,
+            &archive,
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .unwrap();
+    let import = store
+        .inspect_archive(&archive, &std::sync::atomic::AtomicBool::new(false))
+        .unwrap()
+        .preview;
+    drop(store);
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        for label in [
+            "discovery",
+            "discovery-browser-check",
+            "discovery-crawl-rules",
+            "discovery-first-page",
+            "discovery-first-retry",
+            "discovery-stopping",
+            "setup-download",
+            "capture-progress",
+            "capture-pausing",
+            "capture-setup-details",
+            "capture-attention",
+            "capture-gap-details",
+            "capture-complete",
+            "zip-import",
+            "zip-export-stopping",
+            "baseline-finishing",
+            "failed-task",
+            "partial-discovery",
+            "capture-paused",
+            "export-late-success",
+        ] {
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| shell.update(cx, |s, cx| {
+                finish_jobs(s, cx);
+                s.activate_control(Control::SelectProject(0), window, cx);
+                finish_jobs(s, cx);
+                s.configure_review_geometry(width);
+                s.notice = None;
+                s.error = None;
+                let work = match label {
+                    "setup-download" => Work::SetupRuntime,
+                    "capture-progress" | "capture-pausing" | "capture-paused" | "capture-setup-details" | "capture-attention" | "capture-gap-details" | "capture-complete" => Work::CaptureInventory { project, preview: None, check: true, resume: None },
+                    "zip-import" => Work::Import { preview: Box::new(import.clone()), path: archive.clone() },
+                    "zip-export-stopping" | "export-late-success" => Work::Export { preview: Box::new(export.clone()), path: dir.path().join("not-written.zip") },
+                    "baseline-finishing" => Work::Activate { run, revision: s.project.as_ref().unwrap().revision },
+                    _ => Work::Discover(project),
+                };
+                let spec = Spec::for_work(&work).unwrap();
+                // Presentation-only states. No fake queued worker, save or
+                // browser action is sent; real job behavior has separate tests.
+                s.next_request = u64::MAX;
+                s.pending = Some(u64::MAX);
+                s.focus.busy = true;
+                s.focus.capturing = matches!(spec.kind, Kind::Capture | Kind::Check | Kind::Discovery | Kind::Setup);
+                s.begin_task(spec);
+                if label.starts_with("discovery-") && label != "discovery-stopping" {
+                    s.project.as_mut().unwrap().project.discovery.mode = DiscoveryMode::AddressesAndLinks;
+                }
+                s.progress = Some(match label {
+                    "discovery-browser-check" => ("Checking the installed browser files before visiting the website…".into(), 0, None),
+                    "discovery-crawl-rules" => ("Checking website crawl rules (robots.txt) for https://example.test…".into(), 0, None),
+                    "discovery-first-page" => ("Loading the first page and looking for links…".into(), 0, None),
+                    "discovery-first-retry" => ("The page could not be read. Waiting before retry 1 of 2…".into(), 0, None),
+                    "setup-download" => ("Downloading private browser · 78 MiB of 246 MiB received".into(), 78, Some(246)),
+                    "capture-progress" | "capture-pausing" | "capture-setup-details" => ("Capturing screenshots…".into(), 25, Some(100)),
+                    "discovery" | "discovery-stopping" => ("Finding rendered links · 23 pages visited — no clicking or forms".into(), 23, None),
+                    _ => (work.activity_label().into(), 0, None),
+                });
+                s.task.as_mut().unwrap().progress = s.progress.clone();
+                if matches!(label, "capture-progress" | "capture-pausing" | "capture-setup-details") {
+                    let evidence = task_capture_evidence(s, 100, 25, 2, JobState::Running);
+                    s.apply_update(Update { id: u64::MAX, reply: Reply::CaptureStatus(regressee_app::task::CaptureStatus::from_run(&evidence.latest.as_ref().unwrap().run)) }, cx);
+                }
+                if matches!(label, "capture-attention" | "capture-gap-details" | "capture-complete") {
+                    let state = if label == "capture-complete" { JobState::Completed } else { JobState::CompletedWithErrors };
+                    let evidence = task_capture_evidence(s, 148, 148, if state == JobState::Completed { 0 } else { 2 }, state);
+                    s.finish_task(u64::MAX, &Reply::Evidence(Box::new(evidence)));
+                }
+                if label == "zip-import" {
+                    let task = s.task.as_mut().unwrap();
+                    task.project = import.name.clone(); task.project_id = None;
+                    task.website.clear(); task.environment.clear();
+                }
+                if matches!(label, "discovery-stopping" | "zip-export-stopping") {
+                    s.task.as_mut().unwrap().state = State::Stopping;
+                }
+                if label == "capture-pausing" { s.task.as_mut().unwrap().state = State::Pausing; }
+                if label == "failed-task" {
+                    s.error = Some("Synthetic unavailable-storage diagnostic. The captured originals and unsaved edits are kept. Check available disk space and folder permissions, then try again.".into());
+                    s.finish_task(u64::MAX, &Reply::ProductFailure(s.error.clone().unwrap()));
+                    s.task.as_mut().unwrap().details = true;
+                }
+                if label == "partial-discovery" {
+                    let mut inventory = s.evidence.latest.as_ref().unwrap().run.inventory.clone();
+                    inventory.coverage = regressee_core::domain::DiscoveryCoverage::Limited { reason: "Synthetic stopped discovery".into() };
+                    s.finish_task(u64::MAX, &Reply::Discovery(Box::new(DiscoveryPreview { project_revision: s.project.as_ref().unwrap().revision, settings: s.project.as_ref().unwrap().project.clone(), inventory, aliases: vec![], notes: vec!["Discovery cancelled; the preview is incomplete.".into()], visited: 23 })));
+                }
+                if label == "capture-paused" {
+                    let mut evidence = s.evidence.clone();
+                    evidence.latest.as_mut().unwrap().run.state = JobState::Paused;
+                    s.finish_task(u64::MAX, &Reply::Evidence(Box::new(evidence)));
+                }
+                if label == "export-late-success" {
+                    s.task.as_mut().unwrap().state = State::Stopping;
+                    s.finish_task(u64::MAX, &Reply::Exported);
+                }
+                if s.task.as_ref().unwrap().state == State::Finished {
+                    s.pending = None;
+                    s.focus.busy = false;
+                    s.focus.capturing = false;
+                }
+                assert!(!s.control_enabled(Control::Navigate(Screen::Projects), cx));
+                assert_eq!(s.control_enabled(Control::TaskDetails, cx), s.task.as_ref().unwrap().has_details());
+                cx.notify();
+            }));
+            // Exercise the actual disclosure/scroll anchor, not only a fixture flag.
+            if matches!(label, "capture-gap-details" | "capture-setup-details") {
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        s.activate_control(Control::TaskDetails, window, cx)
+                    })
+                });
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+            }
+            capture(cx, &root, &format!("task-{width:.0}x{height:.0}-{label}")).unwrap();
+            let body = workflow_visible_bounds(cx, "task-body", width, height);
+            let actions = workflow_visible_bounds(cx, "task-actions", width, height);
+            assert!(body.bottom() <= actions.top());
+            if shell.read_with(cx, |s, _| s.task.as_ref().unwrap().has_details()) {
+                workflow_visible_bounds(cx, "action-TaskDetails", width, height);
+            } else {
+                shell.read_with(cx, |s, _| {
+                    assert!(!s.visible_controls().contains(&Control::TaskDetails))
+                });
+            }
+            if matches!(label, "capture-progress" | "capture-pausing") {
+                let track = workflow_visible_bounds(cx, "progress-track", width, height);
+                assert!(f32::from(track.size.height) >= 4.);
+            }
+            if !matches!(label, "capture-gap-details" | "capture-setup-details") {
+                let title = workflow_visible_bounds(cx, "task-title-copy", width, height);
+                assert!(
+                    title.size.width >= px(100.) && title.size.height <= px(102.),
+                    "{label}: {title:?}"
+                );
+                let note = cx.debug_bounds("task-note-copy");
+                if label != "failed-task" {
+                    let note = note.unwrap();
+                    let surface = cx.debug_bounds("task-note").unwrap();
+                    assert!(
+                        note.size.width >= px(250.)
+                            && note.size.height <= px(140.)
+                            && note.right() <= surface.right() - px(15.),
+                        "{label}: {note:?}"
+                    );
+                }
+            }
+            if matches!(
+                label,
+                "capture-progress" | "capture-pausing" | "capture-attention" | "capture-complete"
+            ) {
+                let saved = workflow_visible_bounds(
+                    cx,
+                    "task-count-label-screenshots saved",
+                    width,
+                    height,
+                );
+                assert!(
+                    saved.size.width >= px(100.) && saved.size.height <= px(44.),
+                    "{label}: {saved:?}"
+                );
+            }
+            if matches!(label, "capture-gap-details" | "capture-setup-details") {
+                let details = cx.debug_bounds("task-details").unwrap();
+                assert!(
+                    details.top() >= body.top() && details.top() < body.bottom(),
+                    "{label}: {details:?} not revealed in {body:?}"
+                );
+                // Closing the disclosure restores the summary and fixed actions.
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        s.activate_control(Control::TaskDetails, window, cx)
+                    })
+                });
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                workflow_visible_bounds(cx, "task-title-copy", width, height);
+                workflow_visible_bounds(cx, "action-TaskDetails", width, height);
+                shell.read_with(cx, |s, _| assert!(!s.task.as_ref().unwrap().details));
+            }
+            if label.starts_with("discovery-") && label != "discovery-stopping" {
+                workflow_visible_bounds(cx, "discovery-startup-help", width, height);
+                workflow_visible_bounds(cx, "action-CancelCapture", width, height);
+            }
+            if shell.read_with(cx, |s, _| s.task_owns_workspace()) {
+                // GPUI's diagnostic bounds can retain selectors from an
+                // earlier frame. The mounted-control contract, not a stale
+                // selector's absence, establishes the replaced workspace.
+                shell.read_with(cx, |s, cx| {
+                    assert!(!s.control_mounted(Control::Navigate(Screen::Projects)));
+                    assert!(!s.control_enabled(Control::CaptureBaseline, cx));
+                });
+            } else {
+                workflow_visible_bounds(cx, "task-dialog", width, height);
+            }
+            owned.join_after_ui();
+        }
+    }
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        original
+    );
+}
+
+#[gpui::test]
+#[ignore = "bounded task-link renderer batch; synthetic URLs, no OS browser opening"]
+fn renderer_capture_task_links(cx: &mut TestAppContext) {
+    use regressee_app::task::{CaptureStatus, Spec};
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap()
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("synthetic-task-links-")
+        .tempdir_in(&root)
+        .unwrap();
+    let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+    let before = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        cx.simulate_resize(size(px(width), px(height)));
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                finish_jobs(s, cx);
+                s.activate_control(Control::SelectProject(0), window, cx);
+                finish_jobs(s, cx);
+                s.notice = None;
+                s.error = None;
+                s.next_request = u64::MAX;
+                s.pending = Some(u64::MAX);
+                s.focus.busy = true;
+                s.progress = Some(("Capturing screenshots…".into(), 25, Some(100)));
+                s.begin_task(
+                    Spec::for_work(&Work::CaptureInventory {
+                        project,
+                        preview: None,
+                        check: false,
+                        resume: None,
+                    })
+                    .unwrap(),
+                );
+                let evidence = task_capture_evidence(s, 100, 25, 2, JobState::Running);
+                s.apply_update(
+                    Update {
+                        id: u64::MAX,
+                        reply: Reply::CaptureStatus(CaptureStatus::from_run(
+                            &evidence.latest.as_ref().unwrap().run,
+                        )),
+                    },
+                    cx,
+                );
+                cx.notify();
+            })
+        });
+        capture(
+            cx,
+            &root,
+            &format!("task-links-{width:.0}x{height:.0}-context"),
+        )
+        .unwrap();
+        let link = workflow_visible_bounds(cx, "link-TaskLink(0)", width, height);
+        assert!(link.size.height >= px(24.) && link.size.width >= px(200.));
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                window.focus(&s.handle(Control::TaskLink(0), cx));
+                cx.notify();
+            })
+        });
+        capture(
+            cx,
+            &root,
+            &format!("task-links-{width:.0}x{height:.0}-context-focus"),
+        )
+        .unwrap();
+        cx.update(|window, cx| {
+            shell.read_with(cx, |s, cx| {
+                assert!(s.handle(Control::TaskLink(0), cx).is_focused(window));
+            })
+        });
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.task.as_mut().unwrap().capture = None;
+                let evidence = task_capture_evidence(s, 148, 148, 2, JobState::CompletedWithErrors);
+                s.finish_task(u64::MAX, &Reply::Evidence(Box::new(evidence)));
+                s.pending = None;
+                s.focus.busy = false;
+                s.activate_control(Control::TaskDetails, window, cx);
+            })
+        });
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        capture(
+            cx,
+            &root,
+            &format!("task-links-{width:.0}x{height:.0}-gaps"),
+        )
+        .unwrap();
+        workflow_visible_bounds(cx, "link-TaskLink(1)", width, height);
+        workflow_visible_bounds(cx, "link-TaskLink(3)", width, height);
+        cx.update(|_, cx| {
+            shell.update(cx, |s, cx| {
+                let mut evidence =
+                    task_capture_evidence(s, 148, 148, 2, JobState::CompletedWithErrors);
+                let failed = evidence
+                    .latest
+                    .as_mut()
+                    .unwrap()
+                    .run
+                    .targets
+                    .iter_mut()
+                    .find(|target| matches!(target.outcome, TargetOutcome::Failed { .. }))
+                    .unwrap();
+                failed.requested = format!(
+                    "https://example.test/articles/{}?view=all#capture",
+                    "long-page-address-".repeat(14)
+                )
+                .parse()
+                .unwrap();
+                failed.final_url = Some(
+                    "https://example.test/redirected?view=all#capture"
+                        .parse()
+                        .unwrap(),
+                );
+                s.finish_task(u64::MAX, &Reply::Evidence(Box::new(evidence)));
+                s.task.as_mut().unwrap().reveal_details.set(true);
+                cx.notify();
+            })
+        });
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                window.focus(&s.handle(Control::TaskLink(0), cx));
+                s.move_focus(false, window, cx);
+                assert!(s.handle(Control::TaskLink(1), cx).is_focused(window));
+            })
+        });
+        capture(
+            cx,
+            &root,
+            &format!("task-links-{width:.0}x{height:.0}-long-focus"),
+        )
+        .unwrap();
+        let link = workflow_visible_bounds(cx, "link-TaskLink(1)", width, height);
+        let body = cx.debug_bounds("task-body").unwrap();
+        assert!(link.top() >= body.top() && link.bottom() <= body.bottom());
+        assert!(link.right() <= body.right() - px(23.));
+        assert!(
+            link.size.height > px(40.),
+            "long URL must wrap rather than clip"
+        );
+        assert!(link.size.width >= px(200.));
+        cx.update(|window, cx| {
+            shell.read_with(cx, |s, cx| {
+                assert!(s.handle(Control::TaskLink(1), cx).is_focused(window));
+            })
+        });
+        workflow_visible_bounds(cx, "action-TaskContinue", width, height);
+        workflow_visible_bounds(cx, "action-TaskDetails", width, height);
+        assert!(
+            cx.opened_url().is_none(),
+            "rendering/focus must not open a website"
+        );
+        owned.join_after_ui();
+    }
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        before
     );
 }
 
@@ -1321,7 +1996,16 @@ fn renderer_capture_status_progress(cx: &mut TestAppContext) {
     });
     for (width, height) in [(1120., 800.), (820., 600.)] {
         cx.simulate_resize(size(px(width), px(height)));
-        for label in ["download", "discovery", "working", "notice"] {
+        for label in [
+            "download",
+            "discovery",
+            "discovery-reduced",
+            "working",
+            "notice",
+        ] {
+            cx.update(|_, cx| {
+                cx.set_global(controls::ReducedMotion(label == "discovery-reduced"));
+            });
             shell.update(cx, |s, cx| {
                 s.focus.screen = if label == "download" { Screen::Setup } else { Screen::Results };
                 s.focus.busy = label != "notice";
@@ -1329,7 +2013,7 @@ fn renderer_capture_status_progress(cx: &mut TestAppContext) {
                 s.focus.pausable = false;
                 s.progress = match label {
                     "download" => Some((format!("Downloading private browser · {} of {} received", human_bytes(82_350_444), human_bytes(258_433_266)), 82_350_444, Some(258_433_266))),
-                    "discovery" => Some(("Finding rendered links · 23 pages visited — no clicking or forms".into(), 23, None)),
+                    "discovery" | "discovery-reduced" => Some(("Finding rendered links · 23 pages visited — no clicking or forms".into(), 23, None)),
                     _ => None,
                 };
                 s.error = None;
@@ -1338,6 +2022,49 @@ fn renderer_capture_status_progress(cx: &mut TestAppContext) {
                 cx.notify();
             });
             capture(cx, &root, &format!("{width:.0}x{height:.0}-status-{label}")).unwrap();
+            if matches!(label, "discovery" | "discovery-reduced") {
+                let track = cx.debug_bounds("progress-track").unwrap();
+                let track_pixels = |frame: gpui::OffscreenFrame| {
+                    let left = f32::from(track.left()).ceil() as usize;
+                    let right = f32::from(track.right()).floor() as usize;
+                    let top = f32::from(track.top()).ceil() as usize;
+                    let bottom = f32::from(track.bottom()).floor() as usize;
+                    (top..bottom)
+                        .flat_map(|y| {
+                            let start = (y * frame.width as usize + left) * 4;
+                            let end = (y * frame.width as usize + right) * 4;
+                            frame.rgba[start..end].iter().copied()
+                        })
+                        .collect::<Vec<_>>()
+                };
+                let before =
+                    track_pixels(cx.update(|window, _| window.capture_offscreen_frame().unwrap()));
+                // Deliberately send no worker update: actual page counts and
+                // labels stay fixed while the activity pattern moves.
+                std::thread::sleep(Duration::from_millis(150));
+                capture(
+                    cx,
+                    &root,
+                    &format!("{width:.0}x{height:.0}-status-{label}-next-frame"),
+                )
+                .unwrap();
+                let after =
+                    track_pixels(cx.update(|window, _| window.capture_offscreen_frame().unwrap()));
+                assert!(!before.is_empty());
+                if label == "discovery-reduced" {
+                    assert_eq!(before, after, "reduced motion keeps activity static");
+                } else {
+                    assert_ne!(
+                        before, after,
+                        "activity must advance without worker updates"
+                    );
+                }
+                shell.update(cx, |s, _| {
+                    assert_eq!(s.progress.as_ref().unwrap().1, 23);
+                    assert_eq!(s.progress.as_ref().unwrap().2, None);
+                });
+                assert_eq!(track, cx.debug_bounds("progress-track").unwrap());
+            }
         }
     }
     owned.join_after_ui();

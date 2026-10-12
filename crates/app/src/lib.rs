@@ -9,6 +9,7 @@ pub mod jobs;
 pub(crate) mod official_catalog;
 pub mod product;
 pub mod review;
+pub mod task;
 #[cfg(feature = "ui")]
 pub mod ui;
 #[cfg(feature = "ui")]

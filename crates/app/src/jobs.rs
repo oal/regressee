@@ -176,7 +176,7 @@ impl Work {
                 "Starting website check…"
             }
             Self::Capture { .. } | Self::CaptureInventory { .. } => "Starting screenshot capture…",
-            Self::Discover(_) => "Finding website pages…",
+            Self::Discover(_) => "Preparing to find pages…",
             Self::ExistingInventory(_) => "Loading saved page list…",
             Self::EnvironmentStatus(_) => "Loading login and environment settings…",
             Self::SaveEnvironment { .. } => "Saving login and environment settings…",
@@ -222,6 +222,9 @@ pub enum Reply {
     CleanedTemporaries,
     Failure(StorageFailure),
     ProductFailure(String),
+    /// A worker checkpoint acknowledged cancellation. Late requests must never
+    /// turn successful publication or an unrelated failure into cancellation.
+    Cancelled,
     Runtime(String),
     RuntimeReadiness(crate::product::RuntimeReadiness),
     Network {
@@ -245,6 +248,8 @@ pub enum Reply {
         completed: u32,
         total: Option<u32>,
     },
+    /// Real screenshot-target counts and frozen setup, separate from phase text.
+    CaptureStatus(crate::task::CaptureStatus),
     #[cfg(feature = "ui")]
     Viewer(Box<ViewerFrame>),
 }
@@ -490,10 +495,10 @@ impl Jobs {
                         }
                         Work::DiagnosticPreview => crate::diagnostics::collect(store,product.as_ref().ok(),&cancel)
                             .map(|report|Reply::DiagnosticPreview(Box::new(report)))
-                            .unwrap_or_else(|_|Reply::ProductFailure("Diagnostic preview unavailable. No private information was exported; cancel or try again.".into())),
+                            .unwrap_or_else(|error| if cancellation_error(&error) { Reply::Cancelled } else { Reply::ProductFailure("Diagnostic preview unavailable. No private information was exported; try again.".into()) }),
                         Work::DiagnosticExport { report,path } => crate::diagnostics::export(&report,&path,&cancel)
                             .map(|_|Reply::DiagnosticExported)
-                            .unwrap_or_else(|_|Reply::ProductFailure("Diagnostic file could not be saved. Choose a new filename and check folder permissions. Nothing was sent.".into())),
+                            .unwrap_or_else(|error| if cancellation_error(&error) { Reply::Cancelled } else { Reply::ProductFailure("Diagnostic file could not be saved. Choose a new filename and check folder permissions. Nothing was sent.".into()) }),
                         Work::InspectStorage => store
                             .summary()
                             .map(Reply::Storage)
@@ -657,10 +662,31 @@ fn product_work(
     // The submit boundary creates one operation slot; cancellation requested
     // while a command is queued is preserved through its actual start.
     let result = (|| -> anyhow::Result<Reply> {
+        let discovering = matches!(&work, Work::Discover(_));
         if let Some(project) = first_use_project(&work) {
+            if discovering {
+                discovery_update(
+                    updates,
+                    id,
+                    "Reading saved website settings…",
+                    0,
+                    None,
+                    cancel,
+                );
+            }
             let saved = store.load_project(project)?;
             saved.project.validate()?;
             if automatic_setup_allowed(&work, saved.project.active_baseline.is_some()) {
+                if discovering {
+                    discovery_update(
+                        updates,
+                        id,
+                        "Checking the installed browser files before visiting the website…",
+                        0,
+                        None,
+                        cancel,
+                    );
+                }
                 product.ensure_runtime(cancel.clone(), &mut |phase| {
                     setup_update(updates, id, phase);
                 })?;
@@ -700,7 +726,22 @@ fn product_work(
                 store.restore_baseline(baseline, revision)?,
             ))),
             Work::PreviewImages { project, preview } => {
-                product.preview_images(store, project, *preview, cancel.clone())?;
+                product.preview_images_with_progress(
+                    store,
+                    project,
+                    *preview,
+                    cancel.clone(),
+                    &mut |message, completed, total| {
+                        let _ = updates.try_send(Update {
+                            id,
+                            reply: Reply::Progress {
+                                message: message.into(),
+                                completed,
+                                total,
+                            },
+                        });
+                    },
+                )?;
                 Ok(Reply::Evidence(Box::new(store.project_evidence(project)?)))
             }
             Work::NetworkStatus => {
@@ -763,14 +804,7 @@ fn product_work(
                 project,
                 cancel.clone(),
                 &mut |message, completed, total| {
-                    let _ = updates.try_send(Update {
-                        id,
-                        reply: Reply::Progress {
-                            message: message.into(),
-                            completed,
-                            total,
-                        },
-                    });
+                    discovery_update(updates, id, message, completed, total, cancel);
                 },
             )?))),
             Work::ExistingInventory(project) => {
@@ -792,7 +826,7 @@ fn product_work(
                 check,
                 resume,
             } => {
-                product.capture_inventory(
+                product.capture_inventory_with_status(
                     store,
                     project,
                     preview.map(|p| *p),
@@ -808,6 +842,12 @@ fn product_work(
                                 completed,
                                 total,
                             },
+                        });
+                    },
+                    &mut |run| {
+                        let _ = updates.try_send(Update {
+                            id,
+                            reply: Reply::CaptureStatus(crate::task::CaptureStatus::from_run(run)),
                         });
                     },
                 )?;
@@ -852,7 +892,32 @@ fn product_work(
             _ => anyhow::bail!("invalid background product action"),
         }
     })();
-    result.unwrap_or_else(|e| Reply::ProductFailure(format!("{e}")))
+    operation_reply(result)
+}
+fn discovery_update(
+    updates: &SyncSender<Update>,
+    id: u64,
+    message: &str,
+    completed: u32,
+    total: Option<u32>,
+    cancel: &AtomicBool,
+) {
+    let update = Update {
+        id,
+        reply: Reply::Progress {
+            message: message.into(),
+            completed,
+            total,
+        },
+    };
+    if completed == 0 && total.is_none() {
+        // Do not drop the only explanation for a long browser/first-page wait
+        // when fast preceding phases filled the small update queue. Stop/Quit
+        // releases this wait through the same operation cancellation token.
+        let _ = publish(updates, update, cancel);
+    } else {
+        let _ = updates.try_send(update);
+    }
 }
 fn first_use_project(work: &Work) -> Option<ProjectId> {
     match work {
@@ -982,7 +1047,60 @@ fn storage_work(store: &mut Store, work: Work, cancel: &AtomicBool) -> Reply {
             _ => anyhow::bail!("Invalid storage action"),
         }
     })();
-    result.unwrap_or_else(|e| Reply::ProductFailure(e.to_string()))
+    operation_reply(result)
+}
+fn cancellation_error(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        if let Some(failure) = cause.downcast_ref::<regressee_runtime::supervisor::WorkerFailure>()
+        {
+            return failure.0 == regressee_runtime::protocol::FailureCode::Cancelled;
+        }
+        // Recognize existing checkpoints, never an arbitrary diagnostic that
+        // happens to mention cancellation.
+        matches!(
+            cause.to_string().as_str(),
+            "operation cancelled"
+                | "Operation cancelled; retained evidence is unchanged"
+                | "analysis cancelled"
+                | "Diagnostic preview cancelled"
+                | "Diagnostic export cancelled"
+        )
+    })
+}
+fn operation_reply(result: anyhow::Result<Reply>) -> Reply {
+    result.unwrap_or_else(|error| {
+        if cancellation_error(&error) {
+            Reply::Cancelled
+        } else {
+            Reply::ProductFailure(error.to_string())
+        }
+    })
+}
+
+#[cfg(test)]
+mod task_reply_tests {
+    use super::*;
+
+    #[test]
+    fn acknowledged_cancellation_is_distinct_from_failures_and_committed_success() {
+        let cancelled = anyhow::anyhow!("operation cancelled").context("Preparing browser");
+        assert!(matches!(operation_reply(Err(cancelled)), Reply::Cancelled));
+        let failure = regressee_runtime::supervisor::WorkerFailure(
+            regressee_runtime::protocol::FailureCode::Cancelled,
+        );
+        assert!(matches!(
+            operation_reply(Err(failure.into())),
+            Reply::Cancelled
+        ));
+        assert!(matches!(
+            operation_reply(Err(anyhow::anyhow!("Disk failure after cancel requested"))),
+            Reply::ProductFailure(_)
+        ));
+        assert!(matches!(
+            operation_reply(Ok(Reply::Exported)),
+            Reply::Exported
+        ));
+    }
 }
 fn is_operation(work: &Work) -> bool {
     matches!(
@@ -1506,9 +1624,22 @@ mod tests {
         );
         assert!(matches!(reply, Reply::ProductFailure(ref message)
             if message.contains("build is incomplete")));
+        let phases: Vec<_> = rx.try_iter().collect();
+        assert_eq!(phases.len(), 2);
+        for phase in &phases {
+            assert_eq!(phase.id, 42, "preparation belongs to the original request");
+            assert!(matches!(
+                phase.reply,
+                Reply::Progress {
+                    completed: 0,
+                    total: None,
+                    ..
+                }
+            ));
+        }
         assert!(
-            rx.try_recv().is_err(),
-            "no second setup request or fake progress"
+            matches!(&phases[1].reply, Reply::Progress { message, .. } if message.contains("Checking the installed browser files")),
+            "verification must be visible even before the first visit"
         );
         assert!(!product.runtime_cache.exists());
         cancel.store(true, Ordering::Release);
@@ -1521,9 +1652,70 @@ mod tests {
             &tx,
             43,
         );
-        assert!(matches!(reply, Reply::ProductFailure(ref message)
-            if message.contains("cancelled")));
+        assert!(matches!(reply, Reply::Cancelled));
+        assert!(
+            rx.try_recv().is_err(),
+            "a queued Stop cannot restart preparation"
+        );
         Ok(())
+    }
+
+    #[test]
+    fn discovery_startup_status_survives_backpressure_but_stops_on_cancel() {
+        let (tx, rx) = mpsc::sync_channel(1);
+        tx.send(Update {
+            id: 1,
+            reply: Reply::Progress {
+                message: "Earlier phase".into(),
+                completed: 0,
+                total: None,
+            },
+        })
+        .unwrap();
+        let cancelled = Arc::new(AtomicBool::new(false));
+        let sender = tx.clone();
+        let token = cancelled.clone();
+        let task = thread::spawn(move || {
+            discovery_update(
+                &sender,
+                2,
+                "Loading the first page and looking for links…",
+                0,
+                None,
+                &token,
+            )
+        });
+        assert_eq!(rx.recv_timeout(Duration::from_secs(3)).unwrap().id, 1);
+        let update = rx.recv_timeout(Duration::from_secs(3)).unwrap();
+        assert_eq!(update.id, 2);
+        assert!(matches!(
+            update.reply,
+            Reply::Progress {
+                completed: 0,
+                total: None,
+                ..
+            }
+        ));
+        task.join().unwrap();
+
+        // A full queue must never prevent Stop/Quit from joining the worker.
+        tx.send(Update {
+            id: 3,
+            reply: Reply::Progress {
+                message: "Earlier phase".into(),
+                completed: 0,
+                total: None,
+            },
+        })
+        .unwrap();
+        let stop = cancelled.clone();
+        let task = thread::spawn(move || {
+            discovery_update(&tx, 4, "Checking crawl rules…", 0, None, &cancelled)
+        });
+        stop.store(true, Ordering::Release);
+        task.join().unwrap();
+        assert_eq!(rx.recv().unwrap().id, 3);
+        assert!(rx.try_recv().is_err());
     }
 
     #[test]

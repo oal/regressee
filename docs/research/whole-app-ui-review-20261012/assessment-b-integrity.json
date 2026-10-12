@@ -1,0 +1,86 @@
+{
+  "manifestEntries": 182,
+  "wholeAppPairs": 71,
+  "taskPairs": 20,
+  "dimensionCounts": {
+    "1280x800": 91,
+    "820x600": 91
+  },
+  "manifestPngMetadataHashDimensionMismatches": [],
+  "uniquePngHashes": 174,
+  "duplicateGroups": [
+    [
+      "all-1280x800-new-website",
+      "all-1280x800-website"
+    ],
+    [
+      "all-1280x800-review-details",
+      "all-1280x800-review-diagnostics"
+    ],
+    [
+      "all-1280x800-review-analysis",
+      "all-1280x800-review-analysis-advanced"
+    ],
+    [
+      "all-820x600-new-website",
+      "all-820x600-website"
+    ],
+    [
+      "all-820x600-review",
+      "all-820x600-review-overlay",
+      "all-820x600-review-heatmap"
+    ],
+    [
+      "all-820x600-review-details",
+      "all-820x600-review-diagnostics"
+    ],
+    [
+      "all-820x600-review-analysis",
+      "all-820x600-review-analysis-advanced"
+    ]
+  ],
+  "matrixRows": 142,
+  "matrixRetainedRows": 83,
+  "matrixRowsWithGeometry": 59,
+  "bindingCount": 52,
+  "bindingMismatches": [
+    {
+      "file": "crates/app/src/ui_review_matrix.rs",
+      "bound": "697c6f6edbe60a373b5f4af6c3b3655a4e5691ab625f1484b35486d8c3aac636",
+      "current": "83ff46696871b1fb3a5c6ed46a69a5c5e15f8bf175e658a20a77616c7fcc1853"
+    }
+  ],
+  "pngMetadataBindingMismatches": [],
+  "metadataFlags": {
+    "real_gpui_blade_offscreen": {
+      "True": 182
+    },
+    "real_linux_fonts": {
+      "True": 182
+    },
+    "os_presentation_verified": {
+      "False": 182
+    },
+    "os_input_verified": {
+      "False": 182
+    },
+    "synthetic_project_only": {
+      "True": 182
+    },
+    "opaque": {
+      "True": 182
+    },
+    "srgb": {
+      "True": 182
+    },
+    "premultiplied_alpha": {
+      "True": 182
+    }
+  },
+  "browser": {
+    "attempt": "tools.browser.tabs.open fresh tab http://127.0.0.1:40577/index.html",
+    "result": "browser.disconnected; No desktop browser is connected to this session",
+    "tabID": null,
+    "overlay": "Native controls have no DOM; gallery injection is not applicable native UI evidence. No overlay injected."
+  }
+}

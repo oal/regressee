@@ -2,7 +2,9 @@
 pub mod controls;
 pub mod gpu_diagnostics;
 pub mod performance;
+pub mod status_icon;
 pub mod text_input;
 pub mod theme;
 pub mod timezone_select;
+pub mod web_link;
 pub mod zoom_select;

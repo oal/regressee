@@ -36,7 +36,9 @@ mod exit_guard;
 mod form_recovery;
 mod loading_ux;
 mod local_ux;
+mod options_ux;
 mod review_ux;
+mod task_ux;
 #[cfg(all(feature = "ui-inspection", target_os = "linux"))]
 mod ui_inspection;
 mod viewer_ux;
@@ -132,6 +134,8 @@ struct Shell {
     events: Receiver<Update>,
     next_request: u64,
     pending: Option<u64>,
+    task: Option<task_ux::Task>,
+    last_action: Option<Control>,
     viewer_pending: Option<(u64, regressee_app::jobs::ViewerIdentity, usize)>,
     storage_pending: Option<(u64, regressee_core::domain::ProjectId)>,
     projects: ProjectPage,
@@ -181,6 +185,7 @@ struct Shell {
     origins_confirmed: bool,
     approved_origins: std::collections::BTreeSet<String>,
     environment: Option<regressee_app::auth::EnvironmentStatus>,
+    environment_read_signature: Option<(u64, options_ux::EnvironmentDraftSignature)>,
     environment_draft: Option<regressee_core::domain::EnvironmentId>,
     login_ephemeral: bool,
     show_mapping: bool,
@@ -232,6 +237,11 @@ struct Shell {
     history_baseline_scroll: gpui::ScrollHandle,
     history_run_scroll: gpui::ScrollHandle,
     review_details_scroll: gpui::ScrollHandle,
+    options_scroll: gpui::ScrollHandle,
+    options_anchors: Vec<gpui::ScrollAnchor>,
+    options_bounds: Vec<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
+    mapping_preview_scroll: gpui::ScrollHandle,
+    discovery_details_open: bool,
     review_focus_reveal: std::rc::Rc<std::cell::Cell<u8>>,
     approval_provenance_scroll: gpui::ScrollHandle,
     approval_reference_index: usize,
@@ -248,8 +258,8 @@ impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
             root_focus: cx.focus_handle(),
-            handles: (0..640)
-                .map(|i| cx.focus_handle().tab_index(i + 1).tab_stop(true))
+            handles: (0..(621 + regressee_app::task::MAX_TASK_LINKS))
+                .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
             address: cx.new(|cx| {
@@ -262,6 +272,8 @@ impl Shell {
             events,
             next_request: 0,
             pending: None,
+            task: None,
+            last_action: None,
             viewer_pending: None,
             storage_pending: None,
             projects: ProjectPage {
@@ -319,6 +331,7 @@ impl Shell {
             origins_confirmed: false,
             approved_origins: std::collections::BTreeSet::new(),
             environment: None,
+            environment_read_signature: None,
             environment_draft: None,
             login_ephemeral: false,
             show_mapping: false,
@@ -378,6 +391,11 @@ impl Shell {
             history_baseline_scroll: gpui::ScrollHandle::new(),
             history_run_scroll: gpui::ScrollHandle::new(),
             review_details_scroll: gpui::ScrollHandle::new(),
+            options_scroll: gpui::ScrollHandle::new(),
+            options_anchors: Vec::new(),
+            options_bounds: (0..12).map(|_| Default::default()).collect(),
+            mapping_preview_scroll: gpui::ScrollHandle::new(),
+            discovery_details_open: false,
             review_focus_reveal: Default::default(),
             approval_provenance_scroll: gpui::ScrollHandle::new(),
             approval_reference_index: 0,
@@ -402,6 +420,9 @@ impl Shell {
             .collect();
         shell.review_anchors = (0..64)
             .map(|_| gpui::ScrollAnchor::for_handle(shell.review_details_scroll.clone()))
+            .collect();
+        shell.options_anchors = (0..9)
+            .map(|_| gpui::ScrollAnchor::for_handle(shell.options_scroll.clone()))
             .collect();
         shell
             .name
@@ -479,6 +500,15 @@ impl Shell {
             self.apply_update(update, cx);
         }
         self.poll_analysis(cx);
+        if let Some(task) = &mut self.task
+            && task.state != regressee_app::task::State::Finished
+        {
+            let elapsed = task.started.elapsed().as_secs();
+            if elapsed != task.elapsed {
+                task.elapsed = elapsed;
+                cx.notify();
+            }
+        }
     }
     fn apply_update(&mut self, update: Update, cx: &mut Context<Self>) {
         self.observe_exit_reply(&update);
@@ -591,16 +621,50 @@ impl Shell {
         if self.pending != Some(update.id) {
             return;
         }
+        if let Reply::CaptureStatus(status) = update.reply {
+            if let Some(task) = &mut self.task
+                && task.request == update.id
+                && task.state != regressee_app::task::State::Finished
+                && matches!(
+                    task.spec.kind,
+                    regressee_app::task::Kind::Capture
+                        | regressee_app::task::Kind::Check
+                        | regressee_app::task::Kind::Representative
+                )
+                && task.project_id == Some(status.project)
+                && task
+                    .capture
+                    .as_ref()
+                    .is_none_or(|previous| previous.run == status.run)
+            {
+                task.environment = status.environment.clone();
+                task.capture = Some(status);
+            }
+            cx.notify();
+            return;
+        }
         if let Reply::Progress {
             message,
             completed,
             total,
         } = update.reply
         {
+            if let Some(task) = &mut self.task
+                && task.request == update.id
+            {
+                task.progress = Some((message.clone(), completed, total));
+            }
             self.progress = Some((message, completed, total));
             cx.notify();
             return;
         }
+        // Resolve the task from the authoritative terminal reply, not from a
+        // stop request or a guessed elapsed-time threshold.
+        let completing_task = self
+            .task
+            .as_ref()
+            .is_some_and(|task| task.request == update.id);
+        self.finish_task(update.id, &update.reply);
         self.pending = None;
         self.focus.view_loading = false;
         let failed_operation = self.focus.capturing;
@@ -801,6 +865,13 @@ impl Shell {
                 }
                 self.error = Some(error);
             }
+            Reply::Cancelled => {
+                self.notice = Some("The task stopped. Already saved work is kept.".into());
+                if failed_operation && let Some(project) = &self.project {
+                    self.evidence_dirty = true;
+                    self.queue(Work::Evidence(project.project.id), cx);
+                }
+            }
             Reply::Runtime(status) => self.runtime_status = Some(status),
             Reply::RuntimeReadiness(status) => {
                 self.runtime_status = Some(status.message.into());
@@ -832,39 +903,51 @@ impl Shell {
                 }
             }
             Reply::Environment(status) => {
-                self.environment_draft = Some(status.environment);
-                self.login_ephemeral = status.settings.ephemeral;
-                for (i, value) in [
-                    (
-                        10,
-                        status
-                            .settings
-                            .login_address
-                            .as_ref()
-                            .map(ToString::to_string)
-                            .unwrap_or_default(),
-                    ),
-                    (
-                        11,
-                        status
-                            .settings
-                            .representative
-                            .as_ref()
-                            .map(ToString::to_string)
-                            .unwrap_or_default(),
-                    ),
-                    (
-                        12,
-                        status
-                            .settings
-                            .identity_origins
-                            .iter()
-                            .map(ToString::to_string)
-                            .collect::<Vec<_>>()
-                            .join(" "),
-                    ),
-                ] {
-                    self.crawl_fields[i].update(cx, |input, cx| input.set_value(&value, cx));
+                // A status/URL preview refresh observes saved settings; it never
+                // rehydrates an already loaded draft. Initial hydration is bound
+                // to the exact request and rejected if edits arrived meanwhile.
+                let hydrate = self.environment.is_none()
+                    && self
+                        .environment_read_signature
+                        .take()
+                        .is_some_and(|(id, draft)| {
+                            id == update.id && draft == self.environment_draft_signature(cx)
+                        });
+                if hydrate {
+                    self.environment_draft = Some(status.environment);
+                    self.login_ephemeral = status.settings.ephemeral;
+                    for (i, value) in [
+                        (
+                            10,
+                            status
+                                .settings
+                                .login_address
+                                .as_ref()
+                                .map(ToString::to_string)
+                                .unwrap_or_default(),
+                        ),
+                        (
+                            11,
+                            status
+                                .settings
+                                .representative
+                                .as_ref()
+                                .map(ToString::to_string)
+                                .unwrap_or_default(),
+                        ),
+                        (
+                            12,
+                            status
+                                .settings
+                                .identity_origins
+                                .iter()
+                                .map(ToString::to_string)
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        ),
+                    ] {
+                        self.crawl_fields[i].update(cx, |input, cx| input.set_value(&value, cx));
+                    }
                 }
                 self.environment = Some(*status);
             }
@@ -1046,13 +1129,29 @@ impl Shell {
                 self.presentation_focus = Some(Control::CaptureBaseline);
                 self.notice=Some("Review included pages and coverage before capturing. Your active baseline is unchanged.".into());
             }
-            Reply::Progress { .. } => unreachable!(),
+            Reply::Progress { .. } | Reply::CaptureStatus(_) => unreachable!(),
+        }
+        if self
+            .task
+            .as_ref()
+            .is_some_and(|task| task.state == regressee_app::task::State::Finished)
+        {
+            self.presentation_focus = Some(Control::TaskContinue);
+        } else if completing_task
+            && self.task.is_none()
+            && self
+                .presentation_focus
+                .is_none_or(|control| !self.control_enabled(control, cx))
+        {
+            // Successful actions can remove their own trigger (for example,
+            // saving a candidate baseline). Never focus its detached handle.
+            self.presentation_focus = Some(Control::Navigate(self.focus.screen));
         }
         self.refresh_visible(cx);
         cx.notify();
     }
     fn refresh_visible(&mut self, cx: &mut Context<Self>) {
-        if self.pending.is_some() || self.error.is_some() {
+        if self.pending.is_some() || self.error.is_some() || self.task.is_some() {
             return;
         }
         if self.focus.shows_project_picker() {
@@ -2281,19 +2380,23 @@ impl Shell {
             Control::HistoryRun(index) => 450 + index,
             Control::Shortcuts => 604,
             Control::ValidationNext => 605,
+            Control::TaskDetails => 616,
+            Control::TaskContinue => 617,
+            Control::CloseOptions => 618,
+            Control::DiscoveryDetails => 619,
+            Control::CloseMappingPreview => 620,
+            Control::TaskLink(index) => 621 + index,
         };
         self.handles[index].clone()
     }
     fn focused(&self, window: &Window, cx: &App) -> Option<Control> {
-        self.focus
-            .controls()
+        self.visible_controls()
             .into_iter()
             .find(|c| self.control_enabled(*c, cx) && self.handle(*c, cx).is_focused(window))
     }
     fn move_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
         let controls: Vec<_> = self
-            .focus
-            .controls()
+            .visible_controls()
             .into_iter()
             .filter(|control| self.control_enabled(*control, cx))
             .collect();
@@ -2317,6 +2420,7 @@ impl Shell {
         self.reveal_history_control(controls[next]);
         self.reveal_form_control(controls[next], false, window, cx);
         self.reveal_review_control(controls[next], window, cx);
+        self.reveal_task_control(controls[next]);
         window.focus(&self.handle(controls[next], cx));
         cx.notify();
     }
@@ -2398,7 +2502,11 @@ impl Shell {
         }
     }
     fn find_local(&mut self, _: &FindLocal, window: &mut Window, cx: &mut Context<Self>) {
-        if self.focus.dialog || self.focus.approval_dialog || self.native_prompt {
+        if self.task.is_some()
+            || self.focus.dialog
+            || self.focus.approval_dialog
+            || self.native_prompt
+        {
             return;
         }
         if self
@@ -2420,6 +2528,14 @@ impl Shell {
         }
     }
     fn queue(&mut self, work: Work, cx: &mut Context<Self>) {
+        if self
+            .task
+            .as_ref()
+            .is_some_and(|task| task.state == regressee_app::task::State::Finished)
+            && regressee_app::task::Spec::for_work(&work).is_some()
+        {
+            return;
+        }
         if matches!(&work, Work::Viewer { .. } | Work::HistoricalViewer { .. }) {
             self.reload_viewer(cx);
             return;
@@ -2508,6 +2624,17 @@ impl Shell {
         }
         self.next_request += 1;
         let activity_label = work.activity_label();
+        self.environment_read_signature =
+            if matches!(&work, Work::EnvironmentStatus(_)) && self.environment.is_none() {
+                Some((self.next_request, self.environment_draft_signature(cx)))
+            } else {
+                None
+            };
+        let task_spec = regressee_app::task::Spec::for_work(&work);
+        let incoming_project = match &work {
+            Work::Import { preview, .. } => Some(preview.name.clone()),
+            _ => None,
+        };
         let evidence_read = matches!(
             &work,
             Work::Load(_) | Work::Evidence(_) | Work::EnvironmentStatus(_)
@@ -2522,6 +2649,18 @@ impl Shell {
                 self.pending = Some(self.next_request);
                 self.focus.busy = true;
                 self.progress = Some((activity_label.into(), 0, None));
+                if let Some(spec) = task_spec {
+                    self.begin_task(spec);
+                    if let Some(name) = incoming_project {
+                        let task = self.task.as_mut().unwrap();
+                        task.project = name;
+                        task.project_id = None;
+                        // ImportPreview does not contain the incoming origins
+                        // or environment; don't attribute the selected site's.
+                        task.website.clear();
+                        task.environment.clear();
+                    }
+                }
                 if evidence_read {
                     self.evidence_read_failed = false;
                 }
@@ -2539,7 +2678,11 @@ impl Shell {
         cx.notify();
     }
     fn navigate(&mut self, screen: Screen, window: &mut Window, cx: &mut Context<Self>) {
-        if self.focus.dialog || self.focus.approval_dialog || self.native_prompt {
+        if self.task.is_some()
+            || self.focus.dialog
+            || self.focus.approval_dialog
+            || self.native_prompt
+        {
             return;
         }
         if self.focus.screen != screen && regressee_app::ui::performance::enabled() {
@@ -2567,7 +2710,11 @@ impl Shell {
         cx.notify();
     }
     fn create(&mut self, _: &CreateProject, window: &mut Window, cx: &mut Context<Self>) {
-        if self.focus.busy || self.focus.dialog || self.focus.approval_dialog || self.native_prompt
+        if self.task.is_some()
+            || self.focus.busy
+            || self.focus.dialog
+            || self.focus.approval_dialog
+            || self.native_prompt
         {
             return;
         }
@@ -2607,6 +2754,7 @@ impl Shell {
         cx.notify();
     }
     fn save(&mut self, _: &SaveProject, _: &mut Window, cx: &mut Context<Self>) {
+        self.last_action = Some(Control::Save);
         self.save_settings(cx);
     }
     fn local_login_settings(
@@ -2637,7 +2785,8 @@ impl Shell {
         Ok(settings)
     }
     fn save_settings(&mut self, cx: &mut Context<Self>) {
-        if (!self.focus.can_activate(Control::Save) && !self.exit_guard.saving())
+        if ((self.task.is_some() || !self.focus.can_activate(Control::Save))
+            && !self.exit_guard.saving())
             || self.native_prompt
         {
             return;
@@ -2885,6 +3034,13 @@ impl Shell {
         }
         if index == 45 {
             self.result_filters_open = !self.result_filters_open;
+            self.options_scroll.set_offset(gpui::point(px(0.), px(0.)));
+            if self.result_filters_open {
+                self.capture_details_open = false;
+                self.review_tools = false;
+                self.mask_draw = false;
+                self.mask_drag = None;
+            }
             cx.notify();
             return;
         }
@@ -3069,6 +3225,8 @@ impl Shell {
                 if self.preview.is_some() {
                     self.preview = None;
                     self.focus.preview = false;
+                    self.result_filters_open = false;
+                    self.discovery_details_open = false;
                     self.notice = Some("Preview dismissed; the baseline is unchanged.".into());
                 } else if let Some(p) = &self.project {
                     self.queue(Work::ExistingInventory(p.project.id), cx);
@@ -3211,6 +3369,8 @@ impl Shell {
                 if let Some(p) = &self.project {
                     if index == 35 || index == 36 {
                         self.show_mapping = true;
+                        self.mapping_preview_scroll
+                            .set_offset(gpui::point(px(0.), px(0.)));
                     }
                     let id = p.project.id;
                     let work = match index {
@@ -3436,6 +3596,16 @@ impl Shell {
             selected,
             enabled,
         )
+        .when_some(self.options_control_bounds(control), |el, bounds| {
+            el.relative().child(
+                canvas(
+                    |_, _, _| (),
+                    move |painted, _, _, _| bounds.set(Some(painted)),
+                )
+                .absolute()
+                .size_full(),
+            )
+        })
         .when(enabled, |el| {
             el.on_click(
                 cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
@@ -3460,6 +3630,16 @@ impl Shell {
             enabled,
         )
         .anchor_scroll(self.review_anchor(control))
+        .when_some(self.options_control_bounds(control), |el, bounds| {
+            el.relative().child(
+                canvas(
+                    |_, _, _| (),
+                    move |painted, _, _, _| bounds.set(Some(painted)),
+                )
+                .absolute()
+                .size_full(),
+            )
+        })
         .when(enabled, |el| {
             el.on_click(
                 cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
@@ -3677,11 +3857,8 @@ impl Shell {
                     .child(self.guided_button(35, "Preview mapped URLs", cx))
                     .child(self.guided_button(36, "Probe representative pages", cx)),
             );
-        if self.show_mapping
-            && let Some(e) = &self.environment
-        {
-            body=body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(format!("{} intended page mappings · {} · preview shows first 16; probe visits at most 3, never a full discovery.",e.mapped.len(),if e.probed{"Representative probe confirmed"}else{"Probe not confirmed for these saved settings"})))
-                .children(e.mapped.iter().take(16).map(|(a,b)|div().text_size(px(13.)).child(format!("{a} → {b}"))));
+        if self.show_mapping && self.environment.is_some() {
+            body = body.child(self.mapping_preview(cx));
         }
         body.when(
             login_required || self.focus.setup_stage == SetupStage::Settings,
@@ -3748,19 +3925,24 @@ impl Shell {
         div()
             .flex()
             .flex_col()
-            .gap_2()
+            .gap_4()
             .child(
-                div().flex().flex_wrap().gap_2().children(
+                div().flex().flex_col().gap_2().children(
                     Choice::RESULTS
                         .into_iter()
                         .enumerate()
                         .map(|(index, choice)| {
-                            self.button(
-                                Control::Choice(choice),
+                            let control = Control::Choice(choice);
+                            self.choice_button(
+                                control,
                                 ["All", "Changed", "Gaps", "No significant change"][index],
-                                ActionStyle::Choice {
-                                    selected: self.result_filter == index,
-                                },
+                                [
+                                    "Every screenshot target.",
+                                    "Visual differences to review, not confirmed defects.",
+                                    "Missing captures or targets that could not be compared.",
+                                    "Comparable captures below the current change thresholds.",
+                                ][index],
+                                self.result_filter == index,
                                 cx,
                             )
                         }),
@@ -3841,6 +4023,17 @@ impl Shell {
                                     "Filter → All."
                                 } else {
                                     "Clear search."
+                                })
+                                .when(self.selected_key.is_some(), |el| {
+                                    el.child(
+                                        div()
+                                            .debug_selector(|| "empty-retained-evidence".into())
+                                            .w_full()
+                                            .text_size(px(13.))
+                                            .line_height(px(18.))
+                                            .text_color(rgb(MUTED))
+                                            .child("Inspected screenshot and edits are kept."),
+                                    )
                                 }),
                         ),
                 )
@@ -3864,19 +4057,22 @@ impl Shell {
                         .flex()
                         .flex_wrap()
                         .gap_2()
-                        .child(self.guided_button(
-                            45,
+                        .child(self.button(
+                            Control::Guided(45),
                             if self.preview.is_some() {
-                                "Options"
+                                "Page options"
                             } else {
                                 "Filter"
+                            },
+                            ActionStyle::Choice {
+                                selected: self.result_filters_open,
                             },
                             cx,
                         ))
                         .when(!empty_results, |actions| {
                             actions.child(self.guided_button(
                                 23,
-                                if self.narrow_workspace && !self.page_list_workspace() {
+                                if self.narrow_workspace {
                                     "Prev"
                                 } else {
                                     "Previous"
@@ -3890,46 +4086,14 @@ impl Shell {
                 )
             });
         if let Some(p) = &self.preview {
-            body = body
-                .when(self.result_filters_open, |body| {
-                    let targets = p.included() * p.settings.profiles.len();
-                    body.child(format!("Planning range: {}–{} MiB · {}–{} minutes. Full-page height and website speed can exceed these estimates.", targets / 2, targets * 8, targets / 60 + 1, targets / 6 + 1))
-                        .child(
-                            div()
-                                .text_size(px(13.))
-                                .text_color(rgb(MUTED))
-                                .child(format!(
-                                    "{} · {} · {}",
-                                    workflow::count_label(p.visited as usize, "page visit", "page visits"),
-                                    workflow::count_label(p.inventory.pages.len(), "candidate", "candidates"),
-                                    p.inventory.coverage.label()
-                                )),
-                        )
-                        .children(p.notes.iter().take(16).map(|s| {
-                            div()
-                                .text_size(px(13.))
-                                .text_color(rgb(MUTED))
-                                .child(s.clone())
-                        }))
-                        .child(
-                            div()
-                                .flex()
-                                .flex_wrap()
-                                .gap_2()
-                                .child(self.guided_button(20, "Exclude search matches", cx))
-                                .child(self.guided_button(
-                                    21,
-                                    "Restore excluded search matches",
-                                    cx,
-                                ))
-                                .child(self.guided_button(
-                                    22,
-                                    "Include / exclude selected page",
-                                    cx,
-                                )),
-                        )
-                        .child(self.guided_button(16, "Dismiss discovery", cx))
-                });
+            body = body.child(
+                div()
+                    .flex_shrink_0()
+                    .text_size(px(13.))
+                    .line_height(px(18.))
+                    .text_color(rgb(MUTED))
+                    .child(self.discovery_coverage_hint()),
+            );
             let rows = self.preview_page_ids();
             body = body.child(
                 div()
@@ -4082,20 +4246,12 @@ impl Shell {
             }
         } else if let Some(r) = &self.evidence.latest {
             let rows = self.result_indices();
-            body = body
-                .when(self.result_filters_open && !rows.is_empty(), |body| {
-                    body.child(self.result_filter_options(cx))
-                })
-                .when(
-                    matches!(r.run.state, JobState::Paused | JobState::Interrupted),
-                    |el| {
-                        el.child(self.guided_button(
-                            15,
-                            "Resume — same website release confirmed",
-                            cx,
-                        ))
-                    },
-                );
+            body = body.when(
+                matches!(r.run.state, JobState::Paused | JobState::Interrupted),
+                |el| {
+                    el.child(self.guided_button(15, "Resume — same website release confirmed", cx))
+                },
+            );
             if !rows.is_empty() {
                 body = body.child(
                     div()
@@ -4121,18 +4277,7 @@ impl Shell {
             {
                 body = body.child(div().id("inspected-outside-filter").debug_selector(|| "inspected-outside-filter".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Inspected screenshot is outside this filter. Evidence and ignored-area edits are kept."));
             }
-            if rows.is_empty() {
-                if self.result_filters_open {
-                    body = body.child(
-                        div()
-                            .id("empty-result-filter-options")
-                            .flex_1()
-                            .min_h_0()
-                            .overflow_y_scroll()
-                            .child(self.result_filter_options(cx)),
-                    );
-                }
-            } else {
+            if !rows.is_empty() {
                 body = body.child(controls::page_list(
                 uniform_list(
                     "capture-targets",
@@ -4217,6 +4362,7 @@ impl Shell {
         if !self.control_enabled(control, cx) {
             return;
         }
+        self.last_action = Some(control);
         if self.mask_dirty
             && matches!(
                 control,
@@ -4234,6 +4380,41 @@ impl Shell {
             return;
         }
         match control {
+            Control::CloseOptions => {
+                self.result_filters_open = false;
+                window.focus(&self.handle(Control::Guided(45), cx));
+                cx.notify();
+            }
+            Control::DiscoveryDetails => {
+                self.discovery_details_open = !self.discovery_details_open;
+                cx.notify();
+            }
+            Control::CloseMappingPreview => {
+                self.show_mapping = false;
+                self.reveal_form_control(Control::Guided(35), false, window, cx);
+                window.focus(&self.handle(Control::Guided(35), cx));
+                cx.notify();
+            }
+            Control::TaskContinue => self.continue_task(window, cx),
+            Control::TaskLink(index) => {
+                if let Some(url) = self.task.as_ref().and_then(|task| task.link_url(index)) {
+                    cx.open_url(url.as_str());
+                    window.focus(&self.handle(control, cx));
+                }
+            }
+            Control::TaskDetails => {
+                if let Some(task) = &mut self.task {
+                    task.details = !task.details;
+                    if task.details {
+                        task.reveal_details.set(true);
+                    } else {
+                        task.reveal_details.set(false);
+                        task.scroll.set_offset(gpui::point(px(0.), px(0.)));
+                    }
+                }
+                window.focus(&self.handle(control, cx));
+                cx.notify();
+            }
             Control::Navigate(screen) => self.navigate(screen, window, cx),
             Control::SetupStage(stage) => {
                 self.focus.setup_stage = stage;
@@ -4380,6 +4561,15 @@ impl Shell {
                 }
                 if index == 17 {
                     window.focus(&self.handle(Control::CrawlField(9), cx));
+                } else if index == 45 {
+                    window.focus(&self.handle(
+                        if self.result_filters_open {
+                            Control::CloseOptions
+                        } else {
+                            control
+                        },
+                        cx,
+                    ));
                 }
             }
             Control::Choice(choice) => self.choose(choice, cx),
@@ -4409,11 +4599,19 @@ impl Shell {
                 cx.notify();
             }
             Control::PauseCapture => {
+                if self.task.is_some() {
+                    self.request_task_stop(true, window, cx);
+                    return;
+                }
                 self.jobs.pause();
                 self.notice=Some("Pause requested. No new batch will start. Active pages finish their bounded browser work (default budget 55 seconds), then publish evidence. Large image processing may add time.".into());
                 cx.notify();
             }
             Control::CancelCapture => {
+                if self.task.is_some() {
+                    self.request_task_stop(false, window, cx);
+                    return;
+                }
                 self.jobs.cancel();
                 self.notice=Some("Stopping active work. Completed originals will be kept; no baseline is activated.".into());
                 cx.notify();
@@ -4534,6 +4732,14 @@ impl Shell {
         }
     }
     fn dismiss(&mut self, _: &Dismiss, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(task) = &self.task {
+            if task.state == regressee_app::task::State::Finished {
+                self.continue_task(window, cx);
+            } else {
+                self.request_task_stop(false, window, cx);
+            }
+            return;
+        }
         if self.focus.approval_dialog {
             self.guided(47, cx);
             window.focus(&self.handle(Control::Phase5(24), cx));
@@ -4551,6 +4757,15 @@ impl Shell {
                 .take()
                 .unwrap_or(Control::Navigate(self.focus.screen));
             window.focus(&self.handle(target, cx));
+            cx.notify();
+        } else if self.result_filters_open && self.focus.screen == Screen::Results {
+            self.result_filters_open = false;
+            window.focus(&self.handle(Control::Guided(45), cx));
+            cx.notify();
+        } else if self.show_mapping && self.focus.screen == Screen::Setup {
+            self.show_mapping = false;
+            self.reveal_form_control(Control::Guided(35), false, window, cx);
+            window.focus(&self.handle(Control::Guided(35), cx));
             cx.notify();
         } else if self.capture_details_open || self.review_tools {
             let control = if self.capture_details_open {
@@ -4587,6 +4802,16 @@ impl Shell {
             |el| el.px(px(8.)),
         )
         .anchor_scroll(self.review_anchor(control))
+        .when_some(self.options_control_bounds(control), |el, bounds| {
+            el.relative().child(
+                canvas(
+                    |_, _, _| (),
+                    move |painted, _, _, _| bounds.set(Some(painted)),
+                )
+                .absolute()
+                .size_full(),
+            )
+        })
         .when(enabled, |el| {
             el.on_click(
                 cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
@@ -4597,6 +4822,9 @@ impl Shell {
     /// The same prerequisites govern pointer actions, keyboard dispatch, and
     /// Tab stops. Backend validation remains authoritative for every mutation.
     fn control_enabled(&self, control: Control, cx: &App) -> bool {
+        if self.task.is_some() {
+            return !self.native_prompt && self.visible_controls().contains(&control);
+        }
         if !self.focus.can_activate(control)
             || !self.control_mounted(control)
             || self.native_prompt
@@ -4701,11 +4929,29 @@ impl Shell {
             Control::Guided(17) => self.preview.is_some() || self.evidence.latest.is_some(),
             Control::Guided(19) => self.preview.is_none() && self.evidence.latest.is_some(),
             Control::Guided(20 | 21) => {
-                self.preview.is_some() && !self.preview_page_ids().is_empty()
+                let visible: std::collections::BTreeSet<_> =
+                    self.preview_page_ids().into_iter().collect();
+                self.preview.as_ref().is_some_and(|p| {
+                    p.inventory.pages.iter().any(|page| {
+                        visible.contains(&page.id)
+                            && if control == Control::Guided(20) {
+                                page.included
+                            } else {
+                                page.reason.as_deref() == Some("Excluded in preview")
+                            }
+                    })
+                })
             }
-            Control::Guided(22) => self
-                .selected_page
-                .is_some_and(|id| self.preview_page_ids().contains(&id)),
+            Control::Guided(22) => self.selected_page.is_some_and(|id| {
+                self.preview_page_ids().contains(&id)
+                    && self.preview.as_ref().is_some_and(|p| {
+                        p.inventory.pages.iter().any(|page| {
+                            page.id == id
+                                && (page.included
+                                    || page.reason.as_deref() == Some("Excluded in preview"))
+                        })
+                    })
+            }),
             Control::Guided(23 | 24) => {
                 let (index, count) = if self.preview.is_some() {
                     let rows = self.preview_page_ids();
@@ -4882,6 +5128,9 @@ impl Shell {
     /// state from another screen must never become an invisible keyboard target.
     /// Shared action rendering, activation, and Tab all use control_enabled.
     fn control_mounted(&self, control: Control) -> bool {
+        if self.task.is_some() {
+            return self.visible_controls().contains(&control);
+        }
         use Control::*;
         let screen = self.focus.screen;
         if self.focus.approval_dialog {
@@ -4967,6 +5216,10 @@ impl Shell {
             && self.viewer.is_some()
             && (!self.page_list_workspace() || self.discovery_image_mounted());
         match control {
+            TaskDetails | TaskContinue | TaskLink(_) => false,
+            CloseOptions => results && self.result_filters_open,
+            DiscoveryDetails => results && self.preview.is_some() && self.result_filters_open,
+            CloseMappingPreview => setup && self.show_mapping && self.environment.is_some(),
             Navigate(_) => true,
             Shortcuts => settings,
             ValidationNext => setup || settings,
@@ -6848,7 +7101,7 @@ impl Render for Shell {
             .flex()
             .flex_col()
             .gap_3();
-        if self.focus.busy {
+        if self.focus.busy && self.task.is_none() {
             let (message, completed, total) = self
                 .progress
                 .clone()
@@ -6961,7 +7214,8 @@ impl Render for Shell {
                     }),
             )
             .when(
-                self.focus.busy || self.error.is_some() || self.notice.is_some(),
+                self.task.is_none()
+                    && (self.focus.busy || self.error.is_some() || self.notice.is_some()),
                 |el| el.child(feedback),
             )
             .child(
@@ -7032,14 +7286,22 @@ impl Render for Shell {
                     this.navigate(Screen::Settings, w, cx)
                 }),
             )
-            .child(self.project_rail(cx))
-            .child(content)
-            .when(self.focus.approval_dialog, |shell| {
+            .when(self.task_owns_workspace(), |shell| {
+                shell.child(self.task_workspace(cx))
+            })
+            .when(!self.task_owns_workspace(), |shell| {
+                shell.child(self.project_rail(cx)).child(content)
+            })
+            .when(self.task.is_none() && self.focus.approval_dialog, |shell| {
                 shell.child(self.approval_decision(cx))
             })
-            .when(self.focus.dialog, |el| {
+            .when(self.task.is_none() && self.focus.dialog, |el| {
                 el.child(self.information_dialog(cx))
-            });
+            })
+            .when(
+                self.task.is_some() && !self.task_owns_workspace(),
+                |shell| shell.child(self.task_dialog(cx)),
+            );
         shell.when_some(navigation, |shell, (screen, navigation)| {
             let timing = regressee_app::ui::performance::FrameTiming {
                 screen: screen.label(),
@@ -7125,6 +7387,9 @@ fn main() -> anyhow::Result<()> {
     let (jobs, events) = Jobs::start(paths);
     let after_ui = jobs.clone();
     application.run(move |cx: &mut App| {
+        cx.set_global(controls::ReducedMotion(
+            std::env::var_os("REGRESSEE_REDUCED_MOTION").is_some_and(|value| value == "1"),
+        ));
         text_input::bind(cx);
         timezone_select::bind(cx);
         zoom_select::bind(cx);
@@ -7240,6 +7505,9 @@ mod approval_fixture;
 
 #[cfg(all(test, feature = "ui-tests"))]
 mod workflow_refinement_tests;
+
+#[cfg(all(test, feature = "ui-tests"))]
+mod options_ux_tests;
 
 #[cfg(all(test, feature = "ui-tests"))]
 mod tests {
@@ -8386,6 +8654,8 @@ mod tests {
                 settled(s, cx);
                 assert!(zip.exists());
                 assert!(s.export_preview.is_none());
+                s.continue_task(w, cx);
+                settled(s, cx);
                 s.focus.screen = Screen::Projects;
                 s.selected_import_path(zip.clone(), cx);
                 settled(s, cx);
@@ -8411,9 +8681,18 @@ mod tests {
                         .unwrap()
                         .contains("not an independently verified")
                 );
-                assert_eq!(s.projects.items.len(), 2);
+                assert!(
+                    s.task
+                        .as_ref()
+                        .is_some_and(|task| task.state == regressee_app::task::State::Finished)
+                );
                 let imported = s.project.as_ref().unwrap().project.id;
                 assert_ne!(imported, project);
+                s.continue_task(w, cx);
+                settled(s, cx);
+                s.navigate(Screen::Projects, w, cx);
+                settled(s, cx);
+                assert_eq!(s.projects.items.len(), 2);
                 s.focus.screen = Screen::History;
                 s.refresh_visible(cx);
                 settled(s, cx);
@@ -8422,6 +8701,7 @@ mod tests {
                 settled(s, cx);
                 assert!(s.deletion_preview.is_none());
                 assert!(s.error.as_ref().unwrap().contains("Active baseline"));
+                s.continue_task(w, cx);
                 s.error = None;
                 s.focus.screen = Screen::Settings;
                 s.activate_control(Control::Phase6(13), w, cx);
@@ -10028,7 +10308,7 @@ mod tests {
         owned.join_after_ui();
     }
     #[gpui::test]
-    fn save_navigation_completion_refreshes_real_list_without_losing_draft(
+    fn save_task_protects_completion_and_refreshes_real_list_without_losing_draft(
         cx: &mut TestAppContext,
     ) {
         let dir = tempfile::tempdir().unwrap();
@@ -10057,31 +10337,33 @@ mod tests {
         });
         cx.dispatch_action(SaveProject);
         let save_id = cx.update(|_, cx| shell.read(cx).pending.expect("save not queued"));
-        // Use the same enabled navigation-button action as a click. Simulated
-        // keyboard dispatch cannot route through the now-disabled input focus.
+        // Confirmed saves own protected focus until their authoritative reply.
         cx.update(|window, cx| {
             shell.update(cx, |shell, cx| {
                 shell.activate_control(Control::Navigate(Screen::Projects), window, cx)
             })
         });
         shell.update(cx, |shell, cx| {
-            assert_eq!(shell.focus.screen, Screen::Projects);
+            assert_eq!(shell.focus.screen, Screen::Setup);
             assert_eq!(shell.pending, Some(save_id));
             assert!(shell.focus.busy);
             assert!(shell.projects.items.is_empty());
             assert_eq!(shell.name.read(cx).content, "Saved project");
             finish_request(shell, cx);
-            assert_eq!(shell.focus.screen, Screen::Projects);
+            assert_eq!(shell.focus.screen, Screen::Setup);
             assert!(shell.projects_dirty);
-            assert!(
-                shell.pending.is_some_and(|id| id > save_id),
-                "completion did not schedule refresh"
-            );
-            assert!(shell.focus.busy);
             let saved = shell.project.as_ref().unwrap();
             assert_eq!(saved.revision, 1);
             assert_eq!(saved.project.name, "Saved project");
-            finish_request(shell, cx);
+            settle_requests(shell, cx);
+        });
+        cx.update(|window, cx| {
+            shell.update(cx, |shell, cx| {
+                shell.activate_control(Control::Navigate(Screen::Projects), window, cx);
+            })
+        });
+        shell.update(cx, |shell, cx| {
+            settle_requests(shell, cx);
             assert!(shell.pending.is_none());
             assert!(!shell.focus.busy);
             assert!(!shell.projects_dirty);
@@ -10092,8 +10374,8 @@ mod tests {
             );
             assert_eq!(shell.projects.items[0].name, "Saved project");
         });
-        // Edit/save again, visit Projects while pending, then leave it before
-        // completion. No forced navigation or unnecessary hidden-list request.
+        // Edit/save again. Both navigation shortcuts remain guarded until the
+        // save completes; navigating afterwards must not lose the saved draft.
         cx.update(|window, cx| {
             shell.update(cx, |shell, cx| {
                 shell.activate_control(Control::Navigate(Screen::Setup), window, cx)
@@ -10118,7 +10400,15 @@ mod tests {
         });
         shell.update(cx, |shell, cx| {
             finish_request(shell, cx);
-            assert_eq!(shell.focus.screen, Screen::Results);
+            assert_eq!(shell.focus.screen, Screen::Setup);
+            settle_requests(shell, cx);
+        });
+        cx.update(|window, cx| {
+            shell.update(cx, |shell, cx| {
+                shell.activate_control(Control::Navigate(Screen::Results), window, cx);
+            })
+        });
+        shell.update(cx, |shell, cx| {
             // Phase 2 now refreshes actual evidence on the visible Results
             // surface. It must still not schedule a hidden Projects list or
             // replace the selected screen/settings snapshot.
@@ -10195,7 +10485,7 @@ mod tests {
                 Reply::Failure(regressee_app::jobs::StorageFailure::ConflictOrWrite)
             ));
             shell.apply_update(update, cx);
-            assert_eq!(shell.focus.screen, Screen::Projects);
+            assert_eq!(shell.focus.screen, Screen::Setup);
             assert_eq!(shell.name.read(cx).content, "Unsaved next edit");
             assert_eq!(shell.project.as_ref().unwrap().revision, 2);
             assert!(shell.unsaved(cx));
@@ -10316,7 +10606,25 @@ mod tests {
         });
         shell.update(cx, |s, cx| {
             let request = s.pending.expect("the explicit capture request is pending");
-            let update = receive_update_for(s, request, cx);
+            let mut preparation_seen = false;
+            let update = loop {
+                let update = receive_update_for(s, request, cx);
+                if let Reply::Progress {
+                    completed, total, ..
+                } = &update.reply
+                {
+                    assert_eq!((*completed, *total), (0, None));
+                    s.apply_update(update, cx);
+                    assert!(s.focus.busy && s.focus.capturing);
+                    preparation_seen = true;
+                } else {
+                    break update;
+                }
+            };
+            assert!(
+                preparation_seen,
+                "the initial browser check must be visible"
+            );
             assert_eq!(update.id, request);
             assert!(matches!(update.reply, Reply::ProductFailure(_)));
             s.apply_update(update, cx);

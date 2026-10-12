@@ -1,0 +1,21 @@
+{
+  "command": [
+    "/var/home/olav/.config/opencode/skills/impeccable/scripts/impeccable",
+    "detect",
+    "--json",
+    "crates/app/src/main.rs",
+    "crates/app/src/workflow.rs",
+    "crates/app/src/review_ux.rs",
+    "crates/app/src/options_ux.rs",
+    "crates/app/src/workspace_history.rs",
+    "crates/app/src/task_ux.rs",
+    "crates/app/src/ui/controls.rs",
+    "crates/app/src/ui/theme.rs"
+  ],
+  "cwd": "/var/home/olav/Projects/Regressee",
+  "exitCode": 0,
+  "stdoutFile": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/detector.json",
+  "stderrFile": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/detector.stderr.txt",
+  "nativeTarget": true,
+  "generatedGalleryScanned": false
+}

@@ -571,10 +571,16 @@ impl Shell {
         let Some((id, kind)) = self.exit_guard.pending else {
             return Some(update);
         };
-        if update.id != id || matches!(&update.reply, Reply::Progress { .. }) {
+        if update.id != id
+            || matches!(
+                &update.reply,
+                Reply::Progress { .. } | Reply::CaptureStatus(_)
+            )
+        {
             return Some(update);
         }
         self.pending = None;
+        self.task = None;
         self.exit_guard.pending = None;
         self.focus.busy = false;
         self.progress = None;

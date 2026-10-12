@@ -339,7 +339,9 @@ impl Shell {
     }
 
     pub(super) fn review_queue_width(&self) -> f32 {
-        if self.page_list_workspace() && !self.discovery_image_mounted() {
+        if self.preview.is_some() && self.options_panel_open() {
+            self.working_width - self.options_panel_width() - 12.
+        } else if self.page_list_workspace() && !self.discovery_image_mounted() {
             self.working_width
         } else if self.review_queue_collapsed && !self.page_list_workspace() {
             0.
@@ -407,6 +409,18 @@ impl Shell {
             );
         }
         match control {
+            Control::CloseOptions | Control::DiscoveryDetails if results => {
+                self.options_panel_open()
+            }
+            Control::Phase5(0..=19 | 26..=28 | 34..=39)
+            | Control::AnalysisField(0..=8 | 10..=13)
+            | Control::Viewer
+            | Control::Guided(44 | 46)
+            | Control::Details(Detail::Analysis)
+                if results && self.options_panel_open() =>
+            {
+                false
+            }
             Control::Phase5(23 | 24) | Control::AnalysisField(_)
                 if results && self.page_list_workspace() =>
             {
@@ -651,6 +665,7 @@ impl Shell {
                     .flex_1()
                     .min_h_0()
                     .min_w_0()
+                    .relative()
                     .flex()
                     .gap_3()
                     .overflow_hidden()
@@ -665,19 +680,26 @@ impl Shell {
                                 .child(self.inventory_and_results(cx)),
                         )
                     })
-                    .when(!pages || self.discovery_image_mounted(), |workspace| {
-                        workspace.child(
-                            div()
-                                .debug_selector(|| "review-viewer".into())
-                                .flex_1()
-                                .min_w_0()
-                                .h_full()
-                                .min_h_0()
-                                .flex()
-                                .flex_col()
-                                .gap_2()
-                                .child(self.viewer_section(cx)),
-                        )
+                    .when(
+                        (!pages || self.discovery_image_mounted())
+                            && !(pages && self.options_panel_open()),
+                        |workspace| {
+                            workspace.child(
+                                div()
+                                    .debug_selector(|| "review-viewer".into())
+                                    .flex_1()
+                                    .min_w_0()
+                                    .h_full()
+                                    .min_h_0()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_2()
+                                    .child(self.viewer_section(cx)),
+                            )
+                        },
+                    )
+                    .when(self.options_panel_open(), |workspace| {
+                        workspace.child(self.options_panel(cx))
                     }),
             )
             .when(!pages && self.evidence.comparison.is_some(), |workspace| {

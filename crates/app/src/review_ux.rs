@@ -134,6 +134,9 @@ fn seed(before: Dimensions, after: Dimensions) -> Option<Rectangle> {
 impl Shell {
     /// Controls inside the bounded Tools scroller share explicit scroll anchors.
     pub(super) fn review_anchor(&self, control: Control) -> Option<gpui::ScrollAnchor> {
+        if let Some(anchor) = self.options_anchor(control) {
+            return Some(anchor);
+        }
         let index = match control {
             Control::Phase5(index @ (0..=5 | 12..=19 | 26..=28 | 34..=35)) => index,
             Control::AnalysisField(index @ (0..=8 | 10..=13)) => 36 + index,
@@ -149,6 +152,24 @@ impl Shell {
         window: &mut Window,
         cx: &mut App,
     ) {
+        if self.focus.screen == Screen::Results
+            && self.options_panel_open()
+            && self.control_mounted(control)
+            && let Some(bounds) = self.options_control_bounds(control).and_then(|b| b.get())
+        {
+            let viewport = self.options_scroll.bounds();
+            let delta = if bounds.bottom() > viewport.bottom() - px(8.) {
+                viewport.bottom() - px(8.) - bounds.bottom()
+            } else if bounds.top() < viewport.top() + px(8.) {
+                viewport.top() + px(8.) - bounds.top()
+            } else {
+                px(0.)
+            };
+            let offset = self.options_scroll.offset();
+            self.options_scroll
+                .set_offset(gpui::point(offset.x, offset.y + delta));
+            return;
+        }
         if self.focus.screen == Screen::Results
             && self.review_tools
             && self.control_mounted(control)

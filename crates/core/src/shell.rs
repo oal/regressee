@@ -112,6 +112,7 @@ impl SetupStage {
                 control,
                 Environment(_)
                     | Guided(6 | 27 | 31..=38)
+                    | CloseMappingPreview
                     | CrawlField(10..=16)
                     | Choice(
                         self::Choice::PublicAccess
@@ -187,6 +188,12 @@ pub enum Control {
     HistoryRun(usize),
     Shortcuts,
     ValidationNext,
+    TaskDetails,
+    TaskContinue,
+    TaskLink(usize),
+    CloseOptions,
+    DiscoveryDetails,
+    CloseMappingPreview,
 }
 #[derive(Debug, Clone)]
 pub struct FocusState {
@@ -273,6 +280,13 @@ impl FocusState {
         }
         controls.push(Control::DismissFeedback);
         if self.busy {
+            if self.screen == Screen::History && self.project_saved {
+                controls.extend([Control::HistorySearch, Control::HistoryClear]);
+                controls.extend((0..4).map(Control::HistoryKind));
+                controls.extend((16..=18).map(Control::Phase6));
+                controls.extend((0..self.history_baselines.min(128)).map(Control::HistoryBaseline));
+                controls.extend((0..self.history_runs.min(64)).map(Control::HistoryRun));
+            }
             if self.view_loading && self.screen == Screen::Results {
                 controls.push(Control::Viewer);
                 controls.extend((0..18).map(Control::Phase5));
@@ -285,6 +299,8 @@ impl FocusState {
                     Control::Guided(17),
                     Control::Guided(19),
                     Control::Guided(45),
+                    Control::CloseOptions,
+                    Control::DiscoveryDetails,
                 ]);
                 controls.extend(Choice::RESULTS.into_iter().map(Control::Choice));
             }
@@ -356,6 +372,7 @@ impl FocusState {
                     controls.extend([15, 16].map(Control::CrawlField));
                     controls.extend([Choice::LightTheme, Choice::DarkTheme].map(Control::Choice));
                     controls.extend([31, 32, 33, 34, 35, 36].map(Control::Guided));
+                    controls.push(Control::CloseMappingPreview);
                 }
                 controls.push(Control::Details(Detail::Capture));
                 controls.push(Control::ValidationNext);
@@ -405,6 +422,7 @@ impl FocusState {
                     controls.extend((0..29).chain(32..40).map(Control::Phase5));
                     controls.push(Control::Guided(44));
                     controls.push(Control::Guided(45));
+                    controls.extend([Control::CloseOptions, Control::DiscoveryDetails]);
                     controls.extend([50, 51].map(Control::Guided));
                     controls.push(Control::Details(Detail::Analysis));
                     controls.extend((0..14).map(Control::AnalysisField));
@@ -488,7 +506,11 @@ mod tests {
         assert!(state.can_activate(Control::HistorySearch));
         assert!(state.can_activate(Control::HistoryRefresh));
         state.busy = true;
-        assert!(!state.can_activate(Control::HistoryBaseline(0)));
+        // Cached row selection and filtering are local; another storage read
+        // is not. The native exclusive-task layer separately traps all focus.
+        assert!(state.can_activate(Control::HistoryBaseline(0)));
+        assert!(state.can_activate(Control::HistorySearch));
+        assert!(state.can_activate(Control::Phase6(16)));
         assert!(!state.can_activate(Control::HistoryRefresh));
         state.busy = false;
         state.dialog = true;

@@ -48,7 +48,7 @@ fn dismissing_a_read_error_keeps_recovery_instead_of_an_idle_loading_state(
     owned.join_after_ui();
 }
 
-fn finish_jobs(s: &mut Shell, cx: &mut Context<Shell>) {
+pub(super) fn finish_jobs(s: &mut Shell, cx: &mut Context<Shell>) {
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     for _ in 0..64 {
         if s.pending.is_none() && s.viewer_pending.is_none() && s.storage_pending.is_none() {
@@ -69,7 +69,7 @@ fn finish_jobs(s: &mut Shell, cx: &mut Context<Shell>) {
     panic!("controller work did not settle");
 }
 
-fn load_review(s: &mut Shell, project: ProjectId, cx: &mut Context<Shell>) {
+pub(super) fn load_review(s: &mut Shell, project: ProjectId, cx: &mut Context<Shell>) {
     finish_jobs(s, cx);
     s.focus.screen = Screen::History;
     s.queue(Work::Load(project), cx);

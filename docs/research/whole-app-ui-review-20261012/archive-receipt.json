@@ -1,0 +1,126 @@
+{
+  "recorded_on": "2026-10-12",
+  "purpose": "Unmodified assessment archive before fixture corrections or product UI changes",
+  "evidence_root": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48",
+  "files": [
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/assessment-a.md",
+      "archive": "docs/research/whole-app-ui-review-20261012/assessment-a.md",
+      "sha256": "0a7e7128bd96a88df0901b2b3f29bd8058d78917b5a2e27c0b0c82be21e11b38",
+      "bytes": 52767
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/assessment-b.md",
+      "archive": "docs/research/whole-app-ui-review-20261012/assessment-b.md",
+      "sha256": "1c21af6a2d68e52a66948483b0ff60462d49eabb15e0e142e24297b232e6107f",
+      "bytes": 37144
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/assessment-b-integrity.json",
+      "archive": "docs/research/whole-app-ui-review-20261012/assessment-b-integrity.json",
+      "sha256": "e04ff6ff82323efe6f8d7f87a338b73573062f05fc49285bcc0df16402e14f11",
+      "bytes": 2051
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/gallery-manifest.json",
+      "archive": "docs/research/whole-app-ui-review-20261012/gallery-manifest.initial.json",
+      "sha256": "f5e893e5a867c8c729547ba1fc074d5a43a35b4eeca83e0e21d87f1805f47fd2",
+      "bytes": 92064
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/whole-app-matrix.json",
+      "archive": "docs/research/whole-app-ui-review-20261012/whole-app-matrix.initial.json",
+      "sha256": "bff3306b05b9168702c5e88eedf825cfdb117a5263e317ed939c8d691220f056",
+      "bytes": 67718
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/production-source-binding.json",
+      "archive": "docs/research/whole-app-ui-review-20261012/production-source-binding.original.json",
+      "sha256": "a7ec5f9c118fa30995509784b69055710caec460a1abef507f5b807da16bd5ed",
+      "bytes": 5335
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/proof-reviewed.json",
+      "archive": "docs/research/whole-app-ui-review-20261012/proof-reviewed.json",
+      "sha256": "f310d37b95c931427ff2e341ab5ca113fae07f46f339327d5857b84589f88987",
+      "bytes": 145
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/detector.json",
+      "archive": "docs/research/whole-app-ui-review-20261012/detector.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "bytes": 3
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/detector.stderr.txt",
+      "archive": "docs/research/whole-app-ui-review-20261012/detector.stderr.txt",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/detector-run.json",
+      "archive": "docs/research/whole-app-ui-review-20261012/detector-run.json",
+      "sha256": "fe44d6d68dc0edb75112247f21fd676e3bdff07a4ece5a67b6a23161f925f77b",
+      "bytes": 759
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/renderer-complete.log",
+      "archive": "docs/research/whole-app-ui-review-20261012/renderer-complete.log",
+      "sha256": "b9c5aed0d1c0c753c8ca5c7608bbb9e96a39ad6c5befd49d7d7871f9a2ef029d",
+      "bytes": 2074
+    },
+    {
+      "source": "/var/home/olav/Data/opencode/tmp/opencode/regressee-whole-app-review-9inkus48/task-renderer.log",
+      "archive": "docs/research/whole-app-ui-review-20261012/task-renderer.log",
+      "sha256": "e9345715ae82e70fe4a676d98fb4ae9bd6377fe86b07abc905ec6930651c73b9",
+      "bytes": 1971
+    }
+  ],
+  "source_sha256_at_plan_creation": {
+    "crates/app/src/main.rs": "391182da75358bcfb85bdb886d6e290dbd1b5136a3aa8b567c8faa97ceaf7bdd",
+    "crates/app/src/workflow.rs": "12c4a40c12f1e2ada3d55b18706ed8c4ca75e070a56df5f35b5b524725c4e055",
+    "crates/app/src/review_ux.rs": "f608e077582176fe52b6c12a3f4b0d96dc1c3315164a43ac6ac1526558fe7652",
+    "crates/app/src/options_ux.rs": "fe1cdd6a1c2a05e50518ddba112728829f371a52b515820f1f196a188a070e35",
+    "crates/app/src/workspace_history.rs": "290156032df06611ffd874e62bb1ee6f564be3a46d4f724e9e8e33d1fdb67a5e",
+    "crates/app/src/task_ux.rs": "3ccc64babe9f1d850d5d8982c00310fff4986bea400198e0965723a102ae882f",
+    "crates/app/src/ui/controls.rs": "0776e0c63f30d219f7a4ec2df0272b7968701e28ff3fdbdd1f762db14d3a6955",
+    "crates/app/src/ui/theme.rs": "68f6f1a3955c7bdb5dd5f684c2541d2c1ccd69553d3069209c0c81e0441debf4",
+    "crates/app/src/ui_review_matrix.rs": "83ff46696871b1fb3a5c6ed46a69a5c5e15f8bf175e658a20a77616c7fcc1853",
+    "crates/app/src/ui_renderer_capture.rs": "028c6c33a2424154ec09372db63df748b8dd3dae358cb85599b6add277f22980",
+    "scripts/ui-review-fixtures.mjs": "272abc9bc726420331fd8b4479dbd1b88f85f0f0c6e10312d5e54330890f4ec6",
+    "scripts/ui-review-gallery.py": "4d2785cedce439b0906bd97fbce291d5f25480452ca21e89d7e40dc567adab1e"
+  },
+  "working_tree_at_plan_creation": [
+    " M DESIGN.md",
+    " M README.md",
+    " M crates/app/src/crawling.rs",
+    " M crates/app/src/exit_guard.rs",
+    " M crates/app/src/form_recovery.rs",
+    " M crates/app/src/jobs.rs",
+    " M crates/app/src/lib.rs",
+    " M crates/app/src/main.rs",
+    " M crates/app/src/review_ux.rs",
+    " M crates/app/src/ui/controls.rs",
+    " M crates/app/src/ui/mod.rs",
+    " M crates/app/src/ui_renderer_capture.rs",
+    " M crates/app/src/workflow.rs",
+    " M crates/app/src/workflow_refinement_tests.rs",
+    " M crates/app/tests/automatic_runtime_setup_independent.rs",
+    " M crates/app/tests/official_runtime_first_use.rs",
+    " M crates/core/src/shell.rs",
+    "?? crates/app/src/options_ux.rs",
+    "?? crates/app/src/options_ux_tests.rs",
+    "?? crates/app/src/task.rs",
+    "?? crates/app/src/task_ux.rs",
+    "?? crates/app/src/ui/status_icon.rs",
+    "?? crates/app/src/ui/web_link.rs",
+    "?? crates/app/src/ui_review_matrix.rs",
+    "?? docs/research/options-clarity-verification-20261012.md",
+    "?? docs/research/task-panel-clarity-20261012.md",
+    "?? docs/research/task-waiting-implementation-20261012.md",
+    "?? docs/research/whole-app-ui-review-20261012/",
+    "?? scripts/ui-review-fixtures.mjs",
+    "?? scripts/ui-review-gallery.py"
+  ],
+  "qualification": "Archive integrity only; no new render, product test, OS input or accessibility qualification"
+}

@@ -71,6 +71,15 @@ GPUI's native development libraries and a working graphics backend; Cargo does
 not install those prerequisites. See the [build instructions](docs/release-building.md)
 for platform-specific details.
 
+Unknown-duration progress bars animate independently of page-count updates.
+Task screens separate activity, icon-labelled screenshot outcomes and baseline
+consequences. Details shows recorded capture gaps and frozen setup rather than
+repeating the progress message; it is hidden when there is no extra information.
+To keep these activity indicators static, launch with
+`REGRESSEE_REDUCED_MOTION=1`. This is an explicit override; GPUI does not yet expose
+the operating system's reduced-motion preference to the app. Completion bars and
+reported counts always reflect actual work.
+
 ## Privacy and local storage
 
 - Projects, screenshots, baselines, and history are stored locally, outside the

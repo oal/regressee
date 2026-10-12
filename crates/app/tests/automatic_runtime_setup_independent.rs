@@ -463,16 +463,39 @@ impl Drop for Actor {
 }
 impl Actor {
     fn terminal(&self, id: u64, work: Work) -> Result<Reply> {
+        let discovering = matches!(&work, Work::Discover(_));
         self.jobs
             .submit(Request { id, work })
             .map_err(anyhow::Error::msg)?;
-        let update = self.replies.recv_timeout(Duration::from_secs(3))?;
-        ensure!(update.id == id, "reply changed request identity");
-        ensure!(
-            !matches!(update.reply, Reply::Progress { .. }),
-            "guarded request emitted setup progress"
-        );
-        Ok(update.reply)
+        let until = Instant::now() + Duration::from_secs(3);
+        loop {
+            let update = self
+                .replies
+                .recv_timeout(until.saturating_duration_since(Instant::now()))?;
+            ensure!(update.id == id, "reply changed request identity");
+            if let Reply::Progress {
+                message,
+                completed,
+                total,
+            } = update.reply
+            {
+                // Preparation feedback is not installation or website work.
+                // Keep the original refusal of any download/setup phase.
+                ensure!(
+                    discovering
+                        && completed == 0
+                        && total.is_none()
+                        && matches!(
+                            message.as_str(),
+                            "Reading saved website settings…"
+                                | "Checking the installed browser files before visiting the website…"
+                        ),
+                    "guarded request emitted setup progress"
+                );
+            } else {
+                return Ok(update.reply);
+            }
+        }
     }
 }
 
@@ -595,9 +618,7 @@ fn public_jobs_routes_pinned_work_and_queued_cancel_preserving_cas() -> Result<(
         let update = actor.replies.recv_timeout(Duration::from_secs(3))?;
         assert_eq!(update.id, id);
         if id == 25 {
-            assert!(
-                matches!(update.reply, Reply::ProductFailure(message) if message.contains("cancelled"))
-            );
+            assert!(matches!(update.reply, Reply::Cancelled));
         } else {
             assert!(!matches!(update.reply, Reply::Progress { .. }));
         }

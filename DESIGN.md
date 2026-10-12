@@ -216,9 +216,12 @@ Flat tonal layering and precise boundaries, not decorative shadows. GPUI's
 zero-blur spread paint provides a functional focus outline, not elevation.
 Information and approval dialogs dim the workspace; approval occludes background
 interaction. Folder/discard prompts use platform prompts where supported.
-No invented motion scale: state changes are immediate, and unknown-duration
-activity advances only with real work updates, not a timer-driven animation.
-OS theme/high-contrast behavior remains qualification work.
+No invented motion scale: state changes are immediate. Unknown-duration activity
+uses a seamless 1.2-second linear pattern, driven by native animation frames only
+while visible, independently of worker updates. This communicates activity, not
+completion. `REGRESSEE_REDUCED_MOTION=1` keeps the pattern static; automatic OS
+motion-preference integration, theme and high-contrast behavior remain
+qualification work.
 
 ## Shapes
 
@@ -252,6 +255,17 @@ outline with a dark inner border on its selected light surface. Disabled control
 fade, leave the focus model and reject activation. Shared outlines extend (2px)
 without changing layout or replacing inherited GPUI text refinements.
 
+**Links.** Presented website/page addresses that offer navigation must be real
+links: blue accent ink plus an underline at rest, a pointer cursor, visible
+keyboard focus and Tab/Enter activation. Do not rely on color or hover alone, and
+never make ordinary noninteractive text look like a link. External page links
+open the OS default browser only on activation; capture-session credentials are
+not transferred. Truncated addresses disclose the full destination on hover.
+Only complete HTTP(S) addresses without embedded credentials are openable;
+unsupported schemes remain plain data. Editable URL fields, literal code and raw
+diagnostics are not automatically linkified. Task context and gap links share
+this treatment and scroll into view when reached by keyboard.
+
 **Fields and timezone.** Native input stays white when focused, with accent focus
 paint and stable action metrics. Disabled fields reject editing and leave focus
 order; storage work locks affected fields. Clipboard, IME composition, pointer
@@ -268,7 +282,8 @@ outside dismissal does not steal its target's focus.
 **Feedback and progress.** Dismiss belongs inside the feedback surface, centered
 beside the message. Long diagnostics scroll within a bounded area; errors retain
 their red treatment. Known nonzero totals alone produce a clamped completion
-fraction. Unknown/zero totals pair honest text with a patterned activity track;
+fraction. Unknown/zero totals pair honest text with a smoothly moving patterned
+activity track;
 discovery shows the actual pages visited. No fabricated percentage or coverage.
 Short local reads use a compact activity label instead of a patterned completion
 track. Every queued operation names its task immediately, before worker updates.
@@ -276,6 +291,24 @@ Projects, screenshots and History distinguish initial loading, authoritative
 empty results and failed reads. Opening a project never announces missing
 screenshots or an absent baseline before its saved evidence is read; refresh
 keeps already loaded evidence visible.
+
+**Task workspaces and dialogs.** One shared panel separates compact project/site/
+environment context, current activity, labelled outcomes and a single safety note.
+Supporting prose and notes cap at 560px; whole count items wrap together rather
+than separating numbers from labels. Small native-drawn stroke icons always sit
+beside words. Attention is amber, actual failures are red, saved captures use
+normal ink, and zero counts stay muted. A saved-screenshot checkmark never means
+baseline approval. Screenshot progress accounts for processed page/profile
+targets, including failures, not successful captures or an invented ETA.
+An information note stays white and explains the relevant operation/state;
+finished results do not inherit cancellation advice. The independently scrollable
+body has a visible overflow indicator; Stop/Pause/Continue stay in its fixed footer.
+Details appears only for independent information: a run's frozen capture setup,
+recorded gaps/reasons/attempts/warnings, discovery notes or an operation diagnostic.
+It never replays the progress label or repeats the base URL as its only extra fact.
+Opening Details reveals its scroll anchor. Gap previews prioritize failures, cap
+at 20 rows and disclose truncation with a route to the full review workspace.
+No chronological activity log or fabricated active-target telemetry is supplied.
 
 **Comparison and approval.** Coverage comes from actual inventory, captures and
 current analysis, including missing and unclassified evidence. Preserve before/
