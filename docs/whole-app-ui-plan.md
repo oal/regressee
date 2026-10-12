@@ -13,9 +13,17 @@ task; it does not replace the existing implementation `PLAN.md`.
   `research/whole-app-ui-review-20261012/phase1-report.md` and its correction receipt.
 - Independent results: `research/whole-app-ui-review-20261012/phase1-verification.md`.
   Diagnostics tails and remaining advanced controls are not fully qualified.
-- **Next executable step: parent commit/push of verified Phase 1**, before Phase 2.
-  No production UI changed.
-- **Phase 2 pending:** deliver the complete, evidence-qualified whole-app critique.
+- **Phase 1 committed/pushed:** `ac4de65`; no production UI changed.
+- **Phase 2 independently verified PASS (documentation/evidence gate):**
+  `research/whole-app-ui-review-20261012/synthesis.md` and the dated Impeccable
+  critique archive contain the complete evidence-qualified review, original A's
+  24/40, every finding, all screens/tasks and corrected coverage limitations.
+  [Git-eligible byte-identical archive mirror](research/whole-app-ui-review-20261012/critique-20261012.md)
+  preserves the ignored skill archive without force-adding local metadata.
+  [Independent verdict](research/whole-app-ui-review-20261012/phase2-verification.md).
+- **Next executable step: parent commit/push of verified Phase 2 documentation**,
+  then authorized Phase 3 blueprint implementation and independent verification.
+  This verifier does not start Phase 3.
 - **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the
   complete plan be implemented and validated without clarification questions.
   Use the recommended interaction direction and preserve Clear wayfinding.
@@ -208,7 +216,7 @@ originals, or explicitly retained as unresolved coverage gaps. Product UI hashes
 remain unchanged relative to the archive. No presentation clones were stored as
 real site results. The gallery and manifests agree with the actual PNG/JSON pairs.
 
-### Phase 2 — deliver the complete critique **PENDING**
+### Phase 2 — deliver the complete critique **VERIFIED PASS; DOCUMENTATION/EVIDENCE ONLY**
 
 Produce `docs/research/whole-app-ui-review-20261012/synthesis.md` and a dated
 Impeccable critique archive following the skill's critique format. Read that
@@ -450,6 +458,36 @@ or zero-finding certification should be attempted.
    endless polishing. Do not discard unfamiliar working-tree changes.
 
 ### Checkpoint log
+
+**2026-10-12 — independent Phase 2 verification: PASS.** Complete original A/B and
+Phase 1/2 documentation reviewed; all 18 findings, 71 whole-app/20 task tokens,
+original ten A scores (24/40), exact 44/32 read inventories, source/pixel ownership,
+personas and reconciled evidence limits verified. Independent read-only checks pass:
+12 immutable archive hashes, eight production hashes, 53 current bindings, 182
+current/original PNG accounting, 10 corrected pairs and report links/body/metadata.
+Created byte-identical Git-eligible `research/whole-app-ui-review-20261012/critique-20261012.md`
+mirror of the ignored skill archive; no force-add of local metadata. Two original
+ignored logs/pixels remain local-only; native/runtime/scale/tail limits retained.
+See `research/whole-app-ui-review-20261012/phase2-verification.md` for actual checks.
+No product edit, render, app test, commit/push or Phase 3 work. **Next: parent
+commit/push verified Phase 2 documents including the mirror, then authorized Phase 3
+blueprint implementation and independent verification.**
+
+**2026-10-12 — Phase 2 implementation:** read full original A/B, archive index/
+receipt, Phase 1 report/correction receipt/independent PASS; loaded Impeccable
+context once and read critique/native guidance before writing. Produced complete
+`research/whole-app-ui-review-20261012/synthesis.md` and dated Impeccable archive
+for `crates/app/src/main.rs`; preserved original 24/40 without rescoring. Includes
+every E/R/S/H/F/M/Q ledger row with source symbols/pixel links, all whole-app and
+20 task states, three personas, reconciliations and original inspection ledgers.
+Phase 1 was committed/pushed as `ac4de65` before this work. Documentation integrity,
+links and unchanged archive/product hashes checked; see
+`research/whole-app-ui-review-20261012/phase2-validation.md`.
+No production UI edits, new screenshots, new app tests, redundant assessments,
+commit/push, CI/release action or Phase 3 work. **Next: independent Phase 2 verifier;
+parent commits/pushes verified work before Phase 3.** User's no-question/full-plan
+authorization supersedes historical ask/stop instructions; native/runtime/scale
+and advanced/diagnostics-tail limits remain, not silently accepted.
 
 **2026-10-12 — independent Phase 1 verification: PASS.** Independently reran receipt
 checker (10 pairs, eight changed PNGs, 172 unchanged) and binary tests (102 passed,
