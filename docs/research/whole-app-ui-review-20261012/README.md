@@ -44,10 +44,13 @@ URL is only a convenience, not an evidence dependency.
 - The initial matrix has missing geometry for retained captures. Do not invent
   exact bounds or rewrite the preserved matrix as if every row had measurements.
 
-## Pending deliverables
+## Continuation deliverables
 
-1. Fixture correction receipt and corrected coverage addendum (plan Phase 1).
-2. `synthesis.md`: complete final critique with reconciled evidence (Phase 2).
-3. User-approved interaction blueprint before production UI changes (Phase 3).
+1. [Phase 1 report](phase1-report.md) and [independent verification](phase1-verification.md): bounded evidence PASS, committed/pushed `ac4de65`.
+2. [Complete synthesis](synthesis.md) and [independent verification](phase2-verification.md): documentation/evidence PASS, committed/pushed `d4b3ddb`.
+3. [Workflow blueprint](workflow-blueprint.md), [Phase 3 report](phase3-report.md) and [independent verification](phase3-verification.md): documentation/inventory PASS; selected under explicit delegated user judgment. Not participant approval or built UI.
 
-No production UI improvement is implemented or authorized by this archive.
+No production UI improvement is implemented by these phases. Phases 1–7 are
+authorized by the later 2026-10-12 user instruction recorded in the plan, not by
+the original archive or assessments. Next: authorized Phase 4A consequential consent;
+parent commits/pushes verified docs before Phase 4A.
