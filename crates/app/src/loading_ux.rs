@@ -13,6 +13,23 @@ pub(super) enum ScreenshotState {
 }
 
 impl Shell {
+    pub(super) fn selected_capture_failed(&self) -> bool {
+        self.displayed_run()
+            .and_then(|r| {
+                r.run
+                    .targets
+                    .iter()
+                    .find(|t| Some(&t.key) == self.selected_key.as_ref())
+            })
+            .is_some_and(|t| {
+                matches!(
+                    t.outcome,
+                    regressee_core::domain::TargetOutcome::Failed { .. }
+                        | regressee_core::domain::TargetOutcome::Skipped { .. }
+                        | regressee_core::domain::TargetOutcome::Cancelled
+                )
+            })
+    }
     pub(super) fn initial_evidence_unavailable(&self) -> bool {
         self.project.is_some()
             && matches!(self.focus.screen, Screen::Results | Screen::History)
@@ -44,6 +61,7 @@ impl Shell {
         } else if self.focus.capturing {
             ScreenshotState::Capturing
         } else if self.initial_evidence_unavailable()
+            || self.viewer_read_failed
             || self.evidence_read_failed
             || (self.error.is_some() && (self.evidence_dirty || self.focus.viewer))
         {
@@ -56,6 +74,41 @@ impl Shell {
     }
 
     pub(super) fn screenshot_placeholder(&self) -> AnyElement {
+        if self.selected_capture_failed()
+            || matches!(
+                self.screenshot_state(),
+                ScreenshotState::MissingTarget | ScreenshotState::Unavailable
+            )
+        {
+            let target = self.displayed_run().and_then(|r| {
+                r.run
+                    .targets
+                    .iter()
+                    .find(|t| Some(&t.key) == self.selected_key.as_ref())
+            });
+            if let Some(target) = target {
+                let reason = match &target.outcome {
+                    regressee_core::domain::TargetOutcome::Failed { code } => format!(
+                        "Capture failed: {code:?}. {}",
+                        regressee_app::task::capture_recovery(*code)
+                    ),
+                    regressee_core::domain::TargetOutcome::Skipped { reason } => {
+                        format!("Capture skipped: {reason}")
+                    }
+                    regressee_core::domain::TargetOutcome::Cancelled => {
+                        "This target was not captured before the task stopped.".into()
+                    }
+                    _ => self.error.clone().unwrap_or_else(|| {
+                        "The recorded screenshot is missing or could not be read.".into()
+                    }),
+                };
+                return div().debug_selector(|| "unavailable-target-recovery".into()).flex().flex_col().gap_2()
+                    .child(div().text_size(px(21.)).child("Screenshot unavailable — not an unchanged result"))
+                    .child(reason)
+                    .child("Refresh reads saved evidence again; it does not recapture this target. For a new check, return to Review changes. To replace the baseline page list, use Pages & baseline, find pages and explicitly capture/save a replacement. Earlier versions remain in History.")
+                    .into_any_element();
+            }
+        }
         match self.screenshot_state() {
             ScreenshotState::LoadingImage => controls::loading("Loading screenshot…", "Reading the selected screenshot from disk. The page queue stays available."),
             ScreenshotState::LoadingEvidence => controls::loading("Loading saved screenshots…", "Reading this project’s page list, captures and comparison results from disk."),

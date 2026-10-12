@@ -138,6 +138,7 @@ struct Shell {
     task: Option<task_ux::Task>,
     last_action: Option<Control>,
     viewer_pending: Option<(u64, regressee_app::jobs::ViewerIdentity, usize)>,
+    viewer_read_failed: bool,
     storage_pending: Option<(u64, regressee_core::domain::ProjectId)>,
     projects: ProjectPage,
     projects_dirty: bool,
@@ -297,6 +298,7 @@ impl Shell {
             task: None,
             last_action: None,
             viewer_pending: None,
+            viewer_read_failed: false,
             storage_pending: None,
             projects: ProjectPage {
                 items: vec![],
@@ -584,12 +586,21 @@ impl Shell {
                             .any(|current| Arc::ptr_eq(image, current))
                     });
                     self.viewer = Some(*frame);
+                    self.viewer_read_failed = false;
                     self.evidence.before =
                         self.viewer.as_ref().and_then(|v| v.before_capture.clone());
                     self.prefetch_next_viewer();
                 }
-                Reply::ProductFailure(error) => self.error = Some(error),
-                Reply::Failure(error) => self.error = Some(error.message().into()),
+                Reply::ProductFailure(error) => {
+                    self.viewer_read_failed = true;
+                    self.invalidate_approval();
+                    self.error = Some(error);
+                }
+                Reply::Failure(error) => {
+                    self.viewer_read_failed = true;
+                    self.invalidate_approval();
+                    self.error = Some(error.message().into());
+                }
                 _ => (),
             }
             cx.notify();
@@ -2028,6 +2039,7 @@ impl Shell {
         cx.notify();
     }
     fn clear_portability_previews(&mut self) {
+        self.details.remove(&Detail::Portability);
         self.export_preview = None;
         self.import_preview = None;
         self.import_path = None;
@@ -2362,34 +2374,92 @@ impl Shell {
     fn portability_confirmation(&self, cx: &mut Context<Self>) -> AnyElement {
         let mut body = div().flex().flex_col().gap_3().max_w(px(680.));
         if let Some(p) = &self.export_preview {
-            body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Export contents — review before sharing"))
+            body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Share this baseline as a ZIP?"))
+                .child("The ZIP contains original screenshots and project settings, never login sessions or cookies. Ignored rectangles are NOT redaction: recipients can see the original pixels. Recipients must establish their own login.")
                 .child(format!("{} targets · {} original PNGs · {} · {} source capture dates · {} ignored-region configurations. Selected/inherited originals only; no unrelated history or database.",p.targets,p.originals,human_bytes(p.bytes),p.sources,p.masks))
                 .child(div().text_color(rgb(WARNING)).child(p.privacy.clone()))
                 .child(self.button(Control::Phase6(3),"I understand — export ZIP…",ActionStyle::Primary,cx));
         }
         if let Some(p) = &self.import_preview {
             body=body.child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Import “{}” as a NEW local project",p.name)))
+                .child("Your existing projects and baseline stay unchanged. No website is visited. Establish your own login before checking a private website; imported ignored rectangles require revalidation.")
                 .child(format!("Validated {} targets · {} original PNGs · {} · {} ignored-region configurations. Name collisions get a separate safe name. Masks require revalidation for your capture pair.",p.targets,p.originals,human_bytes(p.bytes),p.masks))
                 .child(div().text_color(rgb(WARNING)).child(p.warning.clone()))
                 .child(self.button(Control::Phase6(1),"Confirm import — no website visits",ActionStyle::Primary,cx));
         }
         if let Some(p) = &self.deletion_preview {
-            body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Delete retained history?"))
-                .child(format!("{:?}: {} analyses and {} unshared objects removed; {} deletable. {} of shared data remain. This cannot be undone; active and retained baseline references are protected.",p.item,p.analyses,p.objects,human_bytes(p.bytes),human_bytes(p.shared_bytes)))
+            let identity = match p.item {
+                regressee_storage::DeleteItem::Run(id) => self
+                    .history
+                    .as_ref()
+                    .and_then(|h| h.runs.iter().find(|r| r.run.id == id))
+                    .map(|r| {
+                        format!(
+                            "{} from {}",
+                            workspace_history::history_run_type(&r.run.intent),
+                            r.run
+                                .started_at
+                                .map(workspace_history::history_date)
+                                .unwrap_or_else(|| "an unrecorded start time".into())
+                        )
+                    })
+                    .unwrap_or_else(|| "selected capture run".into()),
+                regressee_storage::DeleteItem::Baseline(id) => self
+                    .evidence
+                    .baselines
+                    .iter()
+                    .find(|b| b.id == id)
+                    .map(|b| {
+                        format!(
+                            "baseline saved {}",
+                            workspace_history::history_date(b.created_at)
+                        )
+                    })
+                    .unwrap_or_else(|| "selected baseline version".into()),
+            };
+            body=body.child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Permanently delete {identity}?")))
+                .child(format!("{} analyses and {} unshared objects will be removed, freeing {}. {} of shared data stay protected. This cannot be undone; active and retained baseline source references are protected.",p.analyses,p.objects,human_bytes(p.bytes),human_bytes(p.shared_bytes)))
                 .child(self.button(Control::Phase6(6),"Confirm permanent deletion",ActionStyle::Danger,cx));
         }
         if let Some(p) = &self.repair_preview {
             body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Interrupted writes and integrity"))
                 .child(format!("{} temporary files and {} dead-owner interrupted imports ({}) may be discarded. {} valid complete unreferenced objects are retained, NOT treated as failed captures. {} missing/corrupt objects require recovery; they cannot establish a valid active baseline.",p.temporaries.len(),p.interrupted_imports.len(),human_bytes(p.temporary_bytes),p.valid_unreferenced.len(),p.missing_or_corrupt.len()))
-                .child(self.button(Control::Phase6(14),"Confirm temporary-only cleanup",ActionStyle::Secondary,cx))
+                .child(self.button(Control::Phase6(14),"Discard interrupted temporary files",ActionStyle::Danger,cx))
                 .child(div().text_color(rgb(WARNING)).child("Complete unreferenced objects can be valid recovery originals, not junk. Retain them unless you explicitly want to delete this recovery evidence. This separate action does NOT delete retained/shared/active-baseline evidence."))
-                .child(self.button(Control::Phase6(15),"Confirm deletion of complete unreferenced recovery objects",ActionStyle::Secondary,cx));
+                .child(self.button(Control::Phase6(15),"Permanently delete recovery originals",ActionStyle::Danger,cx));
         }
         if self.export_preview.is_some()
             || self.import_preview.is_some()
             || self.deletion_preview.is_some()
             || self.repair_preview.is_some()
         {
+            body = body.child(self.button(
+                Control::Details(Detail::Portability),
+                if self.details.contains(&Detail::Portability) {
+                    "Hide exact details"
+                } else {
+                    "Show exact details"
+                },
+                ActionStyle::Secondary,
+                cx,
+            ));
+            if self.details.contains(&Detail::Portability) {
+                if let Some(p) = &self.deletion_preview {
+                    body = body.child(format!(
+                        "Record {:?} · {} exact bytes removed · {} shared bytes retained",
+                        p.item, p.bytes, p.shared_bytes
+                    ));
+                }
+                if let Some(p) = &self.export_preview {
+                    body = body.child(format!("Export size: {} exact bytes", p.bytes));
+                }
+                if let Some(p) = &self.import_preview {
+                    body = body.child(format!("Import size: {} exact bytes", p.bytes));
+                }
+                if let Some(p) = &self.repair_preview {
+                    body = body.child(format!("Temporary bytes: {} · temporaries {:?} · interrupted imports {:?} · complete recovery objects {:?} · missing/corrupt {:?}", p.temporary_bytes, p.temporaries, p.interrupted_imports, p.valid_unreferenced, p.missing_or_corrupt));
+                }
+            }
             body = body.child(self.button(
                 Control::Phase6(7),
                 "Cancel preview",
@@ -5335,7 +5405,14 @@ impl Shell {
                 .history
                 .as_ref()
                 .is_some_and(|history| history.page > 0),
-            Control::Phase6(14 | 15) => self.repair_preview.is_some(),
+            Control::Phase6(14) => self
+                .repair_preview
+                .as_ref()
+                .is_some_and(|p| !p.temporaries.is_empty() || !p.interrupted_imports.is_empty()),
+            Control::Phase6(15) => self
+                .repair_preview
+                .as_ref()
+                .is_some_and(|p| !p.valid_unreferenced.is_empty()),
             Control::Details(Detail::Analysis) => comparison.is_some(),
             _ => true,
         }
@@ -5412,6 +5489,13 @@ impl Shell {
                 DismissFeedback => self.error.is_some() || self.notice.is_some(),
                 CancelProjectChoice => self.focus.choosing_project && self.project.is_some(),
                 NewProject => true,
+                Details(Detail::Portability) => {
+                    screen == Screen::Projects
+                        && (self.import_preview.is_some()
+                            || self.export_preview.is_some()
+                            || self.deletion_preview.is_some()
+                            || self.repair_preview.is_some())
+                }
                 SelectProject(index) => index < self.projects.items.len(),
                 OpenProject(index) => {
                     screen == Screen::Projects && index < self.projects.items.len()
@@ -5442,9 +5526,14 @@ impl Shell {
         let settings = screen == Screen::Settings;
         let portability = screen == Screen::Projects || history || settings;
         let inventory = results && (self.preview.is_some() || self.evidence.latest.is_some());
-        let analysis = results && self.evidence.comparison.is_some() && !self.page_list_workspace();
+        let analysis = results
+            && self.viewer.is_some()
+            && !self.selected_capture_failed()
+            && self.evidence.comparison.is_some()
+            && !self.page_list_workspace();
         let viewer = results
             && self.viewer.is_some()
+            && !self.selected_capture_failed()
             && (!self.page_list_workspace() || self.discovery_image_mounted());
         match control {
             TaskDetails | TaskContinue | TaskLink(_) => false,
@@ -5540,8 +5629,8 @@ impl Shell {
             Phase5(0..=5 | 14..=19 | 26 | 34..=35) => analysis && self.review_tools,
             Phase5(20..=22 | 33) => analysis,
             Phase5(32) => analysis && self.review_note_open,
-            Phase5(36) => viewer,
-            Phase5(38) => viewer && self.capture_details_open,
+            Phase5(36) => results && self.evidence.latest.is_some() && !self.page_list_workspace(),
+            Phase5(38) => results && self.evidence.latest.is_some() && self.capture_details_open,
             Phase5(39) => results && self.viewer_inspector_open(),
             Phase5(37) => analysis,
             Phase5(23) => analysis,
@@ -5619,7 +5708,7 @@ impl Shell {
                     && self.history_run_indices().contains(&self.run_history_index)
             }
             Phase6(8) => history && self.history_section == 2,
-            Phase6(11 | 12) => history && self.history_section == 0,
+            Phase6(11 | 12) => history && self.history_section != 2,
             Phase6(16..=18) => history,
             Phase6(3) => portability && self.export_preview.is_some(),
             Phase6(6) => portability && self.deletion_preview.is_some(),
@@ -5652,7 +5741,14 @@ impl Shell {
                 setup && project && index < self.draft_settings.environments.len()
             }
             Details(Detail::Capture) => setup,
-            Details(Detail::History) => history && self.history_section != 2,
+            Details(Detail::History) => history,
+            Details(Detail::Portability) => {
+                portability
+                    && (self.import_preview.is_some()
+                        || self.export_preview.is_some()
+                        || self.deletion_preview.is_some()
+                        || self.repair_preview.is_some())
+            }
             Details(Detail::Analysis) => analysis && self.review_tools,
             Details(Detail::Network) => settings,
         }
@@ -6111,20 +6207,44 @@ impl Shell {
         body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).max_w(px(680.)).child("Sensitivity and ignored rectangles change only analysis, never captured originals. Numerical change is evidence to review, not a defect probability. Fixture-calibrated presets are not proven user accuracy.")).into_any_element()
     }
     fn viewer_section(&self, cx: &mut Context<Self>) -> AnyElement {
-        let Some(view) = &self.viewer else {
+        let Some(view) = self
+            .viewer
+            .as_ref()
+            .filter(|_| !self.selected_capture_failed())
+        else {
             return div()
+                .id("unavailable-target-body")
+                .track_scroll(&self.review_details_scroll)
+                .overflow_y_scroll()
                 .flex_1()
                 .min_h_0()
                 .flex()
                 .flex_col()
                 .gap_2()
                 .relative()
-                .when(
-                    self.evidence.comparison.is_some() && self.preview.is_none(),
-                    |viewer| viewer.child(self.guided_button(44, "Analysis", cx)),
-                )
-                .when(self.viewer_inspector_open(), |viewer| {
-                    viewer.child(self.viewer_inspector(cx))
+                .when(self.evidence.latest.is_some(), |body| {
+                    body.child(self.button(
+                        Control::Phase5(36),
+                        "Details",
+                        ActionStyle::Secondary,
+                        cx,
+                    ))
+                })
+                .when(self.viewer_inspector_open(), |body| {
+                    body.child(self.viewer_inspector(cx))
+                })
+                .when(self.evidence.latest.is_some(), |body| {
+                    body.child({
+                        let (path, context) = self.inspection_identity();
+                        div()
+                            .debug_selector(|| "unavailable-target-context".into())
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .text_size(px(14.))
+                            .child(path)
+                            .child(context)
+                    })
                 })
                 .child(self.screenshot_placeholder())
                 .into_any_element();
@@ -7869,6 +7989,8 @@ fn main() -> anyhow::Result<()> {
 #[cfg(all(test, feature = "ui-tests"))]
 #[path = "../tests/support/approval_fixture.rs"]
 mod approval_fixture;
+#[cfg(test)]
+mod phase6_history_tests;
 
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase4_review_tests;
@@ -9080,9 +9202,12 @@ mod tests {
                 s.activate_control(Control::Phase6(13), w, cx);
                 settled(s, cx);
                 assert!(s.repair_preview.is_some());
+                assert!(!s.control_enabled(Control::Phase6(14), cx));
+                assert!(!s.control_enabled(Control::Phase6(15), cx));
+                let request = s.next_request;
                 s.activate_control(Control::Phase6(14), w, cx);
-                settled(s, cx);
-                assert!(s.repair_preview.is_none());
+                assert_eq!(s.next_request, request);
+                assert!(s.repair_preview.is_some());
             })
         });
         owned.join_after_ui();
@@ -9114,6 +9239,8 @@ mod tests {
             finish_request(s, cx);
             s.focus.screen = Screen::Results;
             s.evidence.analyses = vec![valid, masked];
+            s.reload_viewer(cx);
+            settle_requests(s, cx);
             s.review_tools = false;
             s.approval_selection.insert(s.selected_key.clone().unwrap());
         });

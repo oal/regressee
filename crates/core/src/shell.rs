@@ -28,6 +28,7 @@ pub enum Detail {
     History,
     Analysis,
     Network,
+    Portability,
 }
 impl Choice {
     pub const SETUP: [Self; 9] = [
@@ -320,6 +321,7 @@ impl FocusState {
             controls.push(Control::NewProject);
             if self.screen == Screen::Projects {
                 controls.extend([0, 1, 3, 6, 7, 14, 15].map(Control::Phase6));
+                controls.push(Control::Details(Detail::Portability));
             }
             for index in 0..self.projects {
                 controls.push(Control::SelectProject(index));
@@ -388,6 +390,7 @@ impl FocusState {
             Screen::Settings => {
                 controls.extend((0..3).map(Control::Phase7));
                 controls.extend([1, 3, 6, 7, 13, 14, 15].map(Control::Phase6));
+                controls.push(Control::Details(Detail::Portability));
                 controls.extend([Control::SetupRuntime, Control::ChooseFolder, Control::About]);
                 controls.extend([
                     Control::CrawlField(17),
@@ -454,6 +457,7 @@ impl FocusState {
                 controls.extend((40..43).map(Control::Phase5));
                 controls.extend((0..13).chain(14..20).map(Control::Phase6));
                 controls.push(Control::Details(Detail::History));
+                controls.push(Control::Details(Detail::Portability));
             }
             _ => (),
         }

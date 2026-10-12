@@ -783,6 +783,11 @@ fn renderer_capture_tasks(cx: &mut TestAppContext) {
             "capture-paused",
             "export-late-success",
         ] {
+            if std::env::var_os("REGRESSEE_RENDERER_PHASE6").is_some()
+                && !matches!(label, "failed-task" | "capture-paused" | "capture-complete")
+            {
+                continue;
+            }
             let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
             let owned = jobs.clone();
             let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));

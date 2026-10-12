@@ -132,10 +132,10 @@ Authority: `PRODUCT.md`, `docs/workflow-revamp.md`,
 `crates/app/src/{main,workflow,workspace_history}.rs` and
 `crates/core/src/shell.rs`. Earlier direction remains in `docs/phase0-design.md`.
 
-Qualification boundary: the final independent verdict is **fix**: review geometry,
-attached approval and indexed coverage are resolved, but the reference's source
-environment still reads “environment not loaded” in the default review workspace.
-The complete 34-image renderer confirmation passed; this is not full UI acceptance.
+Qualification boundary: Phases 4 and 5 independently passed their bounded
+source/controller/offscreen gates. Phase 6 is implemented, with independent
+verification pending. Historical FIX/blocked evidence remains preserved; none of
+these results is full UI or release acceptance.
 Offscreen Linux GPUI pixels establish only development-host rendering;
 they do not supersede earlier black OS-window captures or establish real input,
 IME, screen-reader, high-contrast, Windows/macOS or release qualification.
@@ -260,7 +260,7 @@ while saving, browser visits, baseline changes, exports and deletion stay explic
 
 ## Components
 
-### Guided setup — Phase 5 repaired, independent re-verification pending
+### Guided setup — Phase 5 independently re-verified in bounded scope
 
 Website → Access → Pages & sizes is pinned above the guided scrolling form, with
 Current/Completed/Next/Unavailable state. Public/private choices and the next safe
@@ -285,8 +285,8 @@ Both-size mounted/enabled Tab/reveal/dispatch tests cover setup capabilities;
 Mobile remains scroll-reachable rather than forced into the initial narrow view.
 The exact external worker probes pass, as do 308 package tests. Six narrow native
 repair pairs substantiate Access/Pages validation and Mobile reachability; original
-FIX/blocked evidence remains intact. **Not Phase 5 acceptance:** independent
-re-verification and OS-input/AT/usability/release qualification remain pending. See
+FIX/blocked evidence remains intact. Independent re-verification passed;
+OS-input/AT/usability/release qualification remains pending. See
 `docs/research/whole-app-ui-review-20261012/phase5-report.md`.
 
 **Actions and choices.** Shared actions have a minimum target height (40px).
@@ -425,9 +425,47 @@ When results are hidden, an evidence-owned path/query/fragment and source profil
 environment heading persists across all modes and capture inspection. Narrow
 Compare names Before/After historical environments above their respective panes.
 The earlier blocked confirmation and independent FIX verdict remain intact.
-The separate 22-pair functional repair evidence is not independent acceptance;
-Phase 4 still awaits re-verification. See
+The separate 22-pair functional repair evidence received independent bounded
+re-verification, not OS-input/accessibility/usability/release acceptance. See
 `docs/research/whole-app-ui-review-20261012/phase4-report.md`.
+
+**History, consequences and recovery — Phase 6 built; verification pending.**
+Runs and Baselines use 256px inner scroll viewports with unchanged full-width
+selected paint. The outer workspace remains scrollable: at 820×600 the initial
+list extends below the fold; scrolling exposes its full four-row viewport.
+Overflow help explains scrolling and keyboard reveal, including the last loaded
+run/retained version. **Filter this history page** explicitly excludes unloaded
+pages. Both Runs and Baselines have page controls, disabled when no page exists.
+Readable UTC dates, record types, captured/intended coverage and environment lead;
+the selected identity and its open/share/delete actions sit together. Exact IDs
+and byte accounting remain under advanced provenance, including Storage.
+
+ZIP/import/deletion previews lead with consequences. Originals may expose private
+pixels; ignored rectangles are NOT redaction. ZIPs never carry sessions/cookies;
+recipients establish their own login. Import is a separate new local project and
+does not visit websites. Exact byte counts, record identities and recovery lists
+use a separate **Show exact details** disclosure; it does not open History's
+advanced provenance. Deletion names the run type/date or baseline save date,
+requires explicit danger confirmation and preserves shared/retained source
+protections. Temporary-only cleanup and permanent recovery-original deletion
+remain distinct. Both reject zero-impact activation and leave disabled actions
+out of keyboard traversal. Both actual deletion actions use danger treatment.
+
+Recorded inspection uses its persistent read-only heading and Return to latest
+evidence, without a redundant notice banner. An authoritative empty capture
+reserves neither an empty queue nor unloaded target/profile labels. Actual failed
+target outcomes (including a real before-only frame) show the local path, profile,
+known cause and recovery instead of an empty image or irrelevant Analysis/Zoom.
+Details remains available. The no-image body scrolls independently when long;
+Refresh only reads disk, not recapture. Replacement remains explicit discovery,
+capture and save. Genuine missing/corrupt image-read failures retain their failure
+state through feedback dismissal and conservatively block baseline-update
+presentation until a successful image read. An initial unread project cannot
+invent an unknown target's metadata. Paused/interrupted task continuations say
+**Return to capture recovery**; completed checks say **Review check results**.
+The real workspace Resume control is retained, not fabricated by the task label.
+Failed task titles retain the operation name. No Open folder, targeted retry or
+installer-repair functionality was introduced.
 
 **History and keyboard.** Runs, Baselines and Storage are separate sections.
 Baseline versions and capture/check runs are distinct,

@@ -113,6 +113,15 @@ fn fixture(root: &Path, path: &Path) -> (regressee_storage::Store, ProjectId, Ru
         };
         store.begin_run(&run).unwrap();
         for target in &mut run.run.targets {
+            if std::env::var_os("REGRESSEE_RENDERER_PHASE6").is_some()
+                && sequence == 2
+                && target.requested.path().starts_with("/account")
+            {
+                target.outcome = TargetOutcome::Failed {
+                    code: CaptureError::NeedsLogin,
+                };
+                continue;
+            }
             let profile = project
                 .profiles
                 .iter()
@@ -154,7 +163,16 @@ fn fixture(root: &Path, path: &Path) -> (regressee_storage::Store, ProjectId, Ru
                 image,
             });
         }
-        run.run.state = JobState::Completed;
+        run.run.state = if run
+            .run
+            .targets
+            .iter()
+            .any(|t| matches!(t.outcome, TargetOutcome::Failed { .. }))
+        {
+            JobState::CompletedWithErrors
+        } else {
+            JobState::Completed
+        };
         run.run.finished_at = run.run.started_at.map(|time| time + 180);
         store.finish_run(&run).unwrap();
         if sequence == 0 {
@@ -163,6 +181,45 @@ fn fixture(root: &Path, path: &Path) -> (regressee_storage::Store, ProjectId, Ru
                 .unwrap()
                 .project
                 .active_baseline;
+            if std::env::var_os("REGRESSEE_RENDERER_PHASE6").is_some() {
+                for version in 1..8 {
+                    let mut retained = run.clone();
+                    retained.run.id = RunId::new();
+                    retained.run.started_at = Some(1_790_000_000 + version * 3600);
+                    retained.run.finished_at = None;
+                    retained.run.state = JobState::Running;
+                    let captures = std::mem::take(&mut retained.captures);
+                    for target in &mut retained.run.targets {
+                        target.outcome = TargetOutcome::Pending;
+                    }
+                    store.begin_run(&retained).unwrap();
+                    retained.captures = captures;
+                    for target in &mut retained.run.targets {
+                        let image = &retained
+                            .captures
+                            .iter()
+                            .find(|c| c.metadata.key == target.key)
+                            .unwrap()
+                            .image;
+                        target.outcome = TargetOutcome::Captured {
+                            artifact: image.original.clone(),
+                            width: image.width,
+                            height: image.height,
+                        };
+                    }
+                    retained.run.state = JobState::Completed;
+                    retained.run.finished_at = retained.run.started_at.map(|t| t + 180);
+                    store.finish_run(&retained).unwrap();
+                    baseline = store
+                        .activate_baseline(
+                            retained.run.id,
+                            store.load_project(project.id).unwrap().revision,
+                        )
+                        .unwrap()
+                        .project
+                        .active_baseline;
+                }
+            }
         } else {
             regressee_app::review::analyze_run(
                 &mut store,
@@ -474,6 +531,28 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
     let mut manifest = Vec::new();
     for (width, height) in [(1280., 800.), (820., 600.)] {
         for label in scenes {
+            let phase6 = std::env::var_os("REGRESSEE_RENDERER_PHASE6").is_some();
+            if phase6
+                && !matches!(
+                    label,
+                    "history-runs"
+                        | "history-bottom"
+                        | "history-baselines"
+                        | "history-storage"
+                        | "history-no-matches"
+                        | "history-provenance"
+                        | "history-recorded-check"
+                        | "history-recorded-capture"
+                        | "export-preview"
+                        | "import-preview"
+                        | "delete-preview"
+                        | "integrity-preview"
+                        | "review-failed-target"
+                        | "capture-empty"
+                )
+            {
+                continue;
+            }
             let phase5_repair = std::env::var_os("REGRESSEE_RENDERER_PHASE5_REPAIR").is_some();
             let phase5 = std::env::var_os("REGRESSEE_RENDERER_PHASE5").is_some() || phase5_repair;
             if phase5_repair
@@ -657,6 +736,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     "pages-baseline" => { s.focus.review_surface = ReviewSurface::Pages; },
                     "discovery" | "discovery-options" | "discovery-no-matches" => { discovery(s); s.result_filters_open = label != "discovery"; if label.ends_with("no-matches") { s.crawl_fields[9].update(cx, |f, cx| f.set_value("nothing-matches", cx)); } },
                     "review-mobile" => { let key = s.evidence.latest.as_ref().unwrap().run.targets[1].key.clone(); s.selected_key = Some(key); s.reload_viewer(cx); finish_jobs(s, cx); },
+                    "review-failed-target" if phase6 => { s.selected_key = Some(s.evidence.latest.as_ref().unwrap().run.targets.iter().find(|t| matches!(t.outcome, TargetOutcome::Failed { .. })).unwrap().key.clone()); s.reload_viewer(cx); finish_jobs(s, cx); assert!(s.selected_capture_failed()); assert!(!s.control_mounted(Control::Guided(44))); },
                     "review-mixed-148" | "review-failed-target" => { mixed_queue(s); if label == "review-failed-target" { s.selected_key = Some(s.evidence.latest.as_ref().unwrap().run.targets.iter().find(|t| matches!(t.outcome, TargetOutcome::Failed { .. })).unwrap().key.clone()); s.clear_viewer(); s.focus.viewer = false; } },
                     "review-queue-hidden" => { s.activate_control(Control::Guided(50), window, cx); },
                     "review-navigation-open" => { if s.navigation_collapsed { s.activate_control(Control::Guided(53), window, cx); } },
@@ -724,7 +804,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                         if label == "capture-loading" { s.pending = Some(u64::MAX); s.focus.busy = true; }
                         else if label.starts_with("capture-read-") { s.evidence_read_failed = true; s.error = Some("The saved screenshots could not be read. Check the project data folder, then refresh.".into()); if label.ends_with("dismissed") { s.activate_control(Control::DismissFeedback, window, cx); } }
                     },
-                    "history-baselines" | "export-preview" => { s.history_section = 1; if label == "export-preview" { s.export_preview = Some(export.clone()); } },
+                    "history-baselines" | "export-preview" => { s.history_section = 1; if label == "export-preview" { s.export_preview = Some(export.clone()); } else if phase6 { let last = s.evidence.baselines.len()-1; s.activate_control(Control::HistoryBaseline(last), window, cx); } },
                     "history-storage" => { s.history_section = 2; },
                     "history-empty" => { s.history.as_mut().unwrap().runs.clear(); s.evidence.baselines.clear(); },
                     "history-no-matches" => { s.history_search.update(cx, |f, cx| f.set_value("nothing-matches", cx)); },
@@ -823,6 +903,37 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     cx.notify();
                 });
             }
+            if phase6 && matches!(label, "history-bottom" | "history-baselines") {
+                let list_bounds = cx.debug_bounds(if label == "history-bottom" {
+                    "history-run-list"
+                } else {
+                    "history-baseline-list"
+                });
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        let (control, scroll) = if label == "history-bottom" {
+                            (
+                                Control::HistoryRun(s.history.as_ref().unwrap().runs.len() - 1),
+                                s.history_run_scroll.clone(),
+                            )
+                        } else {
+                            (
+                                Control::HistoryBaseline(s.evidence.baselines.len() - 1),
+                                s.history_baseline_scroll.clone(),
+                            )
+                        };
+                        s.activate_control(control, window, cx);
+                        scroll.set_offset(gpui::point(px(0.), -scroll.max_offset().height));
+                        if let Some(bounds) = list_bounds {
+                            let delta = s.screen_scroll.bounds().top() + px(8.) - bounds.top();
+                            let old = s.screen_scroll.offset();
+                            s.screen_scroll
+                                .set_offset(gpui::point(old.x, (old.y + delta).min(px(0.))));
+                        }
+                        cx.notify();
+                    })
+                });
+            }
             if label == "timezone-popup" {
                 cx.update(|window, cx| {
                     shell.update(cx, |s, cx| {
@@ -899,6 +1010,48 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
             }
             capture(cx, &root, &name).unwrap();
             let mut assertions = Vec::new();
+            if phase6 && matches!(label, "history-bottom" | "history-baselines") {
+                let (control, owner) = shell.read_with(cx, |s, _| {
+                    if label == "history-bottom" {
+                        (
+                            Control::HistoryRun(s.run_history_index),
+                            s.history_run_scroll.bounds(),
+                        )
+                    } else {
+                        (
+                            Control::HistoryBaseline(s.history_index),
+                            s.history_baseline_scroll.bounds(),
+                        )
+                    }
+                });
+                let row = cx
+                    .debug_bounds(format!("history-row-{control:?}").leak())
+                    .unwrap();
+                let screen_clip = shell.read_with(cx, |s, _| s.screen_scroll.bounds());
+                assert!(
+                    row.left() >= owner.left()
+                        && row.right() <= owner.right()
+                        && row.top() >= owner.top()
+                        && row.bottom() <= owner.bottom(),
+                    "last selected painted row {row:?} outside current inner owner {owner:?}"
+                );
+                assert!(
+                    row.top() >= screen_clip.top() && row.bottom() <= screen_clip.bottom(),
+                    "last selected painted row outside screen clip"
+                );
+                assert!((f32::from(row.size.width) - f32::from(owner.size.width)).abs() <= 1.);
+                assertions.push(serde_json::json!({"selected_last_row":format!("{control:?}"),"row":format!("{row:?}"),"actual_inner_scroll_owner":format!("{owner:?}"),"current_screen_clip":format!("{screen_clip:?}"),"full_width":true,"fully_visible":true}));
+            }
+            if phase6
+                && matches!(
+                    label,
+                    "import-preview" | "export-preview" | "integrity-preview" | "delete-preview"
+                )
+            {
+                shell.read_with(cx, |s, cx| {
+                    assert!(s.control_enabled(Control::Details(Detail::Portability), cx))
+                });
+            }
             let viewport =
                 gpui::Bounds::new(gpui::point(px(0.), px(0.)), size(px(width), px(height)));
             let selectors: &[&str] = match label {

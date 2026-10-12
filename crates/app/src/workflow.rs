@@ -739,7 +739,7 @@ impl Shell {
             .into_any_element()
     }
 
-    fn displayed_run(&self) -> Option<&regressee_core::evidence::RunRecord> {
+    pub(super) fn displayed_run(&self) -> Option<&regressee_core::evidence::RunRecord> {
         let id = self.evidence.comparison.as_ref().map(|a| a.revision.run);
         self.evidence
             .latest
@@ -1116,6 +1116,7 @@ impl Shell {
 
     pub(super) fn review_index(&self) -> ReviewIndex {
         let active = if self.history_inspection.is_some()
+            || self.viewer_read_failed
             || self.mask_dirty
             || self.analysis_due.is_some()
             || self.analysis_pending.is_some()

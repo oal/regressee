@@ -237,6 +237,13 @@ impl Task {
                         outcome.action = "Review check results";
                         outcome.destination = Some((Screen::Results, ReviewSurface::Changes));
                     }
+                    if outcome.capture.as_ref().is_some_and(|_| {
+                        evidence.latest.as_ref().is_some_and(|r| {
+                            matches!(r.run.state, JobState::Paused | JobState::Interrupted)
+                        })
+                    }) {
+                        outcome.action = "Return to capture recovery";
+                    }
                 } else {
                     outcome.action = "Return to workspace";
                 }
@@ -259,7 +266,7 @@ impl Task {
                 outcome.action = "Return to workspace";
             }
             Reply::Failure(error) => {
-                outcome.title = "Could not finish".into();
+                outcome.title = format!("{} could not finish", self.spec.title);
                 outcome.message = error.message().into();
                 outcome.action = "Return to workspace";
                 outcome.failed = true;
@@ -267,7 +274,7 @@ impl Task {
                 outcome.icon = StatusIcon::Error;
             }
             Reply::ProductFailure(error) => {
-                outcome.title = "Could not finish".into();
+                outcome.title = format!("{} could not finish", self.spec.title);
                 outcome.message = "The operation could not finish. Your unsaved edits are kept. Review the details, then return to the workspace to try again. Earlier completed steps may already be saved.".into();
                 outcome.action = "Return to workspace";
                 outcome.failed = true;
@@ -1234,6 +1241,60 @@ impl Shell {
 mod tests {
     use super::*;
     use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn phase6_task_recovery_labels_dispatch_to_implemented_workspace(cx: &mut TestAppContext) {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let evidence = store.project_evidence(project).unwrap();
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, vcx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        vcx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                crate::workflow_refinement_tests::load_review(s, project, cx);
+                for state in [JobState::Paused, JobState::Interrupted, JobState::Completed] {
+                    let mut recorded = evidence.clone();
+                    recorded.latest.as_mut().unwrap().run.state = state;
+                    s.evidence = recorded.clone();
+                    s.begin_task(
+                        Spec::for_work(&Work::CaptureInventory {
+                            project,
+                            preview: None,
+                            check: true,
+                            resume: None,
+                        })
+                        .unwrap(),
+                    );
+                    let task = s.task.as_ref().unwrap();
+                    let result = task.outcome(&Reply::Evidence(Box::new(recorded)));
+                    assert_eq!(
+                        result.action,
+                        if state == JobState::Completed {
+                            "Review check results"
+                        } else {
+                            "Return to capture recovery"
+                        }
+                    );
+                    assert_eq!(
+                        result.destination,
+                        Some((Screen::Results, ReviewSurface::Changes))
+                    );
+                    s.task.as_mut().unwrap().result = Some(result);
+                    s.task.as_mut().unwrap().state = State::Finished;
+                    s.continue_task(window, cx);
+                    assert_eq!(s.focus.screen, Screen::Results);
+                    assert!(s.task.is_none());
+                    if state != JobState::Completed {
+                        assert!(s.control_mounted(Control::Guided(15)));
+                    }
+                    crate::workflow_refinement_tests::finish_jobs(s, cx);
+                }
+            })
+        });
+        owned.join_after_ui();
+    }
 
     fn drain_initial_read(shell: &mut Shell, cx: &mut Context<Shell>) {
         while shell.pending.is_some() {

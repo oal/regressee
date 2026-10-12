@@ -62,8 +62,18 @@ task; it does not replace the existing implementation `PLAN.md`.
   Six repair originals inspected; immutable FIX/blocked evidence and 66 source
   bindings checked. [Verdict](research/whole-app-ui-review-20261012/phase5-reverification.md).
   Native input, accessibility, usability and release acceptance are not inferred.
-- **Next:** parent reviews and commits/pushes verified Phase 5 before Phase 6.
-  This verifier did not commit/push or start Phase 6.
+- **Phase 5 committed/pushed:** `a37cf8c`, confirmed by the Phase 6 parent handoff.
+- **Phase 6 independently verified PASS (source/controller/offscreen gate):**
+  independent packages **311 passed, 0 failed, 40 ignored**; serial Phase 6 tests
+  **4 passed**, History regressions **18 passed**, storage recovery regressions
+  **3 passed**. Existing eight confirmation sheets/seven originals inspected;
+  four selected tails checked against actual inner owners/clips and PNG edge paint.
+  Integrity: 12 archives, 182 original PNGs unchanged, 88 sources, 34 initial +
+  34 confirmation pairs. [Verdict](research/whole-app-ui-review-20261012/phase6-verification.md)
+  retains narrow-scroll/expanded-detail limits, the supplemental UI-only test-feature
+  failure and corrected fixture accounting. Production `ui` check passes; native
+  input/AT/usability/platform/release acceptance is not inferred.
+  **Next:** parent reviews and commits/pushes verified Phase 6. No Phase 7 here.
 - **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the
   complete plan be implemented and validated without clarification questions.
   Use the recommended interaction direction and preserve Clear wayfinding.
@@ -374,7 +384,7 @@ safe action; screen-size selection is discoverable; validation points to the
 affected input; dirty settings and explicit login/save boundaries are preserved.
 Existing-project settings still expose every confirmed capability.
 
-### Phase 6 — history, sharing, cleanup and recovery **AUTHORIZED; PENDING**
+### Phase 6 — history, sharing, cleanup and recovery **VERIFIED PASS (SOURCE/CONTROLLER/OFFSCREEN SCOPE)**
 
 Address H1–H3, F1–F2 and remaining M1 across record selection and consequences:
 
@@ -504,6 +514,47 @@ or zero-finding certification should be attempted.
    endless polishing. Do not discard unfamiliar working-tree changes.
 
 ### Checkpoint log
+
+**2026-10-13 — independent Phase 6 verification: PASS.** Read plan/blueprint/
+synthesis/report/receipt, full diff/new files and actual storage/worker/control
+owners. Packages **311 passed, 0 failed, 40 ignored**; serial Phase 6 **4 passed**,
+History **18 passed**, storage recovery **3 passed**. Production `ui` check,
+formatting/whitespace and receipt pass. Both 34-pair batches agree with metadata,
+gallery/matrix/HTML; current confirmation harness bindings match. Read eight
+confirmation sheets/seven originals without rendering; last actual loaded run and
+retained baseline paint fills the current inner owner and lies within the current
+screen clip at both sizes, independently sampled at both row edges. H1–H3/F1–F2/
+remaining M1 and read-only/stale inspection gates pass in bounded scope. Supplemental
+`ui`-only test compilation fails on GPUI test-support/fixture gating (including
+preexisting ungated tests); production `ui` and intended all-features tests pass.
+Fixture correction: eight total baseline/source runs, seven additional, not eight
+additional. No product/source edits, render/polish, commit/push or Phase 7. Native
+input/AT/platform/usability/scaling/release remain unqualified. See
+[verdict](research/whole-app-ui-review-20261012/phase6-verification.md).
+**Next: parent reviews and commits/pushes verified Phase 6.**
+
+**2026-10-13 — Phase 6 implementation handoff (started 2026-10-12).** Based on
+verified/pushed `a37cf8c`. Built 256px History owners/full-width selected tail,
+loaded-page filter scope and paging on both record sections, identity/action
+association, readable dates/coverage and opt-in exact bytes/IDs. Added consequence-
+first ZIP/import/delete, independently mounted exact-details disclosure, disabled
+zero-impact temporary/recovery cleanup and danger treatment for real deletions.
+Real persisted failed targets can produce a before-only frame: outcome-bound local
+identity/cause/recovery now replaces the irrelevant empty image/Analysis path.
+Real missing/corrupt reads with retained validated metadata block update
+presentation; initial unread metadata is not fabricated. Read-only headings replace
+duplicate notices; empty queues/unloaded identity labels removed; paused task
+continuations name capture recovery while preserving implemented Resume.
+Packages **311 passed, 0 failed, 40 ignored**; serial targeted **4 passed**.
+Fresh isolated inspection 34 pairs plus one correction/34-pair confirmation, eight
+sheets each and six confirmation originals inspected. Actual selected tail paint
+is contained in its current inner owner and screen clip at both sizes. Receipt
+checks 12 archives, 182 original PNGs unchanged, 88 source bindings and both batches.
+No post-confirmation production edit, network/download, commit/push/nested agent or
+Phase 7. Native input/AT/usability/platform/release remain unqualified; narrow
+History needs outer scrolling and long failure recovery uses its bounded body.
+See [report](research/whole-app-ui-review-20261012/phase6-report.md) for commands,
+attempt failures, safety/fixture scope and limits. **Next: independent verifier.**
 
 **2026-10-12 — independent Phase 5 re-verification: PASS.** Read repaired source,
 tests, report/receipt and actual diff; reran packages 308/0/40, serial Phase 5 tests
