@@ -383,6 +383,11 @@ impl Store {
         let keys: std::collections::BTreeSet<_> = selected.iter().collect();
         ensure!(keys.len() == selected.len(), "duplicate selection");
         let mut references = parent.references.clone();
+        // One verified source snapshot, local to this preview. Commit calls this
+        // method again, under its own fresh transaction, so no stale disk/cache
+        // authority can cross the consent boundary. Memory stays bounded to one
+        // additional run rather than retaining an arbitrary composite history.
+        let mut source: Option<regressee_core::evidence::RunRecord> = None;
         for key in selected {
             ensure!(
                 a.revision.results.iter().any(|r| &r.key == key
@@ -396,7 +401,10 @@ impl Store {
                 .iter_mut()
                 .find(|r| &r.key == key)
                 .context("selected target not in baseline")?;
-            let old = self.load_run(reference.run)?;
+            if source.as_ref().is_none_or(|s| s.run.id != reference.run) {
+                source = Some(self.load_run(reference.run)?);
+            }
+            let old = source.as_ref().unwrap();
             let before = old.evidence(key).context("inherited evidence missing")?;
             let after = run
                 .evidence(key)
@@ -449,9 +457,18 @@ impl Store {
         let mut provenance = Vec::new();
         let mut source_environments = Vec::new();
         for reference in &baseline.references {
-            let source = self.load_run(reference.run)?;
-            source_environments.push((reference.key.clone(), source.run.environment.name.clone()));
-            let capture = source
+            // The check run is already fully verified above; inherited sources
+            // use the bounded worker-local snapshot, not a UI cache.
+            let record = if reference.run == run.run.id {
+                &run
+            } else {
+                if source.as_ref().is_none_or(|s| s.run.id != reference.run) {
+                    source = Some(self.load_run(reference.run)?);
+                }
+                source.as_ref().unwrap()
+            };
+            source_environments.push((reference.key.clone(), record.run.environment.name.clone()));
+            let capture = record
                 .evidence(&reference.key)
                 .context("source evidence missing")?;
             provenance.push((

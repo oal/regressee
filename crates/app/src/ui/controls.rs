@@ -280,6 +280,7 @@ pub fn check(
             .min_w(px(0.))
             .flex_1()
             .debug_selector(move || format!("check-copy-{text_selector}"))
+            .flex_col()
             .child(label.into()),
     )
 }

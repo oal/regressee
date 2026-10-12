@@ -1202,9 +1202,7 @@ impl Shell {
                     && self.approval_matches(&p)
                 {
                     self.approval = Some(*p);
-                    self.focus.approval_dialog = true;
-                    self.approval_reference_index = 0;
-                    self.presentation_focus = Some(Control::Phase5(25));
+                    self.begin_approval_dialog();
                 }
             }
             Reply::SavedReview(history) => {
@@ -1408,6 +1406,16 @@ impl Shell {
         self.focus.approval_dialog = false;
         self.approval = None;
         self.approval_epoch += 1;
+    }
+    fn begin_approval_dialog(&mut self) {
+        // A new consent reading starts with consequences, not a retained scroll
+        // offset from a previous inspection/window size or cached preview.
+        self.focus.approval_dialog = true;
+        self.approval_reference_index = 0;
+        self.approval_exact_open = false;
+        self.approval_provenance_scroll
+            .set_offset(gpui::point(px(0.), px(0.)));
+        self.presentation_focus = Some(Control::Phase5(25));
     }
     fn approval_matches(&self, preview: &regressee_storage::ApprovalPreview) -> bool {
         let c = &preview.context;
@@ -1926,8 +1934,7 @@ impl Shell {
                     .as_ref()
                     .is_some_and(|p| self.approval_matches(p))
                 {
-                    self.focus.approval_dialog = true;
-                    self.presentation_focus = Some(Control::Phase5(25));
+                    self.begin_approval_dialog();
                     cx.notify();
                     return;
                 }
@@ -7989,8 +7996,13 @@ fn main() -> anyhow::Result<()> {
 #[cfg(all(test, feature = "ui-tests"))]
 #[path = "../tests/support/approval_fixture.rs"]
 mod approval_fixture;
-#[cfg(test)]
+#[cfg(all(test, feature = "ui-tests"))]
+#[path = "../tests/support/bulk_fixture.rs"]
+mod bulk_fixture;
+#[cfg(all(test, feature = "ui-tests"))]
 mod phase6_history_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase7_qualification_tests;
 
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase4_review_tests;

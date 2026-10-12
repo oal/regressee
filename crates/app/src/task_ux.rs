@@ -1237,7 +1237,7 @@ impl Shell {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "ui-tests"))]
 mod tests {
     use super::*;
     use gpui::TestAppContext;

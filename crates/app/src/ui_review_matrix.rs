@@ -478,8 +478,19 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
         "review-heatmap",
         "review-details",
         "review-diagnostics",
+        "review-diagnostics-tail",
         "review-analysis",
         "review-analysis-advanced",
+        "review-analysis-field-0",
+        "review-analysis-field-1",
+        "review-analysis-field-2",
+        "review-analysis-field-3",
+        "review-analysis-field-4",
+        "review-analysis-field-5",
+        "review-analysis-field-6",
+        "review-analysis-field-7",
+        "review-analysis-field-8",
+        "review-analysis-switches-tail",
         "review-ignored-area",
         "review-note",
         "review-filters",
@@ -531,6 +542,22 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
     let mut manifest = Vec::new();
     for (width, height) in [(1280., 800.), (820., 600.)] {
         for label in scenes {
+            let phase7 = std::env::var_os("REGRESSEE_RENDERER_PHASE7").is_some();
+            if phase7
+                && !(label == "review-diagnostics-tail"
+                    || label.starts_with("review-analysis-field-")
+                    || label == "review-analysis-switches-tail")
+            {
+                continue;
+            }
+            // New supplemental scenes never silently expand earlier batches.
+            if !phase7
+                && (label == "review-diagnostics-tail"
+                    || label.starts_with("review-analysis-field-")
+                    || label == "review-analysis-switches-tail")
+            {
+                continue;
+            }
             let phase6 = std::env::var_os("REGRESSEE_RENDERER_PHASE6").is_some();
             if phase6
                 && !matches!(
@@ -758,17 +785,17 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                         assert_eq!(s.viewer_mode, mode - 6);
                         if s.review_tools { s.activate_control(Control::Phase5(39), window, cx); }
                     },
-                    "review-details" | "review-diagnostics" => {
+                    "review-details" | "review-diagnostics" | "review-diagnostics-tail" => {
                         s.activate_control(Control::Phase5(36), window, cx);
-                        if label == "review-diagnostics" {
+                        if label.starts_with("review-diagnostics") {
                             assert!(s.control_mounted(Control::Phase5(38)));
                             s.activate_control(Control::Phase5(38), window, cx);
                             assert!(s.capture_details_open && s.capture_diagnostics_open);
                         }
                     },
-                    "review-analysis" | "review-analysis-advanced" | "review-ignored-area" => {
+                    "review-analysis" | "review-analysis-advanced" | "review-ignored-area" | "review-analysis-field-0" | "review-analysis-field-1" | "review-analysis-field-2" | "review-analysis-field-3" | "review-analysis-field-4" | "review-analysis-field-5" | "review-analysis-field-6" | "review-analysis-field-7" | "review-analysis-field-8" | "review-analysis-switches-tail" => {
                         s.activate_control(Control::Guided(44), window, cx);
-                        if label == "review-analysis-advanced" {
+                        if label == "review-analysis-advanced" || label.starts_with("review-analysis-field-") || label == "review-analysis-switches-tail" {
                             assert!(s.control_mounted(Control::Phase5(3)));
                             s.activate_control(Control::Phase5(3), window, cx);
                             assert!(s.review_tools && s.analysis_advanced);
@@ -949,9 +976,27 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     })
                 });
             }
+            let advanced_labels = [
+                "Color tolerance (ΔE00)",
+                "Whole-page changed percentage",
+                "Local changed percentage",
+                "Local minimum changed pixels",
+                "Local minimum eligible pixels",
+                "Local window size (pixels)",
+                "Local window stride (pixels)",
+                "Connected region minimum pixels",
+                "Ignored-coverage warning percentage",
+            ];
+            let field_selector = label.strip_prefix("review-analysis-field-").map(|n| {
+                // Debug selectors accept static strings; this bounded opt-in test
+                // allocates only nine selectors per window, never product data.
+                &*format!("field-{}", advanced_labels[n.parse::<usize>().unwrap()]).leak()
+            });
             let disclosure_anchor = match label {
                 "review-diagnostics" => Some("capture-provenance-details"),
                 "review-analysis-advanced" => Some("field-Color tolerance (ΔE00)"),
+                "review-analysis-switches-tail" => Some("check-Phase5(28)"),
+                _ if field_selector.is_some() => field_selector,
                 _ => None,
             };
             if label == "review-approval-last-row" {
@@ -1008,8 +1053,70 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     cx.notify();
                 });
             }
+            if label == "review-diagnostics-tail" {
+                shell.update(cx, |s, cx| {
+                    s.review_details_scroll.set_offset(gpui::point(
+                        px(0.),
+                        -s.review_details_scroll.max_offset().height,
+                    ));
+                    cx.notify();
+                });
+            }
             capture(cx, &root, &name).unwrap();
             let mut assertions = Vec::new();
+            if phase7 {
+                let owner = shell.read_with(cx, |s, _| s.review_details_scroll.bounds());
+                if label == "review-diagnostics-tail" {
+                    let content = cx.debug_bounds("capture-provenance-details").unwrap();
+                    assert!(content.left() >= owner.left() && content.right() <= owner.right());
+                    assert!(
+                        content.bottom() > owner.top()
+                            && content.bottom() <= owner.bottom() + px(1.)
+                    );
+                    shell.read_with(cx, |s, _| {
+                        assert!(s.viewer.as_ref().unwrap().request.is_some())
+                    });
+                    assertions.push(serde_json::json!({"selector":"capture-provenance-details","tail_bottom_reachable":true,"content":format!("{content:?}"),"actual_inner_owner":format!("{owner:?}"),"qualification":"bottom of exact pair descriptor body, not whole oversized element visibility"}));
+                } else {
+                    let selector = disclosure_anchor.unwrap();
+                    let field = cx.debug_bounds(selector).unwrap();
+                    assert!(
+                        field.left() >= owner.left()
+                            && field.right() <= owner.right()
+                            && field.top() >= owner.top()
+                            && field.bottom() <= owner.bottom(),
+                        "{selector} {field:?} outside current actual {owner:?}"
+                    );
+                    if let Some(i) = label.strip_prefix("review-analysis-field-") {
+                        let i = i.parse::<usize>().unwrap();
+                        shell.read_with(cx, |s, cx| {
+                            let inner = s.analysis_fields[i].read(cx).rendered_bounds().unwrap();
+                            assert!(
+                                inner.size.width >= px(270.)
+                                    && inner.left() >= owner.left()
+                                    && inner.right() <= owner.right()
+                                    && inner.top() >= owner.top()
+                                    && inner.bottom() <= owner.bottom()
+                            );
+                        });
+                    }
+                    if label == "review-analysis-switches-tail" {
+                        let copy = cx.debug_bounds("check-copy-Phase5(28)").unwrap();
+                        assert!(
+                            copy.left() >= field.left()
+                                && copy.right() <= field.right()
+                                && copy.top() >= field.top()
+                                && copy.bottom() <= field.bottom()
+                        );
+                        assert!(
+                            copy.size.height >= px(36.),
+                            "full long label must wrap, not clip: {copy:?}"
+                        );
+                        assertions.push(serde_json::json!({"selector":"check-copy-Phase5(28)","wrapped_inner_label":format!("{copy:?}"),"painted_checkbox":format!("{field:?}"),"actual_inner_owner":format!("{owner:?}"),"fully_visible":true}));
+                    }
+                    assertions.push(serde_json::json!({"selector":selector,"painted_field":format!("{field:?}"),"actual_inner_owner":format!("{owner:?}"),"fully_visible":true}));
+                }
+            }
             if phase6 && matches!(label, "history-bottom" | "history-baselines") {
                 let (control, owner) = shell.read_with(cx, |s, _| {
                     if label == "history-bottom" {

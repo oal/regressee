@@ -12,7 +12,8 @@ task; it does not replace the existing implementation `PLAN.md`.
   E1–E3 corrections and 10 corrected native pairs are recorded in
   `research/whole-app-ui-review-20261012/phase1-report.md` and its correction receipt.
 - Independent results: `research/whole-app-ui-review-20261012/phase1-verification.md`.
-  Diagnostics tails and remaining advanced controls are not fully qualified.
+  Phase 1 left diagnostics tails and remaining advanced controls unqualified;
+  Phase 7 supplements this with both-size tail and all-nine-field geometry evidence.
 - **Phase 1 committed/pushed:** `ac4de65`; no production UI changed.
 - **Phase 2 independently verified PASS (documentation/evidence gate):**
   `research/whole-app-ui-review-20261012/synthesis.md` and the dated Impeccable
@@ -73,7 +74,32 @@ task; it does not replace the existing implementation `PLAN.md`.
   retains narrow-scroll/expanded-detail limits, the supplemental UI-only test-feature
   failure and corrected fixture accounting. Production `ui` check passes; native
   input/AT/usability/platform/release acceptance is not inferred.
-  **Next:** parent reviews and commits/pushes verified Phase 6. No Phase 7 here.
+  Phase 6 committed/pushed as `135d3eb`, confirmed by the Phase 7 parent handoff.
+- **Phase 7 independently verified PASS (IMPLEMENTATION + FEASIBLE gate):**
+  [report](research/whole-app-ui-review-20261012/phase7-report.md) and
+  [platform matrix](research/whole-app-ui-review-20261012/phase7-platform-qualification.md)
+  record genuinely distinct persisted 100/1,000-page safety qualification, real
+  filtered Jobs approval, supplemental both-size tails/fields/consent and finite
+  consent-scroll/checkbox/source-verification repairs. Source/controller/offscreen
+  final matrix: **nine commands exit 0**, workspace **358/0/45** all-features and
+  **177/0/14** no-default (passed/failed/ignored); UI-only **22/0/0**, UI-tests
+  **120/0/1**. Counts overlap, not a unique sum. Retained-store rerun **1/0/0**.
+  These results are separate from **BLOCKED native input/accessibility/release** and
+  **NOT TESTED Windows/NVDA, macOS/VoiceOver, host scaling and PM usability**.
+  [Final independent verdict](research/whole-app-ui-review-20261012/phase7-verification.md):
+  all nine independent commands exit 0; workspace **358/0/45** and **177/0/14**,
+  UI-only **22/0/0**, UI-tests **120/0/1**; targeted review **8/0/0**, note/mask/history
+  **18/0/0**, setup **5/0/0**, approval/privacy **7/0/0**, Node boundary **9/0/0**.
+  Counts overlap. Both independent workspace runs execute the distinct 100/1,000-page
+  regression. SQLite/CAS/ZIP and all 2,198 original pixel identities independently
+  checked; retained maps replace exactly 0/1/20. Six sheets/twelve existing originals
+  inspected without rendering; actual inner-owner tails and current source bindings
+  pass. Clippy warnings retained, not warning-free. Initial exact receipt passes;
+  subsequent verifier SQLite read-only WAL inspection changes only two volatile
+  recipient SHM files, explicitly recorded, not restored or silently refrozen.
+  Zero participants; **no full native/accessibility/usability/release acceptance**.
+  **Next:** parent verified commit/push, then user-authorized GitHub pipeline repair
+  and release work with actual runs/assets/limitations; no commit/push/tag here.
 - **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the
   complete plan be implemented and validated without clarification questions.
   Use the recommended interaction direction and preserve Clear wayfinding.
@@ -412,7 +438,7 @@ Exit gate: last loaded/retained records are discoverable; deletion names its
 record and consequences; privacy copy remains clear; failure actions match
 implemented recovery; inspection never activates a baseline or rewrites evidence.
 
-### Phase 7 — whole-workflow and native qualification **AUTHORIZED; PENDING**
+### Phase 7 — whole-workflow and native qualification **VERIFIED PASS: IMPLEMENTATION + FEASIBLE GATE; NATIVE/AT/RELEASE BLOCKED**
 
 Validate the complete sequence, not just edited components. Use isolated data,
 normal/minimum desktop windows and a declared supported-platform matrix.
@@ -456,6 +482,16 @@ validate CI/release automation, push fixes, then create a fresh version tag and
 verify the published assets. Do not present build availability as native usability
 or cross-platform acceptance. Record workflow run IDs, release URL and any actual
 distribution limitations in the final checkpoint.
+
+**2026-10-13 handoff:** Phases 1–7 implementation and their feasible independent
+verification gates have passed; full native/accessibility/usability acceptance
+has not. Phase 7 independently passed all nine feature-matrix commands, including
+358 workspace all-feature tests and real distinct 100/1,000-page storage safety
+regressions. Commit/push this phase before CI repairs. The existing Foundation
+workflow fails its strict Clippy step (confirmed run `38315044213`); preserve
+`-D warnings` and repair the underlying lint/build issues rather than weakening CI.
+Then validate hosted checks, create a fresh preview version tag, and verify actual
+Windows/Linux downloadable assets. No supported-production-release claim is made.
 
 ### Known capture commands (reference; not run during planning)
 
@@ -514,6 +550,58 @@ or zero-finding certification should be attempted.
    endless polishing. Do not discard unfamiliar working-tree changes.
 
 ### Checkpoint log
+
+**2026-10-13 — independent Phase 7 verification: PASS (IMPLEMENTATION + FEASIBLE gate).**
+Final [verdict](research/whole-app-ui-review-20261012/phase7-verification.md) records
+the full plan/blueprint/diff/source/evidence review and nine-command independent
+locked/offline matrix at `regressee-phase7-checks-82rqditj`: all exits 0; workspace
+all **358/0/45**, no-default **177/0/14**, UI-only **22/0/0**, UI-tests **120/0/1**.
+Both independent workspace runs execute actual distinct storage-scale tests;
+counts overlap. Separate serial suites: modes **8**, notes/masks/history **18**,
+setup **5**, nonvacuous approval/privacy **7**, all zero failures/ignored; Node
+boundary **9/0**, not production-browser qualification. Actual stores have unique
+PageIds/URLs/original pixels (2,198 independently decoded), real 50/49/1 and
+500/499/1 outcomes, 0/1/20 replacement maps, exact inherited originals, three
+retained versions and byte-exact ZIPs. Source/feature gating, startup timezone
+selection and 1300×700 Custom replacement pass. Six existing sheets/twelve originals
+and actual inner clips checked without a renderer/polish loop. Clippy warnings
+retained. Exact frozen receipt initially passes; stable content still matches,
+except two recipient SQLite SHM headers changed by verifier read-only WAL reads;
+preserved/disclosed, not refrozen. Fresh preview verifies disk before the final
+SQL transaction, which then guards current identity; no atomic filesystem snapshot
+claim. Independent native probes reproduce default Vulkan failure, unmapped X11
+and live-but-unregistered Wayland AT-SPI PID; production build passes, no OS input
+sent. Linux native/AT and release remain **BLOCKED**; Windows/NVDA, macOS/VoiceOver,
+host scaling/appearance/motion and zero-participant usability remain **NOT TESTED**.
+No product edits, renders, commit/push/tag/release; no new feasible functional
+remediation required. **Next: parent verified commit/push, then authorized GitHub
+pipeline repair/release; publish actual distribution limits, never native acceptance.**
+
+**2026-10-13 — Phase 7 implementation handoff; independent verification pending.**
+Based on verified/pushed `135d3eb`; sole agent, no nested agents or delivery/CI work.
+Distinct persisted 100/1,000-page PNG/identity/result fixtures qualify real selective
+1/20 updates, fresh corruption/stale rejection, retained/shared-source protection
+and byte-exact ZIP/session exclusion checks. Both-size real Jobs selection survives
+filtering and supports preview/cancel/explicit commit. One batched visual inspection,
+one finite consent-scroll/checkbox correction and one confirmation: 28+28 pairs,
+six sheets per batch; eight confirmation originals inspected. Actual diagnostics
+tail, nine fields and reference 99 use actual inner bounds, not window wrappers.
+Finite worker-local source snapshot repair avoids repeated whole-run verification;
+commit remains freshly verified. UI-only test gating and production-bound timezone/
+custom replacement tests repaired. Final locked/offline nine-command matrix passes:
+workspace all **358/0/45**, no-default **177/0/14**, UI-only **22/0/0**, UI-tests
+**120/0/1**; production check/inspection build/clippy (warnings retained)/fmt/
+whitespace exit 0. Counts overlap. Retained-store regression **1/0/0**, 553.48s;
+Node boundary **9/0**, not production browser qualification. Final source build and
+owned Wayland/AT-SPI probe preserve the unregistered-PID blocker; X11 attempts
+remain unmapped/default Vulkan failed. Native input/AT/release **BLOCKED**;
+Windows/NVDA/macOS/VoiceOver/host scaling/usability **NOT TESTED**, zero participants.
+Evidence root `regressee-phase7-qualification-gzmro59k`, final logs
+`regressee-phase7-checks-9_07m0rr` under the approved local parent; full paths,
+commands, preserved earlier failures and receipt in the
+[report](research/whole-app-ui-review-20261012/phase7-report.md).
+DESIGN records built behavior only; original/superseded evidence stays immutable.
+**Next: independent verifier, then parent delivery; do not infer native acceptance.**
 
 **2026-10-13 — independent Phase 6 verification: PASS.** Read plan/blueprint/
 synthesis/report/receipt, full diff/new files and actual storage/worker/control

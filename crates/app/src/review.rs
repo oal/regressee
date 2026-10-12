@@ -49,15 +49,24 @@ pub fn analyze_run(
     );
     let baseline = store.load_baseline(baseline_id)?;
     let mut requests = Vec::new();
+    // Keep one fully verified source snapshot within this worker operation.
+    // A 1,000-page baseline otherwise rehashes every source artifact 1,000 times.
+    // This is bounded, never shared across operations, and never bypasses the
+    // next analysis/consent's fresh disk verification.
+    let mut source: Option<RunRecord> = None;
     for reference in &baseline.references {
-        let old = store.load_run(reference.run)?;
+        ensure!(!cancel.load(Ordering::Acquire), "analysis cancelled");
+        if source.as_ref().is_none_or(|s| s.run.id != reference.run) {
+            source = Some(store.load_run(reference.run)?);
+        }
+        let old = source.as_ref().unwrap();
         if let (Some(before), Some(after)) =
             (old.evidence(&reference.key), run.evidence(&reference.key))
         {
             requests.push((
                 reference.key.clone(),
                 e::AnalysisRequest {
-                    before: descriptor(&old, before)?,
+                    before: descriptor(old, before)?,
                     after: descriptor(&run, after)?,
                     policy: policy.clone(),
                     mask: store.latest_mask(run.run.project, &reference.key)?,

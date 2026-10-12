@@ -439,7 +439,7 @@ fn repair_v5_save_continuation_races_keep_selected_draft_and_never_visit(cx: &mu
                 })
             });
             owned.join_after_ui();
-            let mut store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+            let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
             assert_eq!(
                 store.load_project(project).unwrap().project.active_baseline,
                 baseline
@@ -456,6 +456,10 @@ fn repair_v5_save_continuation_races_keep_selected_draft_and_never_visit(cx: &mu
 fn repair_v5_all_setup_capabilities_tab_reveal_and_dispatch_with_current_clips(
     cx: &mut TestAppContext,
 ) {
+    cx.update(|cx| {
+        text_input::bind(cx);
+        timezone_select::bind(cx);
+    });
     let dir = tempfile::tempdir().unwrap();
     let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
     drop(store);
@@ -620,6 +624,12 @@ fn repair_v5_all_setup_capabilities_tab_reveal_and_dispatch_with_current_clips(
                         .count(),
                     1
                 );
+                assert!(
+                    s.draft_settings
+                        .profiles
+                        .iter()
+                        .any(|p| { p.name == "Custom" && p.width == 1300 && p.height == 700 })
+                );
             })
         });
         reach!(Control::Guided(25));
@@ -651,8 +661,10 @@ fn repair_v5_all_setup_capabilities_tab_reveal_and_dispatch_with_current_clips(
             s.crawl_fields[15].update(cx, |f, cx| f.set_value("nb-NO", cx))
         });
         reach!(Control::CrawlField(16));
+        let old_timezone = shell.read_with(cx, |s, cx| s.timezone.read(cx).selected.clone());
         cx.simulate_keystrokes("enter home down enter");
         shell.read_with(cx, |s, cx| {
+            assert_ne!(s.timezone.read(cx).selected, old_timezone);
             assert_eq!(s.next_request, requests);
             assert!(s.unsaved(cx));
         });

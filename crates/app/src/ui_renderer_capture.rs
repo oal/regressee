@@ -29,7 +29,7 @@ fn offscreen_extent_limits_without_gpu() {
     }
 }
 
-fn output_root() -> Result<PathBuf> {
+pub(super) fn output_root() -> Result<PathBuf> {
     let root = PathBuf::from(
         std::env::var_os("REGRESSEE_RENDERER_CAPTURE_DIR")
             .context("explicit private renderer capture directory required")?,
@@ -123,7 +123,7 @@ fn write_frame(
     Ok(())
 }
 
-fn capture(cx: &mut VisualTestContext, root: &Path, label: &str) -> Result<()> {
+pub(super) fn capture(cx: &mut VisualTestContext, root: &Path, label: &str) -> Result<()> {
     let (frame, viewport, cpu_draw_ms, gpu_capture_ms) = cx.update(|window, cx| {
         let started = std::time::Instant::now();
         let _ = window.draw(cx);

@@ -132,10 +132,14 @@ Authority: `PRODUCT.md`, `docs/workflow-revamp.md`,
 `crates/app/src/{main,workflow,workspace_history}.rs` and
 `crates/core/src/shell.rs`. Earlier direction remains in `docs/phase0-design.md`.
 
-Qualification boundary: Phases 4 and 5 independently passed their bounded
-source/controller/offscreen gates. Phase 6 is implemented, with independent
-verification pending. Historical FIX/blocked evidence remains preserved; none of
-these results is full UI or release acceptance.
+Qualification boundary: Phases 4, 5 and 6 independently passed their bounded
+source/controller/offscreen gates. Phase 7 qualification infrastructure and its
+finite consent/long-label repairs are built; independent verification is pending.
+Historical FIX/blocked evidence remains preserved; none of these results is full
+native UI or release acceptance. The running Linux Wayland process did not
+register with the available AT-SPI registry; accessibility integration is a named
+blocker, not a screen-reader pass. See
+`docs/research/whole-app-ui-review-20261012/phase7-platform-qualification.md`.
 Offscreen Linux GPUI pixels establish only development-host rendering;
 they do not supersede earlier black OS-window captures or establish real input,
 IME, screen-reader, high-contrast, Windows/macOS or release qualification.
@@ -292,6 +296,9 @@ OS-input/AT/usability/release qualification remains pending. See
 **Actions and choices.** Shared actions have a minimum target height (40px).
 Buttons fit their labels; navigation fills its column; choice/check rows fill
 their available width with balanced `spacing.row` insets even when help wraps.
+Checkbox label owners now use a finite flexible column so long labels wrap rather
+than clip. The analysis noise-suppression label paints on two lines at both
+qualified logical window sizes (270×40px inner text, 326×66px complete control).
 Primary keeps its filled blue identity through focus; danger uses error ink and
 surface, never primary fill. Secondary hover uses `action-hover`. Focus is distinct
 from selection: ordinary actions use ink outlines, rail navigation a white outer
@@ -370,7 +377,10 @@ At most 32 reference rows mount on a page. Previous/Next inspects every referenc
 and advances the visible page, keeping all unchanged references accessible.
 Exact page/profile IDs, run/artifact identities and requested/final URLs remain
 available, including the technical tail. Keep reviewing/Escape dismisses without approving;
-Confirm baseline is explicit. Focus is trapped, background mutations are guarded,
+Confirm baseline is explicit. Each new or cached consent opening resets the
+inspected reference, exact-details disclosure and actual reading scroll to the
+top, so consequences cannot disappear behind a previous tail inspection/resize.
+Focus is trapped, background mutations are guarded,
 and stale previews are invalidated. Failed/missing/incompatible evidence cannot
 be approved; replacing the whole baseline remains a separate workflow.
 
@@ -429,7 +439,7 @@ The separate 22-pair functional repair evidence received independent bounded
 re-verification, not OS-input/accessibility/usability/release acceptance. See
 `docs/research/whole-app-ui-review-20261012/phase4-report.md`.
 
-**History, consequences and recovery — Phase 6 built; verification pending.**
+**History, consequences and recovery — Phase 6 independently verified in bounded scope.**
 Runs and Baselines use 256px inner scroll viewports with unchanged full-width
 selected paint. The outer workspace remains scrollable: at 820×600 the initial
 list extends below the fold; scrolling exposes its full four-row viewport.
