@@ -6,6 +6,14 @@ task; it does not replace the existing implementation `PLAN.md`.
 
 ## Current checkpoint — read this first
 
+- **Final delivery PASS (2026-10-13): all seven phases implemented, feasibly
+  verified, committed and pushed.** Cross-platform Foundation/Phase 0 are green;
+  [unsigned experimental `v0.1.0-preview.2`](https://github.com/oal/regressee/releases/tag/v0.1.0-preview.2)
+  is published from tested `1911c3b9905d727ac830a420eb6935ceb4d380e9`.
+  [Independent final delivery verdict](research/whole-app-ui-review-20261012/delivery-release-verification.md)
+  confirms fresh downloads, all five asset digests, exact source and inventories.
+  Native input/graphics, clean installation/runtime first-use, AT, usability and
+  full supported-release/license gates remain blocked or untested, not closed.
 - **Phase 0 complete:** both independent assessments have been read in full and
   copied byte-for-byte into the repository, with an integrity receipt.
 - **Phase 1 verified PASS (bounded evidence gate).** Test-only
@@ -29,6 +37,7 @@ task; it does not replace the existing implementation `PLAN.md`.
   capability/safety inventory, concrete owners and Phases 4–7 build/validation order.
   [Implementation report](research/whole-app-ui-review-20261012/phase3-report.md).
   [Independent verdict](research/whole-app-ui-review-20261012/phase3-verification.md).
+  **Phase 3 committed/pushed:** `4e48813`.
 - **Historical Phase 4A and 4B handoff: visual gate BLOCKED** by the inner note input's
   width at both sizes. Source/storage package tests pass (295; 40 ignored), native
   confirmation has 38 pairs, but this is not an exit-gate pass. See
@@ -99,37 +108,33 @@ task; it does not replace the existing implementation `PLAN.md`.
   recipient SHM files, explicitly recorded, not restored or silently refrozen.
   Zero participants; **no full native/accessibility/usability/release acceptance**.
   **Phase 7 committed/pushed:** `b46dff5` (parent-confirmed delivery base).
-- **Post-plan CI/preview delivery pushed as `4f84363`; hosted Foundation PASS, Phase 0 Windows timeout repair locally READY:** semantic-preserving
-  strict lint repairs, launcher/packaging checks in hosted CI, bounded default bulk
-  tests and source-bound whole-app prerelease notes. See
-  [delivery report](research/whole-app-ui-review-20261012/delivery-report.md).
-  Independent [delivery verification](research/whole-app-ui-review-20261012/delivery-verification.md)
-  passes the full Foundation-equivalent local gates with no patch defects; both
-  complete suites finished (default bulk qualification retained). Foundation
-  **38324688298** subsequently passed Ubuntu/Windows/macOS (54m39s / 40m51s /
-  52m55s). Phase 0 **38324688313** passed Ubuntu/macOS, but Windows failed solely
-  at its 30-minute core-test step limit while the distinct 1,000-page test was
-  running; no assertion failure was reported. That interrupted suite is not a pass.
-  Strict all-target/all-feature Clippy, native UI build and formatting pass;
-  complete contracts **178/0/27** and all-features **358/0/45**
-  (passed/failed/ignored) exit 0, both retaining the default distinct 100/1,000-page
-  qualification. Launcher **6**, packaging **8**, source helper **32** tests and
-  Phase 0 smoke/protocol commands pass. Counts overlap, not unique totals.
-  Native/AT/full-release gates remain blocked or untested; no new visual cycle.
-  Finite follow-up: Foundation/Phase 0 jobs **90m**, relevant test steps **45m**;
-  preview contract step **45m**, preview job retains **90m**. All tests, strict
-  lint/security gates and the normal matrices remain unchanged. Actionlint plus
-  launcher **6** and packaging **8** tests pass locally; no duplicate full Rust
-  suite for this YAML/docs-only patch. See the report's post-push timeout appendix.
-  Independent timeout-patch verification **PASS LOCAL**, including actionlint,
-  launcher/packaging checks and fresh read-only hosted evidence; the bounded patch
-  is ready for parent commit/push, not claimed to have repaired hosted Windows yet.
-  **Next:** parent verified commit/push,
-  require the new commit's Foundation and Phase 0 to pass on **all three hosts**,
-  including Windows's previously unexecuted runtime stages, then create a fresh
-  preview tag and verify both
-  hosted builds, exact-source archive, checksums and downloadable assets. No
-  implementation-agent commit/push/tag/release or cancellation of external runs.
+- **Post-plan CI/preview delivery complete at `1911c3b`: pipeline fixed, all
+  intended platforms PASS, preview published.** Semantic-preserving strict lint
+  repairs and bounded budget changes retain default distinct 100/1,000-page tests,
+  all features, security checks and normal matrices. Earlier Windows Phase 0
+  timeout **38324688313** remains a failure in the historical
+  [report](research/whole-app-ui-review-20261012/delivery-report.md) and
+  [verification](research/whole-app-ui-review-20261012/delivery-verification.md).
+  Main Foundation **38329625059** / Phase 0 **38329625072** now pass all three
+  hosts, including Windows runtime stages. Tagged Foundation **38333821918** /
+  Phase 0 **38333821912** also pass all three; release **38333821892** passes both
+  Linux/Windows builds and publication: **9/9 tagged jobs**, not just workflow
+  status. Source SHA is `1911c3b9905d727ac830a420eb6935ceb4d380e9` in every run.
+  [Final verification](research/whole-app-ui-review-20261012/delivery-release-verification.md)
+  independently re-downloads all five assets and verifies sizes/digests/manifest,
+  exact 616-file tracked source, x64 headers/build metadata, standalone EXE/ZIP
+  equality and 785 Windows / 902 Linux notice hashes. Windows help's CRLF-only
+  difference is explicitly retained, not a product defect or rewritten hash.
+  [Published release and download links](https://github.com/oal/regressee/releases/tag/v0.1.0-preview.2)
+  are available. Local test counts remain **178/0/27**, **358/0/45**, launcher
+  **6**, packaging **8**, source helper **32** (overlapping coverage); no new
+  Rust/render cycle or native binary launch for final delivery verification.
+  **Final bookkeeping:** this documentation/evidence update is committed and
+  pushed separately from the tested release source; provide the published download
+  links. No implementation or delivery verification process remains pending.
+  Do not retag or overwrite verified artifacts; final docs postdate the released
+  source archive. Native/AT/clean-install/usability/full-license and supported
+  release gates remain blocked or untested, despite green hosted CI.
 - **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the
   complete plan be implemented and validated without clarification questions.
   Use the recommended interaction direction and preserve Clear wayfinding.
@@ -580,6 +585,30 @@ or zero-finding certification should be attempted.
    endless polishing. Do not discard unfamiliar working-tree changes.
 
 ### Checkpoint log
+
+**2026-10-13 — FINAL DELIVERY: independent PASS (availability/integrity and hosted
+gates, not supported-release acceptance).** All seven implementation phases are
+feasibly verified, committed and pushed; tested source is
+`1911c3b9905d727ac830a420eb6935ceb4d380e9`. Main Foundation **38329625059** and
+Phase 0 **38329625072**, tagged Foundation **38333821918** and Phase 0
+**38333821912**, plus release **38333821892** are genuinely completed/success:
+**15/15 jobs**, with all three CI hosts and both preview build hosts retained.
+The annotated `v0.1.0-preview.2` tag peels to that exact source. Published draft=false,
+prerelease=true release has five downloadable assets. Independent fresh downloads
+match GitHub sizes/digests, parent bytes and `SHA256SUMS`; source has 616 exact
+files/modes, platform metadata binds the same SHA, binaries are x64 ELF/PE, EXE
+equals ZIP bytes and all 785/902 notice hashes pass. No runtime/private recursive
+packaging; Windows CRLF notes diagnosis preserved. Commands and all five direct
+[asset URLs are in the final verdict](research/whole-app-ui-review-20261012/delivery-release-verification.md),
+alongside [hosted evidence](research/whole-app-ui-review-20261012/delivery-hosted-verification.json)
+and [release receipt](research/whole-app-ui-review-20261012/delivery-release-receipt.json).
+No new renders, Rust reruns, binary launches or verifier commit/push/tag/release
+edits; all checks complete. Native/runtime clean-install, input/graphics, AT,
+participant usability, security/installer/signing and full native/transitive
+license acceptance remain blocked/untested. macOS has no preview and retains its
+supervision gap. **Next: parent commits/pushes final evidence/docs and sends user
+download links; preserve the tested tag and archives.** Earlier checkpoints below
+remain historical evidence, not current unfinished handoffs.
 
 **2026-10-13 — independent Phase 7 verification: PASS (IMPLEMENTATION + FEASIBLE gate).**
 Final [verdict](research/whole-app-ui-review-20261012/phase7-verification.md) records

@@ -1,0 +1,1198 @@
+{
+  "date": "2026-10-13",
+  "tag": "v0.1.0-preview.2",
+  "source_commit": "1911c3b9905d727ac830a420eb6935ceb4d380e9",
+  "release": {
+    "assets": [
+      {
+        "apiUrl": "https://api.github.com/repos/oal/regressee/releases/assets/635655921",
+        "contentType": "application/x-gtar",
+        "createdAt": "2026-10-13T02:39:31Z",
+        "digest": "sha256:97239b6bad97bcc78cbe0eb73d1d934d6bbd41fbb534af01bcb5c65618188cf9",
+        "downloadCount": 0,
+        "id": "RA_kwDOVEEwis4l41bx",
+        "label": "",
+        "name": "regressee-linux-x86_64.tar.gz",
+        "size": 24443346,
+        "state": "uploaded",
+        "updatedAt": "2026-10-13T02:39:32Z",
+        "url": "https://github.com/oal/regressee/releases/download/v0.1.0-preview.2/regressee-linux-x86_64.tar.gz"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/oal/regressee/releases/assets/635655926",
+        "contentType": "application/x-gtar",
+        "createdAt": "2026-10-13T02:39:31Z",
+        "digest": "sha256:4feaef1f838575b1d2581303eb924ee7f0f06d5237e42127b9d1e9a3fbac7ffb",
+        "downloadCount": 0,
+        "id": "RA_kwDOVEEwis4l41b2",
+        "label": "",
+        "name": "regressee-source.tar.gz",
+        "size": 11719357,
+        "state": "uploaded",
+        "updatedAt": "2026-10-13T02:39:32Z",
+        "url": "https://github.com/oal/regressee/releases/download/v0.1.0-preview.2/regressee-source.tar.gz"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/oal/regressee/releases/assets/635655918",
+        "contentType": "application/octet-stream",
+        "createdAt": "2026-10-13T02:39:31Z",
+        "digest": "sha256:12c4fce338ecc9f696e714bc27333dff8c6ba2a1d8c3d88e378be482a7a646bf",
+        "downloadCount": 0,
+        "id": "RA_kwDOVEEwis4l41bu",
+        "label": "",
+        "name": "regressee-windows-x86_64.exe",
+        "size": 33300992,
+        "state": "uploaded",
+        "updatedAt": "2026-10-13T02:39:32Z",
+        "url": "https://github.com/oal/regressee/releases/download/v0.1.0-preview.2/regressee-windows-x86_64.exe"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/oal/regressee/releases/assets/635655917",
+        "contentType": "application/zip",
+        "createdAt": "2026-10-13T02:39:31Z",
+        "digest": "sha256:608a2712e5a3184fba6f0165f8968c01ec65e72a09607b912af3e2416fb80d66",
+        "downloadCount": 0,
+        "id": "RA_kwDOVEEwis4l41bt",
+        "label": "",
+        "name": "regressee-windows-x86_64.zip",
+        "size": 19795408,
+        "state": "uploaded",
+        "updatedAt": "2026-10-13T02:39:32Z",
+        "url": "https://github.com/oal/regressee/releases/download/v0.1.0-preview.2/regressee-windows-x86_64.zip"
+      },
+      {
+        "apiUrl": "https://api.github.com/repos/oal/regressee/releases/assets/635655919",
+        "contentType": "application/octet-stream",
+        "createdAt": "2026-10-13T02:39:31Z",
+        "digest": "sha256:5911446eb8383d22f39bc9ed0f3ef3abb497f3500842279182d10b1c325e0075",
+        "downloadCount": 0,
+        "id": "RA_kwDOVEEwis4l41bv",
+        "label": "",
+        "name": "SHA256SUMS",
+        "size": 376,
+        "state": "uploaded",
+        "updatedAt": "2026-10-13T02:39:31Z",
+        "url": "https://github.com/oal/regressee/releases/download/v0.1.0-preview.2/SHA256SUMS"
+      }
+    ],
+    "isDraft": false,
+    "isPrerelease": true,
+    "name": "Regressee test preview \u2014 v0.1.0-preview.2",
+    "publishedAt": "2026-10-13T02:39:33Z",
+    "tagName": "v0.1.0-preview.2",
+    "targetCommitish": "1911c3b9905d727ac830a420eb6935ceb4d380e9",
+    "url": "https://github.com/oal/regressee/releases/tag/v0.1.0-preview.2"
+  },
+  "download_root": "/var/home/olav/Data/opencode/tmp/opencode/regressee-preview2-download-prp9isn8",
+  "checksums": {
+    "regressee-linux-x86_64.tar.gz": "97239b6bad97bcc78cbe0eb73d1d934d6bbd41fbb534af01bcb5c65618188cf9",
+    "regressee-source.tar.gz": "4feaef1f838575b1d2581303eb924ee7f0f06d5237e42127b9d1e9a3fbac7ffb",
+    "regressee-windows-x86_64.exe": "12c4fce338ecc9f696e714bc27333dff8c6ba2a1d8c3d88e378be482a7a646bf",
+    "regressee-windows-x86_64.zip": "608a2712e5a3184fba6f0165f8968c01ec65e72a09607b912af3e2416fb80d66"
+  },
+  "checksums_manifest_sha256": "5911446eb8383d22f39bc9ed0f3ef3abb497f3500842279182d10b1c325e0075",
+  "platform_archives": [
+    {
+      "platform": "windows-x86_64",
+      "build_info": {
+        "binary_sha256": "12c4fce338ecc9f696e714bc27333dff8c6ba2a1d8c3d88e378be482a7a646bf",
+        "features": [
+          "ui"
+        ],
+        "installer": false,
+        "kind": "unsigned-test-preview",
+        "runtime_bundled": false,
+        "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "signed": false,
+        "source_commit": "1911c3b9905d727ac830a420eb6935ceb4d380e9",
+        "target": "x86_64-pc-windows-msvc",
+        "version": "0.1.0"
+      },
+      "archive_entries": 798,
+      "dependency_inventory_entries": 475,
+      "notice_texts_verified": 785,
+      "standalone_equals_archive": true,
+      "notes_byte_identical": false,
+      "notes_text_matches_after_crlf_normalization": true,
+      "qualification": "Archive integrity and hosted build only; no binary was launched."
+    },
+    {
+      "platform": "linux-x86_64",
+      "build_info": {
+        "binary_sha256": "4ac6b9c22f1f34677ecf4d36960ea5aa001d924ce864e58952f029f3540511f6",
+        "features": [
+          "ui"
+        ],
+        "installer": false,
+        "kind": "unsigned-test-preview",
+        "runtime_bundled": false,
+        "rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+        "signed": false,
+        "source_commit": "1911c3b9905d727ac830a420eb6935ceb4d380e9",
+        "target": "x86_64-unknown-linux-gnu",
+        "version": "0.1.0"
+      },
+      "archive_entries": 915,
+      "dependency_inventory_entries": 558,
+      "notice_texts_verified": 902,
+      "standalone_equals_archive": false,
+      "notes_byte_identical": true,
+      "notes_text_matches_after_crlf_normalization": true,
+      "qualification": "Archive integrity and hosted build only; no binary was launched."
+    }
+  ],
+  "exact_source_archive_files_verified": 616,
+  "tag_runs": [
+    {
+      "conclusion": "success",
+      "databaseId": 38333821892,
+      "headSha": "1911c3b9905d727ac830a420eb6935ceb4d380e9",
+      "jobs": [
+        {
+          "completedAt": "2026-10-13T02:39:23Z",
+          "conclusion": "success",
+          "databaseId": 115089320163,
+          "name": "Build windows-x86_64",
+          "startedAt": "2026-10-13T01:47:43Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T01:47:44Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T01:47:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:47:52Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T01:47:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:42Z",
+              "conclusion": "success",
+              "name": "Run ./.github/actions/setup",
+              "number": 3,
+              "startedAt": "2026-10-13T01:47:52Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:42Z",
+              "conclusion": "success",
+              "name": "Install the native Rust target",
+              "number": 4,
+              "startedAt": "2026-10-13T01:48:42Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:44Z",
+              "conclusion": "success",
+              "name": "Locate Windows release shader and inspection tools",
+              "number": 5,
+              "startedAt": "2026-10-13T01:48:42Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:49Z",
+              "conclusion": "success",
+              "name": "Test preview packaging",
+              "number": 6,
+              "startedAt": "2026-10-13T01:48:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:29:50Z",
+              "conclusion": "success",
+              "name": "Run application contract tests",
+              "number": 7,
+              "startedAt": "2026-10-13T01:48:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:06Z",
+              "conclusion": "success",
+              "name": "Build the desktop application",
+              "number": 8,
+              "startedAt": "2026-10-13T02:29:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:06Z",
+              "conclusion": "skipped",
+              "name": "Check Linux ABI and dynamic dependencies",
+              "number": 9,
+              "startedAt": "2026-10-13T02:39:06Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:06Z",
+              "conclusion": "success",
+              "name": "Check Windows DLL dependencies",
+              "number": 10,
+              "startedAt": "2026-10-13T02:39:06Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:15Z",
+              "conclusion": "success",
+              "name": "Package the preview and dependency notices",
+              "number": 11,
+              "startedAt": "2026-10-13T02:39:06Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:18Z",
+              "conclusion": "success",
+              "name": "Upload build downloads",
+              "number": 12,
+              "startedAt": "2026-10-13T02:39:15Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:20Z",
+              "conclusion": "success",
+              "name": "Post Run ./.github/actions/setup",
+              "number": 23,
+              "startedAt": "2026-10-13T02:39:18Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:22Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 24,
+              "startedAt": "2026-10-13T02:39:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:22Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 25,
+              "startedAt": "2026-10-13T02:39:22Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821892/job/115089320163"
+        },
+        {
+          "completedAt": "2026-10-13T02:12:03Z",
+          "conclusion": "success",
+          "databaseId": 115089320328,
+          "name": "Build linux-x86_64",
+          "startedAt": "2026-10-13T01:47:44Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T01:47:45Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T01:47:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:47:47Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T01:47:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:17Z",
+              "conclusion": "success",
+              "name": "Run ./.github/actions/setup",
+              "number": 3,
+              "startedAt": "2026-10-13T01:47:47Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:17Z",
+              "conclusion": "success",
+              "name": "Install the native Rust target",
+              "number": 4,
+              "startedAt": "2026-10-13T01:48:17Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:17Z",
+              "conclusion": "skipped",
+              "name": "Locate Windows release shader and inspection tools",
+              "number": 5,
+              "startedAt": "2026-10-13T01:48:17Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:18Z",
+              "conclusion": "success",
+              "name": "Test preview packaging",
+              "number": 6,
+              "startedAt": "2026-10-13T01:48:17Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:04:56Z",
+              "conclusion": "success",
+              "name": "Run application contract tests",
+              "number": 7,
+              "startedAt": "2026-10-13T01:48:18Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:11:52Z",
+              "conclusion": "success",
+              "name": "Build the desktop application",
+              "number": 8,
+              "startedAt": "2026-10-13T02:04:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:11:52Z",
+              "conclusion": "success",
+              "name": "Check Linux ABI and dynamic dependencies",
+              "number": 9,
+              "startedAt": "2026-10-13T02:11:52Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:11:52Z",
+              "conclusion": "skipped",
+              "name": "Check Windows DLL dependencies",
+              "number": 10,
+              "startedAt": "2026-10-13T02:11:52Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:11:59Z",
+              "conclusion": "success",
+              "name": "Package the preview and dependency notices",
+              "number": 11,
+              "startedAt": "2026-10-13T02:11:52Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:01Z",
+              "conclusion": "success",
+              "name": "Upload build downloads",
+              "number": 12,
+              "startedAt": "2026-10-13T02:11:59Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:01Z",
+              "conclusion": "success",
+              "name": "Post Run ./.github/actions/setup",
+              "number": 23,
+              "startedAt": "2026-10-13T02:12:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:01Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 24,
+              "startedAt": "2026-10-13T02:12:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:01Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 25,
+              "startedAt": "2026-10-13T02:12:01Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821892/job/115089320328"
+        },
+        {
+          "completedAt": "2026-10-13T02:39:35Z",
+          "conclusion": "success",
+          "databaseId": 115102103695,
+          "name": "Publish test preview",
+          "startedAt": "2026-10-13T02:39:25Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T02:39:27Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T02:39:26Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:28Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T02:39:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:29Z",
+              "conclusion": "success",
+              "name": "Run actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333",
+              "number": 3,
+              "startedAt": "2026-10-13T02:39:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:30Z",
+              "conclusion": "success",
+              "name": "Include the exact application source and checksums",
+              "number": 4,
+              "startedAt": "2026-10-13T02:39:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:34Z",
+              "conclusion": "success",
+              "name": "Publish only after both builds succeed",
+              "number": 5,
+              "startedAt": "2026-10-13T02:39:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:34Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 10,
+              "startedAt": "2026-10-13T02:39:34Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:39:34Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 11,
+              "startedAt": "2026-10-13T02:39:34Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821892/job/115102103695"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/oal/regressee/actions/runs/38333821892",
+      "workflowName": "Downloadable Linux and Windows previews"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 38333821918,
+      "headSha": "1911c3b9905d727ac830a420eb6935ceb4d380e9",
+      "jobs": [
+        {
+          "completedAt": "2026-10-13T02:38:25Z",
+          "conclusion": "success",
+          "databaseId": 115089320080,
+          "name": "contracts (windows-2025)",
+          "startedAt": "2026-10-13T01:47:43Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T01:47:45Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T01:47:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:47:53Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T01:47:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:37Z",
+              "conclusion": "success",
+              "name": "Run ./.github/actions/setup",
+              "number": 3,
+              "startedAt": "2026-10-13T01:47:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:40Z",
+              "conclusion": "success",
+              "name": "Run cargo fmt --all -- --check",
+              "number": 4,
+              "startedAt": "2026-10-13T01:48:37Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:41Z",
+              "conclusion": "success",
+              "name": "Offline CI launcher and preview packaging contracts",
+              "number": 5,
+              "startedAt": "2026-10-13T01:48:40Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:41Z",
+              "conclusion": "skipped",
+              "name": "Linux-only private source archive contracts",
+              "number": 6,
+              "startedAt": "2026-10-13T01:48:41Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:10:53Z",
+              "conclusion": "success",
+              "name": "Application contracts including distinct persisted bulk qualification",
+              "number": 7,
+              "startedAt": "2026-10-13T01:48:41Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:13:27Z",
+              "conclusion": "success",
+              "name": "UI-inclusive API and lint check on every target",
+              "number": 8,
+              "startedAt": "2026-10-13T02:10:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:38:20Z",
+              "conclusion": "success",
+              "name": "Native link and simulated GPUI tests (not desktop launch)",
+              "number": 9,
+              "startedAt": "2026-10-13T02:13:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:38:21Z",
+              "conclusion": "success",
+              "name": "Post Run ./.github/actions/setup",
+              "number": 17,
+              "startedAt": "2026-10-13T02:38:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:38:23Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 18,
+              "startedAt": "2026-10-13T02:38:21Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:38:24Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 19,
+              "startedAt": "2026-10-13T02:38:23Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821918/job/115089320080"
+        },
+        {
+          "completedAt": "2026-10-13T02:41:25Z",
+          "conclusion": "success",
+          "databaseId": 115089320341,
+          "name": "contracts (macos-14)",
+          "startedAt": "2026-10-13T01:47:49Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T01:47:50Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T01:47:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:47:53Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T01:47:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:10Z",
+              "conclusion": "success",
+              "name": "Run ./.github/actions/setup",
+              "number": 3,
+              "startedAt": "2026-10-13T01:47:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:11Z",
+              "conclusion": "success",
+              "name": "Run cargo fmt --all -- --check",
+              "number": 4,
+              "startedAt": "2026-10-13T01:48:10Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:12Z",
+              "conclusion": "success",
+              "name": "Offline CI launcher and preview packaging contracts",
+              "number": 5,
+              "startedAt": "2026-10-13T01:48:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:12Z",
+              "conclusion": "skipped",
+              "name": "Linux-only private source archive contracts",
+              "number": 6,
+              "startedAt": "2026-10-13T01:48:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:29Z",
+              "conclusion": "success",
+              "name": "Application contracts including distinct persisted bulk qualification",
+              "number": 7,
+              "startedAt": "2026-10-13T01:48:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:15:03Z",
+              "conclusion": "success",
+              "name": "UI-inclusive API and lint check on every target",
+              "number": 8,
+              "startedAt": "2026-10-13T02:12:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:41:20Z",
+              "conclusion": "success",
+              "name": "Native link and simulated GPUI tests (not desktop launch)",
+              "number": 9,
+              "startedAt": "2026-10-13T02:15:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:41:21Z",
+              "conclusion": "success",
+              "name": "Post Run ./.github/actions/setup",
+              "number": 17,
+              "startedAt": "2026-10-13T02:41:20Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:41:22Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 18,
+              "startedAt": "2026-10-13T02:41:21Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:41:23Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 19,
+              "startedAt": "2026-10-13T02:41:22Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821918/job/115089320341"
+        },
+        {
+          "completedAt": "2026-10-13T02:24:31Z",
+          "conclusion": "success",
+          "databaseId": 115089320370,
+          "name": "contracts (ubuntu-24.04)",
+          "startedAt": "2026-10-13T01:47:43Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T01:47:45Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T01:47:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:47:46Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T01:47:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:13Z",
+              "conclusion": "success",
+              "name": "Run ./.github/actions/setup",
+              "number": 3,
+              "startedAt": "2026-10-13T01:47:46Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:15Z",
+              "conclusion": "success",
+              "name": "Run cargo fmt --all -- --check",
+              "number": 4,
+              "startedAt": "2026-10-13T01:48:13Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:16Z",
+              "conclusion": "success",
+              "name": "Offline CI launcher and preview packaging contracts",
+              "number": 5,
+              "startedAt": "2026-10-13T01:48:15Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:16Z",
+              "conclusion": "success",
+              "name": "Linux-only private source archive contracts",
+              "number": 6,
+              "startedAt": "2026-10-13T01:48:16Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:04:29Z",
+              "conclusion": "success",
+              "name": "Application contracts including distinct persisted bulk qualification",
+              "number": 7,
+              "startedAt": "2026-10-13T01:48:16Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:06:11Z",
+              "conclusion": "success",
+              "name": "UI-inclusive API and lint check on every target",
+              "number": 8,
+              "startedAt": "2026-10-13T02:04:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:24:28Z",
+              "conclusion": "success",
+              "name": "Native link and simulated GPUI tests (not desktop launch)",
+              "number": 9,
+              "startedAt": "2026-10-13T02:06:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:24:29Z",
+              "conclusion": "success",
+              "name": "Post Run ./.github/actions/setup",
+              "number": 17,
+              "startedAt": "2026-10-13T02:24:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:24:29Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 18,
+              "startedAt": "2026-10-13T02:24:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:24:29Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 19,
+              "startedAt": "2026-10-13T02:24:29Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821918/job/115089320370"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/oal/regressee/actions/runs/38333821918",
+      "workflowName": "Foundation checks (not desktop qualification)"
+    },
+    {
+      "conclusion": "success",
+      "databaseId": 38333821912,
+      "headSha": "1911c3b9905d727ac830a420eb6935ceb4d380e9",
+      "jobs": [
+        {
+          "completedAt": "2026-10-13T02:12:58Z",
+          "conclusion": "success",
+          "databaseId": 115089320207,
+          "name": "spike (ubuntu-24.04)",
+          "startedAt": "2026-10-13T01:47:44Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T01:47:45Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T01:47:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:47:48Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T01:47:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:17Z",
+              "conclusion": "success",
+              "name": "Run ./.github/actions/setup",
+              "number": 3,
+              "startedAt": "2026-10-13T01:47:48Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:18Z",
+              "conclusion": "success",
+              "name": "Offline CI launcher contracts",
+              "number": 4,
+              "startedAt": "2026-10-13T01:48:17Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:07:27Z",
+              "conclusion": "success",
+              "name": "Rust core tests",
+              "number": 5,
+              "startedAt": "2026-10-13T01:48:18Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:07:36Z",
+              "conclusion": "success",
+              "name": "Build local private runtime pack source",
+              "number": 6,
+              "startedAt": "2026-10-13T02:07:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:07:43Z",
+              "conclusion": "success",
+              "name": "Install Linux browser shared-library prerequisites",
+              "number": 7,
+              "startedAt": "2026-10-13T02:07:36Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:07:43Z",
+              "conclusion": "success",
+              "name": "Permit pinned browser sandbox under hosted AppArmor policy",
+              "number": 8,
+              "startedAt": "2026-10-13T02:07:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:07:44Z",
+              "conclusion": "success",
+              "name": "Check private sandboxed browser startup with visible errors",
+              "number": 9,
+              "startedAt": "2026-10-13T02:07:43Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:56Z",
+              "conclusion": "success",
+              "name": "Package, provision and smoke (no system Node)",
+              "number": 10,
+              "startedAt": "2026-10-13T02:07:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:56Z",
+              "conclusion": "skipped",
+              "name": "GPUI compile on Windows/macOS (not opening-window evidence)",
+              "number": 11,
+              "startedAt": "2026-10-13T02:12:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:56Z",
+              "conclusion": "success",
+              "name": "Post Run ./.github/actions/setup",
+              "number": 21,
+              "startedAt": "2026-10-13T02:12:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:56Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 22,
+              "startedAt": "2026-10-13T02:12:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:12:56Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 23,
+              "startedAt": "2026-10-13T02:12:56Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821912/job/115089320207"
+        },
+        {
+          "completedAt": "2026-10-13T02:38:34Z",
+          "conclusion": "success",
+          "databaseId": 115089320374,
+          "name": "spike (windows-2025)",
+          "startedAt": "2026-10-13T01:47:43Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T01:47:45Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T01:47:44Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:47:58Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T01:47:45Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:49Z",
+              "conclusion": "success",
+              "name": "Run ./.github/actions/setup",
+              "number": 3,
+              "startedAt": "2026-10-13T01:47:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:50Z",
+              "conclusion": "success",
+              "name": "Offline CI launcher contracts",
+              "number": 4,
+              "startedAt": "2026-10-13T01:48:49Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:30:42Z",
+              "conclusion": "success",
+              "name": "Rust core tests",
+              "number": 5,
+              "startedAt": "2026-10-13T01:48:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:30:55Z",
+              "conclusion": "success",
+              "name": "Build local private runtime pack source",
+              "number": 6,
+              "startedAt": "2026-10-13T02:30:42Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:30:55Z",
+              "conclusion": "skipped",
+              "name": "Install Linux browser shared-library prerequisites",
+              "number": 7,
+              "startedAt": "2026-10-13T02:30:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:30:55Z",
+              "conclusion": "skipped",
+              "name": "Permit pinned browser sandbox under hosted AppArmor policy",
+              "number": 8,
+              "startedAt": "2026-10-13T02:30:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:30:56Z",
+              "conclusion": "success",
+              "name": "Check private sandboxed browser startup with visible errors",
+              "number": 9,
+              "startedAt": "2026-10-13T02:30:55Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:34:33Z",
+              "conclusion": "success",
+              "name": "Package, provision and smoke (no system Node)",
+              "number": 10,
+              "startedAt": "2026-10-13T02:30:56Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:38:28Z",
+              "conclusion": "success",
+              "name": "GPUI compile on Windows/macOS (not opening-window evidence)",
+              "number": 11,
+              "startedAt": "2026-10-13T02:34:33Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:38:30Z",
+              "conclusion": "success",
+              "name": "Post Run ./.github/actions/setup",
+              "number": 21,
+              "startedAt": "2026-10-13T02:38:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:38:32Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 22,
+              "startedAt": "2026-10-13T02:38:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:38:32Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 23,
+              "startedAt": "2026-10-13T02:38:32Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821912/job/115089320374"
+        },
+        {
+          "completedAt": "2026-10-13T02:14:45Z",
+          "conclusion": "success",
+          "databaseId": 115089320411,
+          "name": "spike (macos-14)",
+          "startedAt": "2026-10-13T01:47:50Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-13T01:47:51Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-13T01:47:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:47:54Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 2,
+              "startedAt": "2026-10-13T01:47:51Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:12Z",
+              "conclusion": "success",
+              "name": "Run ./.github/actions/setup",
+              "number": 3,
+              "startedAt": "2026-10-13T01:47:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T01:48:12Z",
+              "conclusion": "success",
+              "name": "Offline CI launcher contracts",
+              "number": 4,
+              "startedAt": "2026-10-13T01:48:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:09:03Z",
+              "conclusion": "success",
+              "name": "Rust core tests",
+              "number": 5,
+              "startedAt": "2026-10-13T01:48:12Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:09:16Z",
+              "conclusion": "success",
+              "name": "Build local private runtime pack source",
+              "number": 6,
+              "startedAt": "2026-10-13T02:09:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:09:16Z",
+              "conclusion": "skipped",
+              "name": "Install Linux browser shared-library prerequisites",
+              "number": 7,
+              "startedAt": "2026-10-13T02:09:16Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:09:16Z",
+              "conclusion": "skipped",
+              "name": "Permit pinned browser sandbox under hosted AppArmor policy",
+              "number": 8,
+              "startedAt": "2026-10-13T02:09:16Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:09:18Z",
+              "conclusion": "success",
+              "name": "Check private sandboxed browser startup with visible errors",
+              "number": 9,
+              "startedAt": "2026-10-13T02:09:16Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:13:02Z",
+              "conclusion": "success",
+              "name": "Package, provision and smoke (no system Node)",
+              "number": 10,
+              "startedAt": "2026-10-13T02:09:18Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:14:41Z",
+              "conclusion": "success",
+              "name": "GPUI compile on Windows/macOS (not opening-window evidence)",
+              "number": 11,
+              "startedAt": "2026-10-13T02:13:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:14:42Z",
+              "conclusion": "success",
+              "name": "Post Run ./.github/actions/setup",
+              "number": 21,
+              "startedAt": "2026-10-13T02:14:41Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:14:42Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803",
+              "number": 22,
+              "startedAt": "2026-10-13T02:14:42Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-13T02:14:42Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 23,
+              "startedAt": "2026-10-13T02:14:42Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/oal/regressee/actions/runs/38333821912/job/115089320411"
+        }
+      ],
+      "status": "completed",
+      "url": "https://github.com/oal/regressee/actions/runs/38333821912",
+      "workflowName": "Phase 0 executable harness (not runtime qualification)"
+    }
+  ],
+  "diagnostic": "Initial audit assumed byte-identical notes across OS checkouts; Windows uses CRLF. All packaged notes match tracked text after explicit CRLF normalization; original bytes remain preserved and hashed. No release files changed.",
+  "verdict": "PASS: published downloadable experimental preview assets and integrity. Native input/accessibility/usability/clean-install/full release qualification are not passed."
+}
