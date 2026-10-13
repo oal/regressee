@@ -46,7 +46,7 @@ impl Shell {
         control: Control,
     ) -> Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>> {
         if self.focus.screen != Screen::Setup
-            || !matches!(control,Control::Name|Control::Address|Control::CrawlField(_)|Control::Choice(_)|Control::Environment(_)|Control::Guided(1..=12|25|27|31..=38)|Control::Details(Detail::Capture)|Control::CloseMappingPreview)
+            || !matches!(control,Control::Name|Control::Address|Control::CrawlField(_)|Control::Choice(_)|Control::Environment(_)|Control::EnvironmentOptions|Control::Guided(1..=12|25|27|31..=38)|Control::Details(Detail::Capture)|Control::CloseMappingPreview)
             || (self.focus.setup_stage == SetupStage::Access
                 && matches!(control, Control::Guided(31 | 32)))
         {
@@ -96,7 +96,10 @@ impl Shell {
                 if guided {
                     self.focus.setup_stage = SetupStage::Access;
                 }
-                self.focus.advanced = true;
+                self.setup_environment_open = true;
+                if matches!(control, Control::CrawlField(10..=12)) {
+                    self.setup_login_correction = true;
+                }
             }
             _ => (),
         }
@@ -308,8 +311,12 @@ impl Shell {
             ("Keyboard shortcuts", keyboard_help())
         } else {
             (
-                "About this preview",
-                "Regressee discovers pages within approved websites, captures chosen screen sizes and checks only an explicitly saved baseline. Projects, screenshots and review history stay local. Login sessions are never included in baseline ZIPs; screenshots may contain private information.\n\nThis is a private preview. Development browsers remain restricted to authorized local fixtures. Native accessibility, cross-platform and public-release qualification remain pending; macOS capture is blocked by a process-ownership code gap. MPL-2.0.",
+                "About Regressee",
+                concat!(
+                    "Regressee ",
+                    env!("CARGO_PKG_VERSION"),
+                    " · MPL-2.0\n\nRegressee discovers pages within approved websites, captures chosen screen sizes and checks only an explicitly saved baseline. Projects, screenshots and review history stay local. Login sessions are never included in baseline ZIPs; screenshots may contain private information.\n\nDevelopment browsers remain restricted to authorized local fixtures. Native accessibility, cross-platform and public-release qualification remain pending; macOS capture is blocked by a process-ownership code gap."
+                ),
             )
         };
         controls::dialog(

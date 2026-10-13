@@ -1334,40 +1334,27 @@ impl Shell {
             .gap_4()
             .child(self.heading(title, next))
             .when(self.focus.setup_stage != SetupStage::Settings, |body| {
-                body.child(
-                    div().flex().flex_wrap().gap_2().children(
-                        [
-                            (SetupStage::Website, "Website"),
-                            (SetupStage::Access, "Access"),
-                            (SetupStage::Pages, "Pages & sizes"),
-                        ]
-                        .into_iter()
-                        .map(|(stage, label)| {
-                            let state = if self.focus.setup_stage == stage {
-                                "Current"
-                            } else if !self.control_enabled(Control::SetupStage(stage), cx) {
-                                "Unavailable"
-                            } else if stage.index() < self.focus.setup_stage.index() {
-                                "Completed"
-                            } else {
-                                "Next"
-                            };
-                            self.button(
-                                Control::SetupStage(stage),
-                                format!("{label} · {state}"),
-                                ActionStyle::Choice {
-                                    selected: self.focus.setup_stage == stage,
-                                },
-                                cx,
-                            )
-                        }),
-                    ),
-                )
+                body.child(self.setup_progress(cx))
             })
             .into_any_element()
     }
 
     pub(super) fn stage_control_mounted(&self, control: Control) -> bool {
+        if self.focus.screen == Screen::Setup
+            && matches!(
+                self.focus.setup_stage,
+                SetupStage::Pages | SetupStage::Settings
+            )
+        {
+            return match control {
+                Control::CrawlField(1..=8)
+                | Control::Guided(7..=10 | 12 | 25)
+                | Control::Choice(Choice::Gentle | Choice::Balanced | Choice::Fast) => {
+                    self.focus.advanced
+                }
+                _ => true,
+            };
+        }
         if self.focus.screen != Screen::Setup || self.focus.setup_stage != SetupStage::Access {
             return true;
         }
@@ -1378,14 +1365,19 @@ impl Shell {
             .find(|e| Some(e.id) == self.environment_draft)
             .is_some_and(|e| e.access == regressee_core::domain::AccessPolicy::InteractiveLogin);
         match control {
+            Control::Guided(6) => false,
             Control::CrawlField(10..=12)
             | Control::Choice(Choice::SaveLogin | Choice::EphemeralLogin) => {
-                login || self.focus.advanced
+                self.setup_login_fields_visible()
             }
             Control::Guided(31..=34) => login,
-            Control::CrawlField(13..=16)
-            | Control::Guided(37 | 38)
-            | Control::Choice(Choice::LightTheme | Choice::DarkTheme) => self.focus.advanced,
+            Control::Environment(_)
+            | Control::CrawlField(13..=16)
+            | Control::Guided(27 | 35..=38)
+            | Control::CloseMappingPreview
+            | Control::Choice(Choice::LightTheme | Choice::DarkTheme) => {
+                self.setup_environment_open
+            }
             _ => true,
         }
     }
@@ -1403,6 +1395,12 @@ impl Shell {
             .bg(rgb(SURFACE))
             .border_t_1()
             .border_color(rgb(LINE))
+            .when(
+                matches!(stage, SetupStage::Access | SetupStage::Pages),
+                |body| {
+                    body.child(self.button(Control::SetupBack, "Back", ActionStyle::Secondary, cx))
+                },
+            )
             .child(self.button(
                 Control::Save,
                 if stage == SetupStage::Website {
@@ -1643,14 +1641,6 @@ impl Shell {
                         },
                         cx,
                     )),
-            )
-            .child(
-                div()
-                    .px_3()
-                    .py_2()
-                    .text_size(px(13.))
-                    .text_color(rgb(RAIL_MUTED))
-                    .child("Private, local preview"),
             )
             .into_any_element()
     }

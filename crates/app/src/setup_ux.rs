@@ -14,6 +14,96 @@ pub(super) struct SetupSave {
 }
 
 impl Shell {
+    pub(super) fn setup_login_fields_visible(&self) -> bool {
+        self.focus.setup_stage == SetupStage::Settings
+            || (self.setup_environment_open && self.setup_login_correction)
+            || self
+                .draft_settings
+                .environments
+                .iter()
+                .find(|e| Some(e.id) == self.environment_draft)
+                .is_some_and(|e| e.access == regressee_core::domain::AccessPolicy::InteractiveLogin)
+    }
+    pub(super) fn refresh_setup_origins(&mut self, cx: &App) {
+        let origins = crawl::sources(&self.address.read(cx).content)
+            .map(|sources| {
+                sources
+                    .iter()
+                    .map(crawl::origin)
+                    .collect::<std::collections::BTreeSet<_>>()
+            })
+            .unwrap_or_default();
+        self.setup_origin_count = origins.len();
+        if self.origins_confirmed && origins != self.approved_origins {
+            self.origins_confirmed = false;
+            self.approved_origins.clear();
+        }
+    }
+    pub(super) fn setup_progress(&self, cx: &mut Context<Self>) -> AnyElement {
+        use regressee_app::ui::setup_progress::{self, StepState};
+        let mut progress = div()
+            .debug_selector(|| "setup-progress".into())
+            .w(px(self.working_width.min(680.)))
+            .flex()
+            .items_center();
+        for (index, (stage, label)) in [
+            (SetupStage::Website, "Website"),
+            (SetupStage::Access, "Access"),
+            (SetupStage::Pages, "Pages & sizes"),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            if index > 0 {
+                progress = progress.child(setup_progress::connector());
+            }
+            let control = Control::SetupStage(stage);
+            let enabled = self.control_enabled(control, cx);
+            let step = setup_progress::step(
+                format!("{control:?}").into(),
+                index + 1,
+                label,
+                StepState::at(index, self.focus.setup_stage.index()),
+                &self.handle(control, cx),
+                enabled,
+            )
+            .when(enabled, |el| {
+                el.on_click(cx.listener(move |s, _, w, cx| s.activate_control(control, w, cx)))
+            });
+            progress = progress.child(step);
+        }
+        progress.into_any_element()
+    }
+    pub(super) fn setup_stage_available(&self, stage: SetupStage, cx: &App) -> bool {
+        !self.focus.busy
+            && (stage.index() <= self.focus.setup_stage.index()
+                || (self.project.is_some()
+                    && !self.unsaved(cx)
+                    && !self.setup_composing(cx)
+                    && (stage != SetupStage::Pages || self.access_can_continue(cx))))
+    }
+    pub(super) fn setup_back(&mut self, w: &mut Window, cx: &mut Context<Self>) {
+        self.focus.setup_stage = match self.focus.setup_stage {
+            SetupStage::Access => SetupStage::Website,
+            SetupStage::Pages => SetupStage::Access,
+            _ => return,
+        };
+        self.show_mapping = false;
+        self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+        w.focus(&self.handle(Control::SetupStage(self.focus.setup_stage), cx));
+        cx.notify();
+    }
+    pub(super) fn toggle_environment_options(&mut self, w: &mut Window, cx: &mut Context<Self>) {
+        self.setup_environment_open = !self.setup_environment_open;
+        if !self.setup_environment_open {
+            self.show_mapping = false;
+            self.setup_login_correction = false;
+            self.timezone.update(cx, |s, _| s.set_enabled(false));
+        }
+        self.reveal_form_control(Control::EnvironmentOptions, false, w, cx);
+        w.focus(&self.handle(Control::EnvironmentOptions, cx));
+        cx.notify();
+    }
     pub(super) fn setup_composing(&self, cx: &App) -> bool {
         self.name.read(cx).composing()
             || self.address.read(cx).composing()

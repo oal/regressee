@@ -103,7 +103,7 @@ impl SetupStage {
     }
     pub fn mounts(self, control: Control) -> bool {
         use Control::*;
-        if matches!(control, ValidationNext) {
+        if matches!(control, ValidationNext | SetupBack) {
             return true;
         }
         match self {
@@ -112,6 +112,7 @@ impl SetupStage {
             Self::Access => matches!(
                 control,
                 Environment(_)
+                    | EnvironmentOptions
                     | Guided(6 | 27 | 31..=38)
                     | CloseMappingPreview
                     | CrawlField(10..=16)
@@ -143,6 +144,8 @@ pub enum ReviewSurface {
 pub enum Control {
     Navigate(Screen),
     SetupStage(SetupStage),
+    SetupBack,
+    EnvironmentOptions,
     PagesBaseline,
     NewProject,
     Name,
@@ -340,6 +343,7 @@ impl FocusState {
         match self.screen {
             Screen::Setup => {
                 controls.extend(SetupStage::ALL.into_iter().map(Control::SetupStage));
+                controls.extend([Control::SetupBack, Control::EnvironmentOptions]);
                 controls.extend([Control::Name, Control::Address]);
                 controls.push(Control::Guided(11));
                 controls.extend(

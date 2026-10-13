@@ -179,6 +179,7 @@ fn mapping_preview_has_bounded_rows_and_a_pinned_close_without_mutations(cx: &mu
         load_review(s, project, cx);
         s.focus.screen = Screen::Setup;
         s.focus.setup_stage = SetupStage::Access;
+        s.setup_environment_open = true;
         s.show_mapping = true;
         s.environment.as_mut().unwrap().mapped = (0..40)
             .map(|i| {
@@ -323,6 +324,7 @@ fn mapped_url_status_refresh_preserves_dirty_and_newer_environment_drafts(cx: &m
             load_review(s, project, cx);
             s.focus.screen = Screen::Setup;
             s.focus.setup_stage = SetupStage::Access;
+            s.activate_control(Control::EnvironmentOptions, window, cx);
             let mut staging = s.draft_settings.environments[0].clone();
             staging.id = regressee_core::domain::EnvironmentId::new();
             staging.name = "Unsaved staging".into();

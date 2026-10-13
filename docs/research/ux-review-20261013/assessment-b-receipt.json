@@ -1,0 +1,101 @@
+{
+  "schema": 1,
+  "assessment": "B",
+  "date": "2026-10-13",
+  "method": "independent native source and existing offscreen-pixel assessment; not A+B synthesis",
+  "report": "docs/research/ux-review-20261013/assessment-b.md",
+  "git_commit": "5f136b7819c3663517d2f9bd5e17f7203e5b262e",
+  "capture_root": "/var/home/olav/Data/opencode/tmp/opencode/regressee-ux-review-20261013-9g3qdv3j",
+  "integrity": {
+    "gallery_manifest_sha256": "7aeaaad48c30dfc7dce448ac94e86734169c5d57e66f3dedaa6336387594d10d",
+    "source_provenance_sha256": "f7189337656662f7fc539c15d67ace89c09e1076360bc9a8766d55239cec424d",
+    "source_hashes_checked": 13,
+    "source_hash_mismatches": 0,
+    "png_hashes_metadata_dimensions_and_main_bindings_checked": 238,
+    "captures_by_size": {"1280x800": 119, "820x600": 119},
+    "errors": [],
+    "extra_source_sha256": {
+      "crates/app/src/ui/text_input.rs": "c5934627ed9aa3aabed349cafaa1ab6b0a03356e9d3eacca98e824e53a9db9bb",
+      "crates/app/src/review_ux.rs": "8a20389179465396389109e1a2d9a1b5e9aa0142cd1ab6ae597de6a43e526b98",
+      "crates/app/src/setup_ux.rs": "cd8fb6d97c5e8ec079f444cd861dad72eeebfc82b4fffab97479f62c6dd8f7fe",
+      "crates/app/src/form_recovery.rs": "3d5fe6db5ce13cdb987961cb635199dc6595fa446c468cfa68f407ed65348522",
+      "crates/storage/src/review.rs": "7c5552135f51b511c57174670741b85be510cd71c1afbf20d3c0921d2aaa3c99"
+    }
+  },
+  "visual_inspection": {
+    "all_contact_sheets": 34,
+    "task_contact_sheets": 8,
+    "full_resolution_spot_checks": true,
+    "new_captures": 0,
+    "real_gpui_blade_offscreen_metadata_count": 238,
+    "real_linux_fonts_metadata_count": 238,
+    "synthetic_project_only_metadata_count": 238,
+    "os_presentation_verified": false,
+    "os_input_verified": false,
+    "accessibility_qualified": false,
+    "state_caveats": [
+      "820x600 pages-mobile-revealed does not visibly reveal Mobile and duplicates pages-sizes",
+      "820x600 access-status-loading duplicates public access; not private-login loading evidence",
+      "1280x800 review-navigation-open duplicates already-open navigation",
+      "advanced analysis and field-0 duplicate the top-field view at both sizes",
+      "constructed scroll offsets do not prove user interaction"
+    ]
+  },
+  "detector": {
+    "command": "/var/home/olav/.config/opencode/skills/impeccable/scripts/impeccable detect --json crates/app/src",
+    "runs": 1,
+    "exit_code": 0,
+    "stdout": "[]\n",
+    "stderr": "",
+    "reported_findings": 0,
+    "rule_names": [],
+    "false_positives": [],
+    "native_rust_coverage": false,
+    "native_clearance": false
+  },
+  "browser": {
+    "inspection": "inapplicable: native GPUI target has no relevant DOM",
+    "dom_injection_attempted": false,
+    "console_findings": null,
+    "visible_overlay": false,
+    "local_server_started": false,
+    "website_visits": 0,
+    "html_proxy_created": false
+  },
+  "tests": {
+    "base": "LIBRARY_PATH=\"$PWD/.runtime/link-libs\" TMPDIR=/var/home/olav/Data/opencode/tmp/opencode cargo test --locked --offline -p regressee-app --all-features",
+    "args_suffix": "-- --test-threads=1",
+    "runs": [
+      {"target": "--bin regressee", "filter": "options_ux_tests::", "passed": 4, "failed": 0, "exit_code": 0},
+      {"target": "--bin regressee", "filter": "phase4_review_tests::", "tests_observed": 8, "exit_code": 0, "aggregate_output_truncated": true},
+      {"target": "--bin regressee", "filter": "phase5_repair_tests::", "passed": 5, "failed": 0, "exit_code": 0},
+      {"target": "--bin regressee", "filter": "phase6_history_tests::", "passed": 2, "failed": 0, "exit_code": 0},
+      {"target": "--bin regressee", "filter": "ui::text_input::tests::", "matched": 0, "filtered": 139, "exit_code": 0, "supplies_coverage": false},
+      {"target": "--lib", "filter": "ui::text_input::tests::", "passed": 8, "failed": 0, "exit_code": 0}
+    ],
+    "full_suite_run": false,
+    "new_regression_tests_added": false,
+    "os_input_qualification": false,
+    "warning": "existing proc-macro-error2 v2.0.1 future-incompatibility warning"
+  },
+  "scores": {"accessibility": 1, "performance": 3, "appearance_and_theming": 3, "platform_conformance": 3, "adaptivity": 3, "total": 13, "maximum": 20, "provisional": true},
+  "findings": [
+    {"id": "B-01", "severity": "P1", "title": "Incompatible review-note limits and silent edit rejection", "evidence": "source-confirmed; existing primitive tests; not OS-reproduced"},
+    {"id": "B-02", "severity": "P2", "title": "Unconditional automatic-install promise contradicts runtime readiness", "evidence": "source and native pixels"},
+    {"id": "B-03", "severity": "P2", "title": "Compact review omits disabled-action reasons", "evidence": "source-confirmed retained-draft edge state; not OS-reproduced"},
+    {"id": "B-04", "severity": "P2", "title": "Production heatmap lacks color-meaning legend", "evidence": "source and native pixels at both sizes"}
+  ],
+  "severity_counts": {"P0": 0, "P1": 1, "P2": 3, "P3": 0},
+  "qualification_limits_separate_from_findings": ["Q-01 native accessibility and desktop input", "Q-02 existing preview/runtime constraints", "Q-03 screenshot state/reveal coverage"],
+  "boundaries": {
+    "assessment_a_or_prior_reports_read": false,
+    "assessment_a_inspection_ledger_read": false,
+    "subagents_spawned": 0,
+    "production_files_edited": 0,
+    "user_projects_mutated": false,
+    "commits_created": 0,
+    "pushes": 0,
+    "authored_files": ["docs/research/ux-review-20261013/assessment-b.md", "docs/research/ux-review-20261013/assessment-b-receipt.json"],
+    "questions": "skipped: all in-scope findings already authorized; no scope/priority questions requested"
+  }
+}

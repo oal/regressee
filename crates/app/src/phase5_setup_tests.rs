@@ -262,6 +262,9 @@ fn explicit_save_and_find_rejects_newer_draft_and_dispatches_only_after_exact_sa
             load_review(s, project, cx);
             s.focus.screen = Screen::Setup;
             s.focus.setup_stage = SetupStage::Pages;
+            // Runtime observation is an independent read, not discovery authorization.
+            s.refresh_visible(cx);
+            finish_jobs(s, cx);
             let baseline = s.project.as_ref().unwrap().project.active_baseline;
             s.name
                 .update(cx, |f, cx| f.set_value("Discovery submitted", cx));

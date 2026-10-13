@@ -51,7 +51,11 @@ fn dismissing_a_read_error_keeps_recovery_instead_of_an_idle_loading_state(
 pub(super) fn finish_jobs(s: &mut Shell, cx: &mut Context<Shell>) {
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     for _ in 0..64 {
-        if s.pending.is_none() && s.viewer_pending.is_none() && s.storage_pending.is_none() {
+        if s.pending.is_none()
+            && s.viewer_pending.is_none()
+            && s.storage_pending.is_none()
+            && s.runtime_pending.is_none()
+        {
             return;
         }
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());

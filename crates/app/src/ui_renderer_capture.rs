@@ -10,6 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "ui_phase1_capture.rs"]
+mod ui_phase1_capture;
 #[path = "ui_review_matrix.rs"]
 mod ui_review_matrix;
 
@@ -101,6 +103,13 @@ fn write_frame(
             "task_icons_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/status_icon.rs"))),
             "web_link_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/web_link.rs"))),
             "main_source_sha256": hex::encode(Sha256::digest(include_bytes!("main.rs")))
+            ,"setup_source_sha256": hex::encode(Sha256::digest(include_bytes!("setup_ux.rs")))
+            ,"progress_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/setup_progress.rs")))
+            ,"runtime_copy_source_sha256": hex::encode(Sha256::digest(include_bytes!("runtime_ux.rs")))
+            ,"workflow_source_sha256": hex::encode(Sha256::digest(include_bytes!("workflow.rs")))
+            ,"form_recovery_source_sha256": hex::encode(Sha256::digest(include_bytes!("form_recovery.rs")))
+            ,"core_shell_source_sha256": hex::encode(Sha256::digest(include_bytes!("../../core/src/shell.rs")))
+            ,"phase1_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase1_capture.rs")))
         });
         let file = fs::OpenOptions::new()
             .write(true)
