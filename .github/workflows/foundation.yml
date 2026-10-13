@@ -15,7 +15,8 @@ permissions:
   contents: read
 jobs:
   contracts:
-    timeout-minutes: 60
+    # Hosted 4f84363 took up to 54m39s; keep cold-host headroom bounded.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -40,12 +41,12 @@ jobs:
         shell: bash
         run: python -B scripts/test_source_release.py --report "$RUNNER_TEMP/source-release-tests.json"
       - name: Application contracts including distinct persisted bulk qualification
-        timeout-minutes: 30
+        timeout-minutes: 45
         run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support
       - name: UI-inclusive API and lint check on every target
         run: cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
       - name: Native link and simulated GPUI tests (not desktop launch)
-        timeout-minutes: 30
+        timeout-minutes: 45
         shell: bash
         run: |
           cargo build --locked --workspace --features ui --bins

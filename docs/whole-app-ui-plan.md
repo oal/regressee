@@ -99,22 +99,35 @@ task; it does not replace the existing implementation `PLAN.md`.
   recipient SHM files, explicitly recorded, not restored or silently refrozen.
   Zero participants; **no full native/accessibility/usability/release acceptance**.
   **Phase 7 committed/pushed:** `b46dff5` (parent-confirmed delivery base).
-- **Post-plan CI/preview delivery independently locally VERIFIED / READY for parent commit/push:** semantic-preserving
+- **Post-plan CI/preview delivery pushed as `4f84363`; hosted Foundation PASS, Phase 0 Windows timeout repair locally READY:** semantic-preserving
   strict lint repairs, launcher/packaging checks in hosted CI, bounded default bulk
   tests and source-bound whole-app prerelease notes. See
   [delivery report](research/whole-app-ui-review-20261012/delivery-report.md).
   Independent [delivery verification](research/whole-app-ui-review-20261012/delivery-verification.md)
   passes the full Foundation-equivalent local gates with no patch defects; both
-  complete suites finished (default bulk qualification retained). Hosted outcomes
-  for this unpushed patch and supported-release acceptance are not claimed.
+  complete suites finished (default bulk qualification retained). Foundation
+  **38324688298** subsequently passed Ubuntu/Windows/macOS (54m39s / 40m51s /
+  52m55s). Phase 0 **38324688313** passed Ubuntu/macOS, but Windows failed solely
+  at its 30-minute core-test step limit while the distinct 1,000-page test was
+  running; no assertion failure was reported. That interrupted suite is not a pass.
   Strict all-target/all-feature Clippy, native UI build and formatting pass;
   complete contracts **178/0/27** and all-features **358/0/45**
   (passed/failed/ignored) exit 0, both retaining the default distinct 100/1,000-page
   qualification. Launcher **6**, packaging **8**, source helper **32** tests and
   Phase 0 smoke/protocol commands pass. Counts overlap, not unique totals.
   Native/AT/full-release gates remain blocked or untested; no new visual cycle.
-  **Next:** parent verified commit/push, observe Foundation
-  and Phase 0 on all three hosts, then create a fresh preview tag and verify both
+  Finite follow-up: Foundation/Phase 0 jobs **90m**, relevant test steps **45m**;
+  preview contract step **45m**, preview job retains **90m**. All tests, strict
+  lint/security gates and the normal matrices remain unchanged. Actionlint plus
+  launcher **6** and packaging **8** tests pass locally; no duplicate full Rust
+  suite for this YAML/docs-only patch. See the report's post-push timeout appendix.
+  Independent timeout-patch verification **PASS LOCAL**, including actionlint,
+  launcher/packaging checks and fresh read-only hosted evidence; the bounded patch
+  is ready for parent commit/push, not claimed to have repaired hosted Windows yet.
+  **Next:** parent verified commit/push,
+  require the new commit's Foundation and Phase 0 to pass on **all three hosts**,
+  including Windows's previously unexecuted runtime stages, then create a fresh
+  preview tag and verify both
   hosted builds, exact-source archive, checksums and downloadable assets. No
   implementation-agent commit/push/tag/release or cancellation of external runs.
 - **Phases 1–7 authorized on 2026-10-12:** the user explicitly requested the

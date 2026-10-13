@@ -9,6 +9,10 @@ accessibility, fresh-runtime installation or supported-release acceptance.
 All independent suites have completed; none is pending. No product edits, renders,
 commit, push, dispatch, tag, publication or cancellation were performed.
 
+The original verification below is historical. The appended **timeout follow-up**
+records hosted outcomes at the subsequently pushed `4f84363` and supersedes the
+original unpushed status and 30-minute budget assessment.
+
 ## Independent checks
 
 Rust used pinned `rustc 1.98.1`, the existing local cache, and
@@ -125,3 +129,87 @@ and requires separately reviewed dependency work before a future toolchain upgra
 
 **Finite defect list: none in the reviewed delivery patch.** Proceed with the
 parent's verified commit/push and hosted validation, not a supported-release claim.
+
+## Independent timeout follow-up — 2026-10-13
+
+Base: `4f843635c8632ba725cb360e1e69d3d8e80e7c50`, committed/pushed by the
+parent. **PASS LOCAL — finite scoped budget patch ready for parent commit/push;
+no fixes required.** This uncommitted follow-up has no hosted result yet.
+
+### Actual hosted evidence
+
+Independently retrieved `gh run view <run> --json status,conclusion,headSha,jobs`
+for both runs: each is completed against the exact base SHA above. Durations
+were independently calculated from returned timestamps and agree with the
+implementation report.
+
+| Run | Host | Actual outcome / job duration | Contract duration |
+|---|---|---|---|
+| Foundation **38324688298** | Ubuntu 24.04 | SUCCESS / 54m39s | SUCCESS / 24m52s |
+| Foundation **38324688298** | macOS 14 | SUCCESS / 52m55s | SUCCESS / 24m49s |
+| Foundation **38324688298** | Windows 2025 | SUCCESS / 40m51s | SUCCESS / 17m03s |
+| Phase 0 **38324688313** | Ubuntu 24.04 | SUCCESS / 16m43s | SUCCESS / 13m05s |
+| Phase 0 **38324688313** | macOS 14 | SUCCESS / 33m18s | SUCCESS / 25m14s |
+| Phase 0 **38324688313** | Windows 2025 | FAILURE / 31m12s | FAILURE / 30m00s timeout |
+
+Foundation's combined UI build/all-feature steps also succeeded on all three
+hosts (Ubuntu 27m15s, macOS 25m27s, Windows 20m01s). Its strict Clippy gate passed.
+Fresh `gh run view 38324688313 --log-failed` retrieval confirms Windows started
+the qualification binary at 23:58:32Z, reported the distinct persisted
+100/1,000-page test still running after 60 seconds, and interrupted it at
+00:27:08Z with `The action 'Rust core tests' has timed out after 30 minutes.`
+No Rust assertion failure was found. **The interrupted suite did not pass**;
+Windows's subsequent runtime setup/smoke/protocol/native compile stages were
+skipped. Foundation's Windows success does not replace those Phase 0 stages or
+prove why this run was slower; a hang/performance diagnosis is not established.
+
+Independent JSON and failure log evidence is retained in the approved temporary
+directory as `delivery-verifier-followup-foundation.json`,
+`delivery-verifier-followup-phase0.json`, and
+`delivery-verifier-followup-phase0-failure.log`.
+
+### Scope, bounds and local checks
+
+- Workflow diff normalization independently proves **only timeout values and
+  comments changed**. Commands, full default bulk tests, workspace features,
+  strict all-target/all-feature `-D warnings`, host matrices, launcher/ownership,
+  sandbox/ACL checks, SHA pins, permissions and preview publication safeguards
+  are identical to the base. No retries, failure swallowing, ignored tests or
+  conditional gate bypasses were added. Product/scripts and Phase 7 historical
+  evidence are unchanged; delivery docs correctly preserve earlier evidence.
+- Foundation now has a **90-minute job** and **45-minute contract and combined
+  UI build/test steps**. Phase 0 has a **90-minute job / 45-minute core-test
+  step**. Preview's contract step is **45 minutes**, with its build job still
+  **90 minutes** and publish job still **10 minutes**. These provide reasonable
+  measured-host headroom while retaining hard limits; 45 minutes is not a
+  demonstrated completion time for the interrupted Windows test. Job limits
+  still cap total setup/lint/runtime/build time even if individual step maxima
+  sum to the entire job budget. Further timeouts require actual-log diagnosis,
+  not unlimited budget escalation or a fabricated pass.
+- **PASS, exit 0:**
+  `/var/home/olav/Data/opencode/tmp/opencode/delivery-validation-bin/actionlint
+  .github/workflows/foundation.yml .github/workflows/phase0.yml
+  .github/workflows/release-preview.yml`, using installed **v1.7.7** and default
+  checks, with no checks disabled.
+- **PASS, exit 0:** `TMPDIR=/var/home/olav/Data/opencode/tmp/opencode python -B
+  scripts/test_ci_run.py` (**6 tests**) and the same environment with `python -B
+  scripts/test_package_preview.py` (**8 tests**); `git diff --check` also passed.
+  No local verification process remains pending. Full Rust suites were not
+  rerun for this YAML/docs-only patch; their prior local and actual hosted
+  Foundation results remain separately scoped evidence.
+
+### Remaining requirements
+
+Parent may commit/push this locally verified patch. Require the **new exact
+commit's Foundation and Phase 0 normal three-host matrices** to complete
+successfully: six jobs, including complete Windows bulk qualification followed
+by its previously skipped runtime and GPUI stages. The old Windows timeout
+remains a failure, not a waived or retroactively repaired result. Only after
+those outcomes should the parent proceed to a fresh preview tag and verify both
+Linux/Windows release builds, ABI/static-CRT/shaders/DLL checks, exact-source and
+checksum binding, publication and actual downloads. No tag availability was
+rechecked or reserved during this follow-up. Existing native/accessibility,
+fresh-installation, macOS supervision and supported-release limitations remain.
+
+**Finite defect list: none.** No commit, push, dispatch, tag, publication,
+cancellation, product edit or render performed by this verifier.

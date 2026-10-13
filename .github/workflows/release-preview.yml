@@ -61,7 +61,8 @@ jobs:
           python -B scripts/test_ci_run.py
           python -B scripts/test_package_preview.py
       - name: Run application contract tests
-        timeout-minutes: 30
+        # Retain the full bulk suite with the same cold-host budget as CI.
+        timeout-minutes: 45
         run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support --target ${{ matrix.target }}
       - name: Build the desktop application
         run: cargo build --release --locked -p regressee-app --features ui --bin regressee --target ${{ matrix.target }}
