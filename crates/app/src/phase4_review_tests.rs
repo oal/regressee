@@ -325,7 +325,7 @@ fn repair_v4_3_persistent_non_root_identity_historical_environments_all_modes(
                 "inspected-target-profile-environments",
             ] {
                 let b = cx.debug_bounds(name).unwrap();
-                let owner = cx.debug_bounds("review-viewer").unwrap();
+                let owner = cx.debug_bounds("bounded-review").unwrap();
                 assert!(b.left() >= owner.left() && b.right() <= owner.right());
                 assert!(b.top() >= owner.top() && b.bottom() <= owner.bottom());
                 assert!(b.size.height > px(0.));

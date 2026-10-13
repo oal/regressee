@@ -498,7 +498,7 @@ pub(super) fn chevron(open: bool) -> impl IntoElement {
     chevron_sized(open, 16.)
 }
 
-pub(super) fn chevron_sized(open: bool, edge: f32) -> impl IntoElement {
+pub fn chevron_sized(open: bool, edge: f32) -> impl IntoElement {
     canvas(
         |_, _, _| (),
         move |bounds, (), window, _| {

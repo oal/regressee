@@ -706,16 +706,85 @@ impl Shell {
                 cx,
             ));
         }
-        div().debug_selector(|| "ordinary-review-decisions".into()).flex_shrink_0().flex().flex_col().gap_1()
-            .child(div().text_size(px(13.)).line_height(px(18.)).child(if self.narrow_workspace {
-                format!("{label} · {}", self.review_progress_summary())
-            } else { format!("Current review: {label} · displayed analysis only") }))
-            .when(!self.narrow_workspace, |bar| bar.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(self.review_progress_summary())))
-            .child(div().flex().flex_wrap().items_center().justify_between().gap_3().child(actions)
-                .child(div().flex().gap_2().child(self.button(Control::Phase5(37), "Review note", ActionStyle::Secondary, cx)).child(self.button(Control::Phase5(33), "Next unreviewed", ActionStyle::Primary, cx))))
-            .when(!self.narrow_workspace && (self.mask_dirty || self.mask_geometry_dirty(cx) || self.review_note_dirty(cx)), |bar| bar.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Save your note and ignored-area drafts before Next unreviewed.")))
-            .when(!self.narrow_workspace && !self.review_result_valid(), |bar| bar.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Review decisions need a completed, comparable analysis with eligible pixels and no pending edits.")))
+        div()
+            .debug_selector(|| "ordinary-review-decisions".into())
+            .flex_shrink_0()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .child(
+                div()
+                    .text_size(px(13.))
+                    .line_height(px(18.))
+                    .child(if self.narrow_workspace {
+                        format!("{label} · {}", self.review_progress_summary())
+                    } else {
+                        format!("Current review: {label} · displayed analysis only")
+                    }),
+            )
+            .when(!self.narrow_workspace, |bar| {
+                bar.child(
+                    div()
+                        .text_size(px(13.))
+                        .text_color(rgb(MUTED))
+                        .child(self.review_progress_summary()),
+                )
+            })
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap_3()
+                    .child(actions)
+                    .child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .child(self.button(
+                                Control::Phase5(37),
+                                "Review note",
+                                ActionStyle::Secondary,
+                                cx,
+                            ))
+                            .child(self.button(
+                                Control::Phase5(33),
+                                "Next unreviewed",
+                                ActionStyle::Primary,
+                                cx,
+                            )),
+                    ),
+            )
+            .when_some(self.review_blocking_reason(cx), |bar, reason| {
+                bar.child(
+                    div()
+                        .debug_selector(|| "review-blocking-reason".into())
+                        .text_size(px(13.))
+                        .line_height(px(18.))
+                        .text_color(rgb(MUTED))
+                        .child(reason),
+                )
+            })
             .into_any_element()
+    }
+    /// Explanatory only: the authoritative action/draft guards remain separate.
+    pub(super) fn review_blocking_reason(&self, cx: &App) -> Option<&'static str> {
+        if self.mask_geometry_dirty(cx) {
+            Some("Apply your coordinates, then save ignored areas in Analysis.")
+        } else if self.mask_dirty {
+            Some("Save ignored areas in Analysis before reviewing or moving on.")
+        } else if self.review_note_dirty(cx) {
+            Some("Save your draft in Review note before Next unreviewed.")
+        } else if self.analysis_pending.is_some() || self.analysis_due.is_some() {
+            Some("Analysis is pending. Wait for results before review decisions.")
+        } else if !self.review_result_valid() {
+            Some("This evidence is not comparable. Open Details for the cause.")
+        } else if self.next_unreviewed_key().is_none() {
+            Some("No other matching unreviewed result. Change filters or choose a result.")
+        } else {
+            None
+        }
     }
     pub(super) fn keyboard_mask_editor(&self, cx: &mut Context<Self>) -> AnyElement {
         let editor = div().flex().flex_col().gap_2().child(

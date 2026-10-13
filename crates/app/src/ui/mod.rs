@@ -2,6 +2,7 @@
 pub mod controls;
 pub mod gpu_diagnostics;
 pub mod performance;
+pub mod selector;
 pub mod setup_progress;
 pub mod status_icon;
 pub mod text_input;

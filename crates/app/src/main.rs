@@ -32,6 +32,7 @@ use std::{
     time::Duration,
 };
 
+mod evidence_workspace;
 mod exit_guard;
 mod form_recovery;
 mod loading_ux;
@@ -275,6 +276,7 @@ struct Shell {
     navigation_collapsed: bool,
     navigation_preference: Option<bool>,
     viewer_mode_open: bool,
+    viewer_mode_trigger: std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>,
     full_width_after: bool,
     discovery_preview_visible: bool,
     result_filters_open: bool,
@@ -444,6 +446,7 @@ impl Shell {
             navigation_collapsed: false,
             navigation_preference: None,
             viewer_mode_open: false,
+            viewer_mode_trigger: Default::default(),
             full_width_after: false,
             discovery_preview_visible: false,
             result_filters_open: false,
@@ -2599,6 +2602,13 @@ impl Shell {
             .find(|c| self.control_enabled(*c, cx) && self.handle(*c, cx).is_focused(window))
     }
     fn move_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
+        // A selector is one shell stop: Tab dismisses and continues from View,
+        // rather than traversing the popup's arrow-key choices.
+        if self.viewer_mode_open {
+            self.viewer_mode_open = false;
+            self.presentation_focus = None;
+            window.focus(&self.handle(Control::Guided(54), cx));
+        }
         let controls: Vec<_> = self
             .visible_controls()
             .into_iter()
@@ -4316,7 +4326,9 @@ impl Shell {
             .gap_2()
             .when(self.narrow_workspace, |body| body.gap_1())
             .when(
-                !self.page_list_workspace() && !self.authoritative_empty_capture(),
+                !self.page_list_workspace()
+                    && (self.viewer.is_none() || self.selected_capture_failed())
+                    && !self.authoritative_empty_capture(),
                 |body| body.child(self.guided_button(50, "Hide results", cx)),
             )
             .when(!empty_results, |body| {
@@ -5159,6 +5171,16 @@ impl Shell {
         style: ActionStyle,
         cx: &mut Context<Self>,
     ) -> AnyElement {
+        self.action_control(control, label, style, cx)
+            .into_any_element()
+    }
+    fn action_control(
+        &self,
+        control: Control,
+        label: impl Into<SharedString>,
+        style: ActionStyle,
+        cx: &mut Context<Self>,
+    ) -> gpui::Stateful<Div> {
         let enabled = self.control_enabled(control, cx);
         let handle = self.handle(control, cx);
         controls::action(
@@ -5192,11 +5214,16 @@ impl Shell {
                 cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
             )
         })
-        .into_any_element()
     }
     /// The same prerequisites govern pointer actions, keyboard dispatch, and
     /// Tab stops. Backend validation remains authoritative for every mutation.
     fn control_enabled(&self, control: Control, cx: &App) -> bool {
+        if self.zoom_select.read(cx).is_open()
+            && matches!(control, Control::Phase5(20..=25 | 32 | 33 | 37))
+        {
+            // The selector occludes evidence: no hidden review/baseline dispatch.
+            return false;
+        }
         if self.task.is_some() {
             return !self.native_prompt && self.visible_controls().contains(&control);
         }
@@ -5681,7 +5708,7 @@ impl Shell {
             Viewer => viewer && self.viewer_has_pixels(),
             Guided(11) => setup && self.setup_origin_count > 1,
             Guided(1..=3 | 6 | 7) => setup,
-            Guided(44) => analysis && self.preview.is_none(),
+            Guided(44) => analysis && self.preview.is_none() && !self.mask_draw,
             Guided(45) => inventory,
             Guided(46) => viewer && self.viewer_has_pixels(),
             Guided(52) => false,
@@ -5717,7 +5744,7 @@ impl Shell {
             Guided(54) => viewer && analysis,
             Guided(55) => viewer && analysis && self.viewer_mode_open,
             Guided(56) => viewer && analysis && self.viewer_mode == 4,
-            Guided(57) => viewer && analysis && self.viewer_mode_open,
+            Guided(57) => false,
             Guided(_) => false,
             CrawlField(0..=2) => setup,
             CrawlField(3..=8) => setup && self.focus.advanced,
@@ -5728,7 +5755,12 @@ impl Shell {
             Phase5(0..=5 | 14..=19 | 26 | 34..=35) => analysis && self.review_tools,
             Phase5(20..=22 | 33) => analysis,
             Phase5(32) => analysis && self.review_note_open,
-            Phase5(36) => results && self.evidence.latest.is_some() && !self.page_list_workspace(),
+            Phase5(36) => {
+                results
+                    && self.evidence.latest.is_some()
+                    && !self.page_list_workspace()
+                    && !self.mask_draw
+            }
             Phase5(38) => results && self.evidence.latest.is_some() && self.capture_details_open,
             Phase5(39) => results && self.viewer_inspector_open(),
             Phase5(37) => analysis,
@@ -6329,104 +6361,19 @@ impl Shell {
             .flex_col()
             .gap_2()
             .when(self.narrow_workspace, |section| section.gap_1());
-        if self.review_queue_collapsed {
-            let (path, context) = self.inspection_identity();
+        if self.page_list_workspace() {
+            section = section.child(self.evidence_toolbar(cx));
+        }
+        section = section.child(self.viewer_panes_layout(view, true, cx));
+        if self.mask_draw {
             section = section.child(
                 div()
-                    .debug_selector(|| "inspected-target-context".into())
-                    .w_full()
-                    .min_w_0()
                     .flex_shrink_0()
-                    .flex()
-                    .flex_col()
-                    .text_size(px(14.))
-                    .line_height(px(20.))
-                    .child(
-                        div()
-                            .debug_selector(|| "inspected-target-path".into())
-                            .font_weight(FontWeight::MEDIUM)
-                            .child(path),
-                    )
-                    .child(
-                        div()
-                            .debug_selector(|| "inspected-target-profile-environments".into())
-                            .text_color(rgb(MUTED))
-                            .child(context),
-                    ),
+                    .text_size(px(13.))
+                    .line_height(px(18.))
+                    .text_color(rgb(MUTED))
+                    .child("Drag to mark an ignored area · Esc to finish"),
             );
-        }
-        let mut view_tools = div()
-            .debug_selector(|| "viewer-toolbar".into())
-            .flex_shrink_0()
-            .flex()
-            .flex_wrap()
-            .gap_2()
-            .when(self.narrow_workspace, |tools| tools.gap_1());
-        if self.evidence.comparison.is_some() {
-            view_tools = view_tools
-                .child(self.guided_button(
-                    54,
-                    format!(
-                        "View: {}",
-                        [
-                            "Compare",
-                            "Difference",
-                            "Overlay",
-                            "Heatmap",
-                            "Before/After (full width)"
-                        ][self.viewer_mode]
-                    ),
-                    cx,
-                ))
-                .when(self.viewer_mode == 4, |modes| {
-                    modes.child(self.guided_button(
-                        56,
-                        if self.full_width_after {
-                            "After · Show Before"
-                        } else {
-                            "Before · Show After"
-                        },
-                        cx,
-                    ))
-                });
-        }
-        view_tools = view_tools
-            .when(self.viewer_has_pixels(), |tools| {
-                tools.child(self.zoom_select.clone())
-            })
-            .child(self.button(
-                Control::Phase5(36),
-                "Details",
-                ActionStyle::Choice {
-                    selected: self.capture_details_open,
-                },
-                cx,
-            ));
-        if self.evidence.comparison.is_some() && self.preview.is_none() {
-            view_tools = view_tools.child(self.button(
-                Control::Guided(44),
-                "Analysis",
-                ActionStyle::Choice {
-                    selected: self.review_tools,
-                },
-                cx,
-            ));
-        }
-        if self.mask_draw {
-            view_tools = view_tools.child(self.button(
-                Control::Phase5(14),
-                "Done drawing",
-                ActionStyle::Secondary,
-                cx,
-            ));
-        }
-        section = section.child(view_tools);
-        section = section.child(self.viewer_panes_layout(view, true, cx));
-        if self.viewer_has_pixels() {
-            section = section.child(div().flex_shrink_0().text_size(px(13.)).line_height(px(18.)).text_color(rgb(MUTED))
-                .child(if self.mask_draw { "Drag to mark an ignored area · Esc to finish" }
-                else if self.narrow_workspace { "Drag / scroll to move · Ctrl + scroll to zoom" }
-                 else { "Drag or scroll to move · Ctrl + scroll to zoom · Zoom menu for fit width or actual size" }));
         }
         if self.evidence.comparison.is_some() && self.viewer_mode == 2 {
             section = section.child(
@@ -6452,89 +6399,6 @@ impl Shell {
             );
         }
         section
-            .when(self.viewer_mode_open, |section| {
-                let origin = self
-                    .viewer_bounds
-                    .get()
-                    .map(|b| b.origin)
-                    .unwrap_or(gpui::point(
-                        px(24.
-                            + if self.navigation_collapsed { 0. } else { 192. }
-                            + self.review_queue_width()
-                            + 12.),
-                        px(180.),
-                    ));
-                let origin = gpui::point(
-                    origin.x,
-                    origin.y.min(px((self.viewport_height - 320.).max(0.))),
-                );
-                section.child(
-                    gpui::deferred(
-                        gpui::anchored().position(origin).child(
-                            div()
-                                .id("viewer-mode-chooser")
-                                .debug_selector(|| "viewer-mode-chooser".into())
-                                .w(px(280.))
-                                .p_3()
-                                .bg(rgb(SURFACE))
-                                .border_1()
-                                .border_color(rgb(CONTROL_LINE))
-                                .occlude()
-                                .flex()
-                                .flex_col()
-                                .gap_2()
-                                .on_key_down(cx.listener(
-                                    |this, event: &gpui::KeyDownEvent, window, cx| {
-                                        let options = [
-                                            Control::Phase5(6),
-                                            Control::Phase5(7),
-                                            Control::Phase5(8),
-                                            Control::Phase5(9),
-                                            Control::Guided(55),
-                                        ];
-                                        let current = options
-                                            .iter()
-                                            .position(|c| this.handle(*c, cx).is_focused(window))
-                                            .unwrap_or(0);
-                                        let next = match event.keystroke.key.as_str() {
-                                            "down" | "right" => (current + 1) % options.len(),
-                                            "up" | "left" => {
-                                                (current + options.len() - 1) % options.len()
-                                            }
-                                            "home" => 0,
-                                            "end" => options.len() - 1,
-                                            _ => return,
-                                        };
-                                        window.focus(&this.handle(options[next], cx));
-                                        cx.stop_propagation();
-                                    },
-                                ))
-                                .children(
-                                    [
-                                        (6, "Compare"),
-                                        (7, "Difference"),
-                                        (8, "Overlay"),
-                                        (9, "Heatmap"),
-                                    ]
-                                    .into_iter()
-                                    .map(|(index, label)| {
-                                        self.button(
-                                            Control::Phase5(index),
-                                            label,
-                                            ActionStyle::Choice {
-                                                selected: self.viewer_mode == index - 6,
-                                            },
-                                            cx,
-                                        )
-                                    }),
-                                )
-                                .child(self.guided_button(55, "Before/After (full width)", cx))
-                                .child(self.guided_button(57, "Close view chooser", cx)),
-                        ),
-                    )
-                    .with_priority(2),
-                )
-            })
             .when(self.viewer_inspector_open(), |section| {
                 section.child(self.viewer_inspector(cx))
             })
@@ -6886,6 +6750,7 @@ impl Shell {
         };
         let mut panes = div()
             .id("image-viewer")
+            .tooltip(|_, cx| cx.new(|_| evidence_workspace::InspectionHint("Drag or scroll to pan · Shift + scroll for horizontal movement · Ctrl + scroll to zoom · Focus evidence: arrows to pan, +/− to zoom, 0 for fit, 1 for actual size".into())).into())
             .when(
                 bounded && self.control_enabled(Control::Viewer, cx),
                 |panes| {
@@ -6991,7 +6856,13 @@ impl Shell {
                 };
                 viewport = viewport.child(div().p_4().child(message));
             }
-            let mut rectangles = self.mask_rectangles.clone();
+            // Ordinary originals stay untinted even with saved ignored areas.
+            // Geometry paint belongs only to the explicit analysis editor.
+            let mut rectangles = if self.review_tools || self.mask_draw {
+                self.mask_rectangles.clone()
+            } else {
+                Vec::new()
+            };
             if let Some((a, b)) = self.mask_drag
                 && let Some(r) = regressee_app::review::rectangle(a, b)
             {
@@ -7132,72 +7003,25 @@ impl Shell {
                     .gap_2()
                     .when(bounded && self.narrow_workspace, |pane| pane.gap_1())
                     .child(if bounded {
-                        let (mut title, origin, profile) = self.pane_caption(index);
+                        let (mut title, _, _) = self.pane_caption(index);
                         if mode == 2 {
                             title = "Overlay · before + after".into();
                         }
-                        if self.narrow_workspace && indices.len() > 1 {
-                            title = format!(
-                                "{}: {}",
-                                if index == 0 { "Before" } else { "After" },
-                                origin.lines().next().unwrap_or("environment not loaded")
-                            );
-                        }
                         div()
                             .debug_selector(move || format!("evidence-caption-{index}"))
-                            .h(px(if indices.len() == 1 {
-                                40.
-                            } else if self.narrow_workspace {
-                                36.
-                            } else {
-                                60.
-                            }))
+                            .h(px(if mode == 3 { 36. } else { 18. }))
                             .flex_shrink_0()
                             .overflow_hidden()
-                            .text_size(px(if self.narrow_workspace { 13. } else { 14. }))
-                            .line_height(px(if self.narrow_workspace { 18. } else { 20. }))
-                            .child(if indices.len() == 1 {
-                                div()
-                                    .flex()
-                                    .items_center()
-                                    .justify_between()
-                                    .gap_2()
-                                    .child(div().font_weight(FontWeight::SEMIBOLD).child(title))
-                                    .child(
-                                        div()
-                                            .text_color(rgb(MUTED))
-                                            .text_ellipsis()
-                                            .child(profile.clone()),
-                                    )
-                                    .into_any_element()
+                            .text_size(px(13.))
+                            .line_height(px(18.))
+                            .child(if mode == 3 {
+                                evidence_workspace::heatmap_legend()
                             } else {
                                 div()
                                     .text_ellipsis()
                                     .font_weight(FontWeight::SEMIBOLD)
                                     .child(title)
                                     .into_any_element()
-                            })
-                            .when(indices.len() == 1 || !self.narrow_workspace, |caption| {
-                                caption.child(
-                                    div()
-                                        .text_ellipsis()
-                                        .text_color(rgb(MUTED))
-                                        .child(origin.replace('\n', " · ")),
-                                )
-                            })
-                            .when(indices.len() > 1, |caption| {
-                                caption.child(div().text_ellipsis().child(
-                                    if self.narrow_workspace {
-                                        profile
-                                            .rsplit_once(" · ")
-                                            .map(|(name, dimensions)| {
-                                                format!("{dimensions} · {name}")
-                                            })
-                                            .unwrap_or(profile)
-                                    } else {
-                                        profile
-                                    },
-                                ))
                             })
                             .into_any_element()
                     } else {
@@ -7625,6 +7449,20 @@ impl Render for Shell {
             self.reveal_form_control(control, true, window, cx);
             self.reveal_review_control(control, window, cx);
             self.presentation_focus = None;
+        }
+        if self.viewer_mode_open
+            && ![
+                Control::Guided(54),
+                Control::Guided(55),
+                Control::Phase5(6),
+                Control::Phase5(7),
+                Control::Phase5(8),
+                Control::Phase5(9),
+            ]
+            .iter()
+            .any(|c| self.handle(*c, cx).is_focused(window))
+        {
+            self.viewer_mode_open = false;
         }
         let mut feedback = div()
             .id("feedback")
@@ -8073,6 +7911,10 @@ mod phase7_qualification_tests;
 mod phase1_runtime_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase1_setup_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase2_evidence_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase2_viewer_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase4_review_tests;
 #[cfg(all(test, feature = "ui-tests"))]

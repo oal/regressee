@@ -143,7 +143,17 @@ Findings: **A1, A5, B-02**.
 
 ## Phase 2 — Evidence workspace, menus and action explanations
 
-**Status: pending**
+**Status: complete — independently verified PASS**
+
+Implementer handoff: `docs/research/ux-review-20261013/phase2-implementation.md`.
+Initial handoff: five new regressions and a 40-frame two-size native confirmation.
+The independent **FIX** is preserved in
+`docs/research/ux-review-20261013/phase2-verification.md`. The same implementer
+repaired V2-1 (mounted drawing-toolbar exit) and V2-2 (width transcription) in one
+correction batch; focused regression/feature gates and targeted drawing confirmation
+are recorded in the handoff. The same verifier accepted the repairs and the
+entire bounded phase; the original FIX remains intact. Parent performs this phase's
+commit/push after this update and records its hash in the next phase.
 
 Findings: **A2, B-03, B-04**, A minor baseline-eligibility ambiguity.
 
@@ -345,8 +355,8 @@ user URLs, user project databases or generated shipping claims.
 
 | Phase | Implementer | Verifier | Verdict | Commit / push |
 |---|---|---|---|---|
-| 1 | `ses_ec954afe7ffeEecoyP5c94slJU` — initial + repairs | `ses_ec9177899ffet7yjIRWlsr1DW8` — FIX → PASS | PASS | phase commit; hash/push recorded next phase |
-| 2 | pending | pending | pending | pending |
+| 1 | `ses_ec954afe7ffeEecoyP5c94slJU` — initial + repairs | `ses_ec9177899ffet7yjIRWlsr1DW8` — FIX → PASS | PASS | `7b73090` — pushed to origin/main |
+| 2 | `ses_ec8f73b54ffeC3IdbDuuX6eF4q` — initial + repairs | `ses_ec8d6e6beffeEIKgytGTffTsVf` — FIX → PASS | PASS | phase commit; hash/push recorded next phase |
 | 3 | pending | pending | pending | pending |
 | 4 | pending | pending | pending | pending |
 | 5 | pending | pending | pending | pending |

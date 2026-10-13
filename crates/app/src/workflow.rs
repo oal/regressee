@@ -635,12 +635,12 @@ impl Shell {
                             .items_center()
                             .justify_between()
                             .gap_2()
-                            .child(
-                                div()
-                                    .text_size(px(if self.narrow_workspace { 21. } else { 24. }))
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(self.review_title()),
-                            )
+                            .child(if !pages && self.viewer.is_some() && !self.selected_capture_failed() {
+                                div().flex_1().min_w_0().child(self.inspection_heading()).into_any_element()
+                            } else {
+                                div().text_size(px(if self.narrow_workspace { 21. } else { 24. }))
+                                    .font_weight(FontWeight::SEMIBOLD).child(self.review_title()).into_any_element()
+                            })
                             .child(actions),
                     )
                     .when_some(self.preview.as_ref(), |header, preview| {
@@ -678,6 +678,9 @@ impl Shell {
                     }),
             )
             .when(!pages, |body| body.child(self.coverage_summary()))
+            .when(!pages && self.viewer.is_some() && !self.selected_capture_failed(), |body| {
+                body.child(self.evidence_toolbar(cx))
+            })
             .child(
                 div()
                     .debug_selector(|| "queue-beside-viewer".into())
@@ -718,13 +721,11 @@ impl Shell {
                                     .flex()
                                     .flex_col()
                                     .gap_2()
-                                    .when(
-                                        self.review_queue_collapsed
-                                            && !self.authoritative_empty_capture(),
-                                        |viewer| {
-                                            viewer.child(self.guided_button(50, "Show results", cx))
-                                        },
-                                    )
+                                    .when(self.review_queue_collapsed
+                                        && (self.viewer.is_none() || self.selected_capture_failed())
+                                        && !self.authoritative_empty_capture(), |viewer| {
+                                        viewer.child(self.guided_button(50, "Show results", cx))
+                                    })
                                     .child(self.viewer_section(cx)),
                             )
                         },
@@ -1275,7 +1276,8 @@ impl Shell {
                             .flex_1()
                             .min_w(px(88.))
                             .font_weight(FontWeight::SEMIBOLD)
-                             .child(format!("{} selected · {eligible} eligible", self.approval_selection.len())),
+                             .debug_selector(|| "baseline-selection-label".into())
+                             .child(crate::evidence_workspace::baseline_selection_label(self.approval_selection.len(), eligible)),
                     )
                     .child(self.button(
                         Control::Phase5(23),

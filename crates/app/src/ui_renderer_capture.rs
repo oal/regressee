@@ -12,6 +12,8 @@ use std::{
 
 #[path = "ui_phase1_capture.rs"]
 mod ui_phase1_capture;
+#[path = "ui_phase2_capture.rs"]
+mod ui_phase2_capture;
 #[path = "ui_review_matrix.rs"]
 mod ui_review_matrix;
 
@@ -110,6 +112,14 @@ fn write_frame(
             ,"form_recovery_source_sha256": hex::encode(Sha256::digest(include_bytes!("form_recovery.rs")))
             ,"core_shell_source_sha256": hex::encode(Sha256::digest(include_bytes!("../../core/src/shell.rs")))
             ,"phase1_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase1_capture.rs")))
+            ,"evidence_workspace_source_sha256": hex::encode(Sha256::digest(include_bytes!("evidence_workspace.rs")))
+            ,"review_ux_source_sha256": hex::encode(Sha256::digest(include_bytes!("review_ux.rs")))
+            ,"viewer_ux_source_sha256": hex::encode(Sha256::digest(include_bytes!("viewer_ux.rs")))
+            ,"selector_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/selector.rs")))
+            ,"zoom_selector_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/zoom_select.rs")))
+             ,"phase2_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase2_capture.rs")))
+             ,"phase2_drawing_input_source_sha256": hex::encode(Sha256::digest(include_bytes!("phase2_evidence_tests.rs")))
+            ,"matrix_fixture_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_review_matrix.rs")))
         });
         let file = fs::OpenOptions::new()
             .write(true)

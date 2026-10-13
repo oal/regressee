@@ -5,7 +5,7 @@ use gpui::{
     AnyElement, App, AvailableSpace, Bounds, Context, EventEmitter, FocusHandle, FontWeight,
     KeyBinding, MouseButton, MouseDownEvent, Pixels, ScrollStrategy, Size, Subscription,
     UniformListScrollHandle, Window, actions, anchored, canvas, deferred, div, point, prelude::*,
-    px, rgb, size, uniform_list,
+    px, rgb, uniform_list,
 };
 
 actions!(
@@ -45,29 +45,7 @@ fn current_index(fit: bool, zoom: f32) -> Option<usize> {
 }
 
 fn popup_bounds(trigger: Bounds<Pixels>, viewport: Size<Pixels>) -> Bounds<Pixels> {
-    let margin = px(8.);
-    let gap = px(4.);
-    let below = (viewport.height - margin - trigger.bottom() - gap).max(px(0.));
-    let above = (trigger.top() - margin - gap).max(px(0.));
-    let desired = px(OPTIONS.len() as f32 * CONTROL_HEIGHT + 2.);
-    let open_above = below < desired && above > below;
-    let height = desired
-        .min(if open_above { above } else { below })
-        .min((viewport.height - margin * 2.).max(px(0.)));
-    let width = px(256.).min((viewport.width - margin * 2.).max(px(0.)));
-    let x = trigger
-        .left()
-        .min(viewport.width - margin - width)
-        .max(margin);
-    let y = if open_above {
-        trigger.top() - gap - height
-    } else {
-        trigger.bottom() + gap
-    };
-    Bounds::new(
-        point(x, y.min(viewport.height - margin - height).max(margin)),
-        size(width, height),
-    )
+    super::selector::popup_bounds(trigger, viewport, OPTIONS.len(), 256.)
 }
 
 pub struct ZoomSelect {
@@ -103,6 +81,9 @@ impl ZoomSelect {
 
     pub fn focus_handle(&self) -> FocusHandle {
         self.focus.clone()
+    }
+    pub fn is_open(&self) -> bool {
+        self.open
     }
 
     pub fn sync(
@@ -425,7 +406,7 @@ impl Render for ZoomSelect {
 #[cfg(all(test, feature = "ui-tests"))]
 mod tests {
     use super::*;
-    use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext};
+    use gpui::{Entity, Modifiers, TestAppContext, VisualTestContext, size};
 
     actions!(zoom_select_tests, [ShellEnter, ShellTab]);
 

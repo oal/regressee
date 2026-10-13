@@ -6,6 +6,14 @@ use regressee_core::evidence::*;
 use std::sync::atomic::AtomicBool;
 
 fn fixture(root: &Path, path: &Path) -> (regressee_storage::Store, ProjectId, RunId) {
+    fixture_named(root, path, false)
+}
+
+pub(super) fn fixture_named(
+    root: &Path,
+    path: &Path,
+    recorded_names: bool,
+) -> (regressee_storage::Store, ProjectId, RunId) {
     let mut store = regressee_storage::Store::open(AppPaths::isolated(path)).unwrap();
     let mut project = Project::draft(
         "Northline · website release".into(),
@@ -111,6 +119,14 @@ fn fixture(root: &Path, path: &Path) -> (regressee_storage::Store, ProjectId, Ru
             captures: vec![],
             queue: None,
         };
+        if recorded_names {
+            run.run.environment.name = if sequence == 0 {
+                "Recorded reference · production release before the environment was renamed"
+            } else {
+                "Recorded check · staging release with a long historical environment name"
+            }
+            .into();
+        }
         store.begin_run(&run).unwrap();
         for target in &mut run.run.targets {
             if std::env::var_os("REGRESSEE_RENDERER_PHASE6").is_some()

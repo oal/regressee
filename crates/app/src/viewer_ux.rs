@@ -224,7 +224,9 @@ impl Shell {
             .id("viewer-inspector")
             .debug_selector(|| "viewer-inspector".into())
             .absolute()
-            .top(px(48.))
+            // The inspection toolbar now belongs to the workspace above us.
+            // Do not reserve its old height again inside the evidence flyout.
+            .top_0()
             .bottom_0()
             .right_0()
             .w(px(available.min(360.)))
