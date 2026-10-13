@@ -687,6 +687,48 @@ impl Shell {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "ui-tests")]
+    #[gpui::test]
+    fn phase3_exit_rejects_multibyte_overflow_before_any_save_and_preserves_draft(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, |s, cx| {
+            crate::workflow_refinement_tests::load_review(s, project, cx);
+            for note in [
+                "x".repeat(8193),
+                "é".repeat(4097),
+                format!("{}x", "🦀".repeat(2048)),
+            ] {
+                s.analysis_fields[9].update(cx, |i, cx| i.set_value(&note, cx));
+                let requests = s.next_request;
+                s.exit_guard.phase = Phase::Saving;
+                s.start_exit_save(cx);
+                assert_eq!(s.exit_guard.phase, Phase::Idle);
+                assert_eq!(s.next_request, requests);
+                assert!(s.pending.is_none());
+                assert!(s.error.as_ref().unwrap().contains("8,192 UTF-8 bytes"));
+                assert_eq!(s.analysis_fields[9].read(cx).content.as_ref(), note);
+            }
+            let note = format!("{}\n", "é".repeat(4095)); // 8,191 bytes, exact exit snapshot
+            s.analysis_fields[9].update(cx, |i, cx| i.set_value(&note, cx));
+            s.exit_guard.phase = Phase::Saving;
+            s.start_exit_save(cx);
+            assert!(s.pending.is_some());
+            assert_eq!(s.exit_guard.pending_note.as_ref().unwrap().note, note);
+            // Existing reply/termination tests own Quit; this test settles the
+            // real save as an ordinary reply, without terminating the test app.
+            s.exit_guard = ExitGuard::default();
+            crate::workflow_refinement_tests::finish_jobs(s, cx);
+            assert!(!s.review_note_dirty(cx));
+        });
+        owned.join_after_ui();
+    }
     #[test]
     fn clean_exit_and_pending_work() {
         let mut guard = ExitGuard::default();

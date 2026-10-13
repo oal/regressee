@@ -14,6 +14,8 @@ use std::{
 mod ui_phase1_capture;
 #[path = "ui_phase2_capture.rs"]
 mod ui_phase2_capture;
+#[path = "ui_phase3_capture.rs"]
+mod ui_phase3_capture;
 #[path = "ui_review_matrix.rs"]
 mod ui_review_matrix;
 
@@ -119,7 +121,13 @@ fn write_frame(
             ,"zoom_selector_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/zoom_select.rs")))
              ,"phase2_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase2_capture.rs")))
              ,"phase2_drawing_input_source_sha256": hex::encode(Sha256::digest(include_bytes!("phase2_evidence_tests.rs")))
-            ,"matrix_fixture_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_review_matrix.rs")))
+             ,"matrix_fixture_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_review_matrix.rs")))
+             ,"text_input_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/text_input.rs")))
+             ,"multiline_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui/text_input/multiline.rs")))
+             ,"note_domain_source_sha256": hex::encode(Sha256::digest(include_bytes!("../../core/src/domain.rs")))
+             ,"note_storage_source_sha256": hex::encode(Sha256::digest(include_bytes!("../../storage/src/review.rs")))
+             ,"exit_guard_source_sha256": hex::encode(Sha256::digest(include_bytes!("exit_guard.rs")))
+             ,"phase3_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase3_capture.rs")))
         });
         let file = fs::OpenOptions::new()
             .write(true)

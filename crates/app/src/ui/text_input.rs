@@ -10,6 +10,9 @@ use gpui::{
     UnderlineStyle, Window, actions, div, fill, point, prelude::*, px, relative, rgb, size,
 };
 use std::ops::Range;
+mod multiline;
+pub use multiline::EDITOR_HEIGHT as REVIEW_NOTE_HEIGHT;
+use multiline::{MultilineElement, MultilineState};
 actions!(
     entry,
     [
@@ -26,7 +29,20 @@ actions!(
         SelectAll,
         Paste,
         Copy,
-        Cut
+        Cut,
+        Up,
+        Down,
+        SelectUp,
+        SelectDown,
+        PageUp,
+        PageDown,
+        SelectPageUp,
+        SelectPageDown,
+        DocumentHome,
+        DocumentEnd,
+        SelectDocumentHome,
+        SelectDocumentEnd,
+        Newline
     ]
 );
 pub struct TextInput {
@@ -46,6 +62,7 @@ pub struct TextInput {
     pub correction: Option<String>,
     pub debug_name: Option<&'static str>,
     blur_observer: Option<gpui::Subscription>,
+    multiline: Option<MultilineState>,
 }
 impl TextInput {
     pub fn new(cx: &mut Context<Self>) -> Self {
@@ -69,7 +86,14 @@ impl TextInput {
             correction: None,
             debug_name: None,
             blur_observer: None,
+            multiline: None,
         }
+    }
+    pub fn review_note(value: &str, tab_index: isize, cx: &mut Context<Self>) -> Self {
+        let mut input = Self::with_value(value, tab_index, cx);
+        input.max_bytes = regressee_core::domain::REVIEW_NOTE_MAX_BYTES;
+        input.multiline = Some(MultilineState::default());
+        input
     }
     pub fn set_value(&mut self, value: &str, cx: &mut Context<Self>) {
         self.content = value.to_owned().into();
@@ -81,6 +105,9 @@ impl TextInput {
         self.scroll_x = px(0.);
         self.touched = false;
         self.correction = None;
+        if let Some(mode) = &mut self.multiline {
+            *mode = MultilineState::default();
+        }
         cx.notify();
     }
     pub fn validation_error(&self) -> Option<&'static str> {
@@ -146,11 +173,13 @@ impl TextInput {
         }
     }
     fn move_to(&mut self, n: usize, cx: &mut Context<Self>) {
+        self.reveal_multiline_caret();
         self.selection = n..n;
         self.selection_reversed = false;
         cx.notify();
     }
     fn select_to(&mut self, n: usize, cx: &mut Context<Self>) {
+        self.reveal_multiline_caret();
         let anchor = if self.selection_reversed {
             self.selection.end
         } else {
@@ -167,12 +196,18 @@ impl TextInput {
         self.select_to(self.next_to(self.caret()), cx);
     }
     fn select_home(&mut self, _: &SelectHome, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(0, cx);
+        self.select_to(self.line_edge(false), cx);
     }
     fn select_end(&mut self, _: &SelectEnd, _: &mut Window, cx: &mut Context<Self>) {
-        self.select_to(self.content.len(), cx);
+        self.select_to(self.line_edge(true), cx);
+        self.line_end_affinity();
     }
     fn index_for_position(&self, p: Point<Pixels>) -> usize {
+        if let Some(mode) = &self.multiline {
+            return mode
+                .index_for_position(&self.content, self.bounds, p)
+                .unwrap_or(self.caret());
+        }
         match (&self.line, self.bounds) {
             // A shaped line can be stale between an edit and the next paint.
             (Some(line), Some(bounds)) if line.text == self.content => {
@@ -233,11 +268,13 @@ impl TextInput {
         } else {
             self.move_to(n, cx);
         }
+        self.pointer_affinity(e.position);
     }
     fn on_mouse_move(&mut self, e: &MouseMoveEvent, w: &mut Window, cx: &mut Context<Self>) {
         if self.is_selecting {
             if self.enabled && self.focus.is_focused(w) && e.dragging() {
                 self.select_to(self.index_for_position(e.position), cx);
+                self.pointer_affinity(e.position);
             } else {
                 self.is_selecting = false;
             }
@@ -303,24 +340,30 @@ impl TextInput {
         self.move_to(n, cx);
     }
     fn home(&mut self, _: &Home, _: &mut Window, cx: &mut Context<Self>) {
-        self.move_to(0, cx);
+        self.move_to(self.line_edge(false), cx);
     }
     fn end(&mut self, _: &End, _: &mut Window, cx: &mut Context<Self>) {
-        let n = self.content.len();
+        let n = self.line_edge(true);
         self.move_to(n, cx);
+        self.line_end_affinity();
     }
     fn cut(&mut self, _: &Cut, w: &mut Window, cx: &mut Context<Self>) {
         self.copy(&Copy, w, cx);
         self.replace_text_in_range(None, "", w, cx);
     }
     fn all(&mut self, _: &SelectAll, _: &mut Window, cx: &mut Context<Self>) {
+        self.reveal_multiline_caret();
         self.selection = 0..self.content.len();
         self.selection_reversed = false;
         cx.notify();
     }
     fn paste(&mut self, _: &Paste, w: &mut Window, cx: &mut Context<Self>) {
         if let Some(t) = cx.read_from_clipboard().and_then(|v| v.text()) {
-            self.replace_text_in_range(None, &t.replace(['\r', '\n'], " "), w, cx);
+            if self.multiline.is_some() {
+                self.replace_text_in_range(None, &t, w, cx);
+            } else {
+                self.replace_text_in_range(None, &t.replace(['\r', '\n'], " "), w, cx);
+            }
         }
     }
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
@@ -378,10 +421,7 @@ impl EntityInputHandler for TextInput {
             .map(|r| self.convert(r))
             .or(self.marked.clone())
             .unwrap_or(self.selection.clone());
-        if r.start > r.end
-            || self.content.len() - (r.end - r.start) + text.len() > self.max_bytes
-            || text.chars().any(char::is_control)
-        {
+        if !self.accept_replacement(&r, text, cx) {
             return;
         }
         self.content = format!(
@@ -397,6 +437,7 @@ impl EntityInputHandler for TextInput {
         self.is_selecting = false;
         self.marked = None;
         self.correction = None;
+        self.reveal_multiline_caret();
         cx.notify();
     }
     fn replace_and_mark_text_in_range(
@@ -415,10 +456,7 @@ impl EntityInputHandler for TextInput {
             .map(|r| self.convert(r))
             .or(self.marked.clone())
             .unwrap_or(self.selection.clone());
-        if range.start > range.end
-            || self.content.len() - (range.end - range.start) + text.len() > self.max_bytes
-            || text.chars().any(char::is_control)
-        {
+        if !self.accept_replacement(&range, text, cx) {
             return;
         }
         self.replace_text_in_range(r, text, w, cx);
@@ -450,6 +488,9 @@ impl EntityInputHandler for TextInput {
         _: &mut Context<Self>,
     ) -> Option<Bounds<Pixels>> {
         let r = self.convert(r);
+        if let Some(mode) = &self.multiline {
+            return mode.bounds_for_range(&self.content, r, bounds);
+        }
         let l = self.line.as_ref()?;
         Some(Bounds::from_corners(
             point(
@@ -468,7 +509,9 @@ impl EntityInputHandler for TextInput {
         _: &mut Window,
         _: &mut Context<Self>,
     ) -> Option<usize> {
-        self.line.as_ref()?;
+        if self.multiline.is_none() {
+            self.line.as_ref()?;
+        }
         self.bounds?;
         Some(self.to_utf16(self.index_for_position(p)))
     }
@@ -630,8 +673,31 @@ impl Render for TextInput {
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::on_mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::on_mouse_up))
-            .child(EntryElement(cx.entity()));
-        let correction = if self.touched && !self.composing() {
+            .when(self.multiline.is_some(), |el| {
+                el.key_context("TextInput MultilineInput")
+                    .h(px(multiline::EDITOR_HEIGHT))
+                    .py(px(8.))
+                    .on_action(cx.listener(Self::up))
+                    .on_action(cx.listener(Self::down))
+                    .on_action(cx.listener(Self::select_up))
+                    .on_action(cx.listener(Self::select_down))
+                    .on_action(cx.listener(Self::page_up))
+                    .on_action(cx.listener(Self::page_down))
+                    .on_action(cx.listener(Self::select_page_up))
+                    .on_action(cx.listener(Self::select_page_down))
+                    .on_action(cx.listener(Self::document_home))
+                    .on_action(cx.listener(Self::document_end))
+                    .on_action(cx.listener(Self::select_document_home))
+                    .on_action(cx.listener(Self::select_document_end))
+                    .on_action(cx.listener(Self::newline))
+                    .on_scroll_wheel(cx.listener(Self::scroll_note))
+            })
+            .child(if self.multiline.is_some() {
+                MultilineElement(cx.entity()).into_any_element()
+            } else {
+                EntryElement(cx.entity()).into_any_element()
+            });
+        let correction = if self.multiline.is_none() && self.touched && !self.composing() {
             self.validation_error()
                 .map(str::to_owned)
                 .or_else(|| self.correction.clone())
@@ -678,6 +744,7 @@ fn input_base() -> gpui::Div {
         .font_weight(gpui::FontWeight::MEDIUM)
 }
 pub fn bind(cx: &mut App) {
+    multiline::bind(cx);
     for key in ["ctrl", "cmd"] {
         cx.bind_keys([
             KeyBinding::new(&format!("{key}-a"), SelectAll, Some("TextInput")),

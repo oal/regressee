@@ -139,7 +139,7 @@ impl Shell {
         }
         let index = match control {
             Control::Phase5(index @ (0..=5 | 12..=19 | 26..=28 | 34..=35)) => index,
-            Control::AnalysisField(index @ (0..=8 | 10..=13)) => 36 + index,
+            Control::AnalysisField(index @ (0..=13)) => 36 + index,
             Control::Details(Detail::Analysis) => 50,
             _ => return None,
         };
@@ -171,12 +171,12 @@ impl Shell {
             return;
         }
         if self.focus.screen == Screen::Results
-            && self.review_tools
+            && (self.review_tools || self.review_note_open)
             && self.control_mounted(control)
             && let Some(anchor) = self.review_anchor(control)
         {
             anchor.scroll_to(window, cx);
-            if matches!(control, Control::AnalysisField(10..=13)) {
+            if matches!(control, Control::AnalysisField(9..=13)) {
                 self.review_focus_reveal.set(2);
             }
             // Painted input bounds also support headless frames, which have no
@@ -217,11 +217,7 @@ impl Shell {
             if saved.map(|d| d.note.as_str()).unwrap_or("") == note.as_str() {
                 continue;
             }
-            if note.chars().count() > 8192 {
-                return Err(
-                    "Shorten the pending review note to 8,192 characters. No note was truncated or saved.",
-                );
-            }
+            regressee_core::domain::validate_review_note(&note)?;
             pending.push(ReviewDecision {
                 analysis,
                 key,
@@ -412,6 +408,38 @@ impl Shell {
             self.evidence.comparison.as_ref()?.revision.id,
             self.selected_key.clone()?,
         ))
+    }
+    pub(super) fn note_for_save(&self, cx: &App) -> Result<String, &'static str> {
+        if self.review_identity().is_none()
+            || self.review_identity().as_ref() != self.review_drafts.active.as_ref()
+        {
+            return Err("Reopen the original result before saving its note. Your draft is kept.");
+        }
+        let input = self.analysis_fields[9].read(cx);
+        if input.composing() {
+            return Err("Finish entering your text before saving the note.");
+        }
+        regressee_core::domain::validate_review_note(&input.content)?;
+        Ok(input.content.to_string())
+    }
+    pub(super) fn note_status(&self, cx: &App) -> (String, bool) {
+        let input = self.analysis_fields[9].read(cx);
+        if let Err(message) = regressee_core::domain::validate_review_note(&input.content) {
+            return (message.into(), true);
+        }
+        if let Some(message) = &input.correction {
+            return (message.clone(), true);
+        }
+        if input.composing() {
+            return ("Finish entering text before saving.".into(), false);
+        }
+        if self.review_note_dirty(cx) {
+            (format!("Unsaved · {} bytes", input.content.len()), false)
+        } else if input.content.is_empty() {
+            ("No unsaved changes".into(), false)
+        } else {
+            (format!("Saved · {} bytes", input.content.len()), false)
+        }
     }
     pub(super) fn sync_review_note(&mut self, cx: &mut Context<Self>) {
         let identity = self.review_identity();
@@ -632,6 +660,7 @@ impl Shell {
             37 => {
                 self.review_note_open = !self.review_note_open;
                 if self.review_note_open {
+                    self.review_focus_reveal.set(2);
                     self.presentation_focus = Some(Control::AnalysisField(9));
                     self.review_tools = false;
                     self.capture_details_open = false;

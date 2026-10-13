@@ -169,8 +169,9 @@ impl Shell {
     pub(super) fn viewer_inspector(&self, cx: &mut Context<Self>) -> AnyElement {
         let available = (self.working_width - self.review_queue_width() - 12.).max(1.);
         let details = self.capture_details_open;
-        let fields = self.analysis_fields[10..14].to_vec();
+        let fields = self.analysis_fields[9..14].to_vec();
         let scroll = self.review_details_scroll.clone();
+        let overflow_scroll = scroll.clone();
         let owner = cx.entity().downgrade();
         let reveal = self.review_focus_reveal.clone();
         // A percentage-width Entity beneath an auto-width scrolling block can
@@ -183,9 +184,20 @@ impl Shell {
             .flex_col()
             .gap_4();
         if self.review_note_open {
-            body = body.child("Review note · draft until saved. Close returns to evidence without discarding text.")
-                .child(div().w_full().min_w_0().flex().flex_col().child(controls::field("Note", "Draft until saved", self.analysis_fields[9].clone().into_any_element())))
-                .child(self.button(Control::Phase5(32), "Save note", ActionStyle::Primary, cx));
+            body = body.child(
+                div()
+                    .id("review-note-field")
+                    .w_full()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .anchor_scroll(self.review_anchor(Control::AnalysisField(9)))
+                    .child(controls::field(
+                        "Note",
+                        "8,192 UTF-8 bytes maximum. Closing keeps unsaved text.",
+                        self.analysis_fields[9].clone().into_any_element(),
+                    )),
+            );
         } else if details {
             for (label, value) in self.capture_summary() {
                 body = body.child(
@@ -327,22 +339,62 @@ impl Shell {
                 .h(px(0.))
                 .w_full(),
             )
-            .when(
-                (self.narrow_workspace || !details) && (details || self.mask_selected.is_none()),
-                |panel| {
-                    panel.child(
-                        div()
-                            .flex_shrink_0()
-                            .px_4()
-                            .py_1()
-                            .border_t_1()
-                            .border_color(rgb(LINE))
-                            .text_size(px(13.))
-                            .text_color(rgb(MUTED))
-                            .child("Scroll for more"),
-                    )
-                },
+            // Disclosure overflow is indicated only from actual painted geometry,
+            // not inferred from the panel type or the window width.
+            .child(
+                canvas(
+                    |_, _, _| (),
+                    move |_, _, window, _| {
+                        let b = overflow_scroll.bounds();
+                        let max = overflow_scroll.max_offset().height;
+                        if max <= px(0.) || b.size.height <= px(0.) {
+                            return;
+                        }
+                        let h =
+                            (b.size.height * (b.size.height / (b.size.height + max))).max(px(18.));
+                        let y =
+                            (b.size.height - h) * (-overflow_scroll.offset().y / max).clamp(0., 1.);
+                        window.paint_quad(gpui::fill(
+                            gpui::Bounds::new(
+                                gpui::point(b.right() - px(5.), b.top() + y),
+                                gpui::size(px(3.), h),
+                            ),
+                            rgb(CONTROL_LINE),
+                        ));
+                    },
+                )
+                .h(px(0.))
+                .w_full(),
             )
+            .when(self.review_note_open, |panel| {
+                let (status, invalid) = self.note_status(cx);
+                panel.child(
+                    div()
+                        .flex_shrink_0()
+                        .flex()
+                        .items_center()
+                        .gap_3()
+                        .p_3()
+                        .border_t_1()
+                        .border_color(rgb(LINE))
+                        .child(self.button(
+                            Control::Phase5(32),
+                            "Save note",
+                            ActionStyle::Primary,
+                            cx,
+                        ))
+                        .child(
+                            div()
+                                .debug_selector(|| "review-note-status".into())
+                                .flex_1()
+                                .min_w_0()
+                                .text_size(px(HELP_TEXT_SIZE))
+                                .line_height(px(HELP_LINE_HEIGHT))
+                                .text_color(rgb(if invalid { ERROR } else { MUTED }))
+                                .child(status),
+                        ),
+                )
+            })
             .into_any_element()
     }
 

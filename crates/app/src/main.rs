@@ -385,7 +385,15 @@ impl Shell {
             ]
             .into_iter()
             .enumerate()
-            .map(|(i, s)| cx.new(|cx| TextInput::with_value(s, 160 + i as isize, cx)))
+            .map(|(i, s)| {
+                cx.new(|cx| {
+                    if i == 9 {
+                        TextInput::review_note(s, 160 + i as isize, cx)
+                    } else {
+                        TextInput::with_value(s, 160 + i as isize, cx)
+                    }
+                })
+            })
             .collect(),
             analysis_signature: vec![],
             analysis_due: None,
@@ -1230,9 +1238,17 @@ impl Shell {
             Reply::SavedReview(history) => {
                 self.evidence.reviews = history;
                 self.review_save_completed(cx);
-                self.notice = Some(
-                    "Review saved for this analysis revision; older decisions are retained.".into(),
-                );
+                // The owned editor already reports the exact saved/draft state
+                // beside Save. A second banner needlessly occludes its reading
+                // area (and must never announce a newer draft as saved).
+                if self.review_note_open {
+                    self.notice = None;
+                } else {
+                    self.notice = Some(
+                        "Review saved for this analysis revision; older decisions are retained."
+                            .into(),
+                    );
+                }
             }
             Reply::SavedMask => {
                 self.mask_dirty = false;
@@ -1924,6 +1940,17 @@ impl Shell {
                 if !self.review_result_valid() {
                     return;
                 }
+                let note = match self.note_for_save(cx) {
+                    Ok(note) => note,
+                    Err(message) => {
+                        self.analysis_fields[9].update(cx, |input, cx| {
+                            input.correction = Some(message.into());
+                            input.touched = true;
+                            cx.notify();
+                        });
+                        return;
+                    }
+                };
                 if let (Some(a), Some(key)) = (&self.evidence.comparison, &self.selected_key) {
                     self.queue(
                         Work::Review(regressee_core::domain::ReviewDecision {
@@ -1934,12 +1961,7 @@ impl Shell {
                                 regressee_core::domain::ReviewState::Intentional,
                                 regressee_core::domain::ReviewState::NeedsFix,
                             ][index - 20],
-                            note: self.analysis_fields[9]
-                                .read(cx)
-                                .content
-                                .chars()
-                                .take(8192)
-                                .collect(),
+                            note,
                             reviewed_at: regressee_runtime::distribution::now(),
                         }),
                         cx,
@@ -7915,6 +7937,8 @@ mod phase1_setup_tests;
 mod phase2_evidence_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase2_viewer_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase3_note_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase4_review_tests;
 #[cfg(all(test, feature = "ui-tests"))]

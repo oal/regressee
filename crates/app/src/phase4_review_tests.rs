@@ -88,8 +88,9 @@ fn repair_v4_1_inner_note_bounds_caret_and_draft_are_usable_at_both_sizes(cx: &m
         cx.update(|w, cx| {
             let _ = w.draw(cx);
         });
+        cx.run_until_parked();
         let border = cx.debug_bounds("review-note-input-border").unwrap();
-        assert_eq!(border.size.height, px(40.));
+        assert_eq!(border.size.height, px(text_input::REVIEW_NOTE_HEIGHT));
         assert!(
             border.size.width >= px(300.),
             "{width}: actual painted border {border:?}"
@@ -102,7 +103,10 @@ fn repair_v4_1_inner_note_bounds_caret_and_draft_are_usable_at_both_sizes(cx: &m
                 "{width}: actual inner content {input:?}"
             );
             assert!(input.left() >= viewport.left() && input.right() <= viewport.right());
-            assert!(input.top() >= viewport.top() && input.bottom() <= viewport.bottom());
+            assert!(
+                input.top() >= viewport.top() && input.bottom() <= viewport.bottom(),
+                "{width}: input {input:?}, viewport {viewport:?}"
+            );
             assert!(!s.control_enabled(Control::Phase5(21), cx));
             assert!(s.control_enabled(Control::Phase5(32), cx));
             assert!(s.control_enabled(Control::Phase5(39), cx));
@@ -111,7 +115,7 @@ fn repair_v4_1_inner_note_bounds_caret_and_draft_are_usable_at_both_sizes(cx: &m
             shell.update(cx, |s, cx| {
                 w.focus(&s.handle(Control::AnalysisField(9), cx))
             });
-            w.dispatch_action(Box::new(text_input::Home), cx);
+            w.dispatch_action(Box::new(text_input::DocumentHome), cx);
         });
         cx.update(|w, cx| {
             let _ = w.draw(cx);
@@ -131,11 +135,13 @@ fn repair_v4_1_inner_note_bounds_caret_and_draft_are_usable_at_both_sizes(cx: &m
                         .unwrap();
                         assert!(
                             caret_bounds.left() >= bounds.left()
-                                && caret_bounds.right() <= bounds.right(),
+                                && caret_bounds.right() <= bounds.right()
+                                && caret_bounds.top() >= bounds.top()
+                                && caret_bounds.bottom() <= bounds.bottom(),
                             "caret {caret}: {caret_bounds:?} outside {bounds:?}"
                         );
                     });
-                    w.dispatch_action(Box::new(text_input::End), cx);
+                    w.dispatch_action(Box::new(text_input::DocumentEnd), cx);
                 })
             });
             cx.update(|w, cx| {

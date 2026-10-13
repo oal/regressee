@@ -321,10 +321,8 @@ impl Store {
         .transpose()
     }
     pub fn save_review(&mut self, decision: &ReviewDecision) -> Result<()> {
-        ensure!(
-            decision.note.len() <= 8192 && decision.reviewed_at > 0,
-            "invalid review note/date"
-        );
+        validate_review_note(&decision.note).map_err(|message| anyhow::anyhow!(message))?;
+        ensure!(decision.reviewed_at > 0, "invalid review date");
         let a = self.load_analysis(decision.analysis)?;
         ensure!(
             a.revision.results.iter().any(|r| r.key == decision.key),

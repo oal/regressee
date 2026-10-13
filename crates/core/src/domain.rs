@@ -879,6 +879,45 @@ impl Classification {
         }
     }
 }
+/// Storage and every native note-save path use UTF-8 bytes, never scalar counts.
+pub const REVIEW_NOTE_MAX_BYTES: usize = 8192;
+pub const REVIEW_NOTE_LIMIT_MESSAGE: &str =
+    "Shorten to 8,192 UTF-8 bytes. Your draft is kept; nothing saved.";
+pub fn validate_review_note(note: &str) -> Result<(), &'static str> {
+    if note.len() <= REVIEW_NOTE_MAX_BYTES {
+        Ok(())
+    } else {
+        Err(REVIEW_NOTE_LIMIT_MESSAGE)
+    }
+}
+
+#[cfg(test)]
+mod review_note_tests {
+    use super::*;
+    #[test]
+    fn shared_note_limit_is_utf8_bytes_and_preserves_valid_text() {
+        for note in [
+            "x".repeat(4096),
+            "x".repeat(4097),
+            "x".repeat(5000),
+            "x".repeat(8192),
+            "🦀".repeat(2048),
+            "\n日本語\r\ncafé\n".into(),
+        ] {
+            assert!(validate_review_note(&note).is_ok());
+        }
+        for note in [
+            "x".repeat(8193),
+            "é".repeat(4097),
+            format!("{}x", "🦀".repeat(2048)),
+        ] {
+            let exact = note.clone();
+            assert_eq!(validate_review_note(&note), Err(REVIEW_NOTE_LIMIT_MESSAGE));
+            assert_eq!(note, exact);
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct ReviewDecision {
