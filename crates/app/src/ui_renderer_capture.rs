@@ -28,6 +28,8 @@ mod ui_phase3_capture;
 mod ui_phase4_capture;
 #[path = "ui_phase5_capture.rs"]
 mod ui_phase5_capture;
+#[path = "ui_project_settings_capture.rs"]
+mod ui_project_settings_capture;
 #[path = "ui_review_matrix.rs"]
 mod ui_review_matrix;
 #[path = "ui_row_hints_capture.rs"]
@@ -146,6 +148,10 @@ fn write_frame(
               ,"phase3_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase3_capture.rs")))
         });
         for (key, source) in [
+            ("project_settings_source_sha256", include_bytes!("project_settings_ux.rs").as_slice()),
+            ("project_settings_test_source_sha256", include_bytes!("project_settings_tests.rs").as_slice()),
+            ("project_settings_harness_source_sha256", include_bytes!("ui_project_settings_capture.rs").as_slice()),
+            ("scrollbar_source_sha256", include_bytes!("ui/scrollbar.rs").as_slice()),
             ("app_settings_source_sha256", include_bytes!("app_settings_ux.rs").as_slice()),
             ("app_settings_test_source_sha256", include_bytes!("app_settings_tests.rs").as_slice()),
             ("app_settings_harness_source_sha256", include_bytes!("ui_app_settings_capture.rs").as_slice()),

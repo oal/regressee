@@ -434,6 +434,25 @@ FIX/blocked evidence remains intact. Independent re-verification passed;
 OS-input/AT/usability/release qualification remains pending. See
 `docs/research/whole-app-ui-review-20261012/phase5-report.md`.
 
+**Project settings wayfinding — 2026-10-14.** A labelled **Jump to** row pins
+**Website**, **Capture plan** and **Access & environments** above one continuous
+form, preserving its existing scroll owner, draft and explicit Save footer rather
+than introducing tabs. Current-section selection follows measured content starts,
+including disclosure and resize changes. Explicit jumps focus the first enabled
+destination; Capture plan focuses Tablet when the sole selected Desktop cannot
+be unchecked. Passive scrolling never steals field focus. An overflow-only native
+scrollbar reserves a gutter (16px), with a thumb (8px wide, minimum 32px high),
+using existing surface, line and muted/ink roles. Track clicks page by 90% of the
+reading viewport; thumb dragging continues outside the gutter and releases there;
+wheel scrolling uses the same owner. Tab/Shift-Tab follow painted order, skipping
+unmounted/disabled controls and retaining complete-control reveal and validation.
+Capture details and limitations belong inside Capture plan, before Access.
+Navigation neither saves, opens login nor changes a baseline, and adds no key
+handlers. This ordinary extension needs no new system tokens or shipping rasters.
+Scoped SHIP covers the three reviewed corrections, not the whole app; two-size
+synthetic Linux GPUI offscreen evidence and its limits are recorded in
+`docs/research/project-settings-wayfinding-20261014.md`.
+
 **Actions and choices.** Shared actions have a minimum target height (40px).
 Buttons fit their labels; navigation fills its column; choice/check rows fill
 their available width with balanced `spacing.row` insets even when help wraps.

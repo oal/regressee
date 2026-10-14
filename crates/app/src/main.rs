@@ -13,6 +13,7 @@ use regressee_app::{
     ui::{
         brand::{self, Background},
         controls::{self, ActionStyle, Tone},
+        scrollbar::{self, ScrollbarState},
         text_input::{self, TextInput},
         theme::*,
         timezone_select::{self, TimezoneSelect},
@@ -26,7 +27,9 @@ use regressee_core::{
         Speed, TargetKey, TargetOutcome,
     },
     evidence::ProjectEvidence,
-    shell::{Choice, Control, Detail, FocusState, ReviewSurface, Screen, SetupStage},
+    shell::{
+        Choice, Control, Detail, FocusState, ReviewSurface, Screen, SettingsSection, SetupStage,
+    },
 };
 use regressee_storage::{AppPaths, ProjectPage, ProjectRecord, StorageSummary};
 use std::{
@@ -42,6 +45,7 @@ mod form_recovery;
 mod loading_ux;
 mod local_ux;
 mod options_ux;
+mod project_settings_ux;
 mod review_ux;
 mod runtime_ux;
 mod safety_ux;
@@ -264,6 +268,8 @@ struct Shell {
     details: std::collections::BTreeSet<Detail>,
     navigation_started: Option<(Screen, std::time::Instant)>,
     screen_scroll: gpui::ScrollHandle,
+    settings_scrollbar: ScrollbarState,
+    settings_section_positions: [std::rc::Rc<std::cell::Cell<Option<Pixels>>>; 3],
     form_anchors: Vec<gpui::ScrollAnchor>,
     review_anchors: Vec<gpui::ScrollAnchor>,
     history_action_bounds: Vec<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
@@ -301,7 +307,7 @@ impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
             root_focus: cx.focus_handle(),
-            handles: (0..(640 + regressee_app::task::MAX_TASK_LINKS))
+            handles: (0..(643 + regressee_app::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -447,6 +453,8 @@ impl Shell {
             details: Default::default(),
             navigation_started: None,
             screen_scroll: gpui::ScrollHandle::new(),
+            settings_scrollbar: ScrollbarState::default(),
+            settings_section_positions: std::array::from_fn(|_| Default::default()),
             form_anchors: Vec::new(),
             review_anchors: Vec::new(),
             history_action_bounds: (0..28).map(|_| Default::default()).collect(),
@@ -2630,6 +2638,9 @@ impl Shell {
         let index = match control {
             Control::Navigate(screen) => Screen::ALL.iter().position(|s| *s == screen).unwrap(),
             Control::SetupStage(stage) => 312 + stage.index(),
+            Control::SettingsSection(section) => {
+                640 + regressee_app::task::MAX_TASK_LINKS + section.index()
+            }
             Control::SetupBack => 626 + regressee_app::task::MAX_TASK_LINKS,
             Control::EnvironmentOptions => 627 + regressee_app::task::MAX_TASK_LINKS,
             Control::PagesBaseline => 316,
@@ -4099,10 +4110,18 @@ impl Shell {
                     .map(crawl::origin)
                     .all(|origin| self.approved_origins.contains(&origin))
             });
-        let mut body=div().w(px(self.working_width.min(680.))).flex_shrink_0().flex().flex_col().gap_4()
-            .when(stage == SetupStage::Settings, |body| body.child(self.setup_heading(cx)))
+        let form_width = (self.working_width
+            - if stage == SetupStage::Settings {
+                scrollbar::GUTTER
+            } else {
+                0.
+            })
+        .max(1.)
+        .min(680.);
+        let mut body=div().w(px(form_width)).flex_shrink_0().flex().flex_col().gap_4()
             .when(!self.form_errors(cx).is_empty(), |body| body.child(self.form_error_summary(cx)))
             .when(website, |body| body.child(controls::section("Website", "Saving settings does not visit your website.")
+                  .when(stage == SetupStage::Settings, |section| self.measured_settings_section(SettingsSection::Website, section))
                  .child(self.measured_form_field(Control::Name, controls::field("Project name","Choose a recognizable name.",self.name.clone().into_any_element())).id("form-project-name").anchor_scroll(self.form_anchor(Control::Name)))
                  .child(self.measured_form_field(Control::Address, controls::field("Starting addresses","Use complete addresses starting with https:// or http://, separated by spaces. Only the listed websites are visited; subdomains must be added separately.",self.address.clone().into_any_element())).id("form-starting-addresses").anchor_scroll(self.form_anchor(Control::Address)))
                 .when(self.setup_origin_count > 1, |section| section
@@ -4155,7 +4174,7 @@ impl Shell {
             .first()
             .is_none_or(|p| p.image_mode == regressee_core::domain::ImageMode::Normal);
         if pages {
-            body=body.child(controls::section("Capture plan & screen sizes", "Mobile and tablet simulate websites, not real devices.")
+            let mut capture=div().w_full().flex_shrink_0().flex().flex_col().gap_4().child(controls::section("Capture plan & screen sizes", "Mobile and tablet simulate websites, not real devices.")
             .child(div().debug_selector(|| "setup-capture-plan".into()).w_full().min_w_0().flex().flex_col().gap_1().text_size(px(13.)).text_color(rgb(MUTED))
                 .children(self.draft_settings.profiles.iter().map(|p| div().w_full().child(format!("{} · {} × {}", p.name, p.width, p.height))))
                  .child(div().w_full().child(format!("{} · {}", if full_page { "Full page" } else { "Visible screen" }, if original_images { "original images" } else { "photos replaced" })))
@@ -4169,7 +4188,7 @@ impl Shell {
                    .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace photos", "Use neutral placeholders so changing photos cause fewer differences. Some logos and other images may also be replaced.", !original_images, cx)))
             .child(self.guided_button(6,if self.focus.advanced{"Hide scope, speed & custom sizes"}else{"Scope, speed & custom sizes (optional)"},cx));
             if self.focus.advanced {
-                body=body.child(div().max_w(px(680.)).flex().flex_col().gap_4()
+                capture=capture.child(div().max_w(px(680.)).flex().flex_col().gap_4()
                 .child(self.crawl_field(1,"Website section (optional)","Use a path such as /docs to stay within that section. Leave blank for the whole listed website."))
                 .child(self.crawl_field(2,"Skip addresses containing (optional)","Separate text exclusions with commas. The preview explains excluded addresses."))
                 .child(controls::section("Capture speed", "Use a read-only account: even visiting pages can change website data.")
@@ -4190,12 +4209,7 @@ impl Shell {
             .child(self.guided_button(12,"Add / replace Custom screen size",cx)).child(self.guided_button(25,"Remove Custom screen size",cx))
               .child(div().debug_selector(|| "setup-image-limitations".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Photo replacement works with ordinary image files and some simple background images. Vector icons stay unchanged. Videos, embedded pages, drawn graphics and more complex or script-controlled images may not be replaced. Review any loading or layout warnings. Replaced photos are not saved separately. Future checks use the baseline's screen sizes, device simulation, pixel scale and browser version.")));
             }
-        }
-        if self.project.is_some() && matches!(stage, SetupStage::Access | SetupStage::Settings) {
-            body = body.child(self.environment_setup(cx));
-        }
-        if pages {
-            body = body.child(self.button(
+            capture = capture.child(self.button(
                 Control::Details(Detail::Capture),
                 if self.details.contains(&Detail::Capture) {
                     "Hide capture details and limitations"
@@ -4206,11 +4220,28 @@ impl Shell {
                 cx,
             ));
             if self.details.contains(&Detail::Capture) {
-                body = body.child(div().debug_selector(|| "setup-capture-limitations".into()).text_size(px(14.)).text_color(rgb(MUTED)).child("Regressee reduces motion, stops animations, hides the text cursor and moves the pointer away before capture. It waits a limited time for fonts, images and the page to finish loading. Pages that exceed capture limits fail rather than being silently cropped. Full-page capture allows up to 32,768 pixels in height, 64 million pixels and 64 scroll steps, or a lower limit set for the screen size. It does not expand lists that load as you scroll or separately scrolling panels. Approved login websites are not added to the capture list. Some password prompts, device-specific or frequently changing logins, VPNs and company networks are not fully tested."));
+                capture = capture.child(div().debug_selector(|| "setup-capture-limitations".into()).text_size(px(14.)).text_color(rgb(MUTED)).child("Regressee reduces motion, stops animations, hides the text cursor and moves the pointer away before capture. It waits a limited time for fonts, images and the page to finish loading. Pages that exceed capture limits fail rather than being silently cropped. Full-page capture allows up to 32,768 pixels in height, 64 million pixels and 64 scroll steps, or a lower limit set for the screen size. It does not expand lists that load as you scroll or separately scrolling panels. Approved login websites are not added to the capture list. Some password prompts, device-specific or frequently changing logins, VPNs and company networks are not fully tested."));
             }
+            body = body.child(capture.when(stage == SetupStage::Settings, |capture| {
+                self.measured_settings_section(SettingsSection::Capture, capture)
+            }));
+        }
+        if self.project.is_some() && matches!(stage, SetupStage::Access | SetupStage::Settings) {
+            body = body.child(
+                div()
+                    .w_full()
+                    .flex_shrink_0()
+                    .child(self.environment_setup(cx))
+                    .when(stage == SetupStage::Settings, |access| {
+                        self.measured_settings_section(SettingsSection::Access, access)
+                    }),
+            );
         }
         body.when(stage != SetupStage::Access, |body| {
             body.child(self.setup_runtime_note())
+        })
+        .when(stage == SetupStage::Settings, |body| {
+            body.child(self.settings_location_sync(cx))
         })
         .into_any_element()
     }
@@ -4973,6 +5004,7 @@ impl Shell {
                 window.focus(&self.handle(control, cx));
                 cx.notify();
             }
+            Control::SettingsSection(section) => self.jump_to_settings_section(section, window, cx),
             Control::SetupBack => self.setup_back(window, cx),
             Control::EnvironmentOptions => self.toggle_environment_options(window, cx),
             Control::PagesBaseline => {
@@ -5877,6 +5909,10 @@ impl Shell {
                 setup
                     && self.focus.setup_stage != regressee_core::shell::SetupStage::Settings
                     && stage != regressee_core::shell::SetupStage::Settings
+            }
+            SettingsSection(section) => {
+                self.project_settings_open()
+                    && (section != regressee_core::shell::SettingsSection::Access || project)
             }
             SetupBack => {
                 setup
@@ -7899,36 +7935,55 @@ impl Render for Shell {
                 |el| el.child(feedback),
             )
             .when(
-                self.focus.screen == Screen::Setup
-                    && self.focus.setup_stage != SetupStage::Settings
-                    && !self.focus.shows_project_picker(),
+                self.focus.screen == Screen::Setup && !self.focus.shows_project_picker(),
                 |body| {
                     body.child(
                         div()
                             .flex_shrink_0()
                             .px_6()
                             .py_4()
-                            .child(self.setup_heading(cx)),
+                            .child(self.setup_heading(cx))
+                            .when(self.project_settings_open(), |heading| {
+                                heading.child(self.settings_navigation(cx))
+                            }),
                     )
                 },
             )
             .child(
                 div()
-                    .id("screen-scroll")
-                    .debug_selector(|| "screen-scroll".into())
+                    .relative()
                     .flex_1()
                     .min_h_0()
                     .min_w_0()
-                    .when(!bounded_review, |body| {
-                        body.overflow_y_scroll().track_scroll(&self.screen_scroll)
-                    })
-                    .when(bounded_review, |body| {
-                        body.overflow_hidden().flex().flex_col()
-                    })
-                    .px_6()
-                    .py(px(if bounded_review { 8. } else { 16. }))
-                    .child(self.content(cx)),
+                    .flex()
+                    .flex_col()
+                    .child(
+                        div()
+                            .id("screen-scroll")
+                            .debug_selector(|| "screen-scroll".into())
+                            .flex_1()
+                            .min_h_0()
+                            .min_w_0()
+                            .when(!bounded_review, |body| {
+                                body.overflow_y_scroll().track_scroll(&self.screen_scroll)
+                            })
+                            .when(bounded_review, |body| {
+                                body.overflow_hidden().flex().flex_col()
+                            })
+                            .px_6()
+                            .py(px(if bounded_review { 8. } else { 16. }))
+                            .child(self.content(cx)),
+                    )
+                    .when(self.project_settings_open(), |body| {
+                        body.pr(px(scrollbar::GUTTER)).child(
+                            self.settings_scrollbar
+                                .element(&self.screen_scroll, cx.entity_id()),
+                        )
+                    }),
             );
+        if !self.project_settings_open() {
+            self.settings_scrollbar.cancel_drag();
+        }
         if self.focus.screen == Screen::Setup && !self.focus.shows_project_picker() {
             content = content.child(self.setup_footer(cx));
         }
@@ -8225,6 +8280,8 @@ mod phase5_repair_tests;
 mod phase5_setup_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase5_state_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod project_settings_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod recovery_ux_tests;
 #[cfg(all(test, feature = "ui-tests"))]
@@ -8752,14 +8809,19 @@ mod tests {
             let arrow = cx.debug_bounds("timezone-chevron").unwrap();
             let value = cx.debug_bounds("timezone-value").unwrap();
             let hint = cx.debug_bounds("environment-login-hint").unwrap();
-            let next = cx.debug_bounds("action-Details(Capture)").unwrap();
+            let capture_details = cx.debug_bounds("action-Details(Capture)").unwrap();
+            let access = cx.debug_bounds("settings-section-Access").unwrap();
             assert!(
                 arrow.right() >= button.right() - px(16.),
-                "button={button:?}, value={value:?}, arrow={arrow:?}, hint={hint:?}, next={next:?}"
+                "button={button:?}, value={value:?}, arrow={arrow:?}, hint={hint:?}"
             );
             assert!(
-                hint.size.height >= px(20.) && hint.bottom() + px(8.) <= next.top(),
-                "hint={hint:?}, next={next:?}"
+                hint.size.height >= px(20.) && hint.bottom() <= access.bottom(),
+                "Login help must remain inside the access group: hint={hint:?}, access={access:?}"
+            );
+            assert!(
+                capture_details.bottom() + px(8.) <= access.top(),
+                "Capture details belong before the separate access group"
             );
         }
         owned.join_after_ui();

@@ -1,12 +1,22 @@
-# Whole-app workflow test preview
+# Project settings wayfinding test preview
 
-This preview includes the whole-app UI implementation and feasible validation
-from Phases 1–7 on 2026-10-12–13. It remains an **unsigned experimental prerelease**, not a supported
+This preview adds clearer Project settings navigation and includes the earlier
+whole-app UI implementation and feasible validation from Phases 1–7 on
+2026-10-12–13. It remains an **unsigned experimental prerelease**, not a supported
 release. The release's source commit and each archive's `build-info.json` identify
 the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
 
+- Project settings now keeps a labelled **Jump to** row visible for Website,
+  Capture plan, and Access & environments. It is one continuous form with one
+  explicit Save action, not separate tabs.
+- A visible interactive scrollbar shows the remaining settings. Drag its thumb,
+  click its track, or scroll normally; the Save footer stays available.
+- Settings Tab order follows the displayed groups, and section jumps focus the
+  first enabled destination without saving, opening a browser or changing the
+  baseline. Local tests and two-size native offscreen inspection cover the change;
+  see `docs/research/project-settings-wayfinding-20261014.md` for its bounded scope.
 - Review gives evidence more space, keeps page/profile/environment context visible,
   and places the queue's collapse/restore controls beside the queue.
 - Review decisions, notes and baseline selection have clearer task ownership;

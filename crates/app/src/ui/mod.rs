@@ -3,6 +3,7 @@ pub mod brand;
 pub mod controls;
 pub mod gpu_diagnostics;
 pub mod performance;
+pub mod scrollbar;
 pub mod selector;
 pub mod setup_progress;
 pub mod status_icon;

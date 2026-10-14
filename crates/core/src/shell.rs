@@ -137,6 +137,26 @@ impl SetupStage {
         }
     }
 }
+/// Local destinations in the unified project-settings form, not setup stages.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SettingsSection {
+    Website,
+    Capture,
+    Access,
+}
+impl SettingsSection {
+    pub const ALL: [Self; 3] = [Self::Website, Self::Capture, Self::Access];
+    pub fn index(self) -> usize {
+        self as usize
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Website => "Website",
+            Self::Capture => "Capture plan",
+            Self::Access => "Access & environments",
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum ReviewSurface {
     #[default]
@@ -149,6 +169,7 @@ pub enum ReviewSurface {
 pub enum Control {
     Navigate(Screen),
     SetupStage(SetupStage),
+    SettingsSection(SettingsSection),
     SetupBack,
     EnvironmentOptions,
     PagesBaseline,
@@ -352,50 +373,66 @@ impl FocusState {
         match self.screen {
             Screen::Setup => {
                 controls.extend(SetupStage::ALL.into_iter().map(Control::SetupStage));
-                controls.extend([Control::SetupBack, Control::EnvironmentOptions]);
+                if self.setup_stage == SetupStage::Settings {
+                    controls.extend(
+                        SettingsSection::ALL
+                            .into_iter()
+                            .filter(|section| {
+                                *section != SettingsSection::Access || self.project_saved
+                            })
+                            .map(Control::SettingsSection),
+                    );
+                }
+                // Match the rendered form, with disclosed children immediately
+                // after their trigger and pinned footer actions last.
+                controls.push(Control::ValidationNext);
                 controls.extend([Control::Name, Control::Address]);
                 controls.push(Control::Guided(11));
+                controls.extend([1, 2, 3].map(Control::Guided));
+                controls.extend([Choice::FullPage, Choice::VisibleScreen].map(Control::Choice));
                 controls.extend(
                     [Choice::AddressesOnly, Choice::AddressesAndLinks].map(Control::Choice),
                 );
-                controls.extend((0..3).map(Control::CrawlField));
-                controls.extend([1, 2, 3].map(Control::Guided));
-                controls.extend(
-                    [
-                        Choice::FullPage,
-                        Choice::VisibleScreen,
-                        Choice::OriginalImages,
-                        Choice::ReplaceImages,
-                        Choice::Gentle,
-                        Choice::Balanced,
-                        Choice::Fast,
-                    ]
-                    .map(Control::Choice),
-                );
-                controls.extend([7, 6].map(Control::Guided));
+                controls.push(Control::CrawlField(0));
+                controls
+                    .extend([Choice::OriginalImages, Choice::ReplaceImages].map(Control::Choice));
+                controls.push(Control::Guided(6));
                 if self.advanced {
-                    controls.extend((3..9).map(Control::CrawlField));
-                    controls.extend([8, 9, 10, 12].map(Control::Guided));
-                    controls.push(Control::Guided(25));
+                    controls.extend([1, 2].map(Control::CrawlField));
+                    controls.extend(
+                        [Choice::Gentle, Choice::Balanced, Choice::Fast].map(Control::Choice),
+                    );
+                    controls.push(Control::Guided(7));
+                    controls.extend((3..7).map(Control::CrawlField));
+                    controls.extend([8, 9, 10].map(Control::Guided));
+                    controls.extend([7, 8].map(Control::CrawlField));
+                    controls.extend([12, 25].map(Control::Guided));
                 }
+                controls.push(Control::Details(Detail::Capture));
                 if self.project_saved {
-                    controls.extend((0..self.environments.min(16)).map(Control::Environment));
-                    controls.push(Control::Guided(27));
                     controls
                         .extend([Choice::PublicAccess, Choice::LoginRequired].map(Control::Choice));
                     controls.extend((10..13).map(Control::CrawlField));
                     controls
                         .extend([Choice::SaveLogin, Choice::EphemeralLogin].map(Control::Choice));
+                    controls.push(Control::EnvironmentOptions);
+                    controls.extend((0..self.environments.min(16)).map(Control::Environment));
+                    controls.push(Control::Guided(27));
                     controls.extend((13..15).map(Control::CrawlField));
                     controls.extend([37, 38].map(Control::Guided));
                     controls.extend([15, 16].map(Control::CrawlField));
                     controls.extend([Choice::LightTheme, Choice::DarkTheme].map(Control::Choice));
-                    controls.extend([31, 32, 33, 34, 35, 36].map(Control::Guided));
+                    if self.setup_stage == SetupStage::Settings {
+                        controls.extend([31, 32].map(Control::Guided));
+                    }
+                    controls.extend([33, 34, 35, 36].map(Control::Guided));
                     controls.push(Control::CloseMappingPreview);
                 }
-                controls.push(Control::Details(Detail::Capture));
-                controls.push(Control::ValidationNext);
+                controls.push(Control::SetupBack);
                 controls.push(Control::Save);
+                if self.project_saved && self.setup_stage == SetupStage::Access {
+                    controls.extend([31, 32].map(Control::Guided));
+                }
                 if self.project_saved {
                     controls.push(Control::Guided(13));
                 }
@@ -711,8 +748,10 @@ mod tests {
             (Control::CrawlField(12), Control::Choice(Choice::SaveLogin)),
             (
                 Control::Choice(Choice::EphemeralLogin),
-                Control::CrawlField(13),
+                Control::EnvironmentOptions,
             ),
+            (Control::Environment(0), Control::Guided(27)),
+            (Control::Guided(27), Control::CrawlField(13)),
             (Control::Guided(38), Control::CrawlField(15)),
             (Control::CrawlField(15), Control::CrawlField(16)),
             (Control::CrawlField(16), Control::Choice(Choice::LightTheme)),
@@ -721,6 +760,50 @@ mod tests {
             assert_eq!(state.next(before, false), Some(after));
             assert_eq!(state.next(after, true), Some(before));
         }
+    }
+    #[test]
+    fn settings_and_advanced_capture_candidates_follow_the_painted_sequence() {
+        let mut state = FocusState {
+            screen: Screen::Setup,
+            busy: false,
+            project_saved: true,
+            advanced: true,
+            ..Default::default()
+        };
+        for (before, after) in [
+            (
+                Control::SettingsSection(SettingsSection::Access),
+                Control::ValidationNext,
+            ),
+            (Control::Guided(11), Control::Guided(1)),
+            (Control::Guided(3), Control::Choice(Choice::FullPage)),
+            (
+                Control::Choice(Choice::VisibleScreen),
+                Control::Choice(Choice::AddressesOnly),
+            ),
+            (
+                Control::CrawlField(0),
+                Control::Choice(Choice::OriginalImages),
+            ),
+            (Control::Guided(6), Control::CrawlField(1)),
+            (Control::CrawlField(2), Control::Choice(Choice::Gentle)),
+            (Control::Choice(Choice::Fast), Control::Guided(7)),
+            (Control::CrawlField(6), Control::Guided(8)),
+            (Control::Guided(10), Control::CrawlField(7)),
+            (Control::Guided(25), Control::Details(Detail::Capture)),
+            (
+                Control::Details(Detail::Capture),
+                Control::Choice(Choice::PublicAccess),
+            ),
+        ] {
+            assert_eq!(state.next(before, false), Some(after));
+            assert_eq!(state.next(after, true), Some(before));
+        }
+        state.setup_stage = SetupStage::Pages;
+        assert!(!state.can_activate(Control::SettingsSection(SettingsSection::Capture)));
+        state.setup_stage = SetupStage::Settings;
+        state.busy = true;
+        assert!(!state.can_activate(Control::SettingsSection(SettingsSection::Website)));
     }
     #[test]
     fn focus_wraps_and_disabled_actions_are_not_activatable() {
