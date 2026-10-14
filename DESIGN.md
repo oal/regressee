@@ -144,6 +144,12 @@ Offscreen Linux GPUI pixels establish only development-host rendering;
 they do not supersede earlier black OS-window captures or establish real input,
 IME, screen-reader, high-contrast, Windows/macOS or release qualification.
 
+The 2026-10-13 UX refinement plan is a separate iteration: all five phases received
+independent bounded PASS verdicts, completed on 2026-10-14. Final interactive-state
+integration and its independent verifier report are documented under
+`docs/research/ux-review-20261013/`. The behavior descriptions below include those
+shipped refinements without changing the qualification boundary.
+
 ## Colors
 
 ### Primary
@@ -264,21 +270,33 @@ while saving, browser visits, baseline changes, exports and deletion stay explic
 
 ## Components
 
-### Guided setup — Phase 5 independently re-verified in bounded scope
+### Guided setup — native connected progression
 
-Website → Access → Pages & sizes is pinned above the guided scrolling form, with
-Current/Completed/Next/Unavailable state. Public/private choices and the next safe
-action fit the minimum window. Clean guided steps Continue without rewriting;
-dirty steps await authoritative save before advancement. Private login remains
+**1 Website → 2 Access → 3 Pages & sizes** is a connected, numbered progress
+component pinned above the guided scrolling form. Numbered native marks and
+Current/Completed/Upcoming words distinguish progress without disabled-button styling.
+Invalid drafts keep their current stage; gated future stages explain the
+prerequisite beside the current action, not as `Unavailable` steps.
+Public/private choices remain keyboard/scroll-reachable at the minimum window;
+the footer keeps the next safe action pinned.
+Clean guided steps Continue without rewriting; dirty steps await authoritative
+save before advancement. Private login remains
 separate: Save settings first, Open login browser, then I'm ready. The footer
 co-locates draft/saved/browser prerequisites. Saving never implicitly opens login;
 Save & find pages explicitly authorizes discovery after its matching save.
 Existing-project Settings remains explicitly saved with all advanced operations.
-Sizes lead Pages, with selected dimensions, extent and image policy in readable
-plan lines. Mobile/tablet are website emulation, not real devices. Mapping pairs
-lead their scope notes; included-target counts, coverage cause and rediscovery
-next step sit beside Capture pages. Photo/bitmap and session-only wording keeps
-the secure-store and replacement limitations truthful.
+Optional environments, mappings and rendering options use a named Access
+disclosure; required login controls remain in the main path. Multiple-website
+authorization appears only for multiple permitted origins. Sizes lead Pages, with
+selected dimensions, extent and image policy in readable plan lines, before
+advanced scope/speed settings. Custom sizes and capture/replacement limitations
+remain scroll-reachable. Mobile/tablet are website emulation, not real devices.
+Mapping pairs lead their scope notes; included-target counts, coverage cause and
+rediscovery next step sit beside Capture pages. Photo/bitmap and session-only wording keeps
+the secure-store and replacement limitations truthful. Browser availability uses
+the same runtime-aware state/help as App settings, never an unconditional install
+promise. The navigation rail has no preview slogan; **About Regressee** retains
+version, local-storage, screenshot-privacy and development/release caveats.
 
 The finite V5-1–V5-3 repair preserves guided validation stages versus full Settings,
 reveals whole painted fields with error/help inside the current scroll clip, and
@@ -305,6 +323,8 @@ from selection: ordinary actions use ink outlines, rail navigation a white outer
 outline with a dark inner border on its selected light surface. Disabled controls
 fade, leave the focus model and reject activation. Shared outlines extend (2px)
 without changing layout or replacing inherited GPUI text refinements.
+Keyboard reveal measures complete bordered choice/check/action rows, not their
+padded content alone. Disclosure focus handles are distinct from project rows.
 
 **Links.** Presented website/page addresses that offer navigation must be real
 links: blue accent ink plus an underline at rest, a pointer cursor, visible
@@ -365,7 +385,16 @@ No chronological activity log or fabricated active-target telemetry is supplied.
 current analysis, including missing and unclassified evidence. Preserve before/
 after origins, screen size, warnings, sensitivity and ignored-area revisions.
 Original screenshots remain untinted; difference, overlay and heatmap are labelled
-analysis modes, not brand treatments of the originals.
+analysis modes, not brand treatments of the originals. Heatmap alone displays the
+production legend for significant differences and ignored pixels; these are
+derived results, not confirmed defects. The View menu is trigger-anchored, uses
+full-width selected rows and stays within the window. One stable path/profile/
+recorded-environment heading and compact toolbar persist with Results hidden.
+Hiding Results does not reduce evidence height; full-width Before/After preserves
+the inspection identity and source scale. One highest-priority reason explains
+blocked review/Next actions: dirty note/areas, pending analysis, noncomparable
+evidence or no next matching target. Empty baseline selection reads **0 selected**;
+nonempty selection names references ready for update without changing eligibility.
 The protected approval dialog has a bounded height (520px) and widths (740px)
 at narrow desktop sizes or (760px) otherwise, capped by its available viewport.
 It asks “Update the baseline for 1 screenshot?” with correct plural forms, names
@@ -402,6 +431,14 @@ and screen size, with one origin line.
 Keyboard ignored-area creation/editing uses original integer coordinates, explicit
 Apply and Save, and focus-revealing scroll anchors. Unapplied or all-masked areas
 cannot be saved.
+Analysis leads with the actual saved result/current-settings summary and
+**Sensitivity** presets. **Ignored areas** has its own disclosure containing Draw
+and Add by coordinates. Advanced parameters/switches and metrics follow the common
+choices. Complete labelled controls reveal within the actual inspector scroll
+owner, not just the whole window. Reanalysis uses saved originals, retains earlier
+revisions and does not visit websites; Cancel and previous-analysis actions mount
+only when meaningful. **No significant change** means below thresholds, not
+identical pixels.
 Only comparisons expose Analysis (sensitivity and ignored areas); capture-only
 views have no generic Tools mode. A flyout has an attached Close action and Escape
 restores its trigger. Drawing an ignored area folds away the flyout and returns
@@ -428,9 +465,14 @@ Notes now use the owned temporary editor rather than a permanent evidence-height
 row. Details, notes and filters remove or disable review/baseline decisions while
 evidence is occluded; Return to evidence/Escape preserves unsaved note text.
 The finite V4 repair gives the inspector scroll body a finite content width;
-the actual note input is 326px wide (300px inner content), with caret scrolling
-and explicit Save/Return. Saved-project Results loading/failed-read candidates
-now permit local navigation restoration without bypassing task/modal guards.
+the actual note input is 326px wide (300px inner content). The current review-note
+editor is bounded and genuinely multiline, with wrapping, caret/selection and
+vertical scrolling. Pasted newlines are preserved. Editor, Save and save-on-exit
+share the **8,192 UTF-8 byte** storage limit: exact save or explicit rejection with
+the draft retained, never silent truncation. One draft/saved/invalid status sits
+beside Save; overflow hints reflect actual overflow. Close/reopen preserves the
+owned draft and restores its trigger. Saved-project Results loading/failed-read
+candidates now permit local navigation restoration without bypassing task/modal guards.
 When results are hidden, an evidence-owned path/query/fragment and source profile/
 environment heading persists across all modes and capture inspection. Narrow
 Compare names Before/After historical environments above their respective panes.
@@ -440,15 +482,20 @@ re-verification, not OS-input/accessibility/usability/release acceptance. See
 `docs/research/whole-app-ui-review-20261012/phase4-report.md`.
 
 **History, consequences and recovery — Phase 6 independently verified in bounded scope.**
-Runs and Baselines use 256px inner scroll viewports with unchanged full-width
-selected paint. The outer workspace remains scrollable: at 820×600 the initial
-list extends below the fold; scrolling exposes its full four-row viewport.
+Runs and Baselines use one to four actual 64px rows for sparse lists and a 256px
+inner viewport for longer loaded pages; zero records mount no empty list.
+Full-width selected paint is unchanged. The outer workspace remains scrollable:
+at 820×600 the initial list extends below the fold; scrolling exposes its full
+four-row viewport.
 Overflow help explains scrolling and keyboard reveal, including the last loaded
 run/retained version. **Filter this history page** explicitly excludes unloaded
 pages. Both Runs and Baselines have page controls, disabled when no page exists.
 Readable UTC dates, record types, captured/intended coverage and environment lead;
 the selected identity and its open/share/delete actions sit together. Exact IDs
 and byte accounting remain under advanced provenance, including Storage.
+App settings uses the same heading as its navigation entry. Projects import and
+App settings secondary actions reveal their painted bounds in the actual outer
+scroll owner when traversed by keyboard; preview/confirm boundaries are unchanged.
 
 ZIP/import/deletion previews lead with consequences. Originals may expose private
 pixels; ignored rectangles are NOT redaction. ZIPs never carry sessions/cookies;

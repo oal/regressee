@@ -293,7 +293,7 @@ impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
             root_focus: cx.focus_handle(),
-            handles: (0..(628 + regressee_app::task::MAX_TASK_LINKS))
+            handles: (0..(634 + regressee_app::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -2514,16 +2514,28 @@ impl Shell {
             ));
             if self.details.contains(&Detail::Portability) {
                 if let Some(p) = &self.deletion_preview {
-                    body = body.child(format!(
-                        "Record {:?} · {} exact bytes removed · {} shared bytes retained",
-                        p.item, p.bytes, p.shared_bytes
-                    ));
+                    body = body.child(
+                        div()
+                            .debug_selector(|| "portability-exact-delete".into())
+                            .child(format!(
+                                "Record {:?} · {} exact bytes removed · {} shared bytes retained",
+                                p.item, p.bytes, p.shared_bytes
+                            )),
+                    );
                 }
                 if let Some(p) = &self.export_preview {
-                    body = body.child(format!("Export size: {} exact bytes", p.bytes));
+                    body = body.child(
+                        div()
+                            .debug_selector(|| "portability-exact-export".into())
+                            .child(format!("Export size: {} exact bytes", p.bytes)),
+                    );
                 }
                 if let Some(p) = &self.import_preview {
-                    body = body.child(format!("Import size: {} exact bytes", p.bytes));
+                    body = body.child(
+                        div()
+                            .debug_selector(|| "portability-exact-import".into())
+                            .child(format!("Import size: {} exact bytes", p.bytes)),
+                    );
                 }
                 if let Some(p) = &self.repair_preview {
                     body = body.child(format!("Temporary bytes: {} · temporaries {:?} · interrupted imports {:?} · complete recovery objects {:?} · missing/corrupt {:?}", p.temporary_bytes, p.temporaries, p.interrupted_imports, p.valid_unreferenced, p.missing_or_corrupt));
@@ -2613,7 +2625,9 @@ impl Shell {
             Control::Phase7(index) => 200 + index,
             Control::Choice(choice) => 204 + choice.index(),
             Control::Environment(index) => 224 + index,
-            Control::Details(detail) => 244 + detail as usize,
+            // Disclosures need their own range: adding IgnoredAreas made the old
+            // 244-based Network/Portability handles alias project rows 0 and 1.
+            Control::Details(detail) => 628 + regressee_app::task::MAX_TASK_LINKS + detail as usize,
             Control::DismissFeedback => 243,
             Control::HistorySearch => return self.history_search.read(cx).focus.clone(),
             Control::HistoryClear => 514,
@@ -3938,9 +3952,13 @@ impl Shell {
                 el.relative().child(
                     canvas(
                         |_, _, _| (),
-                        move |painted, _, _, _| bounds.set(Some(painted)),
+                        move |painted, _, _, _| {
+                            bounds.set(Some(form_recovery::bordered_control_bounds(painted)))
+                        },
                     )
                     .absolute()
+                    .top_0()
+                    .left_0()
                     .size_full(),
                 )
             },
@@ -3977,9 +3995,13 @@ impl Shell {
                 el.relative().child(
                     canvas(
                         |_, _, _| (),
-                        move |painted, _, _, _| bounds.set(Some(painted)),
+                        move |painted, _, _, _| {
+                            bounds.set(Some(form_recovery::bordered_control_bounds(painted)))
+                        },
                     )
                     .absolute()
+                    .top_0()
+                    .left_0()
                     .size_full(),
                 )
             },
@@ -4109,7 +4131,7 @@ impl Shell {
             .child(self.crawl_field(7,"Custom width (CSS pixels)","1–4096; custom profiles use desktop Chromium emulation."))
             .child(self.crawl_field(8,"Custom height (CSS pixels)","1–8192."))
             .child(self.guided_button(12,"Add / replace Custom screen size",cx)).child(self.guided_button(25,"Remove Custom screen size",cx))
-            .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Image replacement supports decoded HTML raster/picture images and single recognized raster CSS backgrounds. Vector icons remain. Canvas, video, frames, shadow DOM, pseudo-elements, complex/extensionless backgrounds and source-selector/script behavior are unsupported. Readiness or geometry warnings prevent assurance. Hidden original photo content is not separately saved in replacement-only captures. Rendering dimensions, touch/mobile emulation, DPR 1 and runtime are frozen with the baseline.")));
+             .child(div().debug_selector(|| "setup-image-limitations".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Image replacement supports decoded HTML raster/picture images and single recognized raster CSS backgrounds. Vector icons remain. Canvas, video, frames, shadow DOM, pseudo-elements, complex/extensionless backgrounds and source-selector/script behavior are unsupported. Readiness or geometry warnings prevent assurance. Hidden original photo content is not separately saved in replacement-only captures. Rendering dimensions, touch/mobile emulation, DPR 1 and runtime are frozen with the baseline.")));
             }
         }
         if self.project.is_some() && matches!(stage, SetupStage::Access | SetupStage::Settings) {
@@ -5244,9 +5266,13 @@ impl Shell {
                 el.relative().child(
                     canvas(
                         |_, _, _| (),
-                        move |painted, _, _, _| bounds.set(Some(painted)),
+                        move |painted, _, _, _| {
+                            bounds.set(Some(form_recovery::bordered_control_bounds(painted)))
+                        },
                     )
                     .absolute()
+                    .top_0()
+                    .left_0()
                     .size_full(),
                 )
             },
@@ -6197,7 +6223,7 @@ impl Shell {
                     .child(self.button(Control::Details(Detail::Network), if self.details.contains(&Detail::Network) { "Hide network limitations" } else { "Network limitations" }, ActionStyle::Secondary, cx))
                     .when(self.details.contains(&Detail::Network), |el| el
                         .when_some(self.network_status.clone(), |el, status| el.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(status)))
-                        .child(div().text_size(px(14.)).text_color(rgb(WARNING)).child("The development browser's Node 22 worker cannot fetch robots.txt through a configured proxy. An authorized robots override is explicit. VPN and enterprise networks remain unqualified. Chromium needs custom CA trust in its OS/browser store; TLS verification is never disabled."))));
+                         .child(div().debug_selector(|| "network-limitations-copy".into()).text_size(px(14.)).text_color(rgb(WARNING)).child("The development browser's Node 22 worker cannot fetch robots.txt through a configured proxy. An authorized robots override is explicit. VPN and enterprise networks remain unqualified. Chromium needs custom CA trust in its OS/browser store; TLS verification is never disabled."))));
                 body = body.child(self.diagnostic_panel(cx));
                 body = body
                     .child(self.button(
@@ -8033,6 +8059,8 @@ mod phase4_review_tests;
 mod phase5_repair_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase5_setup_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase5_state_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod workflow_refinement_tests;
 

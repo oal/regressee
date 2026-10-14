@@ -2,6 +2,15 @@
 //! Local, read-only validation wayfinding and discoverable keyboard help.
 use super::*;
 
+/// Shared controls have a one-pixel border. Their explicitly top/left-anchored
+/// absolute canvas measures the padding box, so include the border for reveal.
+pub(super) fn bordered_control_bounds(painted: Bounds<Pixels>) -> Bounds<Pixels> {
+    Bounds::new(
+        gpui::point(painted.left() - px(1.), painted.top() - px(1.)),
+        size(painted.size.width + px(2.), painted.size.height + px(2.)),
+    )
+}
+
 pub(super) fn next_correction(errors: &[Control], current: Option<Control>) -> Option<Control> {
     if errors.is_empty() {
         return None;
@@ -45,10 +54,20 @@ impl Shell {
         &self,
         control: Control,
     ) -> Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>> {
-        if self.focus.screen != Screen::Setup
-            || !matches!(control,Control::Name|Control::Address|Control::CrawlField(_)|Control::Choice(_)|Control::Environment(_)|Control::EnvironmentOptions|Control::Guided(1..=12|25|27|31..=38)|Control::Details(Detail::Capture)|Control::CloseMappingPreview)
-            || (self.focus.setup_stage == SetupStage::Access
-                && matches!(control, Control::Guided(31 | 32)))
+        let secondary_action = matches!(self.focus.screen, Screen::Projects | Screen::Settings)
+            && matches!(
+                control,
+                Control::Phase6(1 | 3 | 6 | 7 | 14 | 15)
+                    | Control::Details(Detail::Portability | Detail::Network)
+                    | Control::Guided(41 | 42)
+                    | Control::About
+                    | Control::Shortcuts
+            );
+        if !secondary_action
+            && (self.focus.screen != Screen::Setup
+                || !matches!(control,Control::Name|Control::Address|Control::CrawlField(_)|Control::Choice(_)|Control::Environment(_)|Control::EnvironmentOptions|Control::Guided(1..=12|25|27|31..=38)|Control::Details(Detail::Capture)|Control::CloseMappingPreview)
+                || (self.focus.setup_stage == SetupStage::Access
+                    && matches!(control, Control::Guided(31 | 32))))
         {
             return None;
         }
@@ -209,7 +228,10 @@ impl Shell {
         window: &mut Window,
         cx: &mut App,
     ) {
-        if !matches!(self.focus.screen, Screen::Setup | Screen::Settings) {
+        if !matches!(
+            self.focus.screen,
+            Screen::Setup | Screen::Settings | Screen::Projects
+        ) {
             return;
         }
         if let Some(bounds) = self.setup_control_bounds(control) {

@@ -259,7 +259,7 @@ UI-only no-run, workspace UI build, strict all-targets/all-features Clippy,
 formatting and whitespace. The independent verifier inspected all 88 captures,
 confirmed source/state bindings and issued PASS in `phase4-verification.md`.
 Parent performs this phase's commit/push after this update and records its hash
-in the next phase. Phase 5 remains pending.
+in the next phase. Phase 5 is now independently verified below.
 
 Findings: **A4**, A minor History/Settings repetition and terminology findings.
 
@@ -300,7 +300,26 @@ Findings: **A4**, A minor History/Settings repetition and terminology findings.
 
 ## Phase 5 — Interactive-state coverage and final regression gate
 
-**Status: pending**
+**Status: complete — independently verified PASS (2026-10-14)**
+
+Implementer handoff: `docs/research/ux-review-20261013/phase5-implementation.md` and
+`final-integration.md`. The sole targeted native batch has **104 fresh source-bound
+frames**, 52 per desktop size; every frame and 58 native-scale reading crops were
+personally inspected, with 26 original-resolution spot checks. Durable scrubbed
+`phase5-receipt.json` and `phase5-inspection-ledger.json` bind current source,
+state/geometry, proof/fixtures, inspections and exact completed gates. Three
+structurally demonstrated integration defects were repaired before that batch;
+no visual-polish/confirmation round was needed. All eight final-source gates
+completed with exit 0, including complete workspace/all-features tests:
+**387 passed, 0 failed, 52 ignored**, with normal integration qualification.
+`DESIGN.md` reflects the refined native behavior without changing existing
+OS-input/IME/accessibility/platform/runtime/release limits. The separate verifier
+inspected all 104 originals, independently completed the full test/build/feature
+gates, and issued **whole Phase 5 and final integration PASS** in
+`phase5-verification.md`. All five phases are implemented and independently
+verified. Parent performs the final phase commit and normal push after this status
+update; the final hash is supplied in the delivery response rather than inside
+its own commit. Phases 1–4 and their push records remain intact.
 
 Findings: A/B evidence gaps and final integration coverage for Phases 1–4.
 
@@ -378,8 +397,26 @@ user URLs, user project databases or generated shipping claims.
 | 1 | `ses_ec954afe7ffeEecoyP5c94slJU` — initial + repairs | `ses_ec9177899ffet7yjIRWlsr1DW8` — FIX → PASS | PASS | `7b73090` — pushed to origin/main |
 | 2 | `ses_ec8f73b54ffeC3IdbDuuX6eF4q` — initial + repairs | `ses_ec8d6e6beffeEIKgytGTffTsVf` — FIX → PASS | PASS | `98f2e21` — pushed to origin/main |
 | 3 | `ses_ec8ba7cebffe8igywNJgfd2HqS` | `ses_ec89b1360ffet6oQKZZLVOeUsS` — PASS | PASS | `b1becf8` — pushed to origin/main |
-| 4 | `ses_ec894516fffeWg64CmVcDm55T6` | `ses_ec844138fffedfPZA5JnK4IGgr` — PASS | PASS | phase commit; hash/push recorded next phase |
-| 5 | pending | pending | pending | pending |
+| 4 | `ses_ec894516fffeWg64CmVcDm55T6` | `ses_ec844138fffedfPZA5JnK4IGgr` — PASS | PASS | `595ebdc` — pushed to origin/main |
+| 5 | `ses_ec83cc1adffeoMKcoNxRqX8wH4` | `ses_ec7e2ad20ffeOfOSrHNy50HCby` — PASS | PASS | final phase commit/push; hash in delivery response |
 
 The phase commit cannot contain its own hash. Record a preceding phase's hash in
 the next phase's update; final delivery can name the final hash explicitly.
+
+## Completion summary — 2026-10-14
+
+All five implementation phases received independent scoped PASS verdicts, using
+one implementer and one verifier at a time. Phase 1 and 2 FIX findings returned to
+their original implementers and were reverified before commit/push. No in-scope
+implementation requirement is deferred. The final regression result is **387
+passed, 0 failed, 52 deliberately ignored**, with UI build, base/UI/UI-tests
+feature compilation, strict Clippy, formatting and whitespace gates passed.
+
+The initial review inspected 238 native frames; final integration inspected 104
+fresh current-source frames covering actual toggles and customizations. See
+`docs/research/ux-review-20261013/final-integration.md`, `phase5-verification.md`,
+`phase5-receipt.json` and `phase5-inspection-ledger.json` for the complete outcome
+and finding-to-test/evidence map. Private pixels remain outside Git.
+
+Existing real OS-input/IME, accessibility, supported-platform and release
+qualification obligations remain explicitly separate from completed UX scope.

@@ -1507,6 +1507,7 @@ impl Shell {
                     .min_w(px(180.))
                     .text_size(px(13.))
                     .text_color(rgb(MUTED))
+                    .debug_selector(|| "setup-footer-status".into())
                     .child(if stage == SetupStage::Access {
                         if self.unsaved(cx) {
                             "Draft access: save first. Login opens separately."

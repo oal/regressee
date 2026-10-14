@@ -18,6 +18,8 @@ mod ui_phase2_capture;
 mod ui_phase3_capture;
 #[path = "ui_phase4_capture.rs"]
 mod ui_phase4_capture;
+#[path = "ui_phase5_capture.rs"]
+mod ui_phase5_capture;
 #[path = "ui_review_matrix.rs"]
 mod ui_review_matrix;
 
@@ -132,6 +134,9 @@ fn write_frame(
               ,"phase3_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase3_capture.rs")))
         });
         for (key, source) in [
+            ("renderer_harness_source_sha256", include_bytes!("ui_renderer_capture.rs").as_slice()),
+            ("phase5_harness_source_sha256", include_bytes!("ui_phase5_capture.rs").as_slice()),
+            ("phase5_state_source_sha256", include_bytes!("phase5_state_tests.rs").as_slice()),
             ("analysis_ux_source_sha256", include_bytes!("analysis_ux.rs").as_slice()),
             ("history_source_sha256", include_bytes!("workspace_history.rs").as_slice()),
             ("phase4_hierarchy_source_sha256", include_bytes!("phase4_hierarchy_tests.rs").as_slice()),

@@ -1,0 +1,530 @@
+{
+  "scope": "Phase 5 implementer personal inspection; not independent PASS",
+  "date": "2026-10-14",
+  "root": "/var/home/olav/Data/opencode/tmp/opencode/regressee-phase5-20261014-4zgty46x",
+  "proof_inspected_before_app_batch": true,
+  "proof_receipt_sha256": "e1f32c9e885f6edc373673f2583099d0a6ff95ff87f1c8be108c78befa184aa3",
+  "counts": {
+    "app_frames": 104,
+    "full_frame_sheets": 18,
+    "native_scale_reading_crops": 58,
+    "reading_sheets": 10,
+    "original_resolution_spot_checks": 26
+  },
+  "scaling": {
+    "full-1280": "50% labelled derivative",
+    "full-820": "100% labelled derivative",
+    "reading": "100% cropped original pixels"
+  },
+  "visual_iterations": {
+    "planned_native_batches": 1,
+    "post_inspection_visual_repairs": 0,
+    "confirmations": 0
+  },
+  "observations": [
+    {
+      "scenes": "wizard/access/private/loading",
+      "observed": "Connected progress, factual runtime status, Public row fully revealed; optional mapping and Login required are separate reading positions. Saved private access has a real outstanding read-only status request; footer/loading and blocked login controls are painted. No website/browser/login activation."
+    },
+    {
+      "scenes": "mobile/tablet/custom/limitations/alternates/invalid",
+      "observed": "Mobile visibly selected in its actual form clip at both sizes; custom values/actions and complete limitations copy are readable at their own offsets. Extent/image/speed choices show actual selection. Parallel active pages 9, its correction and help fit the real clip after actual Save rejection; no work queued."
+    },
+    {
+      "scenes": "discovery inclusion and matching actions",
+      "observed": "Included count changes 74/75/74/75 within a 128-page isolated inventory; selected and matched pages show included/excluded copy. Search retains the previous selection outside its match and does not silently alter inclusion."
+    },
+    {
+      "scenes": "review modes/results/navigation/menus",
+      "observed": "Stable target/profile/recorded environment, untinted originals and attached View/Zoom menus. Compare/results-hidden/full-width heights are 389px normal and 234px narrow in equivalent navigation states. Heatmap has both significant and ignored colors with the production legend. Fitted website imagery is an overview, not fine-text readability qualification."
+    },
+    {
+      "scenes": "multiline note and dirty blockers",
+      "observed": "Wrapped multiple lines, pasted line breaks, caret, byte status and Return/Save are readable. Close retains dirty note and paints the recovery reason; dirty area has its own reason. Byte/state tests do not establish OS IME, font coverage for every script, or accessibility announcements."
+    },
+    {
+      "scenes": "Analysis hierarchy/coordinates/advanced",
+      "observed": "Actual saved result/current policy precedes Sensitivity; optional Ignored areas exposes coordinates, and advanced tail switches remain readable at a distinct inner-scroll reading position. Inspector intentionally covers part of the evidence and disables consequential review controls."
+    },
+    {
+      "scenes": "classification/grouped filters and baseline selection",
+      "observed": "Distinct Changed/Gaps/no-significant-change headings/counts and recorded classifications; grouping changes actual result ordering without losing the inspected pair. At narrow size the retained success notice reduces list space; these frames do not claim a complete matching row is simultaneously visible. Selected baseline references are explicitly separate from approval; no approval dispatched."
+    },
+    {
+      "scenes": "History selection/pagination/provenance",
+      "observed": "Last loaded row 63 of 64 is selected/revealed in its true list owner; selected actions are revealed in outer owner. Second page and optional saved provenance are separate genuine views. Full four-row History viewport need not fit the initial outer scroll position."
+    },
+    {
+      "scenes": "portability/network",
+      "observed": "Privacy/not-redaction/recipient-login/deletion consequences and exact byte details remain readable in explicit reading positions. Network limitations retain proxy/CA/VPN/enterprise restrictions. Import uses the production post-picker path with a locally constructed synthetic archive, not native picker delivery. No import/export/delete UI confirmation dispatched."
+    }
+  ],
+  "derivatives": [
+    {
+      "file": "full-1280-01.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-wizard-website",
+        "phase5-1280x800-access-public",
+        "phase5-1280x800-access-optional-mapping",
+        "phase5-1280x800-private-login-loading",
+        "phase5-1280x800-mobile-revealed-selected",
+        "phase5-1280x800-tablet-selected"
+      ],
+      "sha256": "3f1644df2c27df151786c6a9ce1192114d9cefd4c6e3d88de28f5da1679dde63"
+    },
+    {
+      "file": "full-1280-02.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-custom-width",
+        "phase5-1280x800-custom-height",
+        "phase5-1280x800-custom-added-actions",
+        "phase5-1280x800-image-limitations-tail",
+        "phase5-1280x800-capture-limitations-tail",
+        "phase5-1280x800-visible-screen-selected"
+      ],
+      "sha256": "9fb709528eefb0219f9b117ee1340b821c8816316b31f8c2ba8bdbaf2c03e906"
+    },
+    {
+      "file": "full-1280-03.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-replacement-selected",
+        "phase5-1280x800-fast-selected",
+        "phase5-1280x800-invalid-advanced-revealed",
+        "phase5-1280x800-discovery-excluded",
+        "phase5-1280x800-discovery-included",
+        "phase5-1280x800-discovery-matches-excluded"
+      ],
+      "sha256": "d24c0440b6a9c87d70860ce8a1972d4712583504618c13a3fb95926dab17ddab"
+    },
+    {
+      "file": "full-1280-04.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-discovery-matches-restored",
+        "phase5-1280x800-review-compare",
+        "phase5-1280x800-results-hidden",
+        "phase5-1280x800-navigation-toggled",
+        "phase5-1280x800-full-before",
+        "phase5-1280x800-full-after"
+      ],
+      "sha256": "dcc05af133e5eae7d4cea132d460e1c7454279f47854b2990ca11779f2e525e3"
+    },
+    {
+      "file": "full-1280-05.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-difference",
+        "phase5-1280x800-overlay",
+        "phase5-1280x800-heatmap-with-ignored",
+        "phase5-1280x800-view-menu",
+        "phase5-1280x800-zoom-menu",
+        "phase5-1280x800-multiline-note"
+      ],
+      "sha256": "d0582766818271aee3c131e9b1ad6ff7f9d2bcab559390b3b5b9509b059fefbb"
+    },
+    {
+      "file": "full-1280-06.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-dirty-note-blocker",
+        "phase5-1280x800-analysis-sensitivity",
+        "phase5-1280x800-analysis-ignored-coordinates",
+        "phase5-1280x800-dirty-area-blocker",
+        "phase5-1280x800-analysis-advanced-tail",
+        "phase5-1280x800-filter-changed"
+      ],
+      "sha256": "deffcd90ffffd3d4d34013921eebae3b99a17f672726089760a0b95a0534a560"
+    },
+    {
+      "file": "full-1280-07.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-filter-gaps",
+        "phase5-1280x800-filter-no-significant-change",
+        "phase5-1280x800-filter-grouped",
+        "phase5-1280x800-baseline-selection",
+        "phase5-1280x800-history-last-run",
+        "phase5-1280x800-history-selected-actions"
+      ],
+      "sha256": "feb923c7f1d0993c69704714b537e61c4e757e354792fa57c7c6d9186465b243"
+    },
+    {
+      "file": "full-1280-08.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-history-page-two",
+        "phase5-1280x800-history-provenance",
+        "phase5-1280x800-delete-consequences",
+        "phase5-1280x800-delete-exact",
+        "phase5-1280x800-export-consequences",
+        "phase5-1280x800-export-exact"
+      ],
+      "sha256": "d09ff59e064e22d20c993526042e6a98dc2a74a2dedea70520cc64349d5aeb6b"
+    },
+    {
+      "file": "full-1280-09.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-1280x800-import-consequences",
+        "phase5-1280x800-import-exact",
+        "phase5-1280x800-network-limits-closed",
+        "phase5-1280x800-network-limits-open"
+      ],
+      "sha256": "ba562af1f32c7c2ac95465939bdc5c7c3361fd35d8608e8b0232c4ff643661d5"
+    },
+    {
+      "file": "reading-1280-01.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-1280x800-access-public",
+        "phase5-1280x800-access-optional-mapping",
+        "phase5-1280x800-private-login-loading",
+        "phase5-1280x800-mobile-revealed-selected",
+        "phase5-1280x800-tablet-selected",
+        "phase5-1280x800-custom-width"
+      ],
+      "sha256": "9e1449cfd4f615487d57d05d09e7ef594a306106d475bb9e3b007cd933097ebd"
+    },
+    {
+      "file": "reading-1280-02.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-1280x800-custom-height",
+        "phase5-1280x800-custom-added-actions",
+        "phase5-1280x800-image-limitations-tail",
+        "phase5-1280x800-capture-limitations-tail",
+        "phase5-1280x800-visible-screen-selected",
+        "phase5-1280x800-replacement-selected"
+      ],
+      "sha256": "90643648794e1f16a58567ec679fae1a86428be398e0606847f4f8f95bf78791"
+    },
+    {
+      "file": "reading-1280-03.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-1280x800-fast-selected",
+        "phase5-1280x800-invalid-advanced-revealed",
+        "phase5-1280x800-multiline-note",
+        "phase5-1280x800-analysis-sensitivity",
+        "phase5-1280x800-analysis-ignored-coordinates",
+        "phase5-1280x800-analysis-advanced-tail"
+      ],
+      "sha256": "9b7d15eb1764de9ed14f0ca87b4faabaf582a900eeeb04eae03a8526af34c98c"
+    },
+    {
+      "file": "reading-1280-04.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-1280x800-history-selected-actions",
+        "phase5-1280x800-history-page-two",
+        "phase5-1280x800-history-provenance",
+        "phase5-1280x800-delete-consequences",
+        "phase5-1280x800-delete-exact",
+        "phase5-1280x800-export-consequences"
+      ],
+      "sha256": "e56053369e0faf7bb36f6857b2537663fb5f9f74bbd2e7a05310ed025bada18e"
+    },
+    {
+      "file": "reading-1280-05.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-1280x800-export-exact",
+        "phase5-1280x800-import-consequences",
+        "phase5-1280x800-import-exact",
+        "phase5-1280x800-network-limits-closed",
+        "phase5-1280x800-network-limits-open"
+      ],
+      "sha256": "5d939cedd0107a88ab80cf1356f367b6dc0642682f7dbb520e9f1edd0d2eee90"
+    },
+    {
+      "file": "full-820-01.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-wizard-website",
+        "phase5-820x600-access-public",
+        "phase5-820x600-access-optional-mapping",
+        "phase5-820x600-private-login-loading",
+        "phase5-820x600-mobile-revealed-selected",
+        "phase5-820x600-tablet-selected"
+      ],
+      "sha256": "172cdb7435ecdf2e9d4a94625aedd76306399942efa775c6030e8bae9b1601b6"
+    },
+    {
+      "file": "full-820-02.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-custom-width",
+        "phase5-820x600-custom-height",
+        "phase5-820x600-custom-added-actions",
+        "phase5-820x600-image-limitations-tail",
+        "phase5-820x600-capture-limitations-tail",
+        "phase5-820x600-visible-screen-selected"
+      ],
+      "sha256": "ac04b79523643b4287e838db04885227ad4add7b7707c20689e6bdd1c9b9d51a"
+    },
+    {
+      "file": "full-820-03.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-replacement-selected",
+        "phase5-820x600-fast-selected",
+        "phase5-820x600-invalid-advanced-revealed",
+        "phase5-820x600-discovery-excluded",
+        "phase5-820x600-discovery-included",
+        "phase5-820x600-discovery-matches-excluded"
+      ],
+      "sha256": "afe44f3432ddd22a0c2d5097ca3f74bb83ef691ca977ae8298b9f9c729b2cef5"
+    },
+    {
+      "file": "full-820-04.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-discovery-matches-restored",
+        "phase5-820x600-review-compare",
+        "phase5-820x600-results-hidden",
+        "phase5-820x600-navigation-toggled",
+        "phase5-820x600-full-before",
+        "phase5-820x600-full-after"
+      ],
+      "sha256": "c94ce12d95827b36148e9248ceaf5aa7c2a29b02457e60a3ed03bfae041d1010"
+    },
+    {
+      "file": "full-820-05.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-difference",
+        "phase5-820x600-overlay",
+        "phase5-820x600-heatmap-with-ignored",
+        "phase5-820x600-view-menu",
+        "phase5-820x600-zoom-menu",
+        "phase5-820x600-multiline-note"
+      ],
+      "sha256": "7d0279e0bf04c142236021b926eaa35cc1a5210d30d961d28f403a5215bd28c5"
+    },
+    {
+      "file": "full-820-06.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-dirty-note-blocker",
+        "phase5-820x600-analysis-sensitivity",
+        "phase5-820x600-analysis-ignored-coordinates",
+        "phase5-820x600-dirty-area-blocker",
+        "phase5-820x600-analysis-advanced-tail",
+        "phase5-820x600-filter-changed"
+      ],
+      "sha256": "d2259f6c7d995c90e77548fb96742aa40e6ba16cc66a0e5b37e917102a2dd532"
+    },
+    {
+      "file": "full-820-07.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-filter-gaps",
+        "phase5-820x600-filter-no-significant-change",
+        "phase5-820x600-filter-grouped",
+        "phase5-820x600-baseline-selection",
+        "phase5-820x600-history-last-run",
+        "phase5-820x600-history-selected-actions"
+      ],
+      "sha256": "b9a9c479ae37cc16d477c4c01f6dc01975245c1b4b81b9281a0e562015b830fe"
+    },
+    {
+      "file": "full-820-08.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-history-page-two",
+        "phase5-820x600-history-provenance",
+        "phase5-820x600-delete-consequences",
+        "phase5-820x600-delete-exact",
+        "phase5-820x600-export-consequences",
+        "phase5-820x600-export-exact"
+      ],
+      "sha256": "191fcb3ef77c7f9ffbccf14ea104e4813a03aecdfeaff51ca0cdb2ac2f993cf8"
+    },
+    {
+      "file": "full-820-09.png",
+      "kind": "labelled full-frame contact sheet",
+      "frames": [
+        "phase5-820x600-import-consequences",
+        "phase5-820x600-import-exact",
+        "phase5-820x600-network-limits-closed",
+        "phase5-820x600-network-limits-open"
+      ],
+      "sha256": "6503abdd90d2939a097cb6c03a03c248bbe53532a69f27105c431b7ae49c8cd4"
+    },
+    {
+      "file": "reading-820-01.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-820x600-access-public",
+        "phase5-820x600-access-optional-mapping",
+        "phase5-820x600-private-login-loading",
+        "phase5-820x600-mobile-revealed-selected",
+        "phase5-820x600-tablet-selected",
+        "phase5-820x600-custom-width"
+      ],
+      "sha256": "9939fd942e262661759206a26710588dd648757c843e6ae71936bda9c7e7b157"
+    },
+    {
+      "file": "reading-820-02.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-820x600-custom-height",
+        "phase5-820x600-custom-added-actions",
+        "phase5-820x600-image-limitations-tail",
+        "phase5-820x600-capture-limitations-tail",
+        "phase5-820x600-visible-screen-selected",
+        "phase5-820x600-replacement-selected"
+      ],
+      "sha256": "35458b407212f01146e537ea72f705624cd9c38f6516f07b112946114b1c0b74"
+    },
+    {
+      "file": "reading-820-03.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-820x600-fast-selected",
+        "phase5-820x600-invalid-advanced-revealed",
+        "phase5-820x600-multiline-note",
+        "phase5-820x600-analysis-sensitivity",
+        "phase5-820x600-analysis-ignored-coordinates",
+        "phase5-820x600-analysis-advanced-tail"
+      ],
+      "sha256": "0f4332c2ebd3f4e9802714ea3f5a1373e42ff86dc0d88577804898a8d6e9c5e1"
+    },
+    {
+      "file": "reading-820-04.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-820x600-history-selected-actions",
+        "phase5-820x600-history-page-two",
+        "phase5-820x600-history-provenance",
+        "phase5-820x600-delete-consequences",
+        "phase5-820x600-delete-exact",
+        "phase5-820x600-export-consequences"
+      ],
+      "sha256": "f42fb0fa7164663591711d5e30887bac5815f1d98f9603b34036233d40e88058"
+    },
+    {
+      "file": "reading-820-05.png",
+      "kind": "native-scale painted-control/copy crops",
+      "frames": [
+        "phase5-820x600-export-exact",
+        "phase5-820x600-import-consequences",
+        "phase5-820x600-import-exact",
+        "phase5-820x600-network-limits-closed",
+        "phase5-820x600-network-limits-open"
+      ],
+      "sha256": "7bf2dfee51899789a5566e8746b52549c02e0abf93a539148e98a0dfb21067a9"
+    }
+  ],
+  "qualified": "Linux GPUI/Blade offscreen paint with simulated control/wheel behavior only",
+  "independent_verdict": "pending",
+  "frames": [
+    {"label":"phase5-1280x800-wizard-website","png_sha256":"c57d98a94180635b0c82de137e43239345b121970f0db5108c9407cf1d0544a8","full_frame_sheet":"full-1280-01.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-access-public","png_sha256":"9d9bbe32367c92434f7c1d34a830e6dde9ee2e1f49a840d38054f7a92480d00b","full_frame_sheet":"full-1280-01.png","native_scale_reading_sheet":"reading-1280-01.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-access-optional-mapping","png_sha256":"1eeab3dc791410b476c76ad9726d75ee9a96f9dce27f433b75c45ebb674d286b","full_frame_sheet":"full-1280-01.png","native_scale_reading_sheet":"reading-1280-01.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-private-login-loading","png_sha256":"b488fb75cb8f9a0ce866008aed211e86da219471ebfb1f6c7706b58de508988d","full_frame_sheet":"full-1280-01.png","native_scale_reading_sheet":"reading-1280-01.png","original_resolution_inspected":true},
+    {"label":"phase5-1280x800-mobile-revealed-selected","png_sha256":"2508c41b937d309fa55c3b62cb95fedfc4696093fc9699b5209ea366d8861e0d","full_frame_sheet":"full-1280-01.png","native_scale_reading_sheet":"reading-1280-01.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-tablet-selected","png_sha256":"7da1ac336fe10d4e025b28264f9f5e3962711a737fb1fc2474a71931e6734a38","full_frame_sheet":"full-1280-01.png","native_scale_reading_sheet":"reading-1280-01.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-custom-width","png_sha256":"c582affa62c276e36d18a0939d84018ef495fd1cc397e7572325995b393c979e","full_frame_sheet":"full-1280-02.png","native_scale_reading_sheet":"reading-1280-01.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-custom-height","png_sha256":"6437224c0df374fe6442da63ed5d5c3d216b6639a6ba8fbe09d5c8c8d3b45762","full_frame_sheet":"full-1280-02.png","native_scale_reading_sheet":"reading-1280-02.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-custom-added-actions","png_sha256":"535b2e5b91de7a641913abc315696005ce5d9fc8984fc946d73b2a9e4c96acdd","full_frame_sheet":"full-1280-02.png","native_scale_reading_sheet":"reading-1280-02.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-image-limitations-tail","png_sha256":"dfd3456ed49fdefd7beec21ae6335c7ce77b654ab9a58ec3bea13fbe9008e6e0","full_frame_sheet":"full-1280-02.png","native_scale_reading_sheet":"reading-1280-02.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-capture-limitations-tail","png_sha256":"3f3533cb1212ef56eb78312efbdcd1b3f5d35366ca83ee7f134a14d68beafb28","full_frame_sheet":"full-1280-02.png","native_scale_reading_sheet":"reading-1280-02.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-visible-screen-selected","png_sha256":"344d253c2e66c10e82eaec35215083333db85d45246eb400dd5f3469b66b3591","full_frame_sheet":"full-1280-02.png","native_scale_reading_sheet":"reading-1280-02.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-replacement-selected","png_sha256":"66924c26e36a6c22cfd16c4de2a04ca7e2e60bc60baca8c1b919adc3c837dbe3","full_frame_sheet":"full-1280-03.png","native_scale_reading_sheet":"reading-1280-02.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-fast-selected","png_sha256":"1042132c42dd080b1d931277348950a554e309285e21526a557d8e9b307ccae2","full_frame_sheet":"full-1280-03.png","native_scale_reading_sheet":"reading-1280-03.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-invalid-advanced-revealed","png_sha256":"8c6d50217544ad9223ed99a3a34793ff806ddda7e66b5cc5923b68d9035a5c24","full_frame_sheet":"full-1280-03.png","native_scale_reading_sheet":"reading-1280-03.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-discovery-excluded","png_sha256":"6170c3eed7381b20a2f291fbd52089f09280ae7a5e48c748e3b6478f6a9f60de","full_frame_sheet":"full-1280-03.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-discovery-included","png_sha256":"ec624d618c89895ac7c96f3b24e2f06499fafe2907ce37fd6ef9d65048ac392a","full_frame_sheet":"full-1280-03.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-discovery-matches-excluded","png_sha256":"e99755bfb24e6861dfe57ccb625e0da7cda679544100aa36a943f625748d2e01","full_frame_sheet":"full-1280-03.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-1280x800-discovery-matches-restored","png_sha256":"40740007c9385e9eb877e07a2185d87a68913baf13e7b921d4e365fda5cf6bf2","full_frame_sheet":"full-1280-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-review-compare","png_sha256":"39c441bc28e61e911140fff1d690408b874dd140fb11e6e1aebab0e96bb6c0cb","full_frame_sheet":"full-1280-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-results-hidden","png_sha256":"5b53c306a3d715b5ff05b1e49dc123188ba1f6765218f3ec6fd9d4ebb1947280","full_frame_sheet":"full-1280-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-navigation-toggled","png_sha256":"22570dc279ca0ff0ed83279b01f16e8ae501d35fcc714174633eeb76418bdb6f","full_frame_sheet":"full-1280-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-full-before","png_sha256":"0c05f2fd5b59cffe4cc2314e6be0ba7de58cc717950d7c6eaac29cc3fbc77773","full_frame_sheet":"full-1280-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-full-after","png_sha256":"53dd5ab487104fd37d959a584f7905c1aa2860c0d3b3a313839e02d9868772cb","full_frame_sheet":"full-1280-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-difference","png_sha256":"d80b18df9516b8d97709d8b558ed5cc890ec13bc4c0cbdd1b7fc92e78dcb7bd1","full_frame_sheet":"full-1280-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-overlay","png_sha256":"70f436359207043ced196cdf81015bb0cd0a5daacf0c8e634868063703b6cc1e","full_frame_sheet":"full-1280-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-heatmap-with-ignored","png_sha256":"6341f3ff704b601c47fa70a3af67fbd6a06372d46a59244542e03c1f70e793a2","full_frame_sheet":"full-1280-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-1280x800-view-menu","png_sha256":"1337f26b4290b24c08e9e7c0c2d44bcf11b705a4f81d409e4f17d729b0e9103d","full_frame_sheet":"full-1280-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-1280x800-zoom-menu","png_sha256":"ca24b6d7e544f8304686d306ceb3caa0cff759b4bb379fa3ee81773efb68c527","full_frame_sheet":"full-1280-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-multiline-note","png_sha256":"9424b94c8f32a232ca09e4bfead9e7e38556a8709d8bab69b7d542df6163a294","full_frame_sheet":"full-1280-05.png","native_scale_reading_sheet":"reading-1280-03.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-dirty-note-blocker","png_sha256":"2d6d110e1386c3319e9153d5eea72988f273f49c516be0bc258786ed0f25d035","full_frame_sheet":"full-1280-06.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-analysis-sensitivity","png_sha256":"bfbe73ec320c91eb0844c1fabe279863804f3c510729b72dd72ef31d5424015c","full_frame_sheet":"full-1280-06.png","native_scale_reading_sheet":"reading-1280-03.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-analysis-ignored-coordinates","png_sha256":"a2e82630ccbe31d17b73806344df623a7b2632b92a687e5b93d7f69372d24059","full_frame_sheet":"full-1280-06.png","native_scale_reading_sheet":"reading-1280-03.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-dirty-area-blocker","png_sha256":"1230ce44826f4d658ab9d78b9a52e47327d7a44e2c7d4ffec344efd7429529a3","full_frame_sheet":"full-1280-06.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-analysis-advanced-tail","png_sha256":"df5833a463fb02d60985d3bc968b32300347d1e8deff9b5d9ac3672aaa5ed99c","full_frame_sheet":"full-1280-06.png","native_scale_reading_sheet":"reading-1280-03.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-filter-changed","png_sha256":"a41a39180cc1b79a9a12f83006919e8970ba75b4db191117486940556dfa2872","full_frame_sheet":"full-1280-06.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-filter-gaps","png_sha256":"6385868ddba6990bfbbe228406ab021297862e1be03b6778968021b7d74c0b6e","full_frame_sheet":"full-1280-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-filter-no-significant-change","png_sha256":"358d50bd2af995dae10a69c72a1f469976d5a04c8389d08746face2817c0b6c1","full_frame_sheet":"full-1280-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-filter-grouped","png_sha256":"25b0a5bc8c7d15e7f38c841df6082708d585fb999be2a07af417c3c388d6bb72","full_frame_sheet":"full-1280-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-baseline-selection","png_sha256":"79e5026167266d3751a091908cb3f457958d0a79b824038ab652d20faf5be290","full_frame_sheet":"full-1280-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-history-last-run","png_sha256":"379a2301dad0d0b02d040e78a694d80c907f4d6a75964dd742bd3cf5c7855916","full_frame_sheet":"full-1280-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-1280x800-history-selected-actions","png_sha256":"8d033c730e765f93c726221348df9c7fb3afb297db433b4b8c8249bef6accdd5","full_frame_sheet":"full-1280-07.png","native_scale_reading_sheet":"reading-1280-04.png","original_resolution_inspected":true},
+    {"label":"phase5-1280x800-history-page-two","png_sha256":"892c163bb165f41b4f07f92aa91276f6a0d18afa726a84cb410de84d0272a6f2","full_frame_sheet":"full-1280-08.png","native_scale_reading_sheet":"reading-1280-04.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-history-provenance","png_sha256":"492fe103ab08bf690e3b720cf45ae85fbc9e816e314173bf63acbd8b23f6531d","full_frame_sheet":"full-1280-08.png","native_scale_reading_sheet":"reading-1280-04.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-delete-consequences","png_sha256":"79ed935f0a8f4f655c81ecbeeb9a79d70009f7e82474ddac9918e02aae1b434d","full_frame_sheet":"full-1280-08.png","native_scale_reading_sheet":"reading-1280-04.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-delete-exact","png_sha256":"631a753ee65662b5613f07c1bcb76e153c948a8cd0bd17babc6b737874e44a53","full_frame_sheet":"full-1280-08.png","native_scale_reading_sheet":"reading-1280-04.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-export-consequences","png_sha256":"3ef1a73830f9fc4ec94c469b2d6a896b86c3395dae90b9eee51772a2a14bfb3b","full_frame_sheet":"full-1280-08.png","native_scale_reading_sheet":"reading-1280-04.png","original_resolution_inspected":true},
+    {"label":"phase5-1280x800-export-exact","png_sha256":"91d1e9daeb752a4639c5d515a5c936450d9870397ba56817a76d6aea79bc1693","full_frame_sheet":"full-1280-08.png","native_scale_reading_sheet":"reading-1280-05.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-import-consequences","png_sha256":"6c5223194283674c755e707c3f3887888cafd18b4b3541061a9f63d3d322c657","full_frame_sheet":"full-1280-09.png","native_scale_reading_sheet":"reading-1280-05.png","original_resolution_inspected":true},
+    {"label":"phase5-1280x800-import-exact","png_sha256":"9806662d0974828d1d71b32a72a0c1ffbd6fed93fd7804e0b1cd63adeca11b69","full_frame_sheet":"full-1280-09.png","native_scale_reading_sheet":"reading-1280-05.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-network-limits-closed","png_sha256":"5e2a369c9f6908e3a1d5dd09498300047365bc1246bf81002975f5540823c83f","full_frame_sheet":"full-1280-09.png","native_scale_reading_sheet":"reading-1280-05.png","original_resolution_inspected":false},
+    {"label":"phase5-1280x800-network-limits-open","png_sha256":"34fd2712575f177b6826e5e4cb763052764b6da3aa086eeba211b7da9e9ddc84","full_frame_sheet":"full-1280-09.png","native_scale_reading_sheet":"reading-1280-05.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-wizard-website","png_sha256":"3575cf8e12773e3dbc56025da2aad05d684ed1ae53a5934be6220e5d079747f7","full_frame_sheet":"full-820-01.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-access-public","png_sha256":"65e168467ecc009aae3a9ff9cfa3b6866109fa4863752a368523e69aef6b6a3d","full_frame_sheet":"full-820-01.png","native_scale_reading_sheet":"reading-820-01.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-access-optional-mapping","png_sha256":"65429220e5ec85b58e9dd55df524359e22e9e2063f39125053e75918274a0c67","full_frame_sheet":"full-820-01.png","native_scale_reading_sheet":"reading-820-01.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-private-login-loading","png_sha256":"e2794c9bf245aa38fbaccb379bd6c6226ea65dba2dd0fdb9234d7e792f7e06ea","full_frame_sheet":"full-820-01.png","native_scale_reading_sheet":"reading-820-01.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-mobile-revealed-selected","png_sha256":"e5d94b44874e3b3e61f2edb8e863cc7b7b1459441466b3da20bdb2ecee1ca1ec","full_frame_sheet":"full-820-01.png","native_scale_reading_sheet":"reading-820-01.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-tablet-selected","png_sha256":"f98440aab7bb5c5c4f585a25107ada1e525a33f85339f5177d1be0c85ce7483a","full_frame_sheet":"full-820-01.png","native_scale_reading_sheet":"reading-820-01.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-custom-width","png_sha256":"152edd478bbc0e6ae0f9a3b6f34c2a751acf1a6fb6c200466caef573dcde31ac","full_frame_sheet":"full-820-02.png","native_scale_reading_sheet":"reading-820-01.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-custom-height","png_sha256":"59b7d72eb0b3264273684d84b5b54fe02fe9a7571e7ced67ea7a1f007ed2be10","full_frame_sheet":"full-820-02.png","native_scale_reading_sheet":"reading-820-02.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-custom-added-actions","png_sha256":"dfc5f853e761220d1af22714d1809afdd07740088bc6ba99292bfe207ef9f038","full_frame_sheet":"full-820-02.png","native_scale_reading_sheet":"reading-820-02.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-image-limitations-tail","png_sha256":"efc4f24b6ffda54b2991410819e24717c404c1496886bc30e7bf791b0cb87cb9","full_frame_sheet":"full-820-02.png","native_scale_reading_sheet":"reading-820-02.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-capture-limitations-tail","png_sha256":"91263ccc4b83efea07ff5a00bafc67fd7d0ed8bf02b27d8ae2139fa8aa2d02ba","full_frame_sheet":"full-820-02.png","native_scale_reading_sheet":"reading-820-02.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-visible-screen-selected","png_sha256":"5cfa24cad2122a84798610aead120d5f5fcce6e86f66ebf737bbe93bcf4f5caa","full_frame_sheet":"full-820-02.png","native_scale_reading_sheet":"reading-820-02.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-replacement-selected","png_sha256":"c2f92a158ff3db6a8a56fb917790f18deaff167c8f5a4d55ed24475bb94dbc3a","full_frame_sheet":"full-820-03.png","native_scale_reading_sheet":"reading-820-02.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-fast-selected","png_sha256":"2bbaa70e2a1496f714c81531fcaf5730efec4eebd0e73ff7a90ad4665998ded9","full_frame_sheet":"full-820-03.png","native_scale_reading_sheet":"reading-820-03.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-invalid-advanced-revealed","png_sha256":"c73bcbf21c6e9fe33240ccd7d0f6fa22086c84bf3b360313b74f6fafa021c399","full_frame_sheet":"full-820-03.png","native_scale_reading_sheet":"reading-820-03.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-discovery-excluded","png_sha256":"32d447bfbb777f6721c09441da6e84268c6dc63c18ca69b80bb234efe246ec83","full_frame_sheet":"full-820-03.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-discovery-included","png_sha256":"331b0fabcd2f490a1ff83e9b2f7e66e8049f372fb06a5e4bace1edace7fd4eac","full_frame_sheet":"full-820-03.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-discovery-matches-excluded","png_sha256":"1546cecbae5412272a6962f5ac5c411010efdda01b25a87cf67e0264d7b1ca9b","full_frame_sheet":"full-820-03.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-820x600-discovery-matches-restored","png_sha256":"d514e202776cfe2d20ccc206ce6f86e156919aa2732ab0a2a7b389e18b570eea","full_frame_sheet":"full-820-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-review-compare","png_sha256":"b987c4e10198f9f96a2661947113fa0b1d1eae5f7c2f76d3ae738a6486040b45","full_frame_sheet":"full-820-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-820x600-results-hidden","png_sha256":"a5d3c798ceec15e4e51b7725b45aed6f3374eadff46b9c6b93c54916a070e137","full_frame_sheet":"full-820-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-navigation-toggled","png_sha256":"0af949e3120f13623676d943d3d8c29234a0d4579491e226c04cc87a8a6d052f","full_frame_sheet":"full-820-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-full-before","png_sha256":"22ede6fe72a5d0d3e51d878622bdfe634b099f1f0392a79f3e14539e6c40c137","full_frame_sheet":"full-820-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-820x600-full-after","png_sha256":"7ca85dc4fc50afa319dff3bb8351adce6c0f314a2269dfa3d1965138226b849b","full_frame_sheet":"full-820-04.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-difference","png_sha256":"622253e7830d84fecba78d216290eb12c1945c666b813f9c845165720bfbfdaa","full_frame_sheet":"full-820-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-overlay","png_sha256":"e4df16a2c9cb80942df55a67ce7283c4beeb5b7888d3cb5f1c359177b2fb7756","full_frame_sheet":"full-820-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-heatmap-with-ignored","png_sha256":"d2e6cd944c5cea783d95739235e4751b200065a96a31ef6b38e82f6e94cd470d","full_frame_sheet":"full-820-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-820x600-view-menu","png_sha256":"c9ec5c83d29f670c0b5d50137aef7e80c4c1397473ac055b683f2c03b467fd3d","full_frame_sheet":"full-820-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-820x600-zoom-menu","png_sha256":"e24a2e766d7524baf0976840c45f4ed5d35df2d9da0c185d6fa34342b63d9313","full_frame_sheet":"full-820-05.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-multiline-note","png_sha256":"71b39cdb0528ede872b8a7a9bf22965d360a2e5f48ce68606f6d7ca22a9c518e","full_frame_sheet":"full-820-05.png","native_scale_reading_sheet":"reading-820-03.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-dirty-note-blocker","png_sha256":"fd47028a36b4e0e04250079cf1deecf4602ad963fd578b4d7db60e92a030b2e3","full_frame_sheet":"full-820-06.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-820x600-analysis-sensitivity","png_sha256":"027db6334b809881148b528567917f3141fbe0dcee829b5a679110d5e6417a9e","full_frame_sheet":"full-820-06.png","native_scale_reading_sheet":"reading-820-03.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-analysis-ignored-coordinates","png_sha256":"aa65827e66347f83685731a1d5a680a514344c25396b7d7168b1f24de15b05e8","full_frame_sheet":"full-820-06.png","native_scale_reading_sheet":"reading-820-03.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-dirty-area-blocker","png_sha256":"63cfd5a3e807be81fdd8d0d3c25acbed6f8bc0a315a539286b06c946d6c577aa","full_frame_sheet":"full-820-06.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-analysis-advanced-tail","png_sha256":"10111a6f97eda3339877ba251ef12788213cacda6d021c0c5915cb9f2ea7af91","full_frame_sheet":"full-820-06.png","native_scale_reading_sheet":"reading-820-03.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-filter-changed","png_sha256":"e741b65bcfc8840ff4e27c2bebce8b679591724c6309c4d86785b1ab521959bd","full_frame_sheet":"full-820-06.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-filter-gaps","png_sha256":"1d6ed13f9149864bba75cc0b5eebc422ab78bbf55391382547b29d515ebeaaa2","full_frame_sheet":"full-820-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-820x600-filter-no-significant-change","png_sha256":"d7ad929f79306b658adb2a52a35b088f42033cc214f2f0b29960378d538ea5fe","full_frame_sheet":"full-820-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-filter-grouped","png_sha256":"1a12164dc724a9b337442dc66a832f816e8c6d46703f08361892dfae4bc4da19","full_frame_sheet":"full-820-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-baseline-selection","png_sha256":"194fba5ef058e35c16377a55adf80b3351c1557017d7e59e4c080c7ade2ad646","full_frame_sheet":"full-820-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":false},
+    {"label":"phase5-820x600-history-last-run","png_sha256":"90cf1e80234fb2475f3a51ba6b872c2058ea82a82e6d2c9880ea2a5d98955833","full_frame_sheet":"full-820-07.png","native_scale_reading_sheet":null,"original_resolution_inspected":true},
+    {"label":"phase5-820x600-history-selected-actions","png_sha256":"5c7877637eb8619310a031f759f7061e96b4f3382a6abd2d17b5e92347c1601c","full_frame_sheet":"full-820-07.png","native_scale_reading_sheet":"reading-820-04.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-history-page-two","png_sha256":"824eadfa84d6c0f2f66fcb9fe298ce8abe5a6b18a0e9ed0020986593ff364208","full_frame_sheet":"full-820-08.png","native_scale_reading_sheet":"reading-820-04.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-history-provenance","png_sha256":"8fe79034921d5d59493e4fa2ef363bb80a0d623340de70647ccadaacf5a70e7d","full_frame_sheet":"full-820-08.png","native_scale_reading_sheet":"reading-820-04.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-delete-consequences","png_sha256":"8e43caa150362613ff17578828fedc709f19aefcce9ac3b9185a63ea04ed05d2","full_frame_sheet":"full-820-08.png","native_scale_reading_sheet":"reading-820-04.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-delete-exact","png_sha256":"0a7b19f208645d2a17c087c279b860e2ae820d4758db49085a9721e2a3d5c0e1","full_frame_sheet":"full-820-08.png","native_scale_reading_sheet":"reading-820-04.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-export-consequences","png_sha256":"d8b6923d22b4e054b0982084ca83312952787e8f1b136adb6844bc92f3b31413","full_frame_sheet":"full-820-08.png","native_scale_reading_sheet":"reading-820-04.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-export-exact","png_sha256":"be41c572e05f11287d23df334ca97ace50b12fc2ec669a9f1ee0440c64b93c34","full_frame_sheet":"full-820-08.png","native_scale_reading_sheet":"reading-820-05.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-import-consequences","png_sha256":"160ca6869b5cfd6f17bc0af505cb64cbb91dfa6ad543cb9844ae82fcc2ce4884","full_frame_sheet":"full-820-09.png","native_scale_reading_sheet":"reading-820-05.png","original_resolution_inspected":true},
+    {"label":"phase5-820x600-import-exact","png_sha256":"60c16af5d3ed94c8f784481a9042c45dd4a9086ebcb2b9e4b4256e036a7671db","full_frame_sheet":"full-820-09.png","native_scale_reading_sheet":"reading-820-05.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-network-limits-closed","png_sha256":"4d85e6a1c89963a66006f047d2f2b44d4b56688a081d982122e4d278d7247509","full_frame_sheet":"full-820-09.png","native_scale_reading_sheet":"reading-820-05.png","original_resolution_inspected":false},
+    {"label":"phase5-820x600-network-limits-open","png_sha256":"67a53c826453c492b79e511ccd5749df5d0203cb06a998762f8d79c4a5f1bac2","full_frame_sheet":"full-820-09.png","native_scale_reading_sheet":"reading-820-05.png","original_resolution_inspected":true}
+  ]
+}
