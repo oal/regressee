@@ -132,6 +132,18 @@ fn seed(before: Dimensions, after: Dimensions) -> Option<Rectangle> {
 }
 
 impl Shell {
+    pub(super) fn review_action_bounds(
+        &self,
+        control: Control,
+    ) -> Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>> {
+        let index = match control {
+            Control::Phase5(index @ (0..=5 | 12..=19 | 26..=28 | 34..=35)) => index,
+            Control::Details(Detail::Analysis) => 50,
+            Control::Details(Detail::IgnoredAreas) => 51,
+            _ => return None,
+        };
+        self.review_action_bounds.get(index).cloned()
+    }
     /// Controls inside the bounded Tools scroller share explicit scroll anchors.
     pub(super) fn review_anchor(&self, control: Control) -> Option<gpui::ScrollAnchor> {
         if let Some(anchor) = self.options_anchor(control) {
@@ -141,6 +153,7 @@ impl Shell {
             Control::Phase5(index @ (0..=5 | 12..=19 | 26..=28 | 34..=35)) => index,
             Control::AnalysisField(index @ (0..=13)) => 36 + index,
             Control::Details(Detail::Analysis) => 50,
+            Control::Details(Detail::IgnoredAreas) => 51,
             _ => return None,
         };
         self.review_anchors.get(index).cloned()
@@ -152,6 +165,27 @@ impl Shell {
         window: &mut Window,
         cx: &mut App,
     ) {
+        if self.focus.screen == Screen::History
+            && self.control_mounted(control)
+            && let Some(bounds) = if control == Control::HistorySearch {
+                self.history_search.read(cx).rendered_bounds()
+            } else {
+                self.history_action_bounds(control).and_then(|b| b.get())
+            }
+        {
+            let viewport = self.screen_scroll.bounds();
+            let delta = if bounds.bottom() > viewport.bottom() - px(8.) {
+                viewport.bottom() - px(8.) - bounds.bottom()
+            } else if bounds.top() < viewport.top() + px(8.) {
+                viewport.top() + px(8.) - bounds.top()
+            } else {
+                px(0.)
+            };
+            let offset = self.screen_scroll.offset();
+            self.screen_scroll
+                .set_offset(gpui::point(offset.x, offset.y + delta));
+            return;
+        }
         if self.focus.screen == Screen::Results
             && self.options_panel_open()
             && self.control_mounted(control)
@@ -176,19 +210,35 @@ impl Shell {
             && let Some(anchor) = self.review_anchor(control)
         {
             anchor.scroll_to(window, cx);
-            if matches!(control, Control::AnalysisField(9..=13)) {
-                self.review_focus_reveal.set(2);
+            self.review_focus_reveal.set(2);
+            if let Some(bounds) = self.review_action_bounds(control).and_then(|b| b.get()) {
+                let viewport = self.review_details_scroll.bounds();
+                let delta = if bounds.bottom() > viewport.bottom() - px(8.) {
+                    viewport.bottom() - px(8.) - bounds.bottom()
+                } else if bounds.top() < viewport.top() + px(8.) {
+                    viewport.top() + px(8.) - bounds.top()
+                } else {
+                    px(0.)
+                };
+                let offset = self.review_details_scroll.offset();
+                self.review_details_scroll
+                    .set_offset(gpui::point(offset.x, offset.y + delta));
             }
-            // Painted input bounds also support headless frames, which have no
-            // OS frame callbacks, and immediate keyboard geometry navigation.
+            // Reveal the complete labelled field, including help/error text,
+            // inside the actual inspector, not the outer workspace.
             if let Control::AnalysisField(index) = control
-                && let Some(bounds) = self.analysis_fields[index].read(cx).rendered_bounds()
+                && let Some(bounds) = if index == 9 {
+                    self.analysis_fields[index].read(cx).rendered_bounds()
+                } else {
+                    self.review_field_bounds[index].get()
+                }
             {
                 let viewport = self.review_details_scroll.bounds();
                 let offset = self.review_details_scroll.offset();
                 self.review_details_scroll.set_offset(gpui::point(
                     offset.x,
-                    offset.y + viewport.top() + px(28.) - bounds.top(),
+                    offset.y + viewport.top() + px(if index == 9 { 28. } else { 8. })
+                        - bounds.top(),
                 ));
             }
         }
@@ -835,9 +885,15 @@ impl Shell {
                 )),
         );
         if self.mask_selected.is_none() {
-            return editor.child(div().text_size(px(13.)).line_height(px(18.)).text_color(rgb(MUTED))
-                .child("Ignore a changing banner or timestamp. Draw an area on the screenshot, or enter its coordinates."))
-                .when(self.mask_dirty, |editor| editor.child(self.button(Control::Phase5(18), "Save ignored areas", ActionStyle::Secondary, cx)))
+            return editor
+                .when(self.mask_dirty, |editor| {
+                    editor.child(self.button(
+                        Control::Phase5(18),
+                        "Save ignored areas",
+                        ActionStyle::Secondary,
+                        cx,
+                    ))
+                })
                 .into_any_element();
         }
         let mut fields = div().flex().flex_wrap().gap_2();
@@ -861,15 +917,32 @@ impl Shell {
                         .child(self.analysis_fields[10 + i].clone())
                         .id(("ignored-area-field", i))
                         .debug_selector(move || format!("ignored-area-field-{i}"))
+                        .relative()
+                        .child(self.record_review_field_bounds(10 + i))
                         .anchor_scroll(self.review_anchor(Control::AnalysisField(10 + i))),
                 ),
             );
         }
-        editor.child(fields)
-            .child(div().flex().flex_wrap().gap_2()
-                .child(self.button(Control::Phase5(35), "Apply area edit", ActionStyle::Secondary, cx))
-                .child(self.button(Control::Phase5(18), "Save ignored areas", ActionStyle::Secondary, cx)))
-            .child(div().text_size(px(13.)).line_height(px(18.)).text_color(rgb(MUTED)).child("Apply edits the draft. Save validates coverage and binds areas to this capture pair."))
+        editor
+            .child(fields)
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .gap_2()
+                    .child(self.button(
+                        Control::Phase5(35),
+                        "Apply area edit",
+                        ActionStyle::Secondary,
+                        cx,
+                    ))
+                    .child(self.button(
+                        Control::Phase5(18),
+                        "Save ignored areas",
+                        ActionStyle::Secondary,
+                        cx,
+                    )),
+            )
             .into_any_element()
     }
 }

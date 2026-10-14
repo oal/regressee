@@ -1,0 +1,215 @@
+// SPDX-License-Identifier: MPL-2.0
+//! Progressive analysis presentation; drafts and mutations keep their incumbent
+//! exact target/capture-pair and revision owners in Shell.
+use super::*;
+
+pub(super) fn analysis_help(text: impl Into<SharedString>) -> Div {
+    div()
+        .text_size(px(HELP_TEXT_SIZE))
+        .line_height(px(HELP_LINE_HEIGHT))
+        .text_color(rgb(MUTED))
+        .child(text.into())
+}
+
+pub(super) fn policy_name(policy: &regressee_app::analysis_engine::Policy) -> &'static str {
+    use regressee_app::analysis_engine::Preset;
+    for (preset, name) in [
+        (Preset::Sensitive, "Sensitive"),
+        (Preset::Balanced, "Balanced"),
+        (Preset::Relaxed, "Relaxed"),
+    ] {
+        if policy == &regressee_app::review::preset(preset) {
+            return name;
+        }
+    }
+    "Custom"
+}
+
+impl Shell {
+    pub(super) fn record_review_field_bounds(&self, index: usize) -> impl IntoElement + use<> {
+        let bounds = self.review_field_bounds[index].clone();
+        canvas(move |paint, _, _| bounds.set(Some(paint)), |_, _, _, _| {})
+            .absolute()
+            .size_full()
+    }
+    pub(super) fn analysis_summary(&self) -> AnyElement {
+        let mut summary = div()
+            .debug_selector(|| "analysis-current-summary".into())
+            .flex()
+            .flex_col()
+            .gap_1();
+        let Some(a) = &self.evidence.comparison else {
+            return summary.into_any_element();
+        };
+        let report = a.perceptual.as_ref().and_then(|p| {
+            p.reports
+                .iter()
+                .find(|(key, _)| Some(key) == self.selected_key.as_ref())
+                .map(|(_, r)| r)
+        });
+        let classification = a
+            .revision
+            .results
+            .iter()
+            .find(|r| Some(&r.key) == self.selected_key.as_ref())
+            .map(|r| r.classification);
+        let (label, help) = match classification {
+            Some(Classification::Changed) => (
+                "Changed",
+                "A threshold was reached; review the evidence, not an automatic defect.",
+            ),
+            Some(Classification::NoSignificantChange) => (
+                "No significant change",
+                "Below the analysis thresholds, not necessarily identical pixels.",
+            ),
+            Some(Classification::CouldNotCapture) => (
+                "Could not capture",
+                "Missing evidence is not a no-change result.",
+            ),
+            _ => (
+                "Not comparable",
+                "Do not treat this as a clean result. Inspect comparison limits below.",
+            ),
+        };
+        summary = summary
+            .child(
+                div()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(format!("Displayed result · {label}")),
+            )
+            .child(analysis_help(help));
+        let displayed = a
+            .perceptual
+            .as_ref()
+            .map(|p| policy_name(&p.policy))
+            .unwrap_or("Historical RGB");
+        let settings = a
+            .perceptual
+            .as_ref()
+            .is_some_and(|p| p.policy == self.analysis_policy);
+        summary = summary.child(analysis_help(if settings {
+            format!("{displayed} sensitivity · saved revision")
+        } else {
+            format!(
+                "Displayed: {displayed} · current settings: {}",
+                policy_name(&self.analysis_policy)
+            )
+        }));
+        if let Some(r) = report {
+            let limits = r
+                .gates
+                .iter()
+                .map(analysis_gate_label)
+                .chain(r.warnings.iter().map(analysis_warning_label))
+                .collect::<Vec<_>>();
+            if !limits.is_empty() {
+                summary = summary.child(
+                    div()
+                        .text_size(px(HELP_TEXT_SIZE))
+                        .text_color(rgb(WARNING))
+                        .child(limits.join("; ")),
+                );
+            }
+            if !r.triggers.is_empty() {
+                summary = summary.child(analysis_help(format!(
+                    "Reason: {}",
+                    r.triggers
+                        .iter()
+                        .map(analysis_trigger_label)
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+        }
+        if let Some((_, failure)) = a.perceptual.as_ref().and_then(|p| {
+            p.failures
+                .iter()
+                .find(|(key, _)| Some(key) == self.selected_key.as_ref())
+        }) {
+            summary = summary.child(controls::error(failure.clone()));
+        }
+        summary.into_any_element()
+    }
+
+    pub(super) fn ignored_area_status(&self, cx: &App) -> String {
+        let count = self.mask_rectangles.len();
+        let state = if self.mask_geometry_dirty(cx) {
+            "unapplied coordinates · Apply, then Save"
+        } else if self.mask_dirty {
+            "unsaved draft"
+        } else if count == 0 {
+            "no ignored areas saved"
+        } else {
+            "saved areas"
+        };
+        format!(
+            "{count} area{} · {state}",
+            if count == 1 { "" } else { "s" }
+        )
+    }
+
+    pub(super) fn ignored_areas_disclosure(&self, cx: &mut Context<Self>) -> AnyElement {
+        let open = self.details.contains(&Detail::IgnoredAreas);
+        let mut group = div()
+            .debug_selector(|| "analysis-ignored-areas".into())
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(self.button(
+                Control::Details(Detail::IgnoredAreas),
+                if open {
+                    "Hide ignored areas".to_owned()
+                } else {
+                    format!(
+                        "Ignored areas · {}{}",
+                        self.mask_rectangles.len(),
+                        if self.mask_dirty || self.mask_geometry_dirty(cx) {
+                            " · draft"
+                        } else {
+                            ""
+                        }
+                    )
+                },
+                ActionStyle::Secondary,
+                cx,
+            ));
+        if !open {
+            return group.into_any_element();
+        }
+        group = group.child(self.keyboard_mask_editor(cx))
+            .child(analysis_help("Areas use original pixel coordinates for this exact before/after pair, not moving page content. Apply changes the draft; Save binds a new revision and automatically reanalyzes. Ignored areas are not redaction."));
+        let mut actions = div().flex().flex_wrap().gap_2();
+        for (i, label) in [
+            (15, "Select next rectangle"),
+            (17, "Redraw selected rectangle"),
+            (16, "Delete selected rectangle"),
+            (19, "Revalidate for this pair"),
+        ] {
+            if self.control_mounted(Control::Phase5(i)) {
+                actions = actions.child(self.button(
+                    Control::Phase5(i),
+                    label,
+                    if i == 16 {
+                        ActionStyle::Danger
+                    } else {
+                        ActionStyle::Secondary
+                    },
+                    cx,
+                ));
+            }
+        }
+        group = group.child(actions).child(
+            analysis_help(self.ignored_area_status(cx))
+                .debug_selector(|| "analysis-ignored-status".into()),
+        );
+        if self
+            .viewer
+            .as_ref()
+            .and_then(|v| v.request.as_ref())
+            .is_some_and(|r| r.validate().is_err())
+        {
+            group = group.child(controls::status("Saved areas belong to another capture pair or geometry. Inspect and explicitly Revalidate; masks are never stretched.", Tone::Warning));
+        }
+        group.into_any_element()
+    }
+}

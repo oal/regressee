@@ -575,6 +575,9 @@ fn keyboard_area_focus_reveals_fields_inside_bounded_tools(cx: &mut TestAppConte
         });
         cx.update(|window, cx| {
             shell.update(cx, |s, cx| {
+                if !s.details.contains(&Detail::IgnoredAreas) {
+                    s.activate_control(Control::Details(Detail::IgnoredAreas), window, cx);
+                }
                 s.activate_control(Control::Phase5(34), window, cx)
             });
         });
@@ -1118,6 +1121,7 @@ fn keyboard_areas_validate_original_pixels_and_save_only_on_explicit_action(
             load_review(s, project, cx);
             s.review_tools = true;
             s.mask_rectangles.clear();
+            s.activate_control(Control::Details(Detail::IgnoredAreas), window, cx);
             s.mask_selected = None;
             s.mask_dirty = false;
             let original_pair = s.viewer.as_ref().unwrap().request.as_ref().unwrap().clone();

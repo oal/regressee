@@ -65,6 +65,9 @@ pub(super) fn exercise_full_width_drawing_toolbar(
             assert!(s.control_enabled(Control::Guided(44), cx));
             s.activate_control(Control::Guided(44), w, cx);
             assert!(s.review_tools && s.viewer_inspector_open());
+            if !s.details.contains(&Detail::IgnoredAreas) {
+                s.activate_control(Control::Details(Detail::IgnoredAreas), w, cx);
+            }
             assert!(s.control_mounted(Control::Phase5(14)));
             assert!(s.control_enabled(Control::Phase5(14), cx));
             s.activate_control(Control::Phase5(14), w, cx);

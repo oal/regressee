@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MPL-2.0
+use analysis_ux::analysis_help;
 use gpui::{
     AnyElement, App, Application, Bounds, Context, Div, Entity, FocusHandle, FontWeight,
     KeyBinding, Menu, MenuItem, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
@@ -32,6 +33,7 @@ use std::{
     time::Duration,
 };
 
+mod analysis_ux;
 mod evidence_workspace;
 mod exit_guard;
 mod form_recovery;
@@ -256,6 +258,9 @@ struct Shell {
     screen_scroll: gpui::ScrollHandle,
     form_anchors: Vec<gpui::ScrollAnchor>,
     review_anchors: Vec<gpui::ScrollAnchor>,
+    history_action_bounds: Vec<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
+    review_field_bounds: Vec<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
+    review_action_bounds: Vec<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
     last_validation_field: Option<Control>,
     history_baseline_scroll: gpui::ScrollHandle,
     history_run_scroll: gpui::ScrollHandle,
@@ -434,6 +439,9 @@ impl Shell {
             screen_scroll: gpui::ScrollHandle::new(),
             form_anchors: Vec::new(),
             review_anchors: Vec::new(),
+            history_action_bounds: (0..28).map(|_| Default::default()).collect(),
+            review_field_bounds: (0..14).map(|_| Default::default()).collect(),
+            review_action_bounds: (0..64).map(|_| Default::default()).collect(),
             last_validation_field: None,
             history_baseline_scroll: gpui::ScrollHandle::new(),
             history_run_scroll: gpui::ScrollHandle::new(),
@@ -1487,7 +1495,7 @@ impl Shell {
         if self.history_inspection.is_some() {
             return;
         }
-        if self.analysis_advanced {
+        if self.control_mounted(Control::AnalysisField(0)) {
             self.configure_analysis_inputs(cx);
             if self
                 .analysis_fields
@@ -2419,6 +2427,7 @@ impl Shell {
             16..=18 => {
                 self.history_selection_epoch = self.history_selection_epoch.wrapping_add(1);
                 self.history_section = index - 16;
+                self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
                 self.clear_portability_previews();
             }
             19 => self.open_history_run(cx),
@@ -2427,10 +2436,15 @@ impl Shell {
         cx.notify();
     }
     fn portability_confirmation(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut body = div().flex().flex_col().gap_3().max_w(px(680.));
+        let mut body = div()
+            .debug_selector(|| "portability-preview".into())
+            .flex()
+            .flex_col()
+            .gap_3()
+            .max_w(px(680.));
         if let Some(p) = &self.export_preview {
             body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Share this baseline as a ZIP?"))
-                .child("The ZIP contains original screenshots and project settings, never login sessions or cookies. Ignored rectangles are NOT redaction: recipients can see the original pixels. Recipients must establish their own login.")
+                .child(div().debug_selector(|| "export-privacy-consequences".into()).child("The ZIP contains original screenshots and project settings, never login sessions or cookies. Ignored rectangles are NOT redaction: recipients can see the original pixels. Recipients must establish their own login."))
                 .child(format!("{} targets · {} original PNGs · {} · {} source capture dates · {} ignored-region configurations. Selected/inherited originals only; no unrelated history or database.",p.targets,p.originals,human_bytes(p.bytes),p.sources,p.masks))
                 .child(div().text_color(rgb(WARNING)).child(p.privacy.clone()))
                 .child(self.button(Control::Phase6(3),"I understand — export ZIP…",ActionStyle::Primary,cx));
@@ -2473,7 +2487,7 @@ impl Shell {
                     .unwrap_or_else(|| "selected baseline version".into()),
             };
             body=body.child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Permanently delete {identity}?")))
-                .child(format!("{} analyses and {} unshared objects will be removed, freeing {}. {} of shared data stay protected. This cannot be undone; active and retained baseline source references are protected.",p.analyses,p.objects,human_bytes(p.bytes),human_bytes(p.shared_bytes)))
+                .child(div().debug_selector(|| "deletion-consequences".into()).child(format!("{} analyses and {} unshared objects will be removed, freeing {}. {} of shared data stay protected. This cannot be undone; active and retained baseline source references are protected.",p.analyses,p.objects,human_bytes(p.bytes),human_bytes(p.shared_bytes))))
                 .child(self.button(Control::Phase6(6),"Confirm permanent deletion",ActionStyle::Danger,cx));
         }
         if let Some(p) = &self.repair_preview {
@@ -3361,6 +3375,8 @@ impl Shell {
         if index == 44 {
             self.review_tools = !self.review_tools;
             if self.review_tools {
+                self.review_details_scroll
+                    .set_offset(gpui::point(px(0.), px(0.)));
                 self.capture_details_open = false;
                 self.review_note_open = false;
                 self.viewer_mode_open = false;
@@ -3955,7 +3971,8 @@ impl Shell {
         .anchor_scroll(self.review_anchor(control))
         .when_some(
             self.options_control_bounds(control)
-                .or_else(|| self.setup_control_bounds(control)),
+                .or_else(|| self.setup_control_bounds(control))
+                .or_else(|| self.review_action_bounds(control)),
             |el, bounds| {
                 el.relative().child(
                     canvas(
@@ -4370,7 +4387,8 @@ impl Shell {
                                 } else {
                                     "Screenshots"
                                 },
-                                ["All", "Changed", "Gaps", "Unchanged"][self.result_filter]
+                                ["All", "Changed", "Gaps", "No significant change"]
+                                    [self.result_filter]
                             )
                         }),
                 )
@@ -5219,7 +5237,9 @@ impl Shell {
         .anchor_scroll(self.review_anchor(control))
         .when_some(
             self.options_control_bounds(control)
-                .or_else(|| self.setup_control_bounds(control)),
+                .or_else(|| self.setup_control_bounds(control))
+                .or_else(|| self.history_action_bounds(control))
+                .or_else(|| self.review_action_bounds(control)),
             |el, bounds| {
                 el.relative().child(
                     canvas(
@@ -5774,7 +5794,62 @@ impl Shell {
             CrawlField(10..=16) => setup && project,
             CrawlField(17 | 18) => settings,
             CrawlField(_) => false,
-            Phase5(0..=5 | 14..=19 | 26 | 34..=35) => analysis && self.review_tools,
+            Phase5(0..=4) => analysis && self.review_tools && !self.mask_draw,
+            Phase5(5) => {
+                analysis
+                    && self.review_tools
+                    && !self.mask_draw
+                    && (self.analysis_due.is_some()
+                        || self.analysis_pending.as_ref().is_some_and(|(_, cancel)| {
+                            !cancel.load(std::sync::atomic::Ordering::Acquire)
+                        }))
+            }
+            Phase5(26) => {
+                analysis && self.review_tools && !self.mask_draw && self.evidence.analyses.len() > 1
+            }
+            Phase5(14) => {
+                analysis
+                    && self.review_tools
+                    && (self.mask_draw || self.details.contains(&Detail::IgnoredAreas))
+            }
+            Phase5(15) => {
+                analysis
+                    && self.review_tools
+                    && !self.mask_draw
+                    && self.details.contains(&Detail::IgnoredAreas)
+                    && !self.mask_rectangles.is_empty()
+            }
+            Phase5(16 | 17 | 35) => {
+                analysis
+                    && self.review_tools
+                    && !self.mask_draw
+                    && self.details.contains(&Detail::IgnoredAreas)
+                    && self.mask_selected.is_some()
+            }
+            Phase5(18) => {
+                analysis
+                    && self.review_tools
+                    && !self.mask_draw
+                    && self.details.contains(&Detail::IgnoredAreas)
+                    && (self.mask_dirty || self.mask_selected.is_some())
+            }
+            Phase5(19) => {
+                analysis
+                    && self.review_tools
+                    && !self.mask_draw
+                    && self.details.contains(&Detail::IgnoredAreas)
+                    && self
+                        .viewer
+                        .as_ref()
+                        .and_then(|v| v.request.as_ref())
+                        .is_some_and(|r| r.validate().is_err())
+            }
+            Phase5(34) => {
+                analysis
+                    && self.review_tools
+                    && !self.mask_draw
+                    && self.details.contains(&Detail::IgnoredAreas)
+            }
             Phase5(20..=22 | 33) => analysis,
             Phase5(32) => analysis && self.review_note_open,
             Phase5(36) => {
@@ -5793,6 +5868,8 @@ impl Shell {
             Phase5(12 | 13) => {
                 analysis
                     && self.review_tools
+                    && !self.mask_draw
+                    && self.details.contains(&Detail::Analysis)
                     && self
                         .evidence
                         .comparison
@@ -5813,7 +5890,9 @@ impl Shell {
                         .as_ref()
                         .is_some_and(|preview| self.approval_matches(preview))
             }
-            Phase5(27 | 28) => analysis && self.analysis_advanced && self.review_tools,
+            Phase5(27 | 28) => {
+                analysis && self.analysis_advanced && self.review_tools && !self.mask_draw
+            }
             Phase5(30) => results && self.preview.is_some(),
             Phase5(40 | 41) => {
                 history
@@ -5836,9 +5915,17 @@ impl Shell {
                         .contains(&self.history_index)
             }
             Phase5(_) => false,
-            AnalysisField(0..=8) => analysis && self.analysis_advanced && self.review_tools,
+            AnalysisField(0..=8) => {
+                analysis && self.analysis_advanced && self.review_tools && !self.mask_draw
+            }
             AnalysisField(9) => analysis && self.review_note_open,
-            AnalysisField(10..=13) => analysis && self.review_tools,
+            AnalysisField(10..=13) => {
+                analysis
+                    && self.review_tools
+                    && !self.mask_draw
+                    && self.details.contains(&Detail::IgnoredAreas)
+                    && self.mask_selected.is_some()
+            }
             AnalysisField(_) => false,
             Phase6(0) => screen == Screen::Projects || (history && self.history_section == 1),
             Phase6(1) => portability && self.import_preview.is_some(),
@@ -5902,7 +5989,9 @@ impl Shell {
                         || self.deletion_preview.is_some()
                         || self.repair_preview.is_some())
             }
-            Details(Detail::Analysis) => analysis && self.review_tools,
+            Details(Detail::Analysis | Detail::IgnoredAreas) => {
+                analysis && self.review_tools && !self.mask_draw
+            }
             Details(Detail::Network) => settings,
         }
     }
@@ -6080,10 +6169,10 @@ impl Shell {
             Screen::Settings => {
                 use regressee_app::product::RuntimeState;
                 let (browser_label, browser_tone, browser_help) = self.runtime_presentation();
-                let mut body = div().max_w(px(680.)).flex().flex_col().gap_6().child(self.heading("Settings", "Browser setup, storage and local support tools."))
+                let mut body = div().max_w(px(680.)).flex().flex_col().gap_6().child(self.heading("App settings", "Browser setup, storage and local support tools.").debug_selector(|| "app-settings-heading".into()))
                       .child(controls::section("Private browser", "Regressee uses its own verified browser components, not your system browser.")
                           .child(controls::status(browser_label, browser_tone))
-                          .child(div().text_color(rgb(MUTED)).child(self.runtime_status.clone().unwrap_or_else(||"Checking whether this build can install its private browser. No download is started by opening Settings.".into())))
+                           .when_some(self.runtime_status.clone(), |section, status| section.child(div().text_color(rgb(MUTED)).child(status)))
                            .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(browser_help))
                           .child(self.button(Control::SetupRuntime, match self.runtime_readiness.as_ref().map(|status| status.status) {
                               Some(RuntimeState::NotInstalled) => "Install browser now",
@@ -6147,6 +6236,9 @@ impl Shell {
         }
     }
     fn selected_capture_details(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.review_tools {
+            return self.phase5_panel(cx);
+        }
         let mut body = div().flex().flex_col().gap_3().child(self.phase5_panel(cx));
         if let Some(run) = &self.evidence.latest {
             body = body.child(
@@ -6451,23 +6543,16 @@ impl Shell {
         if self.preview.is_some() {
             return panel.into_any_element();
         }
-        panel = panel.child(
-            div()
-                .font_weight(FontWeight::SEMIBOLD)
-                .child("Analysis sensitivity & ignored areas"),
-        );
+        panel = panel.child(self.analysis_summary());
         if self.review_tools {
-            panel = panel.child(self.keyboard_mask_editor(cx));
+            panel = panel.child(
+                div()
+                    .debug_selector(|| "analysis-sensitivity-heading".into())
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child("Sensitivity"),
+            );
             let mut actions = div().flex().flex_wrap().gap_2();
-            for (i, label) in [
-                (0, "Sensitive"),
-                (1, "Balanced"),
-                (2, "Relaxed"),
-                (3, "Advanced parameters"),
-                (4, "Reanalyze originals"),
-                (5, "Cancel analysis"),
-                (26, "View previous analysis"),
-            ] {
+            for (i, label) in [(0, "Sensitive"), (1, "Balanced"), (2, "Relaxed")] {
                 let style = if i <= 2 {
                     ActionStyle::Choice {
                         selected: self.analysis_policy
@@ -6484,23 +6569,27 @@ impl Shell {
                 };
                 actions = actions.child(self.button(Control::Phase5(i), label, style, cx));
             }
-            panel=panel.child(actions).child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Sensitivity changes reanalyze the saved originals. Earlier analyses and reviews stay in history."))
-            .child(self.button(Control::Details(Detail::Analysis), if self.details.contains(&Detail::Analysis) { "Hide analysis details" } else { "Analysis details" }, ActionStyle::Secondary, cx));
-            if self.details.contains(&Detail::Analysis) {
-                panel = panel.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(
-                    format!(
-                        "Analysis {} · {}",
-                        a.revision.id,
-                        a.perceptual
-                            .as_ref()
-                            .map(|p| p.policy.revision.as_str())
-                            .unwrap_or("historical RGB policy")
-                    ),
-                ));
-            }
+            panel = panel.child(actions)
+                .child(analysis_help("Presets and valid parameter edits automatically reanalyze saved originals after a short pause. No website visit; originals, earlier analyses and their reviews are retained."))
+                .child(div().flex().flex_wrap().gap_2()
+                    .child(self.button(Control::Phase5(4), "Reanalyze originals", ActionStyle::Secondary, cx))
+                    .when(self.control_mounted(Control::Phase5(5)), |el| el.child(self.button(Control::Phase5(5), "Cancel analysis", ActionStyle::Secondary, cx)))
+                    .when(self.control_mounted(Control::Phase5(26)), |el| el.child(self.button(Control::Phase5(26), "View previous analysis", ActionStyle::Secondary, cx))));
             if self.analysis_pending.is_some() || self.analysis_due.is_some() {
-                panel=panel.child(controls::status("Reanalysis pending — displayed metrics are from the revision above. Viewer remains interactive.",Tone::Neutral));
+                panel=panel.child(controls::status("Reanalysis pending · the displayed result is still the saved revision. Close to inspect evidence; review decisions wait for analysis.",Tone::Neutral));
             }
+            panel = panel
+                .child(self.ignored_areas_disclosure(cx))
+                .child(self.button(
+                    Control::Phase5(3),
+                    if self.analysis_advanced {
+                        "Hide advanced parameters"
+                    } else {
+                        "Advanced parameters"
+                    },
+                    ActionStyle::Secondary,
+                    cx,
+                ));
             if self.analysis_advanced {
                 for (i, label, help) in [
                     (
@@ -6556,6 +6645,9 @@ impl Shell {
                             self.analysis_fields[i].clone().into_any_element(),
                         )
                         .id(("analysis-parameter-field", i))
+                        .debug_selector(move || format!("analysis-parameter-field-{i}"))
+                        .relative()
+                        .child(self.record_review_field_bounds(i))
                         .anchor_scroll(self.review_anchor(Control::AnalysisField(i))),
                     );
                 }
@@ -6563,24 +6655,49 @@ impl Shell {
                 .child(self.check_button(Control::Phase5(28), "Suppress stationary horizontal RGB blend noise", self.analysis_policy.antialias!=regressee_app::analysis_engine::AntiAliasPolicy::Off, cx))
                 .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Optional suppression may hide a real blend-color edit. It is not a proven font-noise detector. Edits debounce for 300 ms and cancel superseded work."));
             }
-            if let Some(p) = &a.perceptual {
+            panel = panel.child(self.button(
+                Control::Details(Detail::Analysis),
+                if self.details.contains(&Detail::Analysis) {
+                    "Hide metrics & revision details"
+                } else {
+                    "Metrics & revision details"
+                },
+                ActionStyle::Secondary,
+                cx,
+            ));
+            if self.details.contains(&Detail::Analysis) {
+                panel = panel.child(analysis_help(format!(
+                    "Analysis {} · {}",
+                    a.revision.id,
+                    a.perceptual
+                        .as_ref()
+                        .map(|p| p.policy.revision.as_str())
+                        .unwrap_or("historical RGB policy")
+                )));
+            }
+            if let Some(p) = &a.perceptual
+                && self.details.contains(&Detail::Analysis)
+            {
                 if let Some((_, r)) = p
                     .reports
                     .iter()
                     .find(|(k, _)| Some(k) == self.selected_key.as_ref())
                 {
-                    panel = panel.child(div().font_weight(FontWeight::MEDIUM).child(
-                        if r.eligible_pixels > 0 {
-                            format!(
-                                "{:.2}% changed · {} change regions · {:.2}% ignored",
-                                100. * r.changed_pixels as f64 / r.eligible_pixels as f64,
-                                r.regions.count,
-                                r.ignored_coverage.value().unwrap_or(0.) * 100.
-                            )
-                        } else {
-                            "No comparable pixels".into()
-                        },
-                    ));
+                    panel = panel.child(
+                        div()
+                            .debug_selector(|| "analysis-metrics-summary".into())
+                            .font_weight(FontWeight::MEDIUM)
+                            .child(if r.eligible_pixels > 0 {
+                                format!(
+                                    "{:.2}% changed · {} change regions · {:.2}% ignored",
+                                    100. * r.changed_pixels as f64 / r.eligible_pixels as f64,
+                                    r.regions.count,
+                                    r.ignored_coverage.value().unwrap_or(0.) * 100.
+                                )
+                            } else {
+                                "No comparable pixels".into()
+                            }),
+                    );
                     if !r.triggers.is_empty() || !r.gates.is_empty() || !r.warnings.is_empty() {
                         panel =
                             panel.child(div().text_size(px(14.)).text_color(rgb(WARNING)).child(
@@ -6618,7 +6735,7 @@ impl Shell {
                     }
                     if self.details.contains(&Detail::Analysis) {
                         panel = panel.child(div().text_size(px(13.)).child(format!("{} significant / {} eligible pixels · {} raw changes · {} suppressed. Ignored {} / {} pixels.", r.changed_pixels, r.eligible_pixels, r.raw_changed_pixels, r.antialias_suppressed_pixels, r.ignored_pixels, r.coordinate_union_pixels)))
-                        .child(div().text_size(px(13.)).child(format!("{} qualifying local windows / {}. Before {}×{}, after {}×{}; width {:+}, height {:+}. {} structural pixels ({} eligible).", r.local.qualifying, r.local.windows, r.dimensions.before.width,r.dimensions.before.height,r.dimensions.after.width,r.dimensions.after.height,r.dimensions.width_delta,r.dimensions.height_delta,r.structural_pixels,r.unmasked_structural_pixels)));
+                        .child(div().debug_selector(|| "analysis-metrics-dimensions".into()).text_size(px(13.)).child(format!("{} qualifying local windows / {}. Before {}×{}, after {}×{}; width {:+}, height {:+}. {} structural pixels ({} eligible).", r.local.qualifying, r.local.windows, r.dimensions.before.width,r.dimensions.before.height,r.dimensions.after.width,r.dimensions.after.height,r.dimensions.width_delta,r.dimensions.height_delta,r.structural_pixels,r.unmasked_structural_pixels)));
                     }
                     if r.eligible_pixels == 0 {
                         panel = panel.child(controls::status(
@@ -6705,30 +6822,6 @@ impl Shell {
                     )))
                     .child(slider)
             });
-            let mut masks = div().flex().flex_wrap().gap_2();
-            for (i, label) in [
-                (15, "Select next rectangle"),
-                (17, "Redraw selected rectangle"),
-                (16, "Delete selected rectangle"),
-                (19, "Revalidate for this pair"),
-            ] {
-                masks = masks.child(self.button(
-                    Control::Phase5(i),
-                    label,
-                    if i == 16 {
-                        ActionStyle::Danger
-                    } else {
-                        ActionStyle::Secondary
-                    },
-                    cx,
-                ));
-            }
-            panel=panel.child(masks).child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(format!("{} geometric rectangles · selected {:?} · {}. Drag on either original image; rectangles appear on both. Otherwise drag to pan. A mask is not attached to moving page content.",self.mask_rectangles.len(),self.mask_selected.map(|i|i+1),if self.mask_dirty{"unsaved edits"}else{"saved revision"})));
-            if let Some(request) = self.viewer.as_ref().and_then(|v| v.request.as_ref())
-                && request.validate().is_err()
-            {
-                panel=panel.child(controls::status("Saved ignored areas belong to another capture pair or geometry. Inspect and explicitly Revalidate; masks are never stretched.",Tone::Warning));
-            }
         }
         for d in self
             .evidence
@@ -6741,7 +6834,13 @@ impl Shell {
                     .as_ref()
                     .is_none_or(|a| d.analysis != a.revision.id)
             })
-            .take(if self.review_tools { 8 } else { 0 })
+            .take(
+                if self.review_tools && self.details.contains(&Detail::Analysis) {
+                    8
+                } else {
+                    0
+                },
+            )
         {
             panel = panel.child(div().text_size(px(13.)).child(format!(
                 "Historical review {:?} · analysis {} · {} · {}",
@@ -7743,19 +7842,6 @@ impl Render for Shell {
         })
     }
 }
-fn relative_time(timestamp: i64) -> String {
-    let age = regressee_runtime::distribution::now().saturating_sub(timestamp);
-    if age < 0 {
-        return "at a future recorded date".into();
-    }
-    match age {
-        0..=59 => "just now".into(),
-        60..=3599 => format!("{} min ago", age / 60),
-        3600..=86399 => format!("{} h ago", age / 3600),
-        86400..=31535999 => format!("{} days ago", age / 86400),
-        _ => format!("{} years ago", age / 31536000),
-    }
-}
 fn job_label(state: JobState) -> &'static str {
     match state {
         JobState::Queued => "Queued",
@@ -7939,6 +8025,8 @@ mod phase2_evidence_tests;
 mod phase2_viewer_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase3_note_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod phase4_hierarchy_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase4_review_tests;
 #[cfg(all(test, feature = "ui-tests"))]
@@ -9665,6 +9753,13 @@ mod tests {
         });
         cx.update(|w, cx| {
             shell.update(cx, |s, cx| {
+                assert!(
+                    s.review_tools && !s.mask_draw,
+                    "Completed drawing returns to Analysis"
+                );
+                if !s.details.contains(&Detail::IgnoredAreas) {
+                    s.activate_control(Control::Details(Detail::IgnoredAreas), w, cx);
+                }
                 s.activate_control(Control::Phase5(15), w, cx);
                 s.activate_control(Control::Phase5(17), w, cx);
             })

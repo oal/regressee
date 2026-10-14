@@ -190,7 +190,12 @@ fn note_editor_close_escape_reopen_identity_reply_and_occlusion_guards(cx: &mut 
                 };
                 s.selected_key = Some(other.clone());
                 assert!(s.note_for_save(cx).is_err());
-                assert_eq!(s.pending_review_notes(cx).unwrap()[0].key, old_key);
+                assert!(
+                    s.pending_review_notes(cx)
+                        .unwrap()
+                        .iter()
+                        .any(|note| note.key == old_key && note.note == draft)
+                );
                 s.sync_review_note(cx);
                 s.analysis_fields[9].update(cx, |i, cx| i.set_value("other target draft", cx));
                 s.selected_key = Some(old_key.clone());

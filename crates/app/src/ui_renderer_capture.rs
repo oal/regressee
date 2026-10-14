@@ -16,6 +16,8 @@ mod ui_phase1_capture;
 mod ui_phase2_capture;
 #[path = "ui_phase3_capture.rs"]
 mod ui_phase3_capture;
+#[path = "ui_phase4_capture.rs"]
+mod ui_phase4_capture;
 #[path = "ui_review_matrix.rs"]
 mod ui_review_matrix;
 
@@ -92,7 +94,7 @@ fn write_frame(
         writer.write_image_data(&rgba)?;
         writer.finish()?;
         let bytes = fs::read(&path)?;
-        let metadata = serde_json::json!({
+        let mut metadata = serde_json::json!({
             "width": width, "height": height,
             "png_sha256": hex::encode(Sha256::digest(&bytes)),
             "distinct_rgb_colors": colors.len(), "opaque": opaque,
@@ -127,8 +129,16 @@ fn write_frame(
              ,"note_domain_source_sha256": hex::encode(Sha256::digest(include_bytes!("../../core/src/domain.rs")))
              ,"note_storage_source_sha256": hex::encode(Sha256::digest(include_bytes!("../../storage/src/review.rs")))
              ,"exit_guard_source_sha256": hex::encode(Sha256::digest(include_bytes!("exit_guard.rs")))
-             ,"phase3_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase3_capture.rs")))
+              ,"phase3_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase3_capture.rs")))
         });
+        for (key, source) in [
+            ("analysis_ux_source_sha256", include_bytes!("analysis_ux.rs").as_slice()),
+            ("history_source_sha256", include_bytes!("workspace_history.rs").as_slice()),
+            ("phase4_hierarchy_source_sha256", include_bytes!("phase4_hierarchy_tests.rs").as_slice()),
+            ("phase4_harness_source_sha256", include_bytes!("ui_phase4_capture.rs").as_slice()),
+        ] {
+            metadata[key] = hex::encode(Sha256::digest(source)).into();
+        }
         let file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)

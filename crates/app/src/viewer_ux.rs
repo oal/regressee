@@ -169,7 +169,17 @@ impl Shell {
     pub(super) fn viewer_inspector(&self, cx: &mut Context<Self>) -> AnyElement {
         let available = (self.working_width - self.review_queue_width() - 12.).max(1.);
         let details = self.capture_details_open;
-        let fields = self.analysis_fields[9..14].to_vec();
+        let fields = self.analysis_fields[..14].to_vec();
+        let field_bounds = self.review_field_bounds.clone();
+        let action_bounds: Vec<_> = self
+            .visible_controls()
+            .into_iter()
+            .filter(|c| self.control_mounted(*c))
+            .filter_map(|c| {
+                self.review_action_bounds(c)
+                    .map(|b| (self.handle(c, cx), b))
+            })
+            .collect();
         let scroll = self.review_details_scroll.clone();
         let overflow_scroll = scroll.clone();
         let owner = cx.entity().downgrade();
@@ -192,6 +202,8 @@ impl Shell {
                     .flex()
                     .flex_col()
                     .anchor_scroll(self.review_anchor(Control::AnalysisField(9)))
+                    .relative()
+                    .child(self.record_review_field_bounds(9))
                     .child(controls::field(
                         "Note",
                         "8,192 UTF-8 bytes maximum. Closing keeps unsaved text.",
@@ -265,12 +277,16 @@ impl Shell {
                         } else if details {
                             "Capture details"
                         } else {
-                            "Adjust comparison"
+                            "Analysis"
                         },
                     ))
                     .child(self.button(
                         Control::Phase5(39),
-                        "Return to evidence",
+                        if self.review_note_open {
+                            "Return to evidence"
+                        } else {
+                            "Close"
+                        },
                         ActionStyle::Secondary,
                         cx,
                     )),
@@ -300,16 +316,46 @@ impl Shell {
                             return;
                         }
                         reveal.set(reveal.get() - 1);
-                        for field in &fields {
+                        for (focus, bounds) in &action_bounds {
+                            if !focus.is_focused(window) {
+                                continue;
+                            }
+                            let Some(bounds) = bounds.get() else {
+                                continue;
+                            };
+                            let viewport = scroll.bounds();
+                            let delta = if bounds.bottom() > viewport.bottom() - px(8.) {
+                                viewport.bottom() - px(8.) - bounds.bottom()
+                            } else if bounds.top() < viewport.top() + px(8.) {
+                                viewport.top() + px(8.) - bounds.top()
+                            } else {
+                                px(0.)
+                            };
+                            if delta.abs() > px(1.) {
+                                let offset = scroll.offset();
+                                scroll.set_offset(gpui::point(offset.x, offset.y + delta));
+                                let owner = owner.clone();
+                                window.defer(cx, move |_, cx| {
+                                    if let Some(owner) = owner.upgrade() {
+                                        owner.update(cx, |_, cx| cx.notify());
+                                    }
+                                });
+                            }
+                        }
+                        for (index, field) in fields.iter().enumerate() {
                             let input = field.read(cx);
                             if !input.focus.is_focused(window) {
                                 continue;
                             }
-                            let Some(bounds) = input.rendered_bounds() else {
+                            let Some(bounds) = (if index == 9 {
+                                input.rendered_bounds()
+                            } else {
+                                field_bounds[index].get()
+                            }) else {
                                 continue;
                             };
                             let viewport = scroll.bounds();
-                            let top_inset = px(28.).min(
+                            let top_inset = px(if index == 9 { 28. } else { 8. }).min(
                                 (viewport.size.height - bounds.size.height - px(8.)).max(px(0.)),
                             );
                             let delta = if bounds.bottom() > viewport.bottom() - px(8.) {

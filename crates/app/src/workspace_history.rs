@@ -4,6 +4,41 @@ use super::*;
 use regressee_core::{domain::BaselineVersion, evidence::RunRecord};
 
 impl Shell {
+    pub(super) fn history_action_bounds(
+        &self,
+        control: Control,
+    ) -> Option<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>> {
+        if self.focus.screen != Screen::History {
+            return None;
+        }
+        let index = match control {
+            Control::Phase6(2) => 0,
+            Control::Phase6(4) => 1,
+            Control::Phase6(5) => 2,
+            Control::Phase6(7) => 3,
+            Control::Phase6(11) => 4,
+            Control::Phase6(12) => 5,
+            Control::Phase6(19) => 6,
+            Control::Phase5(42) => 7,
+            Control::Details(Detail::History) => 8,
+            Control::Details(Detail::Portability) => 9,
+            Control::Phase6(index @ 16..=18) => 10 + index - 16,
+            Control::HistoryRefresh => 13,
+            Control::HistoryClear => 14,
+            Control::HistoryKind(index @ 0..=3) => 15 + index,
+            Control::Phase6(3) => 19,
+            Control::Phase6(6) => 20,
+            Control::Phase6(0) => 21,
+            Control::Phase5(40) => 22,
+            Control::Phase5(41) => 23,
+            Control::Phase6(9) => 24,
+            Control::Phase6(10) => 25,
+            Control::Phase6(8) => 26,
+            Control::Phase6(1) => 27,
+            _ => return None,
+        };
+        self.history_action_bounds.get(index).cloned()
+    }
     pub(super) fn open_history_run(&mut self, cx: &mut Context<Self>) {
         if self.pending.is_some() {
             return;
@@ -186,7 +221,7 @@ impl Shell {
             .text_size(px(15.))
             .child(self.heading(
                 "History",
-                "Inspect saved evidence. Nothing is deleted automatically.",
+                "Saved runs and baseline versions. Cleanup is always explicit.",
             ));
         if self.project.is_none() {
             return body
@@ -253,7 +288,7 @@ impl Shell {
                     .gap_2()
                     .child(controls::field(
                         "Filter this history page",
-                        "Only loaded records · date, type, state, environment or ID. Other pages are not searched.",
+                        "Loaded page only · date, type, state, environment or ID.",
                         self.history_search.clone().into_any_element(),
                     ))
                     .child(div().flex().flex_wrap().gap_2().when(
@@ -261,7 +296,7 @@ impl Shell {
                         |el| {
                             el.child(self.button(
                                 Control::HistoryClear,
-                                "Clear history search",
+                                "Clear",
                                 ActionStyle::Secondary,
                                 cx,
                             ))
@@ -275,14 +310,17 @@ impl Shell {
             .w_full()
             .flex()
             .flex_col()
-            .gap_3()
-            .child(history_title("Baseline versions"))
-            .child(history_help(
-                "Active is the reference for future checks. Retained versions stay available until deleted.",
-            ))
+            .gap_2()
             .child(history_help(format!(
-                "{} of {} loaded baseline versions shown",
-                baseline_indices.len(), self.evidence.baselines.len(),
+                "{} of {} baseline versions · loaded page {}{}",
+                baseline_indices.len(),
+                self.evidence.baselines.len(),
+                self.history.as_ref().map(|h| h.page + 1).unwrap_or(1),
+                if self.history.as_ref().is_some_and(|h| h.more) {
+                    " · more history available"
+                } else {
+                    ""
+                },
             )));
         if !baseline_indices.is_empty() {
             baselines = baselines.child(
@@ -292,7 +330,7 @@ impl Shell {
                         .track_scroll(&self.history_baseline_scroll)
                         .w_full()
                         .debug_selector(|| "history-baseline-list".into())
-                        .h(px(256.))
+                        .h(px(history_list_height(baseline_indices.len())))
                         .flex_shrink_0()
                         .overflow_y_scroll()
                         .flex()
@@ -312,12 +350,7 @@ impl Shell {
                                     }
                                 ),
                                 format!(
-                                    "{} · {} / {} saved{}",
-                                    if active {
-                                        "Active reference"
-                                    } else {
-                                        "Retained version"
-                                    },
+                                    "{} / {} saved{}",
                                     b.references.len(),
                                     b.intended_count,
                                     if b.parent.is_some() {
@@ -338,7 +371,9 @@ impl Shell {
                 "No loaded baseline versions match. Change or clear the search; saved evidence is unchanged.",
             ));
         }
-        baselines = baselines.child(history_help("Scroll the record list to see all loaded versions. Tab reveals each row, including the last retained version."));
+        if baseline_indices.len() > 4 {
+            baselines = baselines.child(history_help("Scroll or Tab through loaded versions."));
+        }
         if let Some(b) = selected_baseline {
             let active = self.history_active_baseline() == Some(b.id);
             baselines = baselines
@@ -367,11 +402,6 @@ impl Shell {
                             b.references.len(),
                             b.intended_count,
                         ))
-                        .child(history_help(format!(
-                            "Saved {} ({})",
-                            history_date(b.created_at),
-                            relative_time(b.created_at),
-                        )))
                         .when_some(history_capture_span(b), |el, (first, last)| el.child(history_help(
                             if first == last {
                                 format!("Reference screenshots captured {}", history_date(first))
@@ -389,16 +419,13 @@ impl Shell {
                             "Use this version to make it the reference for future checks. This does not recapture the website or delete newer versions."
                         })),
                 )
-                .child(if b.parent.is_some() {
+                .when(b.parent.is_some(), |el| el.child(
                     controls::status(
                         "Built from more than one capture time: approved screenshots replace selected references, while other references are inherited. This is not one simultaneous website snapshot.",
                         Tone::Warning,
                     )
                     .into_any_element()
-                } else {
-                    history_help("Saved without inheriting references from another baseline version.")
-                        .into_any_element()
-                });
+                ));
         } else if self.evidence.baselines.is_empty() {
             baselines = baselines.child(if self.history.as_ref().is_some_and(|h| h.page > 0 || h.active_baseline.is_some()) {
                 controls::empty(
@@ -432,10 +459,7 @@ impl Shell {
                     )),
             )
             .child(history_help(
-                "Switching references is reversible while the version is retained. Permanent deletion is different: deleted evidence cannot be restored by choosing an older baseline.",
-            ))
-            .child(history_help(
-                "ZIP sharing includes selected baseline evidence and project settings, never login sessions or cookies. Screenshots may contain private information; review the export preview before sharing.",
+                "ZIPs contain selected baseline evidence and project settings, never sessions or cookies. Review screenshots for private information before sharing.",
             ));
         if self.history_section == 1 {
             body = body.child(baselines);
@@ -446,7 +470,7 @@ impl Shell {
             .w_full()
             .flex()
             .flex_col()
-            .gap_3()
+            .gap_2()
             .child(
                 div().flex().flex_wrap().gap_2().children(
                     ["All runs", "Checks", "Baseline captures", "Previews"]
@@ -492,7 +516,7 @@ impl Shell {
                         .track_scroll(&self.history_run_scroll)
                         .debug_selector(|| "history-run-list".into())
                         .w_full()
-                        .h(px(256.))
+                        .h(px(history_list_height(run_indices.len())))
                         .flex_shrink_0()
                         .overflow_y_scroll()
                         .flex()
@@ -510,8 +534,7 @@ impl Shell {
                                     history_run_type(&r.run.intent)
                                 ),
                                 format!(
-                                    "{} · {} · {} / {} captured",
-                                    history_run_type(&r.run.intent),
+                                    "{} · {} / {} captured",
                                     job_label(r.run.state),
                                     r.all_captures().count(),
                                     r.run.targets.len()
@@ -528,7 +551,9 @@ impl Shell {
                 "No runs on this loaded page match. Change the filters or load another history page; this is not a project-wide search.",
             ));
         }
-        runs = runs.child(history_help("Scroll the record list for all loaded runs. Tab reveals each row. Next history page loads older records; filtering never scans those pages."));
+        if run_indices.len() > 4 {
+            runs = runs.child(history_help("Scroll or Tab through loaded runs."));
+        }
         if let Some(h) = &self.history
             && let Some(r) = selected_run
         {
@@ -562,9 +587,8 @@ impl Shell {
                         .child(self.button(Control::Phase6(19), if matches!(r.run.intent, RunIntent::Check { .. }) { "Open check results" } else { "Open screenshots" }, ActionStyle::Primary, cx))
                         .child(self.button(Control::Phase6(5), "Review deletion…", ActionStyle::Danger, cx)))
                     .child(history_help(format!("Source environment: {}", r.run.environment.name)))
-                    .child(history_help(format!(
-                        "Started {} · Finished {}",
-                        r.run.started_at.map(history_date).unwrap_or_else(|| "not recorded".into()),
+                     .child(history_help(format!(
+                         "Finished {}",
                         r.run.finished_at.map(history_date).unwrap_or_else(|| "not recorded".into()),
                     )))
                     .child(history_help(if h.imported_runs.contains(&r.run.id) {
@@ -593,8 +617,29 @@ impl Shell {
         } else {
             runs = runs.child(history_help("Choose a run above to inspect it."));
         }
-        runs = runs
-            .child(
+        runs = runs.child(
+            div()
+                .flex()
+                .flex_wrap()
+                .gap_2()
+                .child(self.button(
+                    Control::Phase6(12),
+                    "Previous history page",
+                    ActionStyle::Secondary,
+                    cx,
+                ))
+                .child(self.button(
+                    Control::Phase6(11),
+                    "Next history page",
+                    ActionStyle::Secondary,
+                    cx,
+                )),
+        );
+        if self.history_section == 0 {
+            body = body.child(runs);
+        }
+        if self.history_section == 1 {
+            body = body.child(
                 div()
                     .flex()
                     .flex_wrap()
@@ -611,42 +656,7 @@ impl Shell {
                         ActionStyle::Secondary,
                         cx,
                     )),
-            )
-            .child(history_help(format!(
-                "Loaded page {}{}. Search does not scan other pages.",
-                self.history.as_ref().map(|h| h.page + 1).unwrap_or(1),
-                if self.history.as_ref().is_some_and(|h| h.more) { " · more history available" } else { "" },
-            )))
-            .child(history_help(
-                "Retained baselines protect their source runs. Review deletion impact before confirming; failed captures are not unchanged results.",
-            ));
-        if self.history_section == 0 {
-            body = body.child(runs);
-        }
-        if self.history_section == 1 {
-            body = body
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap_2()
-                        .child(self.button(
-                            Control::Phase6(12),
-                            "Previous history page",
-                            ActionStyle::Secondary,
-                            cx,
-                        ))
-                        .child(self.button(
-                            Control::Phase6(11),
-                            "Next history page",
-                            ActionStyle::Secondary,
-                            cx,
-                        )),
-                )
-                .child(history_help(format!(
-                    "Loaded page {} · filtering only this page",
-                    self.history.as_ref().map(|h| h.page + 1).unwrap_or(1)
-                )));
+            );
         }
 
         // Keep the existing validated privacy/deletion previews and their exact
@@ -799,7 +809,10 @@ impl Shell {
             }
             if let Some(r) = selected_run {
                 provenance = provenance
-                    .child(history_help(format!("Run {}", r.run.id)))
+                    .child(
+                        history_help(format!("Run {}", r.run.id))
+                            .debug_selector(|| "history-provenance-run".into()),
+                    )
                     .child(history_help(format!(
                         "Rendering: {} / {} · browser {} · worker {} · fonts {:?}",
                         r.run.rendering.os,
@@ -954,6 +967,11 @@ fn history_title(title: &'static str) -> Div {
         .text_size(px(21.))
         .font_weight(FontWeight::SEMIBOLD)
         .child(title)
+}
+
+/// Use actual mounted 64px rows, with a four-row bound for long loaded pages.
+pub(super) fn history_list_height(records: usize) -> f32 {
+    records.min(4) as f32 * 64.
 }
 
 fn history_help(text: impl Into<SharedString>) -> Div {

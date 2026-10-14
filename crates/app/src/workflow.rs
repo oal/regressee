@@ -1678,7 +1678,11 @@ impl Shell {
         } else {
             let mut metrics = vec![
                 (coverage.changed.to_string(), "changed", false),
-                (coverage.unchanged.to_string(), "unchanged", false),
+                (
+                    coverage.unchanged.to_string(),
+                    "no significant change",
+                    false,
+                ),
                 (coverage.missing.to_string(), "gaps", coverage.missing > 0),
             ];
             if coverage.unclassified > 0 {

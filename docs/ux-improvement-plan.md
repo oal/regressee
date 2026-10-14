@@ -247,7 +247,19 @@ Findings: **A3, B-01**.
 
 ## Phase 4 — Progressive controls and secondary-page hierarchy
 
-**Status: pending**
+**Status: complete — independently verified PASS (2026-10-14)**
+
+Implementer handoff: `docs/research/ux-review-20261013/phase4-implementation.md`.
+Progressive Analysis controls, mounted inner-owner field/action reveal and compact
+History/App settings hierarchy are implemented. One complete initial inspection,
+one collective repair and the sole fresh **88-frame two-size native confirmation**
+are complete; exact source/state/geometry/inspection receipts and private roots are
+in the handoff. Final-source checks passed: **251 app tests + 11 core shell tests**,
+UI-only no-run, workspace UI build, strict all-targets/all-features Clippy,
+formatting and whitespace. The independent verifier inspected all 88 captures,
+confirmed source/state bindings and issued PASS in `phase4-verification.md`.
+Parent performs this phase's commit/push after this update and records its hash
+in the next phase. Phase 5 remains pending.
 
 Findings: **A4**, A minor History/Settings repetition and terminology findings.
 
@@ -365,8 +377,8 @@ user URLs, user project databases or generated shipping claims.
 |---|---|---|---|---|
 | 1 | `ses_ec954afe7ffeEecoyP5c94slJU` — initial + repairs | `ses_ec9177899ffet7yjIRWlsr1DW8` — FIX → PASS | PASS | `7b73090` — pushed to origin/main |
 | 2 | `ses_ec8f73b54ffeC3IdbDuuX6eF4q` — initial + repairs | `ses_ec8d6e6beffeEIKgytGTffTsVf` — FIX → PASS | PASS | `98f2e21` — pushed to origin/main |
-| 3 | `ses_ec8ba7cebffe8igywNJgfd2HqS` | `ses_ec89b1360ffet6oQKZZLVOeUsS` — PASS | PASS | phase commit; hash/push recorded next phase |
-| 4 | pending | pending | pending | pending |
+| 3 | `ses_ec8ba7cebffe8igywNJgfd2HqS` | `ses_ec89b1360ffet6oQKZZLVOeUsS` — PASS | PASS | `b1becf8` — pushed to origin/main |
+| 4 | `ses_ec894516fffeWg64CmVcDm55T6` | `ses_ec844138fffedfPZA5JnK4IGgr` — PASS | PASS | phase commit; hash/push recorded next phase |
 | 5 | pending | pending | pending | pending |
 
 The phase commit cannot contain its own hash. Record a preceding phase's hash in

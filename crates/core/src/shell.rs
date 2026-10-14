@@ -27,6 +27,7 @@ pub enum Detail {
     Capture,
     History,
     Analysis,
+    IgnoredAreas,
     Network,
     Portability,
 }
@@ -430,13 +431,23 @@ impl FocusState {
                     controls.push(Control::CrawlField(9));
                     // Analysis controls can be mounted without image panes;
                     // the app filters these candidates by the actual sections.
-                    controls.extend((0..29).chain(32..40).map(Control::Phase5));
+                    controls.extend((6..12).map(Control::Phase5));
                     controls.push(Control::Guided(44));
                     controls.push(Control::Guided(45));
                     controls.extend([Control::CloseOptions, Control::DiscoveryDetails]);
                     controls.extend([50, 51, 53, 54, 55, 56, 57].map(Control::Guided));
+                    controls.push(Control::Phase5(39));
+                    controls.extend([0, 1, 2, 4, 5, 26].map(Control::Phase5));
+                    controls.push(Control::Details(Detail::IgnoredAreas));
+                    controls.extend([14, 34].map(Control::Phase5));
+                    controls.extend((10..14).map(Control::AnalysisField));
+                    controls.extend([35, 18, 15, 17, 16, 19, 3].map(Control::Phase5));
+                    controls.extend((0..9).map(Control::AnalysisField));
+                    controls.extend([27, 28].map(Control::Phase5));
                     controls.push(Control::Details(Detail::Analysis));
-                    controls.extend((0..14).map(Control::AnalysisField));
+                    controls.extend([12, 13].map(Control::Phase5));
+                    controls.extend((20..26).chain([32, 33, 36, 37, 38]).map(Control::Phase5));
+                    controls.push(Control::AnalysisField(9));
                 }
                 if self.candidate {
                     controls.push(Control::SaveBaseline);
