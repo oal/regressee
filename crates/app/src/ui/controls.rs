@@ -610,25 +610,90 @@ pub fn field(label: &'static str, hint: &'static str, input: AnyElement) -> Div 
         .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(hint))
 }
 
-/// Compact unknown-duration activity, not a completion bar or a guessed count.
-/// Static native geometry also respects reduced-motion environments.
+/// A native activity mark, never a completion fraction. The open arc remains
+/// recognizable when reduced motion is requested; a dot would read as a bullet.
+pub fn activity_indicator() -> Div {
+    div()
+        .debug_selector(|| "activity-indicator".into())
+        .size(px(16.))
+        .flex_shrink_0()
+        .child(
+            canvas(
+                |_, window, cx| activity_frame(window, cx, "compact-activity-clock"),
+                |bounds, (phase, animate), window, _| {
+                    if bounds.intersect(&window.content_mask().bounds).is_empty() {
+                        return;
+                    }
+                    if let Ok(track) = activity_arc(bounds, 0., 1.) {
+                        window.paint_path(track, rgb(CONTROL_LINE));
+                    }
+                    if let Ok(arc) = activity_arc(bounds, phase, 0.75) {
+                        window.paint_path(arc, rgb(ACCENT));
+                    }
+                    if animate {
+                        window.request_animation_frame();
+                    }
+                },
+            )
+            .size_full(),
+        )
+}
+
+/// Compact unknown-duration activity, paired with readable task wording.
 pub fn activity(label: impl Into<SharedString>) -> Div {
+    activity_label(label, false)
+}
+
+fn activity_label(label: impl Into<SharedString>, prominent: bool) -> Div {
+    let (text_size, line_height, weight) = if prominent {
+        (18., 24., FontWeight::SEMIBOLD)
+    } else {
+        (CONTROL_TEXT_SIZE, CONTROL_LINE_HEIGHT, FontWeight::MEDIUM)
+    };
     div()
         .debug_selector(|| "loading-activity".into())
+        .w_full()
+        .min_w_0()
         .flex()
-        .items_center()
+        .items_start()
         .gap(px(8.))
-        .text_size(px(CONTROL_TEXT_SIZE))
-        .line_height(px(CONTROL_LINE_HEIGHT))
-        .text_color(rgb(MUTED))
+        .text_size(px(text_size))
+        .line_height(px(line_height))
+        .font_weight(weight)
+        .text_color(rgb(INK))
         .child(
             div()
-                .size(px(6.))
-                .rounded(px(3.))
                 .flex_shrink_0()
-                .bg(rgb(ACCENT)),
+                .pt(px((line_height - 16.) / 2.))
+                .child(activity_indicator()),
         )
-        .child(div().min_w_0().child(label.into()))
+        .child(
+            div()
+                .debug_selector(|| "activity-label".into())
+                .min_w_0()
+                .flex_1()
+                .flex()
+                .flex_col()
+                .child(label.into()),
+        )
+}
+
+/// Global operations have a quiet, bounded status surface rather than an
+/// unframed line that can be mistaken for an item in the screen's content.
+pub fn activity_notice(label: impl Into<SharedString>) -> Div {
+    div()
+        .debug_selector(|| "activity-surface".into())
+        .w_full()
+        .min_w_0()
+        .min_h(px(CONTROL_HEIGHT))
+        .flex_shrink_0()
+        .px(px(12.))
+        .py(px(9.))
+        .bg(rgb(SURFACE))
+        .border_1()
+        .border_color(rgb(LINE))
+        .rounded(px(4.))
+        .child(activity(label))
 }
 
 pub fn loading(title: &'static str, explanation: &'static str) -> Div {
@@ -640,15 +705,11 @@ pub fn loading(title: &'static str, explanation: &'static str) -> Div {
         .flex()
         .flex_col()
         .gap(px(8.))
+        .child(activity_label(title, true))
         .child(
             div()
-                .text_size(px(18.))
-                .line_height(px(24.))
-                .font_weight(FontWeight::SEMIBOLD)
-                .child(title),
-        )
-        .child(
-            div()
+                .ml(px(24.))
+                .min_w_0()
                 .text_size(px(14.))
                 .line_height(px(20.))
                 .text_color(rgb(MUTED))
@@ -691,7 +752,19 @@ pub fn page_row(
     selected: bool,
     enabled: bool,
 ) -> Stateful<Div> {
-    target_row(id, address, details, selected, enabled, false)
+    target_row(id, address, details, selected, enabled, RowKind::Page)
+}
+
+/// Discovery opens page options, not a screenshot or an external website.
+/// The complete address is available in the selected page's details.
+pub fn discovery_row(
+    id: impl Into<ElementId>,
+    address: impl Into<SharedString>,
+    details: impl Into<SharedString>,
+    selected: bool,
+    enabled: bool,
+) -> Stateful<Div> {
+    target_row(id, address, details, selected, enabled, RowKind::Discovery)
 }
 
 pub fn result_row(
@@ -701,7 +774,14 @@ pub fn result_row(
     selected: bool,
     enabled: bool,
 ) -> Stateful<Div> {
-    target_row(id, address, details, selected, enabled, true)
+    target_row(id, address, details, selected, enabled, RowKind::Result)
+}
+
+#[derive(Clone, Copy)]
+enum RowKind {
+    Page,
+    Discovery,
+    Result,
 }
 
 fn target_row(
@@ -710,10 +790,19 @@ fn target_row(
     details: impl Into<SharedString>,
     selected: bool,
     enabled: bool,
-    result: bool,
+    kind: RowKind,
 ) -> Stateful<Div> {
     let address = address.into();
-    let hint = address.clone();
+    let hint = match kind {
+        RowKind::Discovery => Some(SharedString::from(
+            "View page details and include/exclude options",
+        )),
+        RowKind::Page => Some(address.clone()),
+        // The path is already visible; project origins belong in Details,
+        // not in a hover overlay that obscures the screenshot being reviewed.
+        RowKind::Result => None,
+    };
+    let result = matches!(kind, RowKind::Result);
     let path = page_path(&address);
     let details = details.into();
     let (profile, status) = details.split_once(" · ").unwrap_or((&details, ""));
@@ -740,7 +829,9 @@ fn target_row(
         .gap(px(4.))
         .when(enabled, |el| {
             el.cursor_pointer()
-                .tooltip(move |_, cx| cx.new(|_| PageAddressHint(hint.clone())).into())
+                .when_some(hint, |el, hint| {
+                    el.tooltip(move |_, cx| cx.new(|_| PageAddressHint(hint.clone())).into())
+                })
                 .hover(move |style| style.bg(rgb(if selected { SELECTED } else { GROUND })))
         })
         .child(
@@ -782,7 +873,7 @@ fn target_row(
 }
 
 /// Keep query and fragment identity; the full origin remains available in the
-/// native hint and the selected screenshot's keyboard-accessible Details.
+/// selected screenshot's keyboard-accessible Details.
 pub fn page_path(address: &str) -> String {
     url::Url::parse(address)
         .ok()
@@ -800,19 +891,52 @@ pub fn page_path(address: &str) -> String {
 
 struct PageAddressHint(SharedString);
 impl Render for PageAddressHint {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let mut text_style = window.text_style();
+        text_style.font_weight = FontWeight::NORMAL;
+        let text_width = self
+            .0
+            .lines()
+            .map(|line| {
+                window
+                    .text_system()
+                    .shape_line(
+                        line.to_owned().into(),
+                        px(14.),
+                        &[text_style.to_run(line.len())],
+                        None,
+                    )
+                    .width
+            })
+            .max()
+            .unwrap_or(px(0.));
+        // GPUI lays tooltips out with min-content space. Give wrapping a finite
+        // content-derived width, not the same 480px reservation for every hint.
+        let inset = px(12.);
+        let width = (text_width.ceil() + (inset + px(1.)) * 2.)
+            .min(px(480.))
+            .min(window.viewport_size().width);
         div()
-            .w(px(480.))
-            .max_w_full()
-            .p_3()
+            .debug_selector(|| "page-row-hint".into())
+            .w(width)
+            .p(inset)
             .bg(rgb(SURFACE))
             .border_1()
             .border_color(rgb(CONTROL_LINE))
             .text_size(px(14.))
             .line_height(px(20.))
+            .font_weight(FontWeight::NORMAL)
+            .text_color(rgb(INK))
             .flex()
             .flex_col()
-            .child(self.0.clone())
+            .child(
+                div()
+                    .w_full()
+                    .min_w_0()
+                    .flex()
+                    .flex_col()
+                    .child(self.0.clone()),
+            )
     }
 }
 
@@ -848,6 +972,41 @@ fn activity_phase(elapsed: Duration) -> f32 {
     (elapsed.as_secs_f64() / ACTIVITY_PERIOD.as_secs_f64()).fract() as f32
 }
 
+fn activity_frame(window: &mut Window, cx: &mut App, key: &'static str) -> (f32, bool) {
+    let animate = !cx
+        .try_global::<ReducedMotion>()
+        .is_some_and(|motion| motion.0);
+    let phase = if animate {
+        // Native frames advance this element-local clock independently of worker
+        // updates. Unmounting discards it; reduced motion never schedules frames.
+        let clock = window.use_keyed_state(key, cx, |_, _| Instant::now());
+        activity_phase(clock.read(cx).elapsed())
+    } else {
+        0.
+    };
+    (phase, animate)
+}
+
+fn activity_arc(bounds: Bounds<Pixels>, phase: f32, turns: f32) -> anyhow::Result<Path<Pixels>> {
+    let radius = bounds.size.width.min(bounds.size.height) / 2. - px(1.);
+    let center = bounds.center();
+    let start = std::f32::consts::TAU * phase.rem_euclid(1.) - std::f32::consts::FRAC_PI_2;
+    let at = |angle: f32| center + point(radius * angle.cos(), radius * angle.sin());
+    let mut path = PathBuilder::stroke(px(1.8));
+    path.move_to(at(start));
+    // Two arcs also support a complete track: an SVG arc cannot end at its start.
+    for step in [0.5, 1.] {
+        path.arc_to(
+            point(radius, radius),
+            px(0.),
+            false,
+            true,
+            at(start + std::f32::consts::TAU * turns * step),
+        );
+    }
+    path.build()
+}
+
 fn activity_segments(bounds: Bounds<Pixels>, phase: f32) -> [Bounds<Pixels>; 5] {
     // Four repetitions, plus the one entering from the left. Moving one repeat
     // per cycle makes the wrap seamless; clipping keeps every painted quad in
@@ -872,23 +1031,7 @@ fn indeterminate_track() -> Div {
         .size_full()
         .child(
             canvas(
-                |_, window, cx| {
-                    let animate = !cx
-                        .try_global::<ReducedMotion>()
-                        .is_some_and(|motion| motion.0);
-                    let phase = if animate {
-                        // A stable element-local clock survives worker updates.
-                        // Neither message changes nor page counts restart motion.
-                        let clock =
-                            window.use_keyed_state("progress-activity-clock", cx, |_, _| {
-                                Instant::now()
-                            });
-                        activity_phase(clock.read(cx).elapsed())
-                    } else {
-                        0.
-                    };
-                    (phase, animate)
-                },
+                |_, window, cx| activity_frame(window, cx, "progress-activity-clock"),
                 |bounds, (phase, animate), window, _| {
                     if bounds.intersect(&window.content_mask().bounds).is_empty() {
                         return;
@@ -953,7 +1096,7 @@ pub fn progress(label: impl Into<SharedString>, completed: u32, total: Option<u3
         .child(progress_track(completed, total))
 }
 /// Protected information dialog only. Root shell traps/restores focus and Escape.
-pub fn dialog(title: &'static str, body: &'static str, close: AnyElement) -> Div {
+pub fn dialog(title: impl IntoElement, body: &'static str, close: AnyElement) -> Div {
     div()
         .debug_selector(|| "information-dialog-overlay".into())
         .occlude()
@@ -1298,6 +1441,30 @@ mod tests {
         );
         assert_eq!(inherited_text(&error).color, rgb(ERROR).into());
     }
+
+    #[test]
+    fn compact_activity_is_readable_and_not_selection_or_completion_paint() {
+        let row = merged_base(activity("Opening project…"));
+        assert_eq!(inherited_text(&row).color, rgb(INK).into());
+        assert_eq!(inherited_text(&row).font_weight, FontWeight::MEDIUM);
+        let surface = merged_base(activity_notice("Opening project…"));
+        assert_eq!(surface.min_size.height, px(CONTROL_HEIGHT).into());
+        assert_eq!(
+            surface.background.as_ref().unwrap().color(),
+            Some(rgb(SURFACE).into())
+        );
+        assert_ne!(
+            surface.background.as_ref().unwrap().color(),
+            Some(rgb(SELECTED).into())
+        );
+        assert!(contrast(ACCENT, SURFACE) >= 3.);
+        assert!(contrast(CONTROL_LINE, SURFACE) >= 3.);
+        let bounds = Bounds::new(point(px(12.), px(20.)), size(px(16.), px(16.)));
+        for frame in 0..120 {
+            assert!(activity_arc(bounds, frame as f32 / 120., 0.75).is_ok());
+        }
+        assert!(activity_arc(bounds, 0., 1.).is_ok());
+    }
 }
 
 #[cfg(all(test, feature = "ui-tests"))]
@@ -1350,6 +1517,96 @@ mod ui_tests {
         width: f32,
         selected: bool,
         enabled: bool,
+    }
+
+    struct RowHintView {
+        kind: RowKind,
+        address: SharedString,
+        enabled: bool,
+    }
+
+    impl Render for RowHintView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().w(px(272.)).child(target_row(
+                "hint-test",
+                self.address.clone(),
+                "Desktop · Could not compare · 1 attempt",
+                false,
+                self.enabled,
+                self.kind,
+            ))
+        }
+    }
+
+    #[gpui::test]
+    fn result_rows_have_no_redundant_hint_and_other_hints_fit_content(cx: &mut TestAppContext) {
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            for (kind, enabled, expected_hint) in [
+                (RowKind::Result, true, false),
+                (RowKind::Result, false, false),
+                (RowKind::Discovery, true, true),
+                (RowKind::Discovery, false, false),
+                (RowKind::Page, true, true),
+                (RowKind::Page, false, false),
+            ] {
+                // Fresh windows avoid GPUI's retained debug bounds after unmount.
+                let (_, cx) = cx.add_window_view(|_, _| RowHintView {
+                    kind,
+                    address: "https://example.test/side/aviser/".into(),
+                    enabled,
+                });
+                cx.simulate_resize(size(px(width), px(height)));
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                let row = cx.debug_bounds("page-row-hint-test").unwrap();
+                cx.simulate_mouse_move(row.center(), None, Modifiers::none());
+                cx.executor().advance_clock(Duration::from_millis(600));
+                cx.run_until_parked();
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                let hint = cx.debug_bounds("page-row-hint");
+                assert_eq!(hint.is_some(), expected_hint);
+                if let Some(hint) = hint {
+                    assert!(hint.size.width > px(24.));
+                    assert!(
+                        hint.size.width < px(480.),
+                        "short hints must not reserve 480px"
+                    );
+                    assert!(hint.right() <= px(width));
+                    assert!(hint.bottom() <= px(height));
+                }
+                assert_eq!(row, cx.debug_bounds("page-row-hint-test").unwrap());
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn page_hints_wrap_long_addresses_within_the_window(cx: &mut TestAppContext) {
+        for width in [320., 820.] {
+            let (_, cx) = cx.add_window_view(|_, _| RowHintView {
+                kind: RowKind::Page,
+                address: format!("https://example.test/{}", "long-page-name/".repeat(30)).into(),
+                enabled: true,
+            });
+            cx.simulate_resize(size(px(width), px(600.)));
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            let row = cx.debug_bounds("page-row-hint-test").unwrap();
+            cx.simulate_mouse_move(row.center(), None, Modifiers::none());
+            cx.executor().advance_clock(Duration::from_millis(600));
+            cx.run_until_parked();
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            let hint = cx.debug_bounds("page-row-hint").unwrap();
+            assert!(hint.size.width <= px(480.).min(px(width)));
+            assert!(hint.size.height > px(46.), "long hints must wrap");
+            assert!(hint.left() >= px(0.) && hint.right() <= px(width));
+            assert!(hint.top() >= px(0.) && hint.bottom() <= px(600.));
+        }
     }
 
     impl Render for PageRowsView {
@@ -1419,6 +1676,61 @@ mod ui_tests {
         completed: u32,
         total: Option<u32>,
         width: f32,
+    }
+
+    struct ActivityView {
+        width: f32,
+        prominent: bool,
+    }
+
+    impl Render for ActivityView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().w(px(self.width)).child(if self.prominent {
+                loading(
+                    "Loading saved screenshots…",
+                    "Reading this project’s page list, captures and comparison results from disk.",
+                )
+            } else {
+                activity_notice("Opening a project with a longer name and reading its saved settings from local storage…")
+            })
+        }
+    }
+
+    #[gpui::test]
+    fn activity_icon_and_wrapped_labels_keep_their_bounds_with_reduced_motion(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(|cx| cx.set_global(ReducedMotion(true)));
+        let (view, cx) = cx.add_window_view(|_, _| ActivityView {
+            width: 160.,
+            prominent: false,
+        });
+        for width in [160., 320., 680.] {
+            for prominent in [false, true] {
+                view.update(cx, |view, cx| {
+                    view.width = width;
+                    view.prominent = prominent;
+                    cx.notify();
+                });
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                let icon = cx.debug_bounds("activity-indicator").unwrap();
+                let label = cx.debug_bounds("activity-label").unwrap();
+                let row = cx.debug_bounds("loading-activity").unwrap();
+                assert_eq!(icon.size, size(px(16.), px(16.)));
+                assert_eq!(label.left(), icon.right() + px(8.));
+                assert!(label.right() <= row.right());
+                assert!(label.bottom() <= row.bottom());
+                assert_eq!(icon.top(), row.top() + px(if prominent { 4. } else { 2. }));
+                cx.update(|window, cx| {
+                    assert_eq!(activity_frame(window, cx, "reduced-test"), (0., false));
+                    let _ = window.draw(cx);
+                });
+                assert_eq!(icon, cx.debug_bounds("activity-indicator").unwrap());
+                assert_eq!(label, cx.debug_bounds("activity-label").unwrap());
+            }
+        }
     }
 
     impl Render for ProgressView {

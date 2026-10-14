@@ -55,7 +55,7 @@ fn storage_review_note_roundtrips_exact_bytes_and_rejects_without_rewriting() {
                 .save_review(&decision)
                 .unwrap_err()
                 .to_string()
-                .contains("UTF-8 bytes")
+                .contains(regressee_core::domain::REVIEW_NOTE_LIMIT_MESSAGE)
         );
         assert_eq!(store.review_history(run).unwrap(), saved);
     }
@@ -112,7 +112,7 @@ fn note_explicit_save_exit_boundaries_and_loaded_legacy_shrinking(cx: &mut TestA
             finish_jobs(s, cx);
             assert!(!s.review_note_dirty(cx));
             assert_eq!(s.analysis_fields[9].read(cx).content.as_ref(), note);
-            assert!(s.note_status(cx).0.starts_with("Saved"));
+            assert_eq!(s.note_status(cx), ("Saved".into(), false));
         });
     }
     for note in ["x".repeat(8193), "é".repeat(4097)] {
@@ -126,7 +126,13 @@ fn note_explicit_save_exit_boundaries_and_loaded_legacy_shrinking(cx: &mut TestA
             assert_eq!(s.next_request, request);
             assert_eq!(s.evidence.reviews, saved);
             assert_eq!(s.analysis_fields[9].read(cx).content.as_ref(), note);
-            assert!(s.note_status(cx).1);
+            assert_eq!(
+                s.note_status(cx),
+                (
+                    regressee_core::domain::REVIEW_NOTE_LIMIT_MESSAGE.into(),
+                    true
+                )
+            );
         });
     }
     cx.update(|w, cx| {

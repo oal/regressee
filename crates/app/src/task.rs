@@ -10,6 +10,7 @@ pub struct CaptureStatus {
     pub run: RunId,
     pub project: ProjectId,
     pub pages: usize,
+    pub excluded_pages: usize,
     pub profiles: Vec<String>,
     pub environment: String,
     pub total: u32,
@@ -24,6 +25,7 @@ impl CaptureStatus {
             run: run.id,
             project: run.project,
             pages: run.inventory.pages.iter().filter(|p| p.included).count(),
+            excluded_pages: run.inventory.pages.iter().filter(|p| !p.included).count(),
             profiles: run
                 .profiles
                 .iter()
@@ -50,6 +52,21 @@ impl CaptureStatus {
 
     pub fn processed(&self) -> u32 {
         self.total.saturating_sub(self.counts.pending as u32)
+    }
+
+    pub fn selection_summary(&self) -> String {
+        format!(
+            "{} of {} listed URLs included · {} excluded before capture · {} screen {}",
+            self.pages,
+            self.pages + self.excluded_pages,
+            self.excluded_pages,
+            self.profiles.len(),
+            if self.profiles.len() == 1 {
+                "size"
+            } else {
+                "sizes"
+            },
+        )
     }
 }
 
@@ -150,7 +167,7 @@ pub fn capture_recovery(code: CaptureError) -> &'static str {
             "Choose visible-screen-only capture in Project settings, then find pages and capture again."
         }
         CaptureError::LowSpace => {
-            "Free up disk space before retrying. Inspect saved evidence in History before deleting anything."
+            "Free up disk space before retrying. Review saved screenshots and runs in History before deleting anything."
         }
         CaptureError::RateLimited => "Choose a slower capture speed before retrying.",
         CaptureError::ServerError => "Check that the website is available, then retry.",
@@ -183,6 +200,48 @@ pub enum Kind {
     Baseline,
     Save,
     Delete,
+}
+
+/// An unknown cause still needs an operation-specific, non-destructive next step.
+pub fn failure_recovery(kind: Kind) -> &'static str {
+    match kind {
+        Kind::Discovery => {
+            "Review the starting addresses and website access in Project settings, then choose Find pages & preview again. No baseline was changed."
+        }
+        Kind::Capture | Kind::Representative => {
+            "Return to the workspace to review saved screenshots and capture failures before starting another capture. Your saved baseline was not changed."
+        }
+        Kind::Check => {
+            "Return to the workspace to review any saved results before retrying the check. Your baseline was not changed."
+        }
+        Kind::Setup => {
+            "Check the browser status, network settings and available disk space in App settings before retrying browser setup."
+        }
+        Kind::Login | Kind::Access => {
+            "Review website access in Project settings. If login is needed, open the login browser and finish with I'm ready before retrying."
+        }
+        Kind::Save => {
+            "Your draft is kept. Check the form and available disk space before saving again; do not reopen the project and discard your edits."
+        }
+        Kind::Baseline => {
+            "Return to the workspace and choose Refresh to check which baseline is current before trying this change again."
+        }
+        Kind::Delete => {
+            "Inspect History to see what remains before attempting another deletion. Nothing else will be deleted automatically."
+        }
+        Kind::Storage => {
+            "Check folder permissions and available disk space in App settings. Keep the data folder; do not delete files to bypass this error."
+        }
+        Kind::ArchivePreview | Kind::Import => {
+            "Choose a valid Regressee baseline ZIP and check folder access and free space before retrying. Check Projects for any completed import first."
+        }
+        Kind::Export => {
+            "Choose a writable destination with enough free space, then export again. Your local project is kept."
+        }
+        Kind::Diagnostics => {
+            "Choose a writable destination when exporting. Review the diagnostic preview before sharing; nothing was uploaded."
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -402,7 +461,7 @@ impl Spec {
                 "An existing project is never replaced. If you cancel before saving, recovery files may remain in local storage."
             }
             Kind::Export => {
-                "Your project stays unchanged. Cancellation stops the ZIP before publication; an already saved ZIP is kept."
+                "Your project stays unchanged. Cancelling stops the export before the ZIP is saved; an already saved ZIP is kept."
             }
             Kind::ArchivePreview => {
                 "This preview does not import a project or change your baseline."
@@ -414,7 +473,7 @@ impl Spec {
                 "An already saved login session is kept. Once the browser opens, log in there and return to the app."
             }
             Kind::Access => "Checking access does not capture screenshots or update your baseline.",
-            Kind::Storage => "This inspection does not delete your saved evidence.",
+            Kind::Storage => "Checking storage does not delete saved screenshots or results.",
             Kind::Baseline => {
                 "Earlier baseline versions are kept. This confirmed update must finish safely; cancellation cannot undo it."
             }
@@ -541,6 +600,31 @@ mod tests {
         let frozen = details.setup.profiles.clone();
         run.profiles[0].name = "Edited after this run".into();
         assert_eq!(details.setup.profiles, frozen);
+    }
+
+    #[test]
+    fn excluded_inventory_urls_are_not_missing_capture_targets() {
+        let mut run = presentation_run(579);
+        for page in &mut run.inventory.pages[5..] {
+            page.included = false;
+            page.reason = Some("Website not approved".into());
+        }
+        run.targets.truncate(10); // Five included URLs at two screen sizes.
+        for target in &mut run.targets {
+            target.outcome = TargetOutcome::Failed {
+                code: CaptureError::RedirectOutsideScope,
+            };
+        }
+        let details = CaptureDetails::from_run(&run);
+        assert_eq!(details.setup.pages, 5);
+        assert_eq!(details.setup.excluded_pages, 574);
+        assert_eq!(details.setup.total, 10);
+        assert_eq!(details.gap_count, 10);
+        assert_eq!(details.setup.counts.pending, 0);
+        assert_eq!(
+            details.setup.selection_summary(),
+            "5 of 579 listed URLs included · 574 excluded before capture · 2 screen sizes"
+        );
     }
 
     #[test]

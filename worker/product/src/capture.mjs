@@ -6,7 +6,7 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {replayContext,needsLogin} from './sessions.mjs';
 export const PLAYWRIGHT_VERSION=createRequire(import.meta.url)('playwright/package.json').version;
-export const WORKER_VERSION='5.0.0';
+export const WORKER_VERSION='5.0.1';
 export const IMAGE_ALGORITHM='neutral-raster-v2';
 // Same material transform as the qualified Phase 0 implementation. Changing
 // placeholders/source/layout rules requires a NEW algorithm identity.
@@ -49,11 +49,23 @@ export const launch = (headless=true) => chromium.launch({channel:'chromium',hea
 export async function navigationBoundary(context,address,scope,timeout,section=null,page) {
   if(!page)throw fail('InvalidRequest');
    const requested=new URL(address),prefix=section?.replace(/\/$/,'')||'';
-   const state={redirect:null,blocked:false,error:null};let started=false,closed=false;
+   const state={redirect:null,blocked:false,embeddedBlocked:false,error:null};let started=false,closed=false;
    context.on('close',()=>{closed=true;});
    context.on('page',other=>{if(other!==page){state.blocked=true;void other.close().catch(()=>{});}});
-  await context.route('**/*',async route=>{
-    const req=route.request(),u=new URL(req.url());
+   await context.route('**/*',async route=>{
+     const req=route.request(),u=new URL(req.url());
+     let frame;
+     if(req.isNavigationRequest()) {
+       // A popup's initial request can arrive before Playwright has a frame.
+       // It is not an approved main-page request; fail closed before visiting.
+       try {frame=req.frame();}catch {state.blocked=true;return route.abort('blockedbyclient');}
+     }
+     // Embedded documents are not part of the approved page inventory. Block
+     // them before visiting, but do not misreport an iframe as a main-page
+     // redirect (or invalidate an otherwise valid main-page screenshot).
+     if(frame&&frame.page()===page&&frame!==page.mainFrame()) {
+       state.embeddedBlocked=true;return route.abort('blockedbyclient');
+     }
     if(scope==='loopback'&&['http:','https:'].includes(u.protocol)&&!literalLoopback(u.href)) {
       if(req.isNavigationRequest())state.blocked=true;
       return route.abort('blockedbyclient');
@@ -61,15 +73,20 @@ export async function navigationBoundary(context,address,scope,timeout,section=n
     if(!req.isNavigationRequest())return route.continue();
     // Automatic forms, frames, popups and script/meta navigations are not crawl
     // evidence. Only the one explicit GET is admitted, before any network visit.
-     if(started||req.method()!=='GET'||req.frame().page()!==page||req.frame()!==page.mainFrame()||u.origin!==requested.origin||u.pathname!==requested.pathname||u.search!==requested.search||(prefix&&u.pathname!==prefix&&!u.pathname.startsWith(prefix+'/'))) {
+     if(started||req.method()!=='GET'||frame.page()!==page||frame!==page.mainFrame()||u.origin!==requested.origin||u.pathname!==requested.pathname||u.search!==requested.search||(prefix&&u.pathname!==prefix&&!u.pathname.startsWith(prefix+'/'))) {
       state.blocked=true;return route.abort('blockedbyclient');
     }
     started=true;
      return route.continue(); // The CDP response guard is already installed.
    });
-   const cdp=await context.newCDPSession(page);
-   cdp.on('Fetch.requestPaused',event=>{void (async()=>{
-     const {requestId,request,responseStatusCode,responseHeaders=[]}=event;
+    const cdp=await context.newCDPSession(page);
+    const mainFrameId=(await cdp.send('Page.getFrameTree')).frameTree.frame.id;
+    cdp.on('Fetch.requestPaused',event=>{void (async()=>{
+      const {requestId,request,responseStatusCode,responseHeaders=[]}=event;
+      if(event.resourceType==='Document'&&event.frameId!==mainFrameId) {
+        state.embeddedBlocked=true;
+        return cdp.send('Fetch.failRequest',{requestId,errorReason:'BlockedByClient'});
+      }
      if(responseStatusCode!==undefined||event.responseErrorReason) {
        const header=name=>responseHeaders.find(h=>h.name.toLowerCase()===name)?.value;
        const location=header('location');
@@ -167,7 +184,8 @@ export async function capture(browser, payload, {identity,scope,output,onContext
       const height=await page.evaluate(()=>Math.max(document.documentElement.scrollHeight,document.body?.scrollHeight||0));
       if(height>Math.min(32768,p.stabilization.max_height) || height*p.width>64000000)throw fail('ImageLimit');
       if(y>=height)break;
-      if(++i>64 || Date.now()>=deadline)throw fail('ImageLimit');
+       if(++i>64)throw fail('ImageLimit');
+       if(Date.now()>=deadline)throw fail('Timeout');
       await page.evaluate(y=>scrollTo(0,y),y);await page.waitForTimeout(20);
     }
     await page.evaluate(()=>{scrollTo(0,0);for(const img of document.images)img.loading='eager';});
@@ -214,6 +232,7 @@ export async function capture(browser, payload, {identity,scope,output,onContext
      if(!stable)warn('Unstable');if(resourceFailures)warn('ResourceFailed');
      if(await needsLogin(page))throw fail('NeedsLogin');
      if(navigation.blocked||navigation.redirect||page.url()!==address)throw fail(state?'NeedsLogin':'RedirectOutsideScope');
+     if(navigation.embeddedBlocked)warn('EmbeddedContentBlocked');
     const actualWidth=image.readUInt32BE(16),actualHeight=image.readUInt32BE(20);
     if(actualWidth!==width || actualHeight!==height || image.length>128*1024*1024)throw fail('ImageLimit');
     const token=crypto.randomUUID(),hash=crypto.createHash('sha256').update(image).digest('hex');

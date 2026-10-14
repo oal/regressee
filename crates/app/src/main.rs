@@ -11,6 +11,7 @@ use regressee_app::{
     formatting::human_bytes,
     jobs::{Jobs, Reply, Request, Update, Work},
     ui::{
+        brand::{self, Background},
         controls::{self, ActionStyle, Tone},
         text_input::{self, TextInput},
         theme::*,
@@ -34,6 +35,7 @@ use std::{
 };
 
 mod analysis_ux;
+mod app_settings_ux;
 mod evidence_workspace;
 mod exit_guard;
 mod form_recovery;
@@ -42,6 +44,7 @@ mod local_ux;
 mod options_ux;
 mod review_ux;
 mod runtime_ux;
+mod safety_ux;
 mod setup_ux;
 mod task_ux;
 #[cfg(all(feature = "ui-inspection", target_os = "linux"))]
@@ -58,19 +61,22 @@ fn mask_outline_width(width: f32, height: f32) -> f32 {
 }
 fn capture_warning_label(code: &str) -> &str {
     match code {
-        "ReadinessBudget" => "Page readiness timed out; content may be incomplete",
+        "ReadinessBudget" => "The page took too long to finish loading; content may be incomplete",
         "FontsIncomplete" => "Some fonts did not finish loading",
         "ImagesIncomplete" => "Some images did not finish loading",
         "Unstable" => "Page kept changing between screenshot samples",
         "ResourceFailed" => "Some website resources failed to load",
+        "EmbeddedContentBlocked" => {
+            "Embedded frames were blocked; their content is not included in this screenshot"
+        }
         "ReplacementGeometryChanged" => {
-            "Image replacement changed measured element rectangles; source-dependent behavior is unsupported"
+            "Replacing images changed the page layout; this screenshot may not be reliable"
         }
         "ReplacementGeometryNotMeasured" => {
-            "Element budget exceeded; replacement geometry was not measured"
+            "The page has too many elements to check whether replacing images changed its layout"
         }
         "ReplacementSourceDependent" => {
-            "Source-attribute CSS or unreadable stylesheets detected; replacement support is not assured"
+            "Some website styles could not be checked or depend on the original images; image replacement may be unreliable"
         }
         "ReplacementUnsupportedMedia" => {
             "Some media/backgrounds cannot be replaced; preview the retained content"
@@ -93,10 +99,10 @@ fn analysis_trigger_label(trigger: &regressee_app::analysis_engine::Trigger) -> 
 fn analysis_gate_label(gate: &regressee_app::analysis_engine::GateReason) -> &'static str {
     use regressee_app::analysis_engine::GateReason;
     match gate {
-        GateReason::UnexpectedWidth => "width changed — check capture profile",
+        GateReason::UnexpectedWidth => "screenshot width changed — check the screen size settings",
         GateReason::DeviceScaleMismatch => "pixel scale differs",
         GateReason::MaterialProfileMismatch => "capture settings/image mode do not match",
-        GateReason::AllMasked => "no eligible pixels — all content ignored",
+        GateReason::AllMasked => "all content is ignored — remove or reduce an ignored area",
         GateReason::NonOpaquePixels => "transparent pixels unsupported for ordinary comparison",
     }
 }
@@ -105,7 +111,7 @@ fn analysis_warning_label(warning: &regressee_app::analysis_engine::Warning) -> 
     match warning {
         Warning::LargeIgnoredCoverage => "large ignored area — not whole-page coverage",
         Warning::RenderingEnvironmentMismatch => {
-            "computer/fonts/rendering differs — inspection only"
+            "computer, fonts or browser settings differ — review the screenshots manually"
         }
     }
 }
@@ -193,6 +199,7 @@ struct Shell {
     result_filter: usize,
     group_profiles: bool,
     selected_page: Option<regressee_core::domain::PageId>,
+    preview_list_scroll: gpui::UniformListScrollHandle,
     selected_key: Option<TargetKey>,
     origins_confirmed: bool,
     approved_origins: std::collections::BTreeSet<String>,
@@ -229,6 +236,7 @@ struct Shell {
     mask_rectangles: Vec<regressee_app::analysis_engine::Rectangle>,
     review_drafts: review_ux::ReviewDrafts,
     capture_details_open: bool,
+    image_controls_open: bool,
     capture_diagnostics_open: bool,
     review_note_open: bool,
     mask_selected: Option<usize>,
@@ -293,7 +301,7 @@ impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
             root_focus: cx.focus_handle(),
-            handles: (0..(634 + regressee_app::task::MAX_TASK_LINKS))
+            handles: (0..(640 + regressee_app::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -364,6 +372,7 @@ impl Shell {
             result_filter: 0,
             group_profiles: false,
             selected_page: None,
+            preview_list_scroll: gpui::UniformListScrollHandle::new(),
             selected_key: None,
             origins_confirmed: false,
             approved_origins: std::collections::BTreeSet::new(),
@@ -410,6 +419,7 @@ impl Shell {
             mask_rectangles: vec![],
             review_drafts: Default::default(),
             capture_details_open: false,
+            image_controls_open: false,
             capture_diagnostics_open: false,
             review_note_open: false,
             mask_selected: None,
@@ -476,6 +486,15 @@ impl Shell {
                 this.choose_viewer_zoom(*choice, cx);
             }
         })
+        .detach();
+        cx.subscribe(
+            &shell.zoom_select,
+            |this, _, _: &zoom_select::ImageControlsRequested, cx| {
+                if this.control_enabled(Control::Guided(46), cx) && !this.mask_draw {
+                    this.open_image_controls(cx);
+                }
+            },
+        )
         .detach();
         shell.form_anchors = (0..21)
             .map(|_| gpui::ScrollAnchor::for_handle(shell.screen_scroll.clone()))
@@ -632,6 +651,11 @@ impl Shell {
                     self.invalidate_approval();
                     self.error = Some(error);
                 }
+                Reply::ActionRequired(problem) => {
+                    self.viewer_read_failed = true;
+                    self.invalidate_approval();
+                    self.error = Some(problem.message().into());
+                }
                 Reply::Failure(error) => {
                     self.viewer_read_failed = true;
                     self.invalidate_approval();
@@ -652,6 +676,7 @@ impl Shell {
                 match update.reply {
                     Reply::ProjectStorage(storage) => self.project_storage = Some(storage),
                     Reply::ProductFailure(error) => self.error = Some(error),
+                    Reply::ActionRequired(problem) => self.error = Some(problem.message().into()),
                     Reply::Failure(error) => self.error = Some(error.message().into()),
                     _ => (),
                 }
@@ -694,6 +719,11 @@ impl Shell {
                     if !cancelled && !self.mask_dirty && self.analysis_due.is_none() =>
                 {
                     self.error = Some(error)
+                }
+                Reply::ActionRequired(problem)
+                    if !cancelled && !self.mask_dirty && self.analysis_due.is_none() =>
+                {
+                    self.error = Some(problem.message().into())
                 }
                 _ => (),
             }
@@ -786,7 +816,7 @@ impl Shell {
                     self.project = Some(*record);
                     self.refresh_setup_origins(cx);
                     self.focus.project_saved = true;
-                    self.notice = Some("Submitted settings saved. Newer edits are kept; save them before continuing or visiting the website.".into());
+                    self.notice = Some("Settings saved. You made more edits while saving; save those before continuing or visiting the website.".into());
                     self.refresh_visible(cx);
                     cx.notify();
                     return;
@@ -841,7 +871,7 @@ impl Shell {
                     )
                 });
                 self.notice = (!selecting_project).then(|| {
-                    if saved_baseline { "Baseline saved explicitly. Future checks revisit this fixed inventory; earlier versions remain in History.".into() } else { "Settings saved locally. Review and History use the selected project.".into() }
+                    if saved_baseline { "Baseline saved. Future checks will compare against these screenshots using the same page list. Earlier versions are available in History.".into() } else { "Settings saved on this computer.".into() }
                 });
                 if saved_baseline {
                     self.focus.review_surface = ReviewSurface::Changes;
@@ -852,7 +882,15 @@ impl Shell {
                 self.origins_confirmed = true;
                 self.approved_origins = record.project.sources.iter().map(crawl::origin).collect();
                 self.refresh_setup_origins(cx);
-                self.preview = None;
+                // Preserve discovery choices across same-project settings saves.
+                // Capture still validates the preview's frozen settings/revision.
+                if self
+                    .preview
+                    .as_ref()
+                    .is_some_and(|p| p.settings.id != record.project.id)
+                {
+                    self.preview = None;
+                }
                 self.project = Some(*record);
                 if setup_save.is_none() {
                     self.environment_draft = None;
@@ -864,7 +902,7 @@ impl Shell {
                 self.focus.candidate = false;
                 self.focus.baseline = false;
                 self.focus.viewer = false;
-                self.focus.preview = false;
+                self.focus.preview = self.preview.is_some();
                 self.focus.resumable = false;
                 self.evidence_dirty = true;
                 self.evidence = ProjectEvidence::default();
@@ -892,6 +930,11 @@ impl Shell {
                     }
                     if save.discover {
                         self.guided(13, cx);
+                        if let Some(task) = self.task.as_mut()
+                            && task.spec.kind == regressee_app::task::Kind::Discovery
+                        {
+                            task.settings_saved_before_task = true;
+                        }
                     }
                 }
             }
@@ -907,7 +950,7 @@ impl Shell {
             Reply::ImportPreview(preview) => self.import_preview = Some(*preview),
             Reply::Exported => {
                 self.export_preview = None;
-                self.notice=Some("Selected baseline ZIP saved. Raw screenshots are not redacted; share it only with an authorized recipient.".into());
+                self.notice=Some("Baseline ZIP saved. Screenshots may show private information, including ignored areas. Share only with someone allowed to see it.".into());
             }
             Reply::History { history } => {
                 let baseline = self
@@ -960,13 +1003,13 @@ impl Shell {
                 if let Some(p) = &self.project {
                     self.queue(Work::Load(p.project.id), cx);
                 }
-                self.notice=Some("Confirmed history deletion completed. Shared and baseline-referenced originals were protected.".into());
+                self.notice=Some("History record deleted. Screenshots used by other records or saved baselines were kept.".into());
             }
             Reply::RepairPreview(preview) => self.repair_preview = Some(*preview),
             Reply::CleanedTemporaries => {
                 self.repair_preview = None;
                 self.summary = None;
-                self.notice=Some("Confirmed cleanup completed. Only the explicitly selected temporary or unreferenced-object category was removed; referenced evidence was protected.".into());
+                self.notice=Some("Cleanup complete. Only the files you chose to remove were deleted. Files used by saved records were kept.".into());
             }
             Reply::Storage(summary) => {
                 self.summary = Some(summary);
@@ -991,6 +1034,36 @@ impl Shell {
                     self.queue(Work::Evidence(project.project.id), cx);
                 }
                 self.error = Some(error);
+            }
+            Reply::ActionRequired(problem) => {
+                if failed_operation
+                    && self.focus.screen == Screen::Results
+                    && let Some(project) = &self.project
+                {
+                    self.evidence_dirty = true;
+                    self.queue(Work::Evidence(project.project.id), cx);
+                }
+                if let regressee_app::recovery::Problem::Browser(state) = problem {
+                    // A pre-task observation must not replace the newer failure.
+                    self.runtime_pending = None;
+                    self.runtime_readiness = Some(regressee_app::product::RuntimeReadiness {
+                        status: state,
+                        setup_available: matches!(
+                            state,
+                            regressee_app::product::RuntimeState::NotInstalled
+                                | regressee_app::product::RuntimeState::UpdateRequired
+                                | regressee_app::product::RuntimeState::RepairRequired
+                        ),
+                        message: problem.message(),
+                        identity: None,
+                        scope: self
+                            .runtime_readiness
+                            .as_ref()
+                            .and_then(|status| status.scope),
+                    });
+                    self.runtime_status = Some(problem.message().into());
+                }
+                self.error = Some(problem.message().into());
             }
             Reply::Cancelled => {
                 self.notice = Some("The task stopped. Already saved work is kept.".into());
@@ -1026,7 +1099,7 @@ impl Shell {
                 }
                 self.network_status = Some(message);
                 if !unchanged {
-                    self.notice = Some("Saved network settings were read. Your newer draft was kept; Save explicitly to apply it.".into());
+                    self.notice = Some("Network settings loaded. Your newer edits were kept; choose Save to apply them.".into());
                 }
             }
             Reply::Environment(status) => {
@@ -1116,16 +1189,20 @@ impl Shell {
                 if self.mask_dirty {
                     self.invalidate_approval();
                     self.evidence_dirty = false;
-                    self.notice = Some("New evidence is available. Save ignored areas before refreshing; your inspected evidence is kept.".into());
+                    self.notice = Some("New results are available. Save ignored areas before refreshing. The screenshots you are viewing are kept.".into());
                     self.refresh_visible(cx);
                     cx.notify();
                     return;
                 }
-                if !e
-                    .latest
-                    .as_ref()
-                    .is_some_and(|r| r.run.intent == RunIntent::RepresentativePreview)
-                {
+                // Discovery is an unsaved capture plan, not saved evidence.
+                // Initial/refresh reads may be empty or describe an older run;
+                // only a full capture of this exact inventory consumes the plan.
+                if self.preview.as_ref().is_some_and(|preview| {
+                    e.latest.as_ref().is_some_and(|r| {
+                        r.run.intent != RunIntent::RepresentativePreview
+                            && r.run.inventory.id == preview.inventory.id
+                    })
+                }) {
                     self.preview = None;
                     self.focus.preview = false;
                 }
@@ -1190,7 +1267,7 @@ impl Shell {
                         && !self.capture_is_saved_baseline()
                 });
                 self.focus.baseline = self.evidence.baseline.is_some();
-                if self.focus.candidate && !compatible {
+                if self.focus.candidate && !compatible && self.preview.is_none() {
                     self.focus.review_surface = ReviewSurface::Inspect;
                     self.presentation_focus = Some(Control::SaveBaseline);
                 } else if self.focus.review_surface == ReviewSurface::Capture
@@ -1253,7 +1330,7 @@ impl Shell {
                     self.notice = None;
                 } else {
                     self.notice = Some(
-                        "Review saved for this analysis revision; older decisions are retained."
+                        "Review decision saved for this comparison result. Earlier decisions are kept."
                             .into(),
                     );
                 }
@@ -1261,7 +1338,7 @@ impl Shell {
             Reply::SavedMask => {
                 self.mask_dirty = false;
                 self.schedule_analysis(cx);
-                self.notice = Some("Ignored rectangles saved as a new pair-bound revision. Originals are unchanged.".into());
+                self.notice = Some("Ignored areas saved for these before-and-after screenshots. Original images are unchanged.".into());
             }
             Reply::Discovery(p) => {
                 self.discovery_preview_visible = false;
@@ -1273,6 +1350,8 @@ impl Shell {
                 self.crawl_fields[9].update(cx, |input, cx| input.set_value("", cx));
                 self.local_index.borrow_mut().preview = None;
                 self.selected_page = self.preview_page_ids().first().copied();
+                self.preview_list_scroll
+                    .scroll_to_item(0, gpui::ScrollStrategy::Top);
                 self.focus.screen = Screen::Results;
                 self.focus.review_surface = ReviewSurface::Pages;
                 self.presentation_focus = Some(Control::CaptureBaseline);
@@ -1360,6 +1439,7 @@ impl Shell {
         }
     }
     fn clear_viewer(&mut self) {
+        self.image_controls_open = false;
         if let Some(frame) = self.viewer.take() {
             self.retired_images
                 .extend(frame.panes.into_iter().flatten());
@@ -1552,7 +1632,7 @@ impl Shell {
                             self.error = None;
                         }
                     }
-                    Err(error) => {
+                    Err(_error) => {
                         if let Some((_, c)) = &self.analysis_pending {
                             c.store(true, std::sync::atomic::Ordering::Release);
                         }
@@ -1570,7 +1650,7 @@ impl Shell {
                                 .all(|input| input.read(cx).validation_error().is_none())
                         {
                             for i in [3, 4, 5, 6] {
-                                self.analysis_fields[i].update(cx, |input, _| input.correction = Some(format!("Check related thresholds: {error}. Pixel counts must fit the local window; stride must cover it in at most four steps.")));
+                                self.analysis_fields[i].update(cx, |input, _| input.correction = Some("Check the small-area settings. Pixel counts must fit inside the area. Spacing must be between one quarter of the area size (rounded up) and the full area size.".into()));
                             }
                         }
                     }
@@ -2083,20 +2163,6 @@ impl Shell {
                     self.history_index = rows[next];
                 }
             }
-            42 => {
-                if let (Some(p), Some(b)) = (
-                    &self.project,
-                    self.evidence.baselines.get(self.history_index),
-                ) {
-                    self.queue(
-                        Work::Restore {
-                            baseline: b.id,
-                            revision: p.revision,
-                        },
-                        cx,
-                    );
-                }
-            }
             _ => (),
         }
         cx.notify();
@@ -2200,8 +2266,8 @@ impl Shell {
         cx.notify();
     }
     fn diagnostic_panel(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut panel=controls::section("Private diagnostics", "Preview a small diagnostic report before saving it. No screenshots, website addresses, project names or login secrets are included. Nothing is uploaded.")
-            .child(self.button(Control::Phase7(0),"Preview diagnostic contents",ActionStyle::Secondary,cx));
+        let mut panel=controls::section("Support report", "Preview app and browser information before saving a report for troubleshooting. Screenshots, website addresses, project names and login details are excluded. Nothing is uploaded.")
+            .child(self.button(Control::Phase7(0),"Preview support report",ActionStyle::Secondary,cx));
         if let Some(report) = &self.diagnostic_preview {
             panel =
                 panel
@@ -2218,13 +2284,13 @@ impl Shell {
                             .gap_3()
                             .child(self.button(
                                 Control::Phase7(1),
-                                "I reviewed this — export locally…",
+                                "Export report…",
                                 ActionStyle::Primary,
                                 cx,
                             ))
                             .child(self.button(
                                 Control::Phase7(2),
-                                "Cancel diagnostic export",
+                                "Cancel",
                                 ActionStyle::Secondary,
                                 cx,
                             )),
@@ -2370,11 +2436,6 @@ impl Shell {
                     );
                 }
             }
-            6 => {
-                if let Some(preview) = self.deletion_preview.clone() {
-                    self.queue(Work::Delete(Box::new(preview)), cx);
-                }
-            }
             7 => {
                 self.clear_portability_previews();
             }
@@ -2414,16 +2475,6 @@ impl Shell {
                 }
             }
             13 => self.queue(Work::RepairPreview, cx),
-            14 => {
-                if let Some(preview) = self.repair_preview.clone() {
-                    self.queue(Work::CleanupTemporaries(Box::new(preview)), cx);
-                }
-            }
-            15 => {
-                if let Some(preview) = self.repair_preview.clone() {
-                    self.queue(Work::DeleteUnreferenced(Box::new(preview)), cx);
-                }
-            }
             16..=18 => {
                 self.history_selection_epoch = self.history_selection_epoch.wrapping_add(1);
                 self.history_section = index - 16;
@@ -2444,17 +2495,17 @@ impl Shell {
             .max_w(px(680.));
         if let Some(p) = &self.export_preview {
             body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Share this baseline as a ZIP?"))
-                .child(div().debug_selector(|| "export-privacy-consequences".into()).child("The ZIP contains original screenshots and project settings, never login sessions or cookies. Ignored rectangles are NOT redaction: recipients can see the original pixels. Recipients must establish their own login."))
-                .child(format!("{} targets · {} original PNGs · {} · {} source capture dates · {} ignored-region configurations. Selected/inherited originals only; no unrelated history or database.",p.targets,p.originals,human_bytes(p.bytes),p.sources,p.masks))
+                .child(div().debug_selector(|| "export-privacy-consequences".into()).child("The ZIP contains original screenshots and project settings, but no login sessions or cookies. Ignored areas are still visible in the images. Recipients must log in themselves to check private pages."))
+                .child(format!("{} · {} · {} · {} · {}. Only images used by this baseline are included; unrelated history and the database are not.",workflow::count_label(p.targets,"page and screen-size combination","page and screen-size combinations"),workflow::count_label(p.originals,"original PNG","original PNGs"),human_bytes(p.bytes),workflow::count_label(p.sources,"source capture date","source capture dates"),workflow::count_label(p.masks,"set of ignored areas","sets of ignored areas")))
                 .child(div().text_color(rgb(WARNING)).child(p.privacy.clone()))
                 .child(self.button(Control::Phase6(3),"I understand — export ZIP…",ActionStyle::Primary,cx));
         }
         if let Some(p) = &self.import_preview {
-            body=body.child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Import “{}” as a NEW local project",p.name)))
-                .child("Your existing projects and baseline stay unchanged. No website is visited. Establish your own login before checking a private website; imported ignored rectangles require revalidation.")
-                .child(format!("Validated {} targets · {} original PNGs · {} · {} ignored-region configurations. Name collisions get a separate safe name. Masks require revalidation for your capture pair.",p.targets,p.originals,human_bytes(p.bytes),p.masks))
+            body=body.child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Import “{}” as a new project?",p.name)))
+                .child("Existing projects and baselines stay unchanged. No website is visited. Log in yourself before checking private pages, and check that imported ignored areas fit your screenshots.")
+                .child(format!("{} · {} · {} · {}. If the project name is already used, the import gets a different name.",workflow::count_label(p.targets,"page and screen-size combination","page and screen-size combinations"),workflow::count_label(p.originals,"original PNG","original PNGs"),human_bytes(p.bytes),workflow::count_label(p.masks,"set of ignored areas","sets of ignored areas")))
                 .child(div().text_color(rgb(WARNING)).child(p.warning.clone()))
-                .child(self.button(Control::Phase6(1),"Confirm import — no website visits",ActionStyle::Primary,cx));
+                .child(self.button(Control::Phase6(1),"Import as new project",ActionStyle::Primary,cx));
         }
         if let Some(p) = &self.deletion_preview {
             let identity = match p.item {
@@ -2487,15 +2538,15 @@ impl Shell {
                     .unwrap_or_else(|| "selected baseline version".into()),
             };
             body=body.child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Permanently delete {identity}?")))
-                .child(div().debug_selector(|| "deletion-consequences".into()).child(format!("{} analyses and {} unshared objects will be removed, freeing {}. {} of shared data stay protected. This cannot be undone; active and retained baseline source references are protected.",p.analyses,p.objects,human_bytes(p.bytes),human_bytes(p.shared_bytes))))
-                .child(self.button(Control::Phase6(6),"Confirm permanent deletion",ActionStyle::Danger,cx));
+                .child(div().debug_selector(|| "deletion-consequences".into()).child(format!("{} and {} used only by this record will be removed, freeing {}. {} of shared files will be kept. This cannot be undone. Files needed by current or earlier saved baselines will not be deleted.",workflow::count_label(p.analyses,"analysis","analyses"),workflow::count_label(p.objects,"file","files"),human_bytes(p.bytes),human_bytes(p.shared_bytes))))
+                .child(self.button(Control::Phase6(6),"Delete permanently…",ActionStyle::Danger,cx));
         }
         if let Some(p) = &self.repair_preview {
-            body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Interrupted writes and integrity"))
-                .child(format!("{} temporary files and {} dead-owner interrupted imports ({}) may be discarded. {} valid complete unreferenced objects are retained, NOT treated as failed captures. {} missing/corrupt objects require recovery; they cannot establish a valid active baseline.",p.temporaries.len(),p.interrupted_imports.len(),human_bytes(p.temporary_bytes),p.valid_unreferenced.len(),p.missing_or_corrupt.len()))
-                .child(self.button(Control::Phase6(14),"Discard interrupted temporary files",ActionStyle::Danger,cx))
-                .child(div().text_color(rgb(WARNING)).child("Complete unreferenced objects can be valid recovery originals, not junk. Retain them unless you explicitly want to delete this recovery evidence. This separate action does NOT delete retained/shared/active-baseline evidence."))
-                .child(self.button(Control::Phase6(15),"Permanently delete recovery originals",ActionStyle::Danger,cx));
+            body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Interrupted saves and damaged files"))
+                .child(format!("{} and {} that are no longer running ({}) can be removed. {} not used by saved records will be kept for possible recovery. Recovery is needed for {} before use in a baseline.",workflow::count_label(p.temporaries.len(),"temporary file","temporary files"),workflow::count_label(p.interrupted_imports.len(),"interrupted import","interrupted imports"),human_bytes(p.temporary_bytes),workflow::count_label(p.valid_unreferenced.len(),"complete file","complete files"),workflow::count_label(p.missing_or_corrupt.len(),"missing or damaged file","missing or damaged files")))
+                .child(self.button(Control::Phase6(14),"Discard interrupted temporary files…",ActionStyle::Danger,cx))
+                .child(div().text_color(rgb(WARNING)).child("Complete files not used by saved records may still contain recoverable screenshots. Keep them unless you no longer need recovery. Deleting them does not remove files used by saved baselines or other records."))
+                .child(self.button(Control::Phase6(15),"Permanently delete recovery originals…",ActionStyle::Danger,cx));
         }
         if self.export_preview.is_some()
             || self.import_preview.is_some()
@@ -2642,6 +2693,8 @@ impl Shell {
             Control::CloseOptions => 618,
             Control::DiscoveryDetails => 619,
             Control::CloseMappingPreview => 620,
+            Control::DiscardPageList => 634 + regressee_app::task::MAX_TASK_LINKS,
+            Control::ImageControls => 635 + regressee_app::task::MAX_TASK_LINKS,
             Control::TaskLink(index) => 626 + index,
         };
         self.handles[index].clone()
@@ -2967,6 +3020,7 @@ impl Shell {
             self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
         }
         self.focus.screen = screen;
+        self.image_controls_open = false;
         self.presentation_focus = None;
         if screen == Screen::Setup {
             self.focus.setup_stage = if self.project.is_some() {
@@ -2993,7 +3047,7 @@ impl Shell {
         {
             return;
         }
-        if self.project.is_some() && self.unsaved(cx) {
+        if self.project.is_some() && (self.unsaved(cx) || self.preview.is_some()) {
             self.confirm_switch(Control::NewProject, window, cx);
             return;
         }
@@ -3072,7 +3126,7 @@ impl Shell {
             return;
         }
         if self.mask_dirty {
-            self.error = Some("Save ignored areas before saving project settings. Your rectangles belong to the inspected evidence and are kept.".into());
+            self.error = Some("Save ignored areas before saving project settings. Your draft areas are kept with the screenshots you are viewing.".into());
             cx.notify();
             return;
         }
@@ -3121,7 +3175,7 @@ impl Shell {
                 .collect::<std::collections::BTreeSet<_>>();
             anyhow::ensure!(
                 origins.is_subset(&self.approved_origins) || origins.len() == 1,
-                "Confirm every listed website before saving multiple origins"
+                "Choose Approve all listed websites before saving."
             );
             let mut draft = Project::draft(name.clone(), sources[0].as_str())?;
             draft.sources = sources;
@@ -3376,6 +3430,7 @@ impl Shell {
             self.result_filters_open = !self.result_filters_open;
             self.options_scroll.set_offset(gpui::point(px(0.), px(0.)));
             if self.result_filters_open {
+                self.image_controls_open = false;
                 self.capture_details_open = false;
                 self.review_note_open = false;
                 self.viewer_mode_open = false;
@@ -3389,6 +3444,7 @@ impl Shell {
         if index == 44 {
             self.review_tools = !self.review_tools;
             if self.review_tools {
+                self.image_controls_open = false;
                 self.review_details_scroll
                     .set_offset(gpui::point(px(0.), px(0.)));
                 self.capture_details_open = false;
@@ -3517,10 +3573,10 @@ impl Shell {
                             ..CaptureProfile::desktop()
                         });
                     }
-                    _ => {
-                        self.error =
-                            Some("Custom width must be 1–4096 and height 1–8192 CSS pixels.".into())
-                    }
+                    _ => self.error = Some(
+                        "Enter a width from 1 to 4,096 pixels and a height from 1 to 8,192 pixels."
+                            .into(),
+                    ),
                 }
             }
             13 => {
@@ -3571,13 +3627,9 @@ impl Shell {
                 }
             }
             16 => {
-                if self.preview.is_some() {
-                    self.preview = None;
-                    self.focus.preview = false;
-                    self.result_filters_open = false;
-                    self.discovery_details_open = false;
-                    self.notice = Some("Preview dismissed; the baseline is unchanged.".into());
-                } else if let Some(p) = &self.project {
+                if self.preview.is_none()
+                    && let Some(p) = &self.project
+                {
                     self.queue(Work::ExistingInventory(p.project.id), cx);
                 }
             }
@@ -3604,18 +3656,24 @@ impl Shell {
                             }
                         }
                     }
-                    preview.inventory.coverage=regressee_core::domain::DiscoveryCoverage::Limited{reason:"Selection is user-bounded. Excluded pages are not captured or verified.".into()};
+                    preview.inventory.coverage =
+                        regressee_core::domain::DiscoveryCoverage::Limited {
+                            reason:
+                                "Some pages were excluded from capture and will not be checked."
+                                    .into(),
+                        };
                 }
             }
             23 | 24 => {
-                if self.preview.is_some() {
-                    let visible = self.preview_page_ids();
+                if self.page_list_workspace() {
+                    let visible = self.page_list_page_ids();
                     if let Some(next) = local_ux::adjacent_visible(
                         &visible,
                         self.selected_page.as_ref(),
                         index == 23,
-                    ) {
-                        self.selected_page = visible.get(next).copied();
+                    ) && let Some(id) = visible.get(next)
+                    {
+                        self.select_page_list_page(*id);
                     }
                 } else if let Some(r) = &self.evidence.latest {
                     let indices = self.result_indices();
@@ -3633,7 +3691,7 @@ impl Shell {
                     };
                     if let Some(i) = indices.get(next) {
                         if self.mask_dirty || self.mask_geometry_dirty(cx) {
-                            self.error=Some("Save ignored areas before changing targets; unsaved rectangles belong to this exact page/profile.".into());
+                            self.error=Some("Save ignored areas before choosing another screenshot. Your edits apply only to this page and screen size.".into());
                             cx.notify();
                             return;
                         }
@@ -3709,9 +3767,9 @@ impl Shell {
             }
             29 => self.login_ephemeral = !self.login_ephemeral,
             30 => self.save_settings(cx),
-            31..=36 => {
+            31..=33 | 35 | 36 => {
                 if matches!(index, 31 | 32 | 36) && self.environment_unsaved(cx) {
-                    self.error=Some("Save settings before login or probing. These actions use the saved environment, not draft fields.".into());
+                    self.error=Some("Save settings before logging in or checking access. These actions use saved settings, not your unsaved edits.".into());
                     cx.notify();
                     return;
                 }
@@ -3726,7 +3784,6 @@ impl Shell {
                         31 => Work::OpenLogin(id),
                         32 => Work::ConfirmLogin(id),
                         33 => Work::CloseLogin(id),
-                        34 => Work::ForgetLogin(id),
                         35 => Work::EnvironmentStatus(id),
                         _ => Work::ProbeEnvironment(id),
                     };
@@ -3744,7 +3801,7 @@ impl Shell {
                 for i in [13, 14] {
                     self.crawl_fields[i].update(cx, |input, cx| {
                         input.touched = true;
-                        input.correction = input.content.trim().is_empty().then(|| "Enter a complete http(s) origin or section base to add this mapping.".into());
+                        input.correction = input.content.trim().is_empty().then(|| "Enter a complete website or section address, such as https://example.com/app, to add this mapping.".into());
                         cx.notify();
                     });
                 }
@@ -3803,7 +3860,7 @@ impl Shell {
                 }
             }
             40 => {
-                self.notice=Some("Read-only accounts are strongly recommended: GET page visits can change server data. Logout/delete/action links are excluded by default. Login may use explicitly approved identity providers, but crawl/capture scope never expands. Basic Auth, device-bound and rotating sessions are not universally supported. Full page does not expose virtualized rows or nested scroll contents. VPN uses your existing OS network; managed-network qualification is pending.".into());
+                self.notice=Some("Use a read-only account: even opening a page can change website data. Links that log out, delete or perform other actions are skipped by default. You can approve a separate login website without allowing its pages to be captured. Some login methods and company networks are not fully supported. Full-page capture does not expand lists that load as you scroll or separately scrolling panels. VPN connections use your computer's network settings.".into());
             }
             41 => {
                 if self.network_status.is_none() {
@@ -3852,7 +3909,7 @@ impl Shell {
                         regressee_core::domain::ImageMode::Normal
                     };
                 }
-                self.notice=Some("Image mode applies only to future baseline capture. Existing checks always use their baseline's immutable mode. Save settings and preview a representative page first.".into());
+                self.notice=Some("Image settings apply to future baseline captures. Checks keep the image settings used by their baseline. Save settings, then preview a page before capturing.".into());
             }
             _ => (),
         }
@@ -4047,7 +4104,7 @@ impl Shell {
             .when(!self.form_errors(cx).is_empty(), |body| body.child(self.form_error_summary(cx)))
             .when(website, |body| body.child(controls::section("Website", "Saving settings does not visit your website.")
                  .child(self.measured_form_field(Control::Name, controls::field("Project name","Choose a recognizable name.",self.name.clone().into_any_element())).id("form-project-name").anchor_scroll(self.form_anchor(Control::Name)))
-                 .child(self.measured_form_field(Control::Address, controls::field("Starting addresses","Use complete http(s) addresses separated by spaces. Visits stay within the listed websites; subdomains are not added.",self.address.clone().into_any_element())).id("form-starting-addresses").anchor_scroll(self.form_anchor(Control::Address)))
+                 .child(self.measured_form_field(Control::Address, controls::field("Starting addresses","Use complete addresses starting with https:// or http://, separated by spaces. Only the listed websites are visited; subdomains must be added separately.",self.address.clone().into_any_element())).id("form-starting-addresses").anchor_scroll(self.form_anchor(Control::Address)))
                 .when(self.setup_origin_count > 1, |section| section
                     .child(self.check_button(Control::Guided(11), "Approve all listed websites", approved, cx))
                     .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Approve these distinct websites before saving. Changing the websites requires approval again.")))));
@@ -4065,7 +4122,7 @@ impl Shell {
         .child(self.choice_button(
             Control::Choice(Choice::AddressesAndLinks),
             "Find linked pages",
-            "Follow rendered links within these websites, up to your page limit.",
+            "Follow links visible on these websites, up to your page limit.",
             d.mode == DiscoveryMode::AddressesAndLinks,
             cx,
         ))
@@ -4098,18 +4155,18 @@ impl Shell {
             .first()
             .is_none_or(|p| p.image_mode == regressee_core::domain::ImageMode::Normal);
         if pages {
-            body=body.child(controls::section("Capture plan & screen sizes", "Mobile and tablet emulate websites in Chromium, not real devices.")
+            body=body.child(controls::section("Capture plan & screen sizes", "Mobile and tablet simulate websites, not real devices.")
             .child(div().debug_selector(|| "setup-capture-plan".into()).w_full().min_w_0().flex().flex_col().gap_1().text_size(px(13.)).text_color(rgb(MUTED))
                 .children(self.draft_settings.profiles.iter().map(|p| div().w_full().child(format!("{} · {} × {}", p.name, p.width, p.height))))
-                .child(div().w_full().child(format!("{} · {}", if full_page { "Full page" } else { "Visible screen" }, if original_images { "original images" } else { "photos & bitmap images replaced" })))
+                 .child(div().w_full().child(format!("{} · {}", if full_page { "Full page" } else { "Visible screen" }, if original_images { "original images" } else { "photos replaced" })))
                 .child(div().w_full().child(format!("{} · up to {} pages · {} speed", if d.mode == DiscoveryMode::OnlyAddresses { "Starting addresses only" } else { "Find linked pages" }, self.crawl_fields[0].read(cx).content, match d.speed { Speed::Gentle => "Gentle", Speed::Balanced => "Balanced", Speed::Fast => "Fast" }))))
             .child(profiles)
-            .child(self.choice_button(Control::Choice(Choice::FullPage), "Full page", "Include the page below the fold, within capture limits.", full_page, cx))
-            .child(self.choice_button(Control::Choice(Choice::VisibleScreen), "Visible screen only", "Capture one viewport without scrolling.", !full_page, cx)))
+            .child(self.choice_button(Control::Choice(Choice::FullPage), "Full page", "Include content below the visible screen, within capture limits.", full_page, cx))
+            .child(self.choice_button(Control::Choice(Choice::VisibleScreen), "Visible screen only", "Capture what fits on the screen without scrolling.", !full_page, cx)))
             .child(page_boundaries)
             .child(controls::section("Images", "Choose before capturing a baseline. Later checks keep the baseline's image mode.")
                 .child(self.choice_button(Control::Choice(Choice::OriginalImages), "Keep original images", "Compare the website as it appears.", original_images, cx))
-                 .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace photos & bitmap images", "Use neutral replacements to reduce changing-photo noise. Bitmap logos may also be replaced.", !original_images, cx)))
+                   .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace photos", "Use neutral placeholders so changing photos cause fewer differences. Some logos and other images may also be replaced.", !original_images, cx)))
             .child(self.guided_button(6,if self.focus.advanced{"Hide scope, speed & custom sizes"}else{"Scope, speed & custom sizes (optional)"},cx));
             if self.focus.advanced {
                 body=body.child(div().max_w(px(680.)).flex().flex_col().gap_4()
@@ -4120,18 +4177,18 @@ impl Shell {
                 .child(self.choice_button(Control::Choice(Choice::Balanced), "Balanced", "2 pages at a time, with 350 ms spacing.", d.speed == Speed::Balanced, cx))
                 .child(self.choice_button(Control::Choice(Choice::Fast), "Fast", "4 pages at a time, with no extra spacing.", d.speed == Speed::Fast, cx))
                 .child(self.check_button(Control::Guided(7), "Override robots.txt — I have permission to do this", !d.respect_robots, cx))
-                .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("robots.txt is respected unless you explicitly authorize an override. Robots rules are not permission. Rate limits can slow any preset.")))
-            .child(self.crawl_field(3,"Links away from starting addresses","Optional depth 0–100; blank means bounded only by page/candidate caps."))
-            .child(self.crawl_field(4,"Parallel active pages","Optional 1–8; blank uses the speed preset. Global browser operations remain bounded."))
-            .child(self.crawl_field(5,"Parallel pages per website","1–8, never exceeding the global limit."))
-            .child(self.crawl_field(6,"Retries for temporary failures","0–3. Timeouts, server errors and rate limits only; exponential backoff is bounded."))
+                 .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("robots.txt lists the pages a website asks automated tools not to visit. Regressee follows these rules unless you choose to override them. You still need permission to visit the website. The website may slow requests at any speed.")))
+            .child(self.crawl_field(3,"Links away from starting addresses","Optional: 0–100. Set how many links to follow from a starting page. Leave blank to use only the page-list limits."))
+             .child(self.crawl_field(4,"Pages at once","Optional: 1–8. Leave blank to use the speed preset."))
+             .child(self.crawl_field(5,"Pages at once per website","1–8, no more than Pages at once."))
+            .child(self.crawl_field(6,"Retries for temporary failures","0–3 extra attempts for timeouts, server errors or rate limits. Regressee waits between retries."))
             .child(self.check_button(Control::Guided(8), "Allow action-like links — I understand visits may change data", d.advanced.allow_action_links, cx))
             .child(self.check_button(Control::Guided(9), "Ignore known tracking parameters", d.advanced.strip_tracking, cx))
-            .child(self.check_button(Control::Guided(10), "Keep all explicit fragments (not just hash routes)", d.advanced.preserve_fragments, cx))
-            .child(self.crawl_field(7,"Custom width (CSS pixels)","1–4096; custom profiles use desktop Chromium emulation."))
-            .child(self.crawl_field(8,"Custom height (CSS pixels)","1–8192."))
+             .child(self.check_button(Control::Guided(10), "Treat all address endings after # as separate pages", d.advanced.preserve_fragments, cx))
+             .child(self.crawl_field(7,"Custom width (pixels)","1–4,096. Custom sizes use a simulated desktop browser."))
+             .child(self.crawl_field(8,"Custom height (pixels)","1–8,192."))
             .child(self.guided_button(12,"Add / replace Custom screen size",cx)).child(self.guided_button(25,"Remove Custom screen size",cx))
-             .child(div().debug_selector(|| "setup-image-limitations".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Image replacement supports decoded HTML raster/picture images and single recognized raster CSS backgrounds. Vector icons remain. Canvas, video, frames, shadow DOM, pseudo-elements, complex/extensionless backgrounds and source-selector/script behavior are unsupported. Readiness or geometry warnings prevent assurance. Hidden original photo content is not separately saved in replacement-only captures. Rendering dimensions, touch/mobile emulation, DPR 1 and runtime are frozen with the baseline.")));
+              .child(div().debug_selector(|| "setup-image-limitations".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Photo replacement works with ordinary image files and some simple background images. Vector icons stay unchanged. Videos, embedded pages, drawn graphics and more complex or script-controlled images may not be replaced. Review any loading or layout warnings. Replaced photos are not saved separately. Future checks use the baseline's screen sizes, device simulation, pixel scale and browser version.")));
             }
         }
         if self.project.is_some() && matches!(stage, SetupStage::Access | SetupStage::Settings) {
@@ -4149,7 +4206,7 @@ impl Shell {
                 cx,
             ));
             if self.details.contains(&Detail::Capture) {
-                body = body.child(div().debug_selector(|| "setup-capture-limitations".into()).text_size(px(14.)).text_color(rgb(MUTED)).child("Reduced motion, disabled animations, hidden caret and pointer-away capture are fixed. Font/image readiness, lazy loading and stability are bounded; tall/infinite pages fail rather than silently crop. Full page is limited to 32,768 pixels tall, 64 million pixels and 64 scroll steps, or the profile's lower limit. Virtualized rows and nested scroll areas are not expanded. Login may use approved identity providers without expanding crawl scope. Basic Auth, device-bound/rotating sessions, VPN and enterprise networks are not universally qualified."));
+                body = body.child(div().debug_selector(|| "setup-capture-limitations".into()).text_size(px(14.)).text_color(rgb(MUTED)).child("Regressee reduces motion, stops animations, hides the text cursor and moves the pointer away before capture. It waits a limited time for fonts, images and the page to finish loading. Pages that exceed capture limits fail rather than being silently cropped. Full-page capture allows up to 32,768 pixels in height, 64 million pixels and 64 scroll steps, or a lower limit set for the screen size. It does not expand lists that load as you scroll or separately scrolling panels. Approved login websites are not added to the capture list. Some password prompts, device-specific or frequently changing logins, VPNs and company networks are not fully tested."));
             }
         }
         body.when(stage != SetupStage::Access, |body| {
@@ -4176,9 +4233,9 @@ impl Shell {
             .child(self.choice_button(Control::Choice(Choice::LoginRequired), "Login required", "Log in yourself in the app's browser, then confirm you are ready.", login_required, cx))
             .when(self.focus.setup_stage == SetupStage::Settings, |body| body.child(controls::status(if self.unsaved(cx) { "Draft access — Save settings first. No browser opens when saving." } else if self.environment.is_none() { "Loading saved browser status. Your access choices are kept." } else if self.environment.as_ref().is_some_and(|e| e.login_open) { "Saved access · browser open. Finish login, then choose I'm ready." } else if self.access_can_continue(cx) { "Saved access · continue to pages & sizes." } else { "Saved access · open login browser, then choose I'm ready." }, Tone::Information)))
             .child(self.setup_runtime_note())
-            .when(login_fields, |body| body.child(self.crawl_field(10,"Login / consent page (optional)","Blank opens the representative page. Use a complete URL, without credentials."))
-            .child(self.crawl_field(11,"Representative page after login (optional)","Choose a real application page, not a login form. Blank uses the first mapped source. Replay is checked in a fresh isolated context."))
-            .child(self.crawl_field(12,"Approved identity-provider origins (optional)","Exact http(s) origins ending in /, separated by spaces. Approve only providers you trust. This does not expand crawl scope."))
+             .when(login_fields, |body| body.child(self.crawl_field(10,"Login / consent page (optional)","Leave blank to open the page used to check login. Use a complete website address without an embedded username or password."))
+             .child(self.crawl_field(11,"Page to check after login (optional)","Choose an application page, not the login form. Leave blank to use the first mapped starting address. Regressee opens a separate browser session to check that your saved login works."))
+             .child(self.crawl_field(12,"Approved login websites (optional)","For a separate sign-in service, enter its website address, such as https://login.example.com/, ending in /. Separate addresses with spaces. Only approve services you trust; their pages will not be captured."))
             .child(self.choice_button(Control::Choice(Choice::SaveLogin), "Remember login securely", "Use encrypted storage and your operating system's secure store.", !self.login_ephemeral, cx))
             .child(self.choice_button(Control::Choice(Choice::EphemeralLogin), "Only for this app session", "Forget the login when Regressee closes.", self.login_ephemeral, cx))
             .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("If secure storage is locked or unavailable, unlock it or choose Only for this app session. There is no plaintext fallback. Screenshots may still contain private website content.")))
@@ -4189,8 +4246,8 @@ impl Shell {
                 .child(self.guided_button(27,"Add staging environment",cx))
                 .when(self.environment_unsaved(cx), |el| el.child(controls::status("Unsaved environment edits — Save settings before choosing another environment.", Tone::Information)))
                 .child(div().font_weight(FontWeight::SEMIBOLD).mt_3().child("Production → staging mapping"))
-            .child(self.crawl_field(13,"Source origin or section base","For example https://production.example/app. No query or fragment in the base."))
-            .child(self.crawl_field(14,"Matching destination base","For example https://staging.example/preview. Relative paths, ordered query pairs and hash routes are preserved."))
+             .child(self.crawl_field(13,"Original website or section","For example https://production.example/app. Leave out address endings starting with ? or #."))
+             .child(self.crawl_field(14,"Matching website or section","For example https://staging.example/preview. The rest of each page address stays unchanged, including anything after ? or #."))
             .child(div().flex().flex_wrap().gap_2().child(self.guided_button(37,"Approve / replace this base mapping",cx)).child(self.guided_button(38,"Use same website for every mapping",cx))));
         if let Some(env) = draft.filter(|_| advanced) {
             body = body.children(env.mappings.iter().take(16).map(|m| {
@@ -4199,7 +4256,7 @@ impl Shell {
                     .child(format!("{} → {}", m.source, m.destination))
             }));
         }
-        body=body.when(advanced, |body| body.child(self.crawl_field(15,"Capture language / locale","For example en-US or nb-NO. Changing rendering settings requires a replacement baseline."))
+        body=body.when(advanced, |body| body.child(self.crawl_field(15,"Website language","Use a language code such as en-US for US English or nb-NO for Norwegian Bokmål. Changing this requires a new baseline."))
              .child(self.measured_form_field(Control::CrawlField(16),controls::field("Capture timezone", "Choose a timezone or search by region or city. Changes apply to future baseline captures.", self.timezone.clone().into_any_element())))
             .child(self.choice_button(Control::Choice(Choice::LightTheme), "Light website theme", "Capture the website's light color scheme.", self.draft_settings.profiles.first().is_none_or(|profile| !profile.dark), cx))
             .child(self.choice_button(Control::Choice(Choice::DarkTheme), "Dark website theme", "Capture the website's dark color scheme.", self.draft_settings.profiles.first().is_some_and(|profile| profile.dark), cx)))
@@ -4247,7 +4304,7 @@ impl Shell {
                             .child(self.guided_button(33, "Close login browser", cx))
                             .child(self.button(
                                 Control::Guided(34),
-                                "Forget login",
+                                "Forget login…",
                                 ActionStyle::Danger,
                                 cx,
                             )),
@@ -4263,7 +4320,7 @@ impl Shell {
                             .flex_wrap()
                             .gap_2()
                             .child(self.guided_button(35, "Preview mapped URLs", cx))
-                            .child(self.guided_button(36, "Probe representative pages", cx)),
+                            .child(self.guided_button(36, "Check access to sample pages", cx)),
                     )
                 },
             );
@@ -4293,18 +4350,32 @@ impl Shell {
         .into_any_element()
     }
     fn preview_page_ids(&self) -> Vec<regressee_core::domain::PageId> {
-        let Some(preview) = &self.preview else {
+        if self.preview.is_none() {
+            return vec![];
+        }
+        self.page_list_page_ids()
+    }
+    fn page_list_inventory(&self) -> Option<&regressee_core::domain::InventoryRevision> {
+        self.preview.as_ref().map(|p| &p.inventory).or_else(|| {
+            (self.focus.review_surface == ReviewSurface::Pages)
+                .then(|| self.evidence.latest.as_ref().map(|r| &r.run.inventory))
+                .flatten()
+        })
+    }
+    fn page_list_page_ids(&self) -> Vec<regressee_core::domain::PageId> {
+        let Some(inventory) = self.page_list_inventory() else {
             return vec![];
         };
         let mut cache = self.local_index.borrow_mut();
-        if cache.preview.as_ref().is_none_or(|(id, len, _)| {
-            *id != preview.inventory.id || *len != preview.inventory.pages.len()
-        }) {
+        if cache
+            .preview
+            .as_ref()
+            .is_none_or(|(id, len, _)| *id != inventory.id || *len != inventory.pages.len())
+        {
             cache.preview = Some((
-                preview.inventory.id,
-                preview.inventory.pages.len(),
-                preview
-                    .inventory
+                inventory.id,
+                inventory.pages.len(),
+                inventory
                     .pages
                     .iter()
                     .map(|p| (p.id, p.canonical.as_str().to_lowercase()))
@@ -4322,8 +4393,21 @@ impl Shell {
             .collect()
     }
     fn select_preview_page(&mut self, id: regressee_core::domain::PageId) {
-        if self.preview_page_ids().contains(&id) {
+        if self.preview.is_some() {
+            self.select_page_list_page(id);
+        }
+    }
+    fn select_page_list_page(&mut self, id: regressee_core::domain::PageId) {
+        if let Some(index) = self
+            .page_list_page_ids()
+            .iter()
+            .position(|page| *page == id)
+        {
             self.selected_page = Some(id);
+            self.result_filters_open = true;
+            self.options_scroll.set_offset(gpui::point(px(0.), px(0.)));
+            self.preview_list_scroll
+                .scroll_to_item(index, gpui::ScrollStrategy::Top);
         }
     }
     fn result_indices(&self) -> Vec<usize> {
@@ -4348,12 +4432,12 @@ impl Shell {
                             let control = Control::Choice(choice);
                             self.choice_button(
                                 control,
-                                ["All", "Changed", "Gaps", "No significant change"][index],
+                                ["All", "Changed", "Missing or not compared", "No significant change"][index],
                                 [
-                                    "Every screenshot target.",
+                                    "Every page and screen size selected for capture.",
                                     "Visual differences to review, not confirmed defects.",
-                                    "Missing captures or targets that could not be compared.",
-                                    "Comparable captures below the current change thresholds.",
+                                    "Missing screenshots or screenshots that could not be compared.",
+                                    "Differences below your sensitivity settings; screenshots may not be identical.",
                                 ][index],
                                 self.result_filter == index,
                                 cx,
@@ -4371,6 +4455,14 @@ impl Shell {
     }
     fn inventory_and_results(&self, cx: &mut Context<Self>) -> AnyElement {
         if self.preview.is_none() && self.evidence.latest.is_none() {
+            if self.page_list_workspace() {
+                return controls::empty(
+                    "No pages to review yet",
+                    "Choose Find pages to review this website’s page list, then capture and save a baseline. Finding pages does not save a baseline.",
+                )
+                .debug_selector(|| "pages-empty-state".into())
+                .into_any_element();
+            }
             return div().into_any_element();
         }
         let fixed_pages =
@@ -4407,10 +4499,14 @@ impl Shell {
                                 if self.evidence.comparison.is_some() {
                                     "Results"
                                 } else {
-                                    "Screenshots"
+                                    "Capture results"
                                 },
-                                ["All", "Changed", "Gaps", "No significant change"]
-                                    [self.result_filter]
+                                [
+                                    "All",
+                                    "Changed",
+                                    "Missing or not compared",
+                                    "No significant change"
+                                ][self.result_filter]
                             )
                         }),
                 )
@@ -4470,42 +4566,61 @@ impl Shell {
                         el.child(self.guided_button(17, "Clear", cx))
                     }),
             )
-            .when(!fixed_pages, |body| {
-                body.child(
-                    div()
-                        .flex_shrink_0()
-                        .flex()
-                        .flex_wrap()
-                        .gap_2()
-                        .child(self.button(
-                            Control::Guided(45),
-                            if self.preview.is_some() {
-                                "Page options"
+            .child(
+                div()
+                    .flex_shrink_0()
+                    .flex()
+                    .flex_wrap()
+                    .gap_2()
+                    .child(self.button(
+                        Control::Guided(45),
+                        if self.preview.is_some() {
+                            "Page options"
+                        } else if fixed_pages {
+                            "Page details"
+                        } else {
+                            "Filter"
+                        },
+                        ActionStyle::Choice {
+                            selected: self.result_filters_open,
+                        },
+                        cx,
+                    ))
+                    .when(!empty_results, |actions| {
+                        actions.child(self.guided_button(
+                            23,
+                            if self.page_list_workspace() {
+                                "Previous page"
+                            } else if self.narrow_workspace {
+                                "Prev"
                             } else {
-                                "Filter"
-                            },
-                            ActionStyle::Choice {
-                                selected: self.result_filters_open,
+                                "Previous"
                             },
                             cx,
                         ))
-                        .when(!empty_results, |actions| {
-                            actions.child(self.guided_button(
-                                23,
-                                if self.narrow_workspace {
-                                    "Prev"
-                                } else {
-                                    "Previous"
-                                },
-                                cx,
-                            ))
-                        })
-                        .when(!empty_results, |actions| {
-                            actions.child(self.guided_button(24, "Next", cx))
-                        }),
-                )
-            });
+                    })
+                    .when(!empty_results, |actions| {
+                        actions.child(self.guided_button(
+                            24,
+                            if self.page_list_workspace() {
+                                "Next page"
+                            } else {
+                                "Next"
+                            },
+                            cx,
+                        ))
+                    }),
+            );
         if let Some(p) = &self.preview {
+            body = body.child(
+                div()
+                    .debug_selector(|| "discovery-selection-help".into())
+                    .flex_shrink_0()
+                    .text_size(px(13.))
+                    .line_height(px(18.))
+                    .text_color(rgb(MUTED))
+                    .child("Select a page to view its details and include/exclude options."),
+            );
             body = body.child(
                 div()
                     .flex_shrink_0()
@@ -4533,7 +4648,7 @@ impl Shell {
                 .selected_page
                 .is_some_and(|selected| !rows.contains(&selected))
             {
-                body = body.child(div().id("selected-page-outside-search").debug_selector(|| "selected-page-outside-search".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Selected page is outside search. Previous / Next selects a match; inclusion is unchanged."));
+                body = body.child(div().id("selected-page-outside-search").debug_selector(|| "selected-page-outside-search".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Selected page is outside search. Select a matching page to view its options; inclusion is unchanged."));
             }
             if rows.is_empty() {
                 body = body.child(controls::empty(
@@ -4555,7 +4670,7 @@ impl Shell {
                                         }) else {
                                             return div().into_any_element();
                                         };
-                                        controls::page_row(
+                                        controls::discovery_row(
                                             SharedString::from(format!("candidate-{id}")),
                                             p.canonical.to_string(),
                                             if p.included {
@@ -4566,10 +4681,10 @@ impl Shell {
                                                     .unwrap_or_else(|| "Excluded".into())
                                             },
                                             Some(id) == this.selected_page,
-                                            this.pending.is_none(),
+                                            this.pending.is_none() && !this.native_prompt,
                                         )
                                         .on_click(cx.listener(move |this, _, _, cx| {
-                                            if this.pending.is_none() {
+                                            if this.pending.is_none() && !this.native_prompt {
                                                 this.select_preview_page(id);
                                                 cx.notify();
                                             }
@@ -4579,6 +4694,7 @@ impl Shell {
                                     .collect::<Vec<_>>()
                             }),
                         )
+                        .track_scroll(self.preview_list_scroll.clone())
                         .debug_selector(|| "inventory-preview".into())
                         .w_full()
                         .h_full()
@@ -4593,16 +4709,15 @@ impl Shell {
             }
         } else if fixed_pages {
             let run = self.evidence.latest.as_ref().unwrap();
-            let query = self.search.trim().to_lowercase();
-            let rows: Vec<_> = run
-                .run
-                .inventory
-                .pages
-                .iter()
-                .enumerate()
-                .filter(|(_, page)| page.canonical.as_str().to_lowercase().contains(&query))
-                .map(|(i, _)| i)
-                .collect();
+            let rows = self.page_list_page_ids();
+            body = body.child(
+                div()
+                    .flex_shrink_0()
+                    .text_size(px(13.))
+                    .line_height(px(18.))
+                    .text_color(rgb(MUTED))
+                    .child("Select a page to view its recorded details. Use recorded pages to prepare another capture without crawling again."),
+            );
             body = body.child(
                 div()
                     .text_size(px(13.))
@@ -4620,7 +4735,7 @@ impl Shell {
             if rows.is_empty() {
                 body = body.child(controls::empty(
                     "No matching pages",
-                    "Change or clear search. The fixed baseline page list is unchanged.",
+                    "Change or clear search. The recorded page list is unchanged.",
                 ));
             } else {
                 body = body.child(
@@ -4628,13 +4743,18 @@ impl Shell {
                         uniform_list(
                             "fixed-inventory",
                             rows.len(),
-                            cx.processor(move |this, range: std::ops::Range<usize>, _, _| {
+                            cx.processor(move |this, range: std::ops::Range<usize>, _, cx| {
                                 let Some(run) = &this.evidence.latest else {
                                     return Vec::new();
                                 };
                                 range
                                     .map(|visible| {
-                                        let page = &run.run.inventory.pages[rows[visible]];
+                                        let id = rows[visible];
+                                        let Some(page) =
+                                            run.run.inventory.pages.iter().find(|p| p.id == id)
+                                        else {
+                                            return div().into_any_element();
+                                        };
                                         controls::page_row(
                                             SharedString::from(format!("fixed-page-{}", page.id)),
                                             page.canonical.to_string(),
@@ -4645,14 +4765,22 @@ impl Shell {
                                                     .clone()
                                                     .unwrap_or_else(|| "Excluded".into())
                                             },
-                                            false,
-                                            false,
+                                            Some(id) == this.selected_page,
+                                            this.pending.is_none() && !this.native_prompt,
                                         )
+                                        .on_click(cx.listener(move |this, _, _, cx| {
+                                            if this.pending.is_none() && !this.native_prompt {
+                                                this.select_page_list_page(id);
+                                                cx.notify();
+                                            }
+                                        }))
                                         .into_any_element()
                                     })
                                     .collect::<Vec<_>>()
                             }),
                         )
+                        .track_scroll(self.preview_list_scroll.clone())
+                        .debug_selector(|| "fixed-inventory".into())
                         .w_full()
                         .h_full()
                         .flex_1()
@@ -4682,9 +4810,9 @@ impl Shell {
                             rows.len(),
                             r.run.targets.len(),
                             if r.run.targets.len() == 1 {
-                                "screenshot"
+                                "result"
                             } else {
-                                "screenshots"
+                                "results"
                             }
                         )),
                 );
@@ -4745,7 +4873,7 @@ impl Shell {
                                     .on_click(cx.listener(move |this, _, _, cx| {
                                         if this.pending.is_none() {
                                              if this.mask_dirty || this.mask_geometry_dirty(cx) {
-                                                this.error = Some("Save ignored areas before changing targets; rectangles will not be moved to another page/profile.".into());
+                                                this.error = Some("Save ignored areas before choosing another screenshot. They will not be moved to another page or screen size.".into());
                                                 cx.notify();
                                                 return;
                                             }
@@ -4795,8 +4923,11 @@ impl Shell {
                     | Control::Phase6(4..=6)
             )
         {
-            self.error = Some("Save ignored areas before reloading or replacing this evidence. Your unsaved rectangles are kept.".into());
+            self.error = Some("Save ignored areas before reloading or replacing these screenshots. Your draft areas are kept.".into());
             cx.notify();
+            return;
+        }
+        if self.request_destructive_control(control, window, cx) {
             return;
         }
         match control {
@@ -4882,7 +5013,7 @@ impl Shell {
                     self.navigate(screen, window, cx);
                     return;
                 }
-                if self.unsaved(cx) {
+                if self.unsaved(cx) || self.preview.is_some() {
                     self.confirm_switch(control, window, cx);
                     return;
                 }
@@ -4910,10 +5041,10 @@ impl Shell {
                     files: false,
                     directories: true,
                     multiple: false,
-                    prompt: Some("Inspect a folder (does not move project data)".into()),
+                    prompt: Some("Preview a folder path (no files are inspected or moved)".into()),
                 });
                 cx.spawn(async move |this, cx| {
-                    if let Ok(Ok(Some(paths))) = prompt.await && let Some(path) = paths.first() { let text = format!("Selected {}. Project data has not moved; changing the data location is not available yet.", path.display()); let _ = this.update(cx, |this, cx| { this.notice = Some(text); cx.notify(); }); }
+                    if let Ok(Ok(Some(paths))) = prompt.await && let Some(path) = paths.first() { let text = format!("Folder path preview: {}. No files were inspected or moved. Changing the project data location is not available yet.", path.display()); let _ = this.update(cx, |this, cx| { this.notice = Some(text); cx.notify(); }); }
                 }).detach();
             }
             Control::About => {
@@ -4975,6 +5106,14 @@ impl Shell {
                 self.zoom_select
                     .update(cx, |select, cx| select.toggle(window, cx));
             }
+            Control::ImageControls => {
+                if self.image_controls_open {
+                    self.close_image_controls(true, window, cx);
+                } else {
+                    self.open_image_controls(cx);
+                }
+            }
+            Control::DiscardPageList => (), // Handled by the confirmation gate.
             Control::Guided(index) => {
                 if !self.toggle_workspace_presentation(control) {
                     self.guided(index, cx);
@@ -5029,7 +5168,7 @@ impl Shell {
                     return;
                 }
                 self.jobs.pause();
-                self.notice=Some("Pause requested. No new batch will start. Active pages finish their bounded browser work (default budget 55 seconds), then publish evidence. Large image processing may add time.".into());
+                self.notice=Some("Pausing capture. No new pages will start. Pages already running will finish and save their screenshots; the browser has a 55-second default time limit, plus image processing time.".into());
                 cx.notify();
             }
             Control::CancelCapture => {
@@ -5038,7 +5177,7 @@ impl Shell {
                     return;
                 }
                 self.jobs.cancel();
-                self.notice=Some("Stopping active work. Completed originals will be kept; no baseline is activated.".into());
+                self.notice=Some("Stopping. Completed screenshots will be kept. Your saved baseline will not change.".into());
                 cx.notify();
             }
             Control::SetupRuntime => {
@@ -5077,7 +5216,7 @@ impl Shell {
                     let run = r.run.id;
                     let revision = p.revision;
                     self.native_prompt = true;
-                    let answer=window.prompt(PromptLevel::Warning,"Use this successful capture as the approved baseline?",Some("This explicitly activates a new immutable reference. Earlier baselines and runs are kept."),&["Keep reviewing","Save baseline"],cx);
+                    let answer=window.prompt(PromptLevel::Warning,"Save these screenshots as the baseline?",Some("Future checks will compare against these screenshots using the same page list. Earlier baseline versions and captures are kept in History."),&["Keep reviewing","Save baseline"],cx);
                     cx.spawn_in(window, async move |this, cx| {
                         let confirm = answer.await == Ok(1);
                         let _ = this.update_in(cx, |this, _, cx| {
@@ -5209,6 +5348,8 @@ impl Shell {
             self.viewer_mode_open = false;
             window.focus(&self.handle(Control::Guided(54), cx));
             cx.notify();
+        } else if self.image_controls_open {
+            self.close_image_controls(true, window, cx);
         } else if self.capture_details_open || self.review_tools || self.review_note_open {
             let control = if self.capture_details_open {
                 Control::Phase5(36)
@@ -5316,6 +5457,8 @@ impl Shell {
         }
         match control {
             Control::ValidationNext => !self.form_errors(cx).is_empty(),
+            Control::DiscardPageList => self.preview.is_some(),
+            Control::CaptureBaseline => self.preview.is_none() || self.discovery_plan_current(),
             Control::Phase6(19) => {
                 self.history_run_indices().contains(&self.run_history_index)
                     && !self.unsaved(cx)
@@ -5388,7 +5531,9 @@ impl Shell {
             }
             Control::Guided(13) => self.focus.screen == Screen::Setup && self.project.is_some(),
             Control::Guided(14) => false, // One contextual capture action, not a duplicate ID.
-            Control::Guided(16) => self.preview.is_some() || self.evidence.baseline.is_some(),
+            Control::Guided(16) => {
+                self.preview.is_none() && self.evidence.latest.is_some() && !self.unsaved(cx)
+            }
             Control::Guided(17) => self.preview.is_some() || self.evidence.latest.is_some(),
             Control::Guided(19) => self.preview.is_none() && self.evidence.latest.is_some(),
             Control::Guided(20 | 21) => {
@@ -5416,8 +5561,8 @@ impl Shell {
                     })
             }),
             Control::Guided(23 | 24) => {
-                let (index, count) = if self.preview.is_some() {
-                    let rows = self.preview_page_ids();
+                let (index, count) = if self.page_list_workspace() {
+                    let rows = self.page_list_page_ids();
                     (
                         rows.iter()
                             .position(|id| Some(*id) == self.selected_page)
@@ -5467,11 +5612,11 @@ impl Shell {
                 .as_ref()
                 .is_some_and(|environment| environment.login_open),
             Control::Guided(34) => self.project.as_ref().is_some_and(|project| {
-                project
-                    .project
-                    .environments
-                    .iter()
-                    .any(|environment| environment.session.is_some())
+                !self.unsaved(cx)
+                    && project.project.environments.iter().any(|environment| {
+                        Some(environment.id) == self.environment_draft
+                            && environment.session.is_some()
+                    })
             }),
             Control::Phase5(5) => self.analysis_pending.is_some() || self.analysis_due.is_some(),
             Control::Phase5(10 | 11) => self.viewer_mode == 2,
@@ -5535,7 +5680,7 @@ impl Shell {
             Control::Phase5(26) => self.evidence.analyses.len() > 1,
             Control::Phase5(27 | 28) => self.analysis_advanced,
             Control::Phase5(29 | 31) => false,
-            Control::Phase5(30) => self.preview.is_some(),
+            Control::Phase5(30) => self.discovery_plan_current(),
             Control::Phase5(40) => self
                 .history_baseline_indices()
                 .iter()
@@ -5621,7 +5766,7 @@ impl Shell {
         }
         if self.focus.screen == Screen::Results {
             if control == Guided(53) {
-                return true;
+                return self.review_navigation_available();
             }
             if self.navigation_collapsed
                 && matches!(control, Navigate(_) | PagesBaseline | Shortcuts)
@@ -5636,7 +5781,7 @@ impl Shell {
         }
         if self.history_inspection.is_some()
             && matches!(control,
-            CaptureBaseline | SaveBaseline | CheckChanges | Guided(15)
+            CaptureBaseline | SaveBaseline | CheckChanges | Guided(15 | 16)
                 | Phase5(0..=5 | 14..=28 | 32..=35 | 37) | AnalysisField(_))
         {
             return false;
@@ -5717,6 +5862,7 @@ impl Shell {
             && (!self.page_list_workspace() || self.discovery_image_mounted());
         match control {
             TaskDetails | TaskContinue | TaskLink(_) => false,
+            DiscardPageList => results && self.preview.is_some() && self.options_panel_open(),
             CloseOptions => results && self.result_filters_open,
             DiscoveryDetails => results && self.preview.is_some() && self.result_filters_open,
             CloseMappingPreview => setup && self.show_mapping && self.environment.is_some(),
@@ -5755,7 +5901,8 @@ impl Shell {
             ChooseProject => screen != Screen::Projects && project,
             PreviousPage => screen == Screen::Projects && self.projects.page > 0,
             NextPage => screen == Screen::Projects && self.projects.more,
-            ChooseFolder | About | SetupRuntime => settings,
+            ChooseFolder => settings && self.details.contains(&Detail::LocalStorage),
+            About | SetupRuntime => settings,
             CaptureBaseline => {
                 results
                     && (self.focus.review_surface == ReviewSurface::Pages
@@ -5774,6 +5921,9 @@ impl Shell {
             PauseCapture => self.focus.busy && self.focus.capturing && self.focus.pausable,
             ZoomIn | ZoomOut | PanLeft | PanRight | PanUp | PanDown => false,
             Viewer => viewer && self.viewer_has_pixels(),
+            ImageControls => {
+                viewer && self.viewer_has_pixels() && !self.narrow_workspace && !self.mask_draw
+            }
             Guided(11) => setup && self.setup_origin_count > 1,
             Guided(1..=3 | 6 | 7) => setup,
             Guided(44) => analysis && self.preview.is_none() && !self.mask_draw,
@@ -5793,9 +5943,9 @@ impl Shell {
             }
             Guided(16) => {
                 results
-                    && (self.preview.is_some()
-                        || (self.focus.review_surface == ReviewSurface::Pages
-                            && self.evidence.baseline.is_some()))
+                    && self.preview.is_none()
+                    && self.focus.review_surface == ReviewSurface::Pages
+                    && self.evidence.latest.is_some()
             }
             Guided(17) => inventory && !self.search.is_empty(),
             Guided(23 | 24) => inventory,
@@ -5807,8 +5957,13 @@ impl Shell {
             }
             Guided(20..=22) => results && self.preview.is_some() && self.result_filters_open,
             Guided(27 | 31..=38) => setup && project,
-            Guided(41) => settings,
-            Guided(42) => settings && self.network_status.is_none() && self.pending.is_none(),
+            Guided(41) => settings && self.details.contains(&Detail::ManagedNetwork),
+            Guided(42) => {
+                settings
+                    && self.details.contains(&Detail::ManagedNetwork)
+                    && self.network_status.is_none()
+                    && self.pending.is_none()
+            }
             Guided(54) => viewer && analysis,
             Guided(55) => viewer && analysis && self.viewer_mode_open,
             Guided(56) => viewer && analysis && self.viewer_mode == 4,
@@ -5818,7 +5973,7 @@ impl Shell {
             CrawlField(3..=8) => setup && self.focus.advanced,
             CrawlField(9) => inventory,
             CrawlField(10..=16) => setup && project,
-            CrawlField(17 | 18) => settings,
+            CrawlField(17 | 18) => settings && self.details.contains(&Detail::ManagedNetwork),
             CrawlField(_) => false,
             Phase5(0..=4) => analysis && self.review_tools && !self.mask_draw,
             Phase5(5) => {
@@ -5985,11 +6140,15 @@ impl Shell {
                         || self.deletion_preview.is_some()
                         || self.repair_preview.is_some())
             }
-            Phase6(13) => settings,
+            Phase6(13) => settings && self.details.contains(&Detail::SupportTools),
             Phase6(14 | 15) => portability && self.repair_preview.is_some(),
             Phase6(_) => false,
-            Phase7(0) => settings,
-            Phase7(1 | 2) => settings && self.diagnostic_preview.is_some(),
+            Phase7(0) => settings && self.details.contains(&Detail::SupportTools),
+            Phase7(1 | 2) => {
+                settings
+                    && self.details.contains(&Detail::SupportTools)
+                    && self.diagnostic_preview.is_some()
+            }
             Phase7(_) => false,
             Choice(choice) => {
                 if regressee_core::shell::Choice::SETUP.contains(&choice) {
@@ -6018,7 +6177,9 @@ impl Shell {
             Details(Detail::Analysis | Detail::IgnoredAreas) => {
                 analysis && self.review_tools && !self.mask_draw
             }
-            Details(Detail::Network) => settings,
+            Details(Detail::Network) => settings && self.details.contains(&Detail::ManagedNetwork),
+            Details(Detail::Browser | Detail::ManagedNetwork | Detail::SupportTools) => settings,
+            Details(Detail::LocalStorage) => settings && self.summary.is_some(),
         }
     }
     fn field_enabled(&self, index: usize) -> bool {
@@ -6192,73 +6353,7 @@ impl Shell {
             Screen::Setup => self.crawl_setup(cx),
             Screen::Results => self.results(cx),
             Screen::History => self.baseline_history(cx),
-            Screen::Settings => {
-                use regressee_app::product::RuntimeState;
-                let (browser_label, browser_tone, browser_help) = self.runtime_presentation();
-                let mut body = div().max_w(px(680.)).flex().flex_col().gap_6().child(self.heading("App settings", "Browser setup, storage and local support tools.").debug_selector(|| "app-settings-heading".into()))
-                      .child(controls::section("Private browser", "Regressee uses its own verified browser components, not your system browser.")
-                          .child(controls::status(browser_label, browser_tone))
-                           .when_some(self.runtime_status.clone(), |section, status| section.child(div().text_color(rgb(MUTED)).child(status)))
-                           .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(browser_help))
-                          .child(self.button(Control::SetupRuntime, match self.runtime_readiness.as_ref().map(|status| status.status) {
-                              Some(RuntimeState::NotInstalled) => "Install browser now",
-                              Some(RuntimeState::Ready | RuntimeState::RepairRequired) => "Repair browser",
-                              _ => "Browser setup unavailable",
-                          },ActionStyle::Primary,cx)));
-                if let Some(summary) = &self.summary {
-                    body = body.child(div().border_t_1().border_color(rgb(LINE)).pt_5().flex().flex_col().gap_3().child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).child("On this computer"))
-                        .child(self.setting_line("Saved projects", &summary.projects.to_string()))
-                        .child(self.setting_line("Screenshots & data", &format!("{} · {} objects", human_bytes(summary.artifact_bytes), summary.artifacts)))
-                        .child(div().text_color(rgb(MUTED)).text_size(px(13.)).child(format!("Project data: {}", summary.paths.data.display())))
-                        .child(div().text_color(rgb(MUTED)).text_size(px(13.)).child(format!("Rebuildable cache: {}", summary.paths.cache.display())))
-                          .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Object totals exclude the database and browser/login caches. Use History to inspect storage and deletion impact. Browser repair never deletes screenshot history.")));
-                }
-                body=body.child(div().debug_selector(|| "managed-network-section".into()).border_t_1().border_color(rgb(LINE)).pt_5().max_w(px(680.)).flex().flex_col().gap_3()
-                    .child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).child("Managed network"))
-                    .when(!self.form_errors(cx).is_empty(), |body| body.child(self.form_error_summary(cx)))
-                    .child(self.crawl_field(17,"Proxy server (optional)","Complete http(s) origin without credentials. Blank uses existing OS networking."))
-                    .child(self.crawl_field(18,"Trusted CA PEM file (optional)","PEM file for downloads and Node. Chromium also needs OS/browser trust; TLS stays verified."))
-                    .child(div().flex().flex_wrap().gap_2().when(self.network_status.is_none() && self.pending.is_none(), |el| el.child(self.guided_button(42,"Retry loading saved settings",cx))).child(self.guided_button(41,"Save network settings",cx)))
-                    .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(if self.network_status.is_some() { "Saved network settings loaded. Saving changes is explicit." } else { "Reading saved network settings…" }))
-                    .child(self.button(Control::Details(Detail::Network), if self.details.contains(&Detail::Network) { "Hide network limitations" } else { "Network limitations" }, ActionStyle::Secondary, cx))
-                    .when(self.details.contains(&Detail::Network), |el| el
-                        .when_some(self.network_status.clone(), |el, status| el.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(status)))
-                         .child(div().debug_selector(|| "network-limitations-copy".into()).text_size(px(14.)).text_color(rgb(WARNING)).child("The development browser's Node 22 worker cannot fetch robots.txt through a configured proxy. An authorized robots override is explicit. VPN and enterprise networks remain unqualified. Chromium needs custom CA trust in its OS/browser store; TLS verification is never disabled."))));
-                body = body.child(self.diagnostic_panel(cx));
-                body = body
-                    .child(self.button(
-                        Control::Phase6(13),
-                        "Inspect interrupted writes / integrity",
-                        ActionStyle::Secondary,
-                        cx,
-                    ))
-                    .child(self.portability_confirmation(cx));
-                body.child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap_3()
-                        .child(self.button(
-                            Control::ChooseFolder,
-                            "Choose a folder to inspect…",
-                            ActionStyle::Secondary,
-                            cx,
-                        ))
-                        .child(self.button(
-                            Control::About,
-                            "About Regressee",
-                            ActionStyle::Secondary,
-                            cx,
-                        ))
-                        .child(self.button(
-                            Control::Shortcuts,
-                            "Keyboard shortcuts · F1",
-                            ActionStyle::Secondary,
-                            cx,
-                        )),
-                )
-                .into_any_element()
-            }
+            Screen::Settings => self.app_settings(cx),
         }
     }
     fn selected_capture_details(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -6294,7 +6389,7 @@ impl Shell {
                             .map(|result| result.classification)
                         {
                             Some(Classification::Changed) => {
-                                ("Changed — review the evidence", Tone::Warning)
+                                ("Changed — review the screenshots", Tone::Warning)
                             }
                             Some(Classification::NoSignificantChange)
                                 if matches!(target.outcome, TargetOutcome::Captured { .. }) =>
@@ -6319,11 +6414,11 @@ impl Shell {
                     }
                 }
                 JobState::Cancelled => (
-                    "Cancelled — evidence kept; baseline unchanged",
+                    "Cancelled — saved screenshots kept; baseline unchanged",
                     Tone::Warning,
                 ),
                 JobState::Interrupted => (
-                    "Interrupted — start a fresh capture; evidence kept",
+                    "Interrupted — start a new capture; saved screenshots kept",
                     Tone::Warning,
                 ),
                 JobState::CompletedWithErrors => {
@@ -6334,7 +6429,7 @@ impl Shell {
             if r.run.targets.len() > 1 {
                 (label, tone) = match r.run.state {
                     JobState::Completed if matches!(r.run.intent, RunIntent::Check { .. }) => (
-                        "Check captured — review changed targets and coverage",
+                        "Check captured — review changes and missing screenshots",
                         Tone::Neutral,
                     ),
                     JobState::Completed if self.focus.candidate => {
@@ -6344,7 +6439,7 @@ impl Shell {
                         ("Saved baseline capture", Tone::Neutral)
                     }
                     JobState::Completed => ("Capture kept — not a saved baseline", Tone::Neutral),
-                    JobState::Paused => ("Paused — completed evidence kept", Tone::Warning),
+                    JobState::Paused => ("Paused — completed screenshots kept", Tone::Warning),
                     JobState::Interrupted => (
                         "Interrupted — validate and resume, or start fresh",
                         Tone::Warning,
@@ -6365,7 +6460,7 @@ impl Shell {
                     })
             }) {
                 body = body.child(controls::status(
-                    "Log in again — queue paused; login forms are not baseline evidence",
+                    "Log in again — capture paused; login forms cannot be used as baseline screenshots",
                     Tone::Warning,
                 ));
             }
@@ -6379,7 +6474,7 @@ impl Shell {
             }
             if let TargetOutcome::Failed { code } = &target.outcome {
                 body = body.child(controls::error(format!(
-                    "{} for the selected target. Previous baseline evidence is unchanged.",
+                    "{} for this page and screen size. Your saved baseline is unchanged.",
                     code.label()
                 )));
             }
@@ -6400,15 +6495,14 @@ impl Shell {
                         .text_size(px(13.))
                         .text_color(rgb(MUTED))
                         .child(format!(
-                            "Lossless original · {} × {} pixels · {} viewer tiles · {} ms",
+                            "Original screenshot · {} × {} pixels · capture took {:.1} seconds",
                             c.image.width,
                             c.image.height,
-                            c.image.tiles.len(),
-                            c.metadata.duration_ms
+                            c.metadata.duration_ms as f64 / 1000.
                         )),
                 );
                 if let Some(replacement) = &c.metadata.replacement {
-                    body=body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(format!("Replacement-only capture · neutral-raster-v2 · {} transformed images/backgrounds · geometry {} · {} canceled source reloads recorded (not completed loads). Original hidden photos were not separately saved.",replacement["count"].as_u64().unwrap_or(0),match replacement["geometryPreserved"].as_bool(){Some(true)=>"equal for measured light-DOM rectangles",Some(false)=>"changed — unsupported behavior",None=>"not measured"},replacement["cancelledSourceReloads"].as_u64().unwrap_or(0))));
+                    body=body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(format!("Photos replaced · {} images or backgrounds · layout {}. Original photos were not saved separately.",replacement["count"].as_u64().unwrap_or(0),match replacement["geometryPreserved"].as_bool(){Some(true)=>"unchanged where checked",Some(false)=>"changed — this screenshot may be unreliable",None=>"not checked"})));
                 }
             }
             if let Some(a) = &self.evidence.comparison
@@ -6442,13 +6536,13 @@ impl Shell {
                     .text_size(px(13.))
                     .text_color(rgb(MUTED))
                     .child(format!(
-                        "Active baseline · {} of {} intended screenshot targets",
+                        "Current baseline · {} of {} planned screenshots",
                         b.references.len(),
                         b.intended_count
                     )),
             );
         }
-        body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).max_w(px(680.)).child("Sensitivity and ignored rectangles change only analysis, never captured originals. Numerical change is evidence to review, not a defect probability. Fixture-calibrated presets are not proven user accuracy.")).into_any_element()
+        body.child(div().text_size(px(13.)).text_color(rgb(MUTED)).max_w(px(680.)).child("Sensitivity and ignored areas change comparison results, not the original screenshots. A measured difference is not necessarily a bug. Sensitivity presets have been tested with sample images, not a user study.")).into_any_element()
     }
     fn viewer_section(&self, cx: &mut Context<Self>) -> AnyElement {
         let Some(view) = self
@@ -6466,30 +6560,36 @@ impl Shell {
                 .flex_col()
                 .gap_2()
                 .relative()
-                .when(self.evidence.latest.is_some(), |body| {
-                    body.child(self.button(
-                        Control::Phase5(36),
-                        "Details",
-                        ActionStyle::Secondary,
-                        cx,
-                    ))
-                })
+                .when(
+                    self.evidence.latest.is_some() && !self.inspection_chrome_mounted(),
+                    |body| {
+                        body.child(self.button(
+                            Control::Phase5(36),
+                            "Details",
+                            ActionStyle::Secondary,
+                            cx,
+                        ))
+                    },
+                )
                 .when(self.viewer_inspector_open(), |body| {
                     body.child(self.viewer_inspector(cx))
                 })
-                .when(self.evidence.latest.is_some(), |body| {
-                    body.child({
-                        let (path, context) = self.inspection_identity();
-                        div()
-                            .debug_selector(|| "unavailable-target-context".into())
-                            .flex()
-                            .flex_col()
-                            .gap_1()
-                            .text_size(px(14.))
-                            .child(path)
-                            .child(context)
-                    })
-                })
+                .when(
+                    self.evidence.latest.is_some() && !self.inspection_chrome_mounted(),
+                    |body| {
+                        body.child({
+                            let (path, context) = self.inspection_identity();
+                            div()
+                                .debug_selector(|| "unavailable-target-context".into())
+                                .flex()
+                                .flex_col()
+                                .gap_1()
+                                .text_size(px(14.))
+                                .child(path)
+                                .child(context)
+                        })
+                    },
+                )
                 .child(self.screenshot_placeholder())
                 .into_any_element();
         };
@@ -6561,7 +6661,10 @@ impl Shell {
             .as_ref()
             .is_some_and(|r| r.run.intent == RunIntent::RepresentativePreview)
         {
-            panel=panel.child(controls::status("Representative preview only — cannot be approved as a baseline. Review the full inventory before capture.",Tone::Warning));
+            panel = panel.child(controls::status(
+                "Preview only. Review and capture the full page list before saving a baseline.",
+                Tone::Warning,
+            ));
         }
         let Some(a) = &self.evidence.comparison else {
             return panel.into_any_element();
@@ -6596,13 +6699,13 @@ impl Shell {
                 actions = actions.child(self.button(Control::Phase5(i), label, style, cx));
             }
             panel = panel.child(actions)
-                .child(analysis_help("Presets and valid parameter edits automatically reanalyze saved originals after a short pause. No website visit; originals, earlier analyses and their reviews are retained."))
+                .child(analysis_help("Changing sensitivity updates the comparison after a short pause, using saved screenshots without visiting the website. Original screenshots, earlier results and review decisions are kept."))
                 .child(div().flex().flex_wrap().gap_2()
                     .child(self.button(Control::Phase5(4), "Reanalyze originals", ActionStyle::Secondary, cx))
                     .when(self.control_mounted(Control::Phase5(5)), |el| el.child(self.button(Control::Phase5(5), "Cancel analysis", ActionStyle::Secondary, cx)))
                     .when(self.control_mounted(Control::Phase5(26)), |el| el.child(self.button(Control::Phase5(26), "View previous analysis", ActionStyle::Secondary, cx))));
             if self.analysis_pending.is_some() || self.analysis_due.is_some() {
-                panel=panel.child(controls::status("Reanalysis pending · the displayed result is still the saved revision. Close to inspect evidence; review decisions wait for analysis.",Tone::Neutral));
+                panel=panel.child(controls::status("Updating comparison. The previous result stays visible until it is ready. Choose Close to view the screenshots; review decisions are unavailable while the comparison updates.",Tone::Neutral));
             }
             panel = panel
                 .child(self.ignored_areas_disclosure(cx))
@@ -6620,48 +6723,48 @@ impl Shell {
                 for (i, label, help) in [
                     (
                         0,
-                        "Color tolerance (ΔE00)",
-                        "Significant pixels exceed this value; not an RGB percentage.",
+                        "Color difference tolerance",
+                        "Uses the ΔE00 color-difference scale, not a percentage. Higher values ignore smaller color differences.",
                     ),
                     (
                         1,
                         "Whole-page changed percentage",
-                        "Blank disables the global criterion.",
+                        "Flag a change when this percentage of the page differs. Leave blank to turn this off.",
                     ),
                     (
                         2,
                         "Local changed percentage",
-                        "Blank disables local windows. Overlapping windows do not add area.",
+                        "Flag concentrated changes within small areas. Leave blank to turn this off. Overlapping areas are not counted twice.",
                     ),
                     (
                         3,
                         "Local minimum changed pixels",
-                        "Both the local count and percentage must meet the thresholds.",
+                        "A small area must reach both this pixel count and the local changed percentage to flag a change.",
                     ),
                     (
                         4,
-                        "Local minimum eligible pixels",
-                        "Windows with less unignored coverage cannot trigger.",
+                        "Local minimum compared pixels",
+                        "Skip areas with fewer pixels left to compare after ignored areas are removed.",
                     ),
                     (
                         5,
-                        "Local window size (pixels)",
-                        "1–256, in original capture pixels.",
+                        "Small-area size (pixels)",
+                        "1–256. Sets the width and height of each square area checked for concentrated changes.",
                     ),
                     (
                         6,
-                        "Local window stride (pixels)",
-                        "Must be within size and keep at most four window rows active.",
+                        "Small-area spacing (pixels)",
+                        "Distance between areas checked. Use no more than the area size and no less than one quarter of it, rounded up.",
                     ),
                     (
                         7,
-                        "Connected region minimum pixels",
-                        "Blank disables. Four-neighbor actual members, not bounding box area.",
+                        "Minimum connected change (pixels)",
+                        "Flag a change when this many changed pixels touch along their edges. Diagonal contact and empty gaps do not count. Leave blank to turn this off.",
                     ),
                     (
                         8,
-                        "Ignored-coverage warning percentage",
-                        "Warnings are not a whole-page verification claim.",
+                        "Warn when this percentage is ignored",
+                        "Warn when ignored areas cover this much of the screenshots. Ignored content is not checked.",
                     ),
                 ] {
                     panel = panel.child(
@@ -6678,8 +6781,8 @@ impl Shell {
                     );
                 }
                 panel=panel.child(self.check_button(Control::Phase5(27), "Review page-height changes", self.analysis_policy.height_change_triggers, cx))
-                .child(self.check_button(Control::Phase5(28), "Suppress stationary horizontal RGB blend noise", self.analysis_policy.antialias!=regressee_app::analysis_engine::AntiAliasPolicy::Off, cx))
-                .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Optional suppression may hide a real blend-color edit. It is not a proven font-noise detector. Edits debounce for 300 ms and cancel superseded work."));
+                .child(self.check_button(Control::Phase5(28), "Ignore small color-blending differences", self.analysis_policy.antialias!=regressee_app::analysis_engine::AntiAliasPolicy::Off, cx))
+                .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Ignores some color differences along unchanged horizontal edges. This may hide a real color edit and is not guaranteed to remove text-rendering noise. Results update shortly after you stop editing."));
             }
             panel = panel.child(self.button(
                 Control::Details(Detail::Analysis),
@@ -6897,7 +7000,6 @@ impl Shell {
         };
         let mut panes = div()
             .id("image-viewer")
-            .tooltip(|_, cx| cx.new(|_| evidence_workspace::InspectionHint("Drag or scroll to pan · Shift + scroll for horizontal movement · Ctrl + scroll to zoom · Focus evidence: arrows to pan, +/− to zoom, 0 for fit, 1 for actual size".into())).into())
             .when(
                 bounded && self.control_enabled(Control::Viewer, cx),
                 |panes| {
@@ -6995,11 +7097,13 @@ impl Shell {
                             }
                             _ => None,
                         })
-                        .unwrap_or_else(|| "No captured screenshot for this target".into())
+                        .unwrap_or_else(|| {
+                            "No captured screenshot for this page and screen size".into()
+                        })
                 } else if index == 0 {
-                    "No baseline screenshot for this target".into()
+                    "No baseline screenshot for this page and screen size".into()
                 } else {
-                    "No difference image for this target".into()
+                    "No difference image for this page and screen size".into()
                 };
                 viewport = viewport.child(div().p_4().child(message));
             }
@@ -7165,9 +7269,28 @@ impl Shell {
                                 evidence_workspace::heatmap_legend()
                             } else {
                                 div()
-                                    .text_ellipsis()
-                                    .font_weight(FontWeight::SEMIBOLD)
-                                    .child(title)
+                                    .flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(
+                                        div()
+                                            .flex_1()
+                                            .min_w_0()
+                                            .text_ellipsis()
+                                            .font_weight(FontWeight::SEMIBOLD)
+                                            .child(title),
+                                    )
+                                    .when(
+                                        !self.narrow_workspace
+                                            && !self.mask_draw
+                                            && self.viewer_has_pixels()
+                                            && self.current_viewer_pane_width() >= 460.
+                                            && indices.last() == Some(&index),
+                                        |caption| {
+                                            caption
+                                                .child(evidence_workspace::image_navigation_hint())
+                                        },
+                                    )
                                     .into_any_element()
                             })
                             .into_any_element()
@@ -7405,7 +7528,7 @@ impl Shell {
         let answer = window.prompt(
             PromptLevel::Warning,
             "Discard unsaved project edits?",
-            Some("Saved settings are unchanged. Keep editing to save these changes first."),
+            Some("This discards unsaved settings, review edits, and any discovered page list and inclusion choices for the current project. Saved settings, screenshots and baselines are unchanged. Keep editing to retain your work."),
             &["Keep editing", "Discard edits"],
             cx,
         );
@@ -7414,6 +7537,9 @@ impl Shell {
             let _ = this.update_in(cx, |this, window, cx| {
                 this.native_prompt = false;
                 if discard {
+                    this.preview = None;
+                    this.focus.preview = false;
+                    this.result_filters_open = false;
                     this.discard_review_drafts(cx);
                     // Reset to the stored snapshot before replaying the explicit
                     // action. The replay cannot prompt recursively.
@@ -7515,8 +7641,14 @@ impl Shell {
         div()
             .flex()
             .gap_4()
-            .child(div().w(px(136.)).text_color(rgb(MUTED)).child(label))
-            .child(value.to_owned())
+            .child(
+                div()
+                    .w(px(176.))
+                    .flex_shrink_0()
+                    .text_color(rgb(MUTED))
+                    .child(label),
+            )
+            .child(div().min_w_0().flex_1().child(value.to_owned()))
     }
 }
 impl Drop for Shell {
@@ -7574,6 +7706,7 @@ impl Render for Shell {
         self.configure_analysis_inputs(cx);
         let zoom_enabled = self.control_enabled(Control::Guided(46), cx);
         self.zoom_select.update(cx, |select, cx| {
+            select.set_image_controls_available(!self.mask_draw, cx);
             select.sync(
                 self.viewer_fit,
                 self.zoom,
@@ -7611,6 +7744,7 @@ impl Render for Shell {
         {
             self.viewer_mode_open = false;
         }
+        let inline_activity = self.activity_is_inline();
         let mut feedback = div()
             .id("feedback")
             .when(bounded_review, |feedback| {
@@ -7622,7 +7756,7 @@ impl Render for Shell {
             .flex()
             .flex_col()
             .gap_3();
-        if self.focus.busy && self.task.is_none() {
+        if self.focus.busy && self.task.is_none() && !inline_activity {
             let (message, completed, total) = self
                 .progress
                 .clone()
@@ -7632,7 +7766,7 @@ impl Render for Shell {
                     if self.focus.capturing || total.is_some_and(|n| n > 0) {
                         controls::progress(message, completed, total).into_any_element()
                     } else {
-                        controls::activity(message).into_any_element()
+                        controls::activity_notice(message).into_any_element()
                     },
                 ),
             );
@@ -7640,14 +7774,14 @@ impl Render for Shell {
                 if self.focus.pausable {
                     progress = progress.child(self.button(
                         Control::PauseCapture,
-                        "Pause at a safe boundary",
+                        "Pause after current pages",
                         ActionStyle::Secondary,
                         cx,
                     ));
                 }
                 progress = progress.child(self.button(
                     Control::CancelCapture,
-                    "Cancel — keep completed evidence",
+                    "Stop — keep completed screenshots",
                     ActionStyle::Secondary,
                     cx,
                 ));
@@ -7676,6 +7810,7 @@ impl Render for Shell {
             .flex_col()
             .child(
                 div()
+                    .debug_selector(|| "project-header".into())
                     .flex()
                     .flex_wrap()
                     .items_center()
@@ -7686,8 +7821,27 @@ impl Render for Shell {
                     .bg(rgb(SURFACE))
                     .border_b_1()
                     .border_color(rgb(LINE))
-                    .when(self.navigation_collapsed, |header| {
-                        header.child(self.guided_button(53, "Show navigation", cx))
+                    .when(self.review_navigation_available(), |header| {
+                        let (label, hint) = if self.navigation_collapsed {
+                            ("Show sidebar", "Show project navigation and App settings.")
+                        } else {
+                            (
+                                "Hide sidebar",
+                                "Hide project navigation to give screenshots more room.",
+                            )
+                        };
+                        header.child(
+                            self.action_control(
+                                Control::Guided(53),
+                                label,
+                                ActionStyle::Secondary,
+                                cx,
+                            )
+                            .tooltip(move |_, cx| {
+                                cx.new(|_| evidence_workspace::InspectionHint(hint.into()))
+                                    .into()
+                            }),
+                        )
                     })
                     .child(
                         div()
@@ -7739,7 +7893,9 @@ impl Render for Shell {
             )
             .when(
                 self.task.is_none()
-                    && (self.focus.busy || self.error.is_some() || self.notice.is_some()),
+                    && ((self.focus.busy && !inline_activity)
+                        || self.error.is_some()
+                        || self.notice.is_some()),
                 |el| el.child(feedback),
             )
             .when(
@@ -8042,6 +8198,14 @@ mod phase6_history_tests;
 mod phase7_qualification_tests;
 
 #[cfg(all(test, feature = "ui-tests"))]
+mod app_settings_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod discovery_handoff_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod image_controls_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod loading_feedback_tests;
+#[cfg(all(test, feature = "ui-tests"))]
 mod phase1_runtime_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase1_setup_tests;
@@ -8062,10 +8226,19 @@ mod phase5_setup_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase5_state_tests;
 #[cfg(all(test, feature = "ui-tests"))]
+mod recovery_ux_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod safety_ux_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod sidebar_ux_tests;
+#[cfg(all(test, feature = "ui-tests"))]
 mod workflow_refinement_tests;
 
 #[cfg(all(test, feature = "ui-tests"))]
 mod options_ux_tests;
+
+#[cfg(all(test, feature = "ui-tests"))]
+mod ux_copy_tests;
 
 #[cfg(all(test, feature = "ui-tests"))]
 mod tests {
@@ -8656,6 +8829,7 @@ mod tests {
                 (RuntimeState::UnsupportedPlatform, false),
                 (RuntimeState::NotInstalled, true),
                 (RuntimeState::Ready, true),
+                (RuntimeState::UpdateRequired, true),
                 (RuntimeState::RepairRequired, true),
             ] {
                 s.runtime_readiness = Some(RuntimeReadiness {
@@ -8729,6 +8903,8 @@ mod tests {
             s.queue(Work::NetworkStatus, cx);
             settle_requests(s, cx);
             assert!(s.network_status.is_some());
+            assert!(!s.field_enabled(17) && !s.field_enabled(18));
+            s.details.insert(Detail::ManagedNetwork);
             assert!(s.field_enabled(17) && s.field_enabled(18));
             assert!(!s.field_enabled(10));
             s.focus.busy = true;
@@ -8788,12 +8964,7 @@ mod tests {
                 s.activate_control(Control::RefreshEvidence, window, cx);
                 assert!(s.mask_dirty);
                 assert!(s.pending.is_none());
-                assert!(
-                    s.error
-                        .as_ref()
-                        .unwrap()
-                        .contains("unsaved rectangles are kept")
-                );
+                assert!(s.error.as_ref().unwrap().contains("draft areas are kept"));
             })
         });
         owned.join_after_ui();
@@ -9146,6 +9317,7 @@ mod tests {
             shell.update(cx, |s, cx| {
                 settled(s, cx);
                 s.focus.screen = Screen::Settings;
+                s.activate_control(Control::Details(Detail::SupportTools), window, cx);
                 s.activate_control(Control::Phase7(0), window, cx);
                 settled(s, cx);
                 let report = s.diagnostic_preview.clone().unwrap();
@@ -9205,7 +9377,11 @@ mod tests {
                 s.activate_control(Control::Phase6(2), w, cx);
                 settled(s, cx);
                 let preview = s.export_preview.clone().unwrap();
-                assert!(preview.privacy.contains("DO NOT redact"));
+                assert!(
+                    preview
+                        .privacy
+                        .contains("private information, including ignored areas")
+                );
                 assert!(!zip.exists());
                 // Simulate only the platform dialog's returned path; the actual service writes the ZIP.
                 s.selected_export_path(zip.clone(), preview, cx);
@@ -9237,7 +9413,7 @@ mod tests {
                     s.notice
                         .as_ref()
                         .unwrap()
-                        .contains("not an independently verified")
+                        .contains("have not been verified on this computer")
                 );
                 assert!(
                     s.task
@@ -9262,6 +9438,7 @@ mod tests {
                 s.continue_task(w, cx);
                 s.error = None;
                 s.focus.screen = Screen::Settings;
+                s.activate_control(Control::Details(Detail::SupportTools), w, cx);
                 s.activate_control(Control::Phase6(13), w, cx);
                 settled(s, cx);
                 assert!(s.repair_preview.is_some());
@@ -9849,12 +10026,7 @@ mod tests {
                 assert_eq!(s.analysis_policy.pixel_tolerance_delta_e00, 2.);
                 assert!(s.analysis_due.is_none());
                 assert!(s.mask_dirty);
-                assert!(
-                    s.error
-                        .as_ref()
-                        .unwrap()
-                        .contains("unsaved rectangles are kept")
-                );
+                assert!(s.error.as_ref().unwrap().contains("draft areas are kept"));
                 assert!(!s.focus.busy);
             })
         });
@@ -10139,7 +10311,12 @@ mod tests {
             settle_requests(s, cx);
             s.crawl_fields[17].update(cx, |i, cx| i.set_value("http://127.0.0.1:3128/", cx));
         });
-        cx.update(|w, cx| shell.update(cx, |s, cx| s.activate_control(Control::Guided(41), w, cx)));
+        cx.update(|w, cx| {
+            shell.update(cx, |s, cx| {
+                s.activate_control(Control::Details(Detail::ManagedNetwork), w, cx);
+                s.activate_control(Control::Guided(41), w, cx);
+            })
+        });
         shell.update(cx, |s, cx| {
             finish_request(s, cx);
             assert!(
@@ -11199,9 +11376,14 @@ mod tests {
                 "the initial browser check must be visible"
             );
             assert_eq!(update.id, request);
-            assert!(matches!(update.reply, Reply::ProductFailure(_)));
+            assert!(matches!(update.reply, Reply::ActionRequired(_)));
             s.apply_update(update, cx);
-            assert!(s.error.as_ref().unwrap().contains("trusted distribution"));
+            assert!(
+                s.error
+                    .as_ref()
+                    .unwrap()
+                    .contains("cannot install its browser")
+            );
             assert!(s.evidence.latest.is_none());
             assert!(!s.focus.candidate && !s.focus.baseline);
             assert!(
@@ -11210,7 +11392,12 @@ mod tests {
             );
             finish_request(s, cx);
             assert!(!s.focus.busy);
-            assert!(s.error.as_ref().unwrap().contains("trusted distribution"));
+            assert!(
+                s.error
+                    .as_ref()
+                    .unwrap()
+                    .contains("cannot install its browser")
+            );
         });
         owned.join_after_ui();
         let store = regressee_storage::Store::open(paths).unwrap();

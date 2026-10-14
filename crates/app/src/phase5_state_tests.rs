@@ -403,6 +403,8 @@ fn final_import_and_network_actions_reveal_in_their_real_outer_clip_without_writ
         activate(&shell, cx, Control::Phase6(7));
         activate(&shell, cx, Control::Navigate(Screen::Settings));
         shell.update(cx, finish_jobs);
+        assert_form(&shell, cx, Control::Details(Detail::ManagedNetwork));
+        activate(&shell, cx, Control::Details(Detail::ManagedNetwork));
         assert_form(&shell, cx, Control::Details(Detail::Network));
         activate(&shell, cx, Control::Details(Detail::Network));
         read_at(&shell, cx, "network-limitations-copy");

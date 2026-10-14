@@ -61,6 +61,19 @@ fn renderer_capture_phase3(cx: &mut TestAppContext) {
             "closed-draft",
             "reopened-draft",
         ] {
+            if std::env::var_os("REGRESSEE_RENDERER_CLARITY").is_some()
+                && !matches!(
+                    scene,
+                    "two-sentences"
+                        | "limit-feedback"
+                        | "legacy-invalid"
+                        | "saved"
+                        | "closed-draft"
+                        | "reopened-draft"
+                )
+            {
+                continue;
+            }
             cx.update(|w, cx| {
                 shell.update(cx, |s, cx| {
                     s.review_note_open = false;

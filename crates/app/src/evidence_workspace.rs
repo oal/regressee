@@ -27,6 +27,21 @@ impl Render for InspectionHint {
 }
 
 impl Shell {
+    pub(super) fn inspection_chrome_mounted(&self) -> bool {
+        // Selection metadata is already available while its pixels are read.
+        // Keep the same heading and toolbar instead of briefly showing the
+        // workspace title. Only the current request may hold this chrome open.
+        !self.page_list_workspace()
+            && !self.selected_capture_failed()
+            && (self.viewer.is_some()
+                || self
+                    .viewer_pending
+                    .as_ref()
+                    .is_some_and(|(_, identity, _)| {
+                        self.viewer_identity().as_ref() == Some(identity)
+                    }))
+    }
+
     pub(super) fn inspection_heading(&self) -> AnyElement {
         let (path, context) = self.inspection_identity();
         let displayed_path = format!(
@@ -245,8 +260,23 @@ impl Shell {
                 );
             }
         }
-        if self.viewer_has_pixels() {
+        if self.viewer_has_pixels() || self.viewer_pending.is_some() {
+            // Retain its place during loading; the control stays disabled until
+            // the selected image has pixels to navigate.
             tools = tools.child(self.zoom_select.clone());
+        }
+        if self.control_mounted(Control::ImageControls) {
+            tools = tools.child(
+                self.action_control(
+                    Control::ImageControls,
+                    "Image controls",
+                    ActionStyle::Choice {
+                        selected: self.image_controls_open,
+                    },
+                    cx,
+                )
+                .px(px(8.)),
+            );
         }
         // Drawing has one explicit exit in place of secondary disclosures, not
         // an appended action that overflows the navigation-open narrow row.
@@ -360,6 +390,91 @@ pub(super) fn baseline_selection_label(selected: usize, ready: usize) -> String 
     } else {
         format!("{selected} selected · {ready} ready to update")
     }
+}
+
+pub(super) fn image_zoom_gesture() -> &'static str {
+    if cfg!(target_os = "macos") {
+        "⌘ + scroll"
+    } else {
+        "Ctrl + scroll"
+    }
+}
+
+pub(super) fn image_navigation_hint() -> AnyElement {
+    div()
+        .debug_selector(|| "image-navigation-hint".into())
+        .flex_shrink_0()
+        .whitespace_nowrap()
+        .text_size(px(HELP_TEXT_SIZE))
+        .line_height(px(HELP_LINE_HEIGHT))
+        .text_color(rgb(MUTED))
+        .child(format!("Drag to pan · {} to zoom", image_zoom_gesture()))
+        .into_any_element()
+}
+
+pub(super) fn image_controls_help() -> AnyElement {
+    let rows = |items: Vec<(&'static str, &'static str)>| {
+        div()
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .children(items.into_iter().map(|(action, gesture)| {
+                div()
+                    .debug_selector(move || format!("image-help-{action}-{gesture}"))
+                    .w_full()
+                    .flex()
+                    .gap_3()
+                    .child(
+                        div()
+                            .w(px(124.))
+                            .flex_shrink_0()
+                            .text_color(rgb(MUTED))
+                            .child(action),
+                    )
+                    .child(div().flex_1().min_w_0().child(gesture))
+            }))
+    };
+    div()
+        .debug_selector(|| "image-controls-help".into())
+        .w_full()
+        .flex()
+        .flex_col()
+        .gap_4()
+        .text_size(px(HELP_TEXT_SIZE))
+        .line_height(px(HELP_LINE_HEIGHT))
+        .child(rows(vec![
+            ("Move around", "Drag or scroll"),
+            ("Move horizontally", "Shift + scroll"),
+            ("Zoom at pointer", image_zoom_gesture()),
+        ]))
+        .child(
+            div()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .border_t_1()
+                .border_color(rgb(LINE))
+                .pt_4()
+                .child(
+                    div()
+                        .font_weight(FontWeight::SEMIBOLD)
+                        .child("With the image focused"),
+                )
+                .child(
+                    div()
+                        .text_color(rgb(MUTED))
+                        .child("Close help, then click the image or Tab to it first."),
+                )
+                .child(rows(vec![
+                    ("Move around", "Arrow keys"),
+                    ("Move a screenful", "Page Up / Page Down"),
+                    ("Zoom in / out", "+ / −"),
+                    ("Fit width", "0"),
+                    ("Actual size", "1"),
+                ])),
+        )
+        .into_any_element()
 }
 
 pub(super) fn heatmap_legend() -> AnyElement {

@@ -18,7 +18,7 @@ export type Command =
   | { type: 'CaptureTarget'; payload: { key: TargetKey; address: string; profile: Readonly<Record<string, unknown>>; session: SessionReference | null } };
 export interface Request { version: 2; request_id: number; job: string; command: Command }
 export type FailureCode = 'UnsupportedVersion' | 'InvalidRequest' | 'NeedsLogin' | 'Timeout' | 'CaptureFailed' | 'WorkerStopped' | 'PayloadLimit' | 'Cancelled' | 'AccessDenied' | 'NotFound' | 'RedirectOutsideScope' | 'ImageLimit' | 'RateLimited' | 'ServerError';
-export type WarningCode = 'ReadinessBudget' | 'Unstable' | 'ReplacementGeometryChanged' | 'ReplacementGeometryNotMeasured' | 'ReplacementSourceDependent' | 'ReplacementUnsupportedMedia' | 'FontsIncomplete' | 'ImagesIncomplete' | 'ResourceFailed';
+export type WarningCode = 'ReadinessBudget' | 'Unstable' | 'ReplacementGeometryChanged' | 'ReplacementGeometryNotMeasured' | 'ReplacementSourceDependent' | 'ReplacementUnsupportedMedia' | 'FontsIncomplete' | 'ImagesIncomplete' | 'ResourceFailed' | 'EmbeddedContentBlocked';
 export interface Artifact { id: string; bytes: number; kind: 'Screenshot' | 'Thumbnail' | 'Tile' | 'Difference' }
 export type EventKind =
   | { type: 'Acknowledged' | 'RequiresLogin' | 'LoginOpened' | 'Completed' | 'Cancelled' }

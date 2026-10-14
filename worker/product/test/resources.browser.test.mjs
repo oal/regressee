@@ -64,7 +64,9 @@ test('signed Chromium native scope boundary: real resources, zero forbidden visi
     if(u.pathname==='/scope/doc-cross')return redirect(res,secondOrigin+'/forbidden-document');
     if(u.pathname==='/scope/refresh'){res.writeHead(200,{Refresh:`0;url=${secondOrigin}/forbidden-document`});res.end(html('refresh'));return;}
     if(u.pathname==='/scope/client') {res.end(html(`<script>location.href='${secondOrigin}/forbidden-document'</script>`));return;}
-    if(u.pathname==='/scope/frame') {res.end(html(`<iframe src="${secondOrigin}/forbidden-document"></iframe>`));return;}
+     if(u.pathname==='/scope/frame') {res.end(html(`<iframe src="${secondOrigin}/forbidden-document"></iframe>`));return;}
+     if(u.pathname==='/scope/frame-same') {res.end(html('<a href="/scope/linked">Linked page</a><iframe src="/scope/frame-content"></iframe>'));return;}
+     if(u.pathname==='/scope/frame-redirect') {res.end(html('<iframe src="/scope/doc-cross"></iframe>'));return;}
     if(u.pathname==='/scope/popup') {res.end(html(`<script>window.open('${secondOrigin}/forbidden-document')</script>`));return;}
     if(u.pathname==='/scope/form') {res.end(html('<form action="/outside" method="post"></form><script>document.forms[0].submit()</script>'));return;}
     if(u.pathname==='/scope/reload') {res.end(html('<script>location.reload()</script>'));return;}
@@ -244,8 +246,34 @@ test('signed Chromium native scope boundary: real resources, zero forbidden visi
         try {await exit;}finally{clearTimeout(timer);await fs.writeFile(path.join(workerOutput,'events.json'),JSON.stringify({frames,stderr},null,2));}
       }
     });
-    await t.test('client navigation, frames, popups, forms, reload and Refresh remain pre-network blocked',async()=>{
-      for(const name of ['client','frame','popup','form','reload','refresh']) {
+    await t.test('blocked embedded frames do not masquerade as main-page redirects or poison capture/discovery',async()=>{
+      const contentBefore=count('main','/scope/frame-content'),redirectBefore=count('main','/scope/doc-cross');
+      for(const name of ['frame','frame-same','frame-redirect']) {
+        const address=mainOrigin+'/scope/'+name;
+        await guarded(address,async(page,state)=>{
+          await page.goto(address,{waitUntil:'load',timeout:5000});
+          assert.equal(page.url(),address);assert.equal(state.blocked,false);
+          assert.equal(state.redirect,null);assert.equal(state.embeddedBlocked,true);assert.equal(state.error,null);
+        });
+        const result=await runCapture(address);
+        assert.ok(result.warnings.includes('EmbeddedContentBlocked'));
+        const found=await discover(browser,{address,section:'/scope'},{scope:'loopback',onContext:()=>{}});
+        assert.equal(found.final_url,address);
+        if(name==='frame-same')assert.ok(found.addresses.includes(mainOrigin+'/scope/linked'));
+        zero();
+      }
+      assert.equal(count('main','/scope/frame-content'),contentBefore);
+      assert.equal(count('main','/scope/doc-cross'),redirectBefore);
+      report.cases.push({name:'blocked-embeds-valid-main-page',passed:true});
+    });
+    await t.test('exhausted full-page readiness is a timeout, not a false image-size limit',async()=>{
+      const short=structuredClone(profile);short.stabilization.readiness_ms=1;
+      await assert.rejects(()=>capture(browser,{address:mainOrigin+'/scope/frame-same',profile:short,key:{page:crypto.randomUUID(),profile:short.id},session:null},{identity:short.runtime,scope:'loopback',output,onContext:()=>{},progress:()=>{},warning:()=>{}}),{code:'Timeout'});
+      zero();
+      report.cases.push({name:'readiness-timeout-not-image-limit',passed:true});
+    });
+    await t.test('client navigation, popups, forms, reload and Refresh remain pre-network blocked',async()=>{
+      for(const name of ['client','popup','form','reload','refresh']) {
         const address=mainOrigin+'/scope/'+name,before=count('main','/scope/'+name);
         await assert.rejects(()=>discover(browser,{address,section:'/scope'},{scope:'loopback',onContext:()=>{}}),{code:'RedirectOutsideScope'});
         assert.equal(count('main','/scope/'+name),before+1);zero();

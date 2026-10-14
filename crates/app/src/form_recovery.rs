@@ -29,20 +29,20 @@ fn field_label(control: Control) -> &'static str {
             0 => "Maximum pages",
             1 => "Website section",
             2 => "Skipped address text",
-            3 => "Link depth",
-            4 => "Parallel active pages",
-            5 => "Parallel pages per website",
+            3 => "Links away from starting addresses",
+            4 => "Pages at once",
+            5 => "Pages at once per website",
             6 => "Retries",
             7 => "Custom width",
             8 => "Custom height",
             10 => "Login / consent page",
-            11 => "Representative page",
-            12 => "Identity-provider origins",
-            13 => "Source mapping base",
-            14 => "Destination mapping base",
-            15 => "Capture language",
+            11 => "Page to check after login",
+            12 => "Approved login websites",
+            13 => "Original website or section",
+            14 => "Matching website or section",
+            15 => "Website language",
             17 => "Proxy server",
-            18 => "Trusted CA file",
+            18 => "Trusted certificate file",
             _ => "Setting",
         },
         _ => "Setting",
@@ -57,9 +57,13 @@ impl Shell {
         let secondary_action = matches!(self.focus.screen, Screen::Projects | Screen::Settings)
             && matches!(
                 control,
-                Control::Phase6(1 | 3 | 6 | 7 | 14 | 15)
-                    | Control::Details(Detail::Portability | Detail::Network)
+                Control::Phase6(1 | 3 | 6 | 7 | 13 | 14 | 15)
+                    | Control::Phase7(_)
+                    | Control::Details(_)
+                    | Control::CrawlField(17 | 18)
                     | Control::Guided(41 | 42)
+                    | Control::SetupRuntime
+                    | Control::ChooseFolder
                     | Control::About
                     | Control::Shortcuts
             );
@@ -95,6 +99,10 @@ impl Shell {
         })
     }
     pub(super) fn route_form_correction(&mut self, control: Control) {
+        if self.focus.screen == Screen::Settings && matches!(control, Control::CrawlField(17 | 18))
+        {
+            self.details.insert(Detail::ManagedNetwork);
+        }
         if self.focus.screen != Screen::Setup {
             return;
         }
@@ -337,12 +345,17 @@ impl Shell {
                 concat!(
                     "Regressee ",
                     env!("CARGO_PKG_VERSION"),
-                    " · MPL-2.0\n\nRegressee discovers pages within approved websites, captures chosen screen sizes and checks only an explicitly saved baseline. Projects, screenshots and review history stay local. Login sessions are never included in baseline ZIPs; screenshots may contain private information.\n\nDevelopment browsers remain restricted to authorized local fixtures. Native accessibility, cross-platform and public-release qualification remain pending; macOS capture is blocked by a process-ownership code gap."
+                    " · MPL-2.0\n\nRegressee finds pages on approved websites, captures screenshots at your chosen screen sizes and compares them with a baseline you have saved. Projects, screenshots and review history stay on your computer. Shared baseline ZIPs never include logins or cookies, but screenshots may contain private information.\n\nThis app is still in development. Development-only browsers can visit approved local test websites, not public websites. Accessibility and support across operating systems are not yet fully tested. Website capture on macOS is not yet supported."
                 ),
             )
         };
+        let heading = if self.help_dialog {
+            div().child(title).into_any_element()
+        } else {
+            brand::lockup(Background::Light, title).into_any_element()
+        };
         controls::dialog(
-            title,
+            heading,
             body,
             self.button(Control::CloseDialog, "Close", ActionStyle::Primary, cx),
         )

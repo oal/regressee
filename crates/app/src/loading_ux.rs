@@ -13,6 +13,44 @@ pub(super) enum ScreenshotState {
 }
 
 impl Shell {
+    /// Give a read one visible status owner. Global feedback remains for saves
+    /// and other operations, and for reads that keep already-loaded content.
+    pub(super) fn activity_is_inline(&self) -> bool {
+        let Some((label, _, _)) = &self.progress else {
+            return false;
+        };
+        if self.error.is_some() {
+            return false;
+        }
+        if self.focus.shows_project_picker() {
+            return self.projects.items.is_empty()
+                && self.projects_dirty
+                && self.pending.is_some()
+                && label == "Loading projects…";
+        }
+        match self.focus.screen {
+            Screen::Settings => {
+                (self.runtime_readiness.is_none() && label == Work::RuntimeStatus.activity_label())
+                    || (self.summary.is_none() && label == Work::InspectStorage.activity_label())
+            }
+            Screen::History => {
+                self.history_section != 2
+                    && self.history.is_none()
+                    && self.pending.is_some()
+                    && label == "Loading capture and baseline history…"
+            }
+            Screen::Results => {
+                self.initial_evidence_loading()
+                    && matches!(
+                        label.as_str(),
+                        "Loading saved screenshots and results…"
+                            | "Loading login and environment settings…"
+                    )
+            }
+            _ => false,
+        }
+    }
+
     pub(super) fn selected_capture_failed(&self) -> bool {
         self.displayed_run()
             .and_then(|r| {
@@ -89,33 +127,38 @@ impl Shell {
             if let Some(target) = target {
                 let reason = match &target.outcome {
                     regressee_core::domain::TargetOutcome::Failed { code } => format!(
-                        "Capture failed: {code:?}. {}",
+                        "{}. {}",
+                        code.label(),
                         regressee_app::task::capture_recovery(*code)
                     ),
                     regressee_core::domain::TargetOutcome::Skipped { reason } => {
                         format!("Capture skipped: {reason}")
                     }
                     regressee_core::domain::TargetOutcome::Cancelled => {
-                        "This target was not captured before the task stopped.".into()
+                        "This screenshot was not taken before capture stopped.".into()
                     }
                     _ => self.error.clone().unwrap_or_else(|| {
                         "The recorded screenshot is missing or could not be read.".into()
                     }),
                 };
                 return div().debug_selector(|| "unavailable-target-recovery".into()).flex().flex_col().gap_2()
-                    .child(div().text_size(px(21.)).child("Screenshot unavailable — not an unchanged result"))
+                    .child(div().text_size(px(21.)).child(if self.selected_capture_failed() {
+                        "This page could not be captured"
+                    } else {
+                        "Screenshot unavailable"
+                    }))
                     .child(reason)
-                    .child("Refresh reads saved evidence again; it does not recapture this target. For a new check, return to Review changes. To replace the baseline page list, use Pages & baseline, find pages and explicitly capture/save a replacement. Earlier versions remain in History.")
+                    .child("Find pages creates a new page list for another capture. Refresh only rereads saved results; it does not take screenshots. Your saved baseline is unchanged.")
                     .into_any_element();
             }
         }
         match self.screenshot_state() {
-            ScreenshotState::LoadingImage => controls::loading("Loading screenshot…", "Reading the selected screenshot from disk. The page queue stays available."),
+            ScreenshotState::LoadingImage => controls::loading("Loading screenshot…", "Reading the selected screenshot from disk. The page list stays available."),
             ScreenshotState::LoadingEvidence => controls::loading("Loading saved screenshots…", "Reading this project’s page list, captures and comparison results from disk."),
             ScreenshotState::Capturing => controls::loading("Preparing screenshots…", "Completed captures will appear here when they are ready to inspect."),
             ScreenshotState::Unavailable => controls::empty("Screenshots could not load", "Use Refresh to try reading saved screenshots again. Saved screenshots and the baseline have not been changed."),
             ScreenshotState::Empty => controls::empty("No screenshots yet", "Find pages, then capture them to inspect this website. No baseline is saved automatically."),
-            ScreenshotState::MissingTarget => controls::empty("No screenshot for this target", "Select a captured target to inspect its screenshot. A failed or missing capture is not an unchanged result."),
+            ScreenshotState::MissingTarget => controls::empty("No screenshot for this page and screen size", "Select a page and screen size to view its screenshot. A failed or missing capture does not mean the page is unchanged."),
         }.into_any_element()
     }
 }

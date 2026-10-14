@@ -159,14 +159,14 @@ impl Work {
             Self::ImportPreview(_) => "Reading baseline ZIP…",
             Self::Import { .. } => "Importing project and baseline…",
             Self::History { .. } => "Loading capture and baseline history…",
-            Self::InspectRun { .. } => "Loading recorded evidence…",
+            Self::InspectRun { .. } => "Loading saved screenshots and results…",
             #[cfg(feature = "ui")]
             Self::Viewer { .. } | Self::HistoricalViewer { .. } => "Loading screenshot…",
             Self::DeletePreview { .. } => "Preparing deletion preview…",
             Self::Delete(_) => "Deleting selected history…",
             Self::RepairPreview => "Checking local storage…",
             Self::CleanupTemporaries(_) => "Removing confirmed temporary files…",
-            Self::DeleteUnreferenced(_) => "Removing confirmed unreferenced files…",
+            Self::DeleteUnreferenced(_) => "Deleting recovery files…",
             Self::RuntimeStatus => "Checking installed browser…",
             Self::NetworkStatus => "Loading network settings…",
             Self::SaveNetwork(_) => "Saving network settings…",
@@ -192,7 +192,7 @@ impl Work {
             Self::Review(_) => "Saving review decision…",
             Self::LoadAnalysis(_) => "Loading saved comparison…",
             Self::Approval { .. } => "Preparing baseline update preview…",
-            Self::PreviewImages { .. } => "Capturing representative screenshot…",
+            Self::PreviewImages { .. } => "Capturing a preview screenshot…",
         }
     }
 }
@@ -222,6 +222,7 @@ pub enum Reply {
     CleanedTemporaries,
     Failure(StorageFailure),
     ProductFailure(String),
+    ActionRequired(crate::recovery::Problem),
     /// A worker checkpoint acknowledged cancellation. Late requests must never
     /// turn successful publication or an unrelated failure into cancellation.
     Cancelled,
@@ -327,7 +328,7 @@ impl StorageFailure {
                 "These project settings could not be saved. Check the name and complete website address."
             }
             Self::ConflictOrWrite => {
-                "The project could not be saved. It may have changed in another window, or storage is unavailable. Reopen it and check available space."
+                "The project could not be saved. Your draft is kept. Check available space, folder permissions and whether another window changed this project before saving again."
             }
             Self::MissingOrCorrupt => {
                 "The project could not be opened. Its stored settings may be missing or damaged. Keep the data folder for recovery."
@@ -481,7 +482,7 @@ impl Jobs {
                                 store
                                     .save_project(&project, expected_revision)
                                     .map(|p| Reply::Project(Box::new(p)))
-                                    .unwrap_or(Reply::Failure(StorageFailure::ConflictOrWrite))
+                                    .unwrap_or_else(|error| storage_failure(error, StorageFailure::ConflictOrWrite))
                             }
                         }
                         Work::SaveEnvironment { project, revision, environment, settings } => {
@@ -490,7 +491,7 @@ impl Jobs {
                             } else {
                                 store.save_project_and_environment(&project, revision, environment, &settings)
                                     .map(|record| Reply::Project(Box::new(record)))
-                                    .unwrap_or(Reply::Failure(StorageFailure::ConflictOrWrite))
+                                    .unwrap_or_else(|error| storage_failure(error, StorageFailure::ConflictOrWrite))
                             }
                         }
                         Work::DiagnosticPreview => crate::diagnostics::collect(store,product.as_ref().ok(),&cancel)
@@ -506,7 +507,7 @@ impl Jobs {
                         work @ (Work::ExportPreview {..} | Work::Export {..} | Work::ImportPreview(_) | Work::Import {..} | Work::History {..} | Work::ProjectStorage(_) | Work::DeletePreview {..} | Work::Delete(_) | Work::RepairPreview | Work::CleanupTemporaries(_) | Work::DeleteUnreferenced(_)) => storage_work(store,work,&cancel),
                         work=>match &product {
                              Err(_) if matches!(&work, Work::RuntimeStatus) => Reply::RuntimeReadiness(crate::product::RuntimeReadiness::invalid_configuration()),
-                             Err(_)=>Reply::ProductFailure("Browser distribution configuration is invalid. Keep existing evidence and check its trusted configuration before retrying.".into()),
+                              Err(_)=>Reply::ActionRequired(crate::recovery::Problem::Browser(crate::product::RuntimeState::UnavailableDistribution)),
                              Ok(product)=>product_work(product,store,work,&cancel,&pause,&updates,request.id),
                         },
                     },
@@ -663,6 +664,7 @@ fn product_work(
     // while a command is queued is preserved through its actual start.
     let result = (|| -> anyhow::Result<Reply> {
         let discovering = matches!(&work, Work::Discover(_));
+        let mut verified_runtime = None;
         if let Some(project) = first_use_project(&work) {
             if discovering {
                 discovery_update(
@@ -687,9 +689,9 @@ fn product_work(
                         cancel,
                     );
                 }
-                product.ensure_runtime(cancel.clone(), &mut |phase| {
+                verified_runtime = Some(product.ensure_runtime(cancel.clone(), &mut |phase| {
                     setup_update(updates, id, phase);
-                })?;
+                })?);
             }
             // Same operation/cancellation slot, immediately before continuation.
             regressee_runtime::distribution::check_cancel(cancel)?;
@@ -809,16 +811,13 @@ fn product_work(
             )?))),
             Work::ExistingInventory(project) => {
                 let saved = store.load_project(project)?;
-                let baseline = store.load_baseline(
-                    saved
-                        .project
-                        .active_baseline
-                        .context("No saved baseline inventory")?,
-                )?;
-                let before = store.load_run(baseline.references[0].run)?;
-                let mut inventory = before.run.inventory;
+                let latest = store
+                    .project_evidence(project)?
+                    .latest
+                    .context("No recorded page list")?;
+                let mut inventory = latest.run.inventory;
                 inventory.id = regressee_core::domain::InventoryId::new();
-                Ok(Reply::Discovery(Box::new(DiscoveryPreview{project_revision:saved.revision,settings:saved.project,inventory,aliases:vec![],notes:vec!["Existing inventory selected. No links were discovered; review the same pages for this replacement baseline.".into()],visited:0})))
+                Ok(Reply::Discovery(Box::new(DiscoveryPreview{project_revision:saved.revision,settings:saved.project,inventory,aliases:vec![],notes:vec!["Recorded page list selected. No website was visited; review included pages before starting another capture.".into()],visited:0})))
             }
             Work::CaptureInventory {
                 project,
@@ -828,6 +827,7 @@ fn product_work(
             } => {
                 product.capture_inventory_with_status(
                     store,
+                    verified_runtime,
                     project,
                     preview.map(|p| *p),
                     check,
@@ -854,8 +854,9 @@ fn product_work(
                 Ok(Reply::Evidence(Box::new(store.project_evidence(project)?)))
             }
             Work::Capture { project, check } => {
-                product.capture(
+                product.capture_with_runtime(
                     store,
+                    verified_runtime,
                     project,
                     check,
                     cancel.clone(),
@@ -1003,6 +1004,9 @@ fn setup_progress(
         InstallProgress::Verifying => ("Verifying private browser files…".into(), 0, None),
         InstallProgress::Extracting => ("Installing private browser files…".into(), 0, None),
         InstallProgress::TestingBrowser => ("Testing the private browser…".into(), 0, None),
+        InstallProgress::Publishing => {
+            ("Saving the verified browser installation…".into(), 0, None)
+        }
         InstallProgress::Ready => ("Private browser setup finished.".into(), 0, None),
     }
 }
@@ -1071,10 +1075,41 @@ fn operation_reply(result: anyhow::Result<Reply>) -> Reply {
     result.unwrap_or_else(|error| {
         if cancellation_error(&error) {
             Reply::Cancelled
+        } else if let Some(setup) = error.chain().find_map(|cause| {
+            cause.downcast_ref::<regressee_runtime::setup_diagnostics::SetupFailure>()
+        }) {
+            Reply::ProductFailure(format!(
+                "{setup}\nRegressee version: {}.",
+                env!("CARGO_PKG_VERSION")
+            ))
+        } else if let Some(problem) = io_recovery(&error) {
+            Reply::ActionRequired(problem)
+        } else if let Some(blocked) = error.downcast_ref::<crate::product::RuntimeBlocked>() {
+            Reply::ActionRequired(crate::recovery::Problem::Browser(blocked.0))
+        } else if let Some(worker) =
+            error.downcast_ref::<regressee_runtime::supervisor::WorkerFailure>()
+        {
+            Reply::ActionRequired(crate::recovery::Problem::Worker(worker.0))
         } else {
             Reply::ProductFailure(error.to_string())
         }
     })
+}
+
+fn io_recovery(error: &anyhow::Error) -> Option<crate::recovery::Problem> {
+    error.chain().find_map(
+        |cause| match cause.downcast_ref::<std::io::Error>()?.kind() {
+            std::io::ErrorKind::PermissionDenied => {
+                Some(crate::recovery::Problem::PermissionDenied)
+            }
+            std::io::ErrorKind::StorageFull => Some(crate::recovery::Problem::LowSpace),
+            _ => None,
+        },
+    )
+}
+
+fn storage_failure(error: anyhow::Error, fallback: StorageFailure) -> Reply {
+    io_recovery(&error).map_or(Reply::Failure(fallback), Reply::ActionRequired)
 }
 
 #[cfg(test)]
@@ -1100,6 +1135,146 @@ mod task_reply_tests {
             operation_reply(Ok(Reply::Exported)),
             Reply::Exported
         ));
+    }
+
+    #[test]
+    fn known_causes_survive_context_without_exposing_private_stack_text() {
+        use crate::{
+            product::{RuntimeBlocked, RuntimeState},
+            recovery::Problem,
+        };
+        use regressee_runtime::{protocol::FailureCode, supervisor::WorkerFailure};
+        for state in [
+            RuntimeState::NotInstalled,
+            RuntimeState::UpdateRequired,
+            RuntimeState::RepairRequired,
+            RuntimeState::UnavailableDistribution,
+            RuntimeState::UnsupportedPlatform,
+        ] {
+            let error = anyhow::Error::new(RuntimeBlocked(state))
+                .context("private website/query/session context");
+            assert!(
+                matches!(operation_reply(Err(error)), Reply::ActionRequired(Problem::Browser(actual)) if actual == state)
+            );
+        }
+        for code in [
+            FailureCode::NeedsLogin,
+            FailureCode::AccessDenied,
+            FailureCode::Timeout,
+            FailureCode::RateLimited,
+            FailureCode::WorkerStopped,
+        ] {
+            let error = anyhow::Error::new(WorkerFailure(code)).context("private site error");
+            assert!(
+                matches!(operation_reply(Err(error)), Reply::ActionRequired(Problem::Worker(actual)) if actual == code)
+            );
+        }
+        for (kind, expected) in [
+            (
+                std::io::ErrorKind::PermissionDenied,
+                Problem::PermissionDenied,
+            ),
+            (std::io::ErrorKind::StorageFull, Problem::LowSpace),
+        ] {
+            let error = anyhow::Error::new(std::io::Error::new(kind, "private path"))
+                .context("Writing private data");
+            assert!(
+                matches!(operation_reply(Err(error)), Reply::ActionRequired(problem) if problem == expected)
+            );
+            let error = anyhow::Error::new(std::io::Error::new(kind, "private path"))
+                .context("Saving private project");
+            assert!(
+                matches!(storage_failure(error, StorageFailure::ConflictOrWrite), Reply::ActionRequired(problem) if problem == expected)
+            );
+        }
+        assert!(matches!(
+            storage_failure(
+                anyhow::anyhow!("revision changed"),
+                StorageFailure::ConflictOrWrite
+            ),
+            Reply::Failure(StorageFailure::ConflictOrWrite)
+        ));
+    }
+
+    #[test]
+    fn wrapped_setup_failures_keep_details_but_other_operations_do_not_expand_errors() {
+        use regressee_runtime::{distribution::InstallProgress, setup_diagnostics::SetupAttempt};
+        let mut attempt = SetupAttempt::default();
+        attempt.observe(InstallProgress::Downloading {
+            bytes: 1024,
+            total: Some(2048),
+        });
+        let source = anyhow::anyhow!("Read timed out")
+            .context("Downloading Chromium from storage.googleapis.com");
+        let error = anyhow::Error::new(attempt.failure(source)).context("Preparing to find pages");
+        let Reply::ProductFailure(message) = operation_reply(Err(error)) else {
+            panic!("expected setup failure")
+        };
+        assert!(message.starts_with("Browser setup failed during download."));
+        assert!(message.contains("1024 of 2048 bytes"));
+        assert!(message.contains("Downloading Chromium from storage.googleapis.com"));
+        assert!(message.contains("Read timed out"));
+        assert!(message.contains("Regressee version:"));
+
+        let source = anyhow::anyhow!("private site/session detail").context("Capture failed");
+        let Reply::ProductFailure(message) = operation_reply(Err(source)) else {
+            panic!("expected failure")
+        };
+        assert_eq!(message, "Capture failed");
+    }
+
+    #[test]
+    fn setup_failure_wrapper_preserves_cancellation_classification() {
+        let error = regressee_runtime::setup_diagnostics::SetupAttempt::default()
+            .failure(anyhow::anyhow!("operation cancelled"));
+        assert!(matches!(
+            operation_reply(Err(error.into())),
+            Reply::Cancelled
+        ));
+    }
+
+    #[cfg(all(target_arch = "x86_64", any(target_os = "linux", windows)))]
+    #[test]
+    fn explicit_and_first_use_setup_preserve_real_preflight_io_errors() -> anyhow::Result<()> {
+        let root = tempfile::tempdir()?;
+        let paths = AppPaths::isolated(root.path());
+        let product = Product::configured(&paths.cache)?;
+        let mut store = Store::open(paths.clone())?;
+        let project = Project::draft("Setup diagnostics fixture".into(), "https://example.test/")?;
+        store.save_project(&project, None)?;
+        std::fs::write(
+            paths.cache.join("network-settings.json"),
+            serde_json::to_vec(&regressee_runtime::network::NetworkSettings {
+                proxy: None,
+                trusted_ca: Some(root.path().join("missing-ca.pem")),
+            })?,
+        )?;
+        let cancel = Arc::new(AtomicBool::new(false));
+        let (updates, _results) = mpsc::sync_channel(16);
+        for work in [
+            Work::SetupRuntime,
+            Work::Discover(project.id),
+            Work::OpenLogin(project.id),
+        ] {
+            let Reply::ProductFailure(message) =
+                product_work(&product, &mut store, work, &cancel, &cancel, &updates, 1)
+            else {
+                panic!("expected setup failure")
+            };
+            assert!(
+                message.starts_with("Browser setup failed during preparation."),
+                "{message}"
+            );
+            assert!(message.contains("Browser network settings could not be validated"));
+            assert!(message.contains("os error 2"), "{message}");
+            assert!(!message.contains("https://example.test"));
+            assert!(
+                !product.runtime_cache.exists(),
+                "preflight failure started installation"
+            );
+        }
+        assert_eq!(store.load_project(project.id)?.revision, 1);
+        Ok(())
     }
 }
 fn is_operation(work: &Work) -> bool {
@@ -1572,6 +1747,7 @@ mod tests {
             InstallProgress::Verifying,
             InstallProgress::Extracting,
             InstallProgress::TestingBrowser,
+            InstallProgress::Publishing,
             InstallProgress::Ready,
         ] {
             let (message, _, total) = setup_progress(phase);
@@ -1622,8 +1798,12 @@ mod tests {
             &tx,
             42,
         );
-        assert!(matches!(reply, Reply::ProductFailure(ref message)
-            if message.contains("build is incomplete")));
+        assert!(matches!(
+            reply,
+            Reply::ActionRequired(crate::recovery::Problem::Browser(
+                crate::product::RuntimeState::UnavailableDistribution
+            ))
+        ));
         let phases: Vec<_> = rx.try_iter().collect();
         assert_eq!(phases.len(), 2);
         for phase in &phases {

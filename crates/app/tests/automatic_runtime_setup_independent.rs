@@ -550,7 +550,12 @@ fn public_jobs_routes_pinned_work_and_queued_cancel_preserving_cas() -> Result<(
     for (index, work) in works.into_iter().enumerate() {
         let reply = actor.terminal(index as u64 + 2, work)?;
         assert!(
-            matches!(reply, Reply::ProductFailure(ref message) if !message.contains("network settings")),
+            matches!(
+                reply,
+                Reply::ActionRequired(regressee_app::recovery::Problem::Browser(
+                    RuntimeState::NotInstalled
+                ))
+            ),
             "pinned request entered setup: {reply:?}"
         );
     }

@@ -1,0 +1,40 @@
+[
+  {
+    "file": "logo-light.png",
+    "origin": "User-supplied Regressee logo, 2026-10-14",
+    "source": "assets/logo.png",
+    "source_sha256": "73242aa95e2a97828ea361d16098e405f9a3a9e5635346d0545b9f3ca3c82424",
+    "sha256": "38141ec1972f74f021761d6f8d6d4ebb00e56a383e2e85b4de98b4c164627e5c",
+    "background": "light",
+    "crop_xyxy": [
+      40,
+      280,
+      1216,
+      1000
+    ],
+    "size_px": [
+      294,
+      180
+    ],
+    "transform": "Shared padding crop and Lanczos downsample; no recoloring"
+  },
+  {
+    "file": "logo-dark.png",
+    "origin": "User-supplied Regressee logo, 2026-10-14",
+    "source": "assets/logo-dark.png",
+    "source_sha256": "2724ebd4493acb70cb8e75f2123735fb88d8f6895e8595d0e95f8dada2f783b3",
+    "sha256": "6d7e428ac5f36e4cd97c3b673f762459ff1292c209b269c935edbdb2e034b939",
+    "background": "dark",
+    "crop_xyxy": [
+      40,
+      280,
+      1216,
+      1000
+    ],
+    "size_px": [
+      294,
+      180
+    ],
+    "transform": "Shared padding crop and Lanczos downsample; no recoloring"
+  }
+]

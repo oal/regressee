@@ -88,6 +88,10 @@ for checks of an existing baseline, not automatic alternate-site rediscovery.
   screenshots produce visible warnings. Up to three screenshot samples are used.
 - Virtualized rows, nested scrolling, hidden tabs and unvisited UI states are not
   expanded. A screenshot is not proof of complete website coverage.
+- Embedded frames are blocked before their documents are visited. The main page
+  can still be captured, with **Embedded frames were blocked** in its warnings;
+  embedded content is not included. A blocked iframe is not a main-page redirect.
+  Actual main-page redirects and automatic navigations remain blocked.
 - OS/architecture/font differences or unstable/incomplete captures produce
   **Rendering caution / Not comparable**, not a trustworthy unchanged release
   verdict. Material profile/runtime differences require matching settings or an

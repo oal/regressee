@@ -2,10 +2,9 @@
 
 <!-- impeccable:product-schema 1 -->
 
-Regressee is the working name taken from the project directory. The name has not
-been separately confirmed. This document records the original planning decisions
-and the product-context confirmation on 2026-10-11; `PLAN.md` contains the
-implementation strategy and proposed defaults.
+Regressee is the user-confirmed app name (2026-10-14). This document records the
+original planning decisions and the product-context confirmation on 2026-10-11;
+`PLAN.md` contains the implementation strategy and proposed defaults.
 
 ## Platform
 
@@ -127,7 +126,12 @@ failures in ordinary language rather than exposing an automation framework.
   selection, readable system UI typography, and a clear next safe action. The
   user confirmed the workflow brief in `docs/workflow-revamp.md`. This is approval
   of the direction and brief, not native usability or release qualification.
-- No logo or final product name has been selected.
+- On **2026-10-14**, the user supplied light/dark-background logo variants and
+  confirmed that the icon must accompany **Regressee**, never replace its name.
+  The approved palette adaptation keeps the existing layout and white workspaces,
+  with navy navigation, readable teal primary actions and pale mint selection.
+  Originals live in `assets/`; cropped, optimized embedded copies and provenance
+  live in `assets/brand/`. This is not a request for a full dark workspace theme.
 
 ## Product Principles
 
@@ -176,7 +180,7 @@ These are implementation/design decisions, not unanswered core product scope:
   design and GPUI component behavior.
 - Calibrated comparison preset values, informed by test fixtures.
 - Precise supported image-replacement cases and limitations.
-- Final product name and release artifact hosting.
+- Release artifact hosting.
 
 `PLAN.md` assigns these decisions to explicit phase gates. No deadline or
 additional distribution constraint was specified.

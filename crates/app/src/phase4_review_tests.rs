@@ -320,7 +320,7 @@ fn repair_v4_3_persistent_non_root_identity_historical_environments_all_modes(
                 assert_eq!(path, "/account/orders/customer-service/release-notes/?sort=recent&locale=nb-NO#delivery");
                 assert!(context.contains("Historical reference") && context.contains("Historical check"));
                 let profile = &s.evidence.latest.as_ref().unwrap().evidence(s.selected_key.as_ref().unwrap()).unwrap().metadata.profile;
-                assert!(context.contains(&profile.name) && context.contains(&format!("{} × {} CSS px",profile.width,profile.height)));
+                assert!(context.contains(&profile.name) && context.contains(&format!("{} × {} pixels",profile.width,profile.height)));
                 assert!(!context.contains("Today's")); cx.notify();
             });
             cx.update(|w, cx| {

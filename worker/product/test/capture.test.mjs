@@ -24,7 +24,7 @@ test('development scope accepts literal loopback, not localhost/DNS/external hos
 test('native document response interception never releases a redirect',async()=>{
    for(const status of [301,302,303,307,308]) {
      let routeHandler,paused;const commands=[];
-     const cdp={on:(_,handler)=>{paused=handler;},send:async(method,params)=>{commands.push({method,params});}};
+     const cdp={on:(_,handler)=>{paused=handler;},send:async(method,params)=>{commands.push({method,params});if(method==='Page.getFrameTree')return {frameTree:{frame:{id:'main'}}};}};
      const context={on:()=>{},route:async(_,handler)=>{routeHandler=handler;},routeWebSocket:async()=>{},newCDPSession:async()=>cdp};
      const frame={page:()=>page};const page={mainFrame:()=>frame};
      const state=await navigationBoundary(context,'http://127.0.0.1:1234/scope','loopback',1000,'/scope',page);
@@ -32,7 +32,7 @@ test('native document response interception never releases a redirect',async()=>
      let continued=0,aborts=0;
      const route={request:()=>request,abort:async()=>{aborts++;},continue:async()=>{continued++;},fetch:()=>assert.fail('must retain native network response'),fulfill:()=>assert.fail('must retain native network response')};
      await routeHandler(route);
-     paused({requestId:'document',request:{url:request.url()},resourceType:'Document',responseStatusCode:status,responseHeaders:[{name:'Location',value:'http://127.0.0.1:5678/identity-provider'}]});
+     paused({requestId:'document',frameId:'main',request:{url:request.url()},resourceType:'Document',responseStatusCode:status,responseHeaders:[{name:'Location',value:'http://127.0.0.1:5678/identity-provider'}]});
      await new Promise(resolve=>setImmediate(resolve));
      assert.equal(state.redirect,'http://127.0.0.1:5678/identity-provider');
      assert.equal(continued,1);assert.equal(commands.at(-1).method,'Fetch.failRequest');
@@ -43,11 +43,11 @@ test('native document response interception never releases a redirect',async()=>
 test('forms, child documents and off-section initial navigations are blocked before fetching',async()=>{
   for(const kind of ['POST','frame','section','origin']) {
      let routeHandler;
-     const context={on:()=>{},route:async(_,h)=>{routeHandler=h;},routeWebSocket:async()=>{},newCDPSession:async()=>({on:()=>{},send:async()=>{}})};
+      const context={on:()=>{},route:async(_,h)=>{routeHandler=h;},routeWebSocket:async()=>{},newCDPSession:async()=>({on:()=>{},send:async(method)=>method==='Page.getFrameTree'?{frameTree:{frame:{id:'main'}}}:undefined})};
      const frame={page:()=>page};const page={mainFrame:()=>frame};
      const state=await navigationBoundary(context,'http://127.0.0.1:1234/outside','loopback',1000,kind==='section'?'/scope':null,page);
     let aborted=false;
     await routeHandler({request:()=>({url:()=>kind==='origin'?'http://127.0.0.1:5678/outside':'http://127.0.0.1:1234/outside',method:()=>kind==='POST'?'POST':'GET',frame:()=>kind==='frame'?{page:()=>page}:frame,isNavigationRequest:()=>true}),abort:async()=>{aborted=true;},fetch:()=>assert.fail('forbidden request fetched'),continue:()=>assert.fail('forbidden request continued')});
-    assert.equal(aborted,true);assert.equal(state.blocked,true);
+     assert.equal(aborted,true);assert.equal(state.blocked,kind!=='frame');assert.equal(state.embeddedBlocked,kind==='frame');
   }
 });

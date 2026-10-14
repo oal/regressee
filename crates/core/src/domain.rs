@@ -509,7 +509,15 @@ pub enum DiscoveryCoverage {
 }
 impl DiscoveryCoverage {
     pub fn label(&self) -> String {
-        match self {Self::Complete=>"Visible-link queue exhausted within these settings; not proof of every website page.".into(),Self::Limited{reason}=>format!("Limited coverage: {reason}"),Self::Interrupted=>"Discovery interrupted; coverage is incomplete.".into()}
+        match self {
+            Self::Complete => "Finished following visible links within your settings. Some website pages may still be missing.".into(),
+            Self::Limited { reason } => {
+                let reason = reason.trim();
+                let punctuation = if reason.ends_with(['.', '!', '?']) { "" } else { "." };
+                format!("Limited page list: {reason}{punctuation}")
+            }
+            Self::Interrupted => "Page search interrupted. The page list is incomplete.".into(),
+        }
     }
 }
 impl InventoryRevision {
@@ -872,7 +880,7 @@ pub enum Classification {
 impl Classification {
     pub fn label(self) -> &'static str {
         match self {
-            Self::Changed => "Changed — review the evidence",
+            Self::Changed => "Changed — review the screenshots",
             Self::NoSignificantChange => "No significant change",
             Self::CouldNotCapture => "Could not capture — not verified",
             Self::NotComparable => "Could not compare",
@@ -882,7 +890,7 @@ impl Classification {
 /// Storage and every native note-save path use UTF-8 bytes, never scalar counts.
 pub const REVIEW_NOTE_MAX_BYTES: usize = 8192;
 pub const REVIEW_NOTE_LIMIT_MESSAGE: &str =
-    "Shorten to 8,192 UTF-8 bytes. Your draft is kept; nothing saved.";
+    "This note is too long. Shorten it before saving. Your draft is kept; nothing was saved.";
 pub fn validate_review_note(note: &str) -> Result<(), &'static str> {
     if note.len() <= REVIEW_NOTE_MAX_BYTES {
         Ok(())

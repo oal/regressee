@@ -9,6 +9,7 @@ pub mod protocol;
 #[cfg(target_os = "linux")]
 mod scratch;
 pub mod secrets;
+pub mod setup_diagnostics;
 pub mod supervisor;
 #[cfg(windows)]
 mod windows_process;

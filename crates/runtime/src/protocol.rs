@@ -5,7 +5,7 @@ use regressee_core::domain::*;
 use serde::{Deserialize, Serialize};
 use std::io::{BufRead, Read};
 pub const PROTOCOL_VERSION: u32 = 2;
-pub const WORKER_VERSION: &str = "5.0.0";
+pub const WORKER_VERSION: &str = "5.0.1";
 pub const MAX_FRAME: usize = 1024 * 1024;
 pub const MAX_LINKS: usize = 2000;
 pub const MAX_REQUEST_ID: u64 = 9_007_199_254_740_991; // Node safe integer range.
@@ -240,6 +240,7 @@ pub enum WarningCode {
     FontsIncomplete,
     ImagesIncomplete,
     ResourceFailed,
+    EmbeddedContentBlocked,
 }
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum FailureCode {

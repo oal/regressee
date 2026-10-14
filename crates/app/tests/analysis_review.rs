@@ -351,7 +351,11 @@ fn phase6_real_composite_roundtrip_historical_settings_privacy_and_shared_deleti
     assert_eq!(preview.sources, 2);
     assert_eq!(preview.targets, 3);
     assert_eq!(preview.masks, 1);
-    assert!(preview.privacy.contains("DO NOT redact"));
+    assert!(
+        preview
+            .privacy
+            .contains("private information, including ignored areas")
+    );
     let zip = root.path().join("selected.zip");
     owner.export_archive(&preview, &zip, &cancel)?;
     let destination = AppPaths::isolated(&root.path().join("recipient"));

@@ -56,19 +56,19 @@ impl Shell {
         let (label, help) = match classification {
             Some(Classification::Changed) => (
                 "Changed",
-                "A threshold was reached; review the evidence, not an automatic defect.",
+                "The difference exceeds your sensitivity settings. Review the screenshots to decide whether it needs fixing.",
             ),
             Some(Classification::NoSignificantChange) => (
                 "No significant change",
-                "Below the analysis thresholds, not necessarily identical pixels.",
+                "Differences are below your sensitivity settings. The screenshots may not be identical.",
             ),
             Some(Classification::CouldNotCapture) => (
                 "Could not capture",
-                "Missing evidence is not a no-change result.",
+                "A missing screenshot does not mean the page is unchanged.",
             ),
             _ => (
-                "Not comparable",
-                "Do not treat this as a clean result. Inspect comparison limits below.",
+                "Could not compare",
+                "The screenshots could not be compared reliably. Check the reasons below.",
             ),
         };
         summary = summary
@@ -82,13 +82,13 @@ impl Shell {
             .perceptual
             .as_ref()
             .map(|p| policy_name(&p.policy))
-            .unwrap_or("Historical RGB");
+            .unwrap_or("Earlier color-comparison method");
         let settings = a
             .perceptual
             .as_ref()
             .is_some_and(|p| p.policy == self.analysis_policy);
         summary = summary.child(analysis_help(if settings {
-            format!("{displayed} sensitivity · saved revision")
+            format!("{displayed} sensitivity · saved result")
         } else {
             format!(
                 "Displayed: {displayed} · current settings: {}",
@@ -177,13 +177,13 @@ impl Shell {
             return group.into_any_element();
         }
         group = group.child(self.keyboard_mask_editor(cx))
-            .child(analysis_help("Areas use original pixel coordinates for this exact before/after pair, not moving page content. Apply changes the draft; Save binds a new revision and automatically reanalyzes. Ignored areas are not redaction."));
+            .child(analysis_help("Areas stay at fixed pixel positions in these before-and-after screenshots; they do not follow moving content. Apply updates your draft. Save keeps the areas and recalculates the comparison. Ignored content remains visible in the original images."));
         let mut actions = div().flex().flex_wrap().gap_2();
         for (i, label) in [
             (15, "Select next rectangle"),
             (17, "Redraw selected rectangle"),
             (16, "Delete selected rectangle"),
-            (19, "Revalidate for this pair"),
+            (19, "Check areas fit these screenshots"),
         ] {
             if self.control_mounted(Control::Phase5(i)) {
                 actions = actions.child(self.button(
@@ -208,7 +208,7 @@ impl Shell {
             .and_then(|v| v.request.as_ref())
             .is_some_and(|r| r.validate().is_err())
         {
-            group = group.child(controls::status("Saved areas belong to another capture pair or geometry. Inspect and explicitly Revalidate; masks are never stretched.", Tone::Warning));
+            group = group.child(controls::status("Saved areas came from different screenshots or image sizes. Review their positions, then choose Check areas fit these screenshots. Areas are never stretched automatically.", Tone::Warning));
         }
         group.into_any_element()
     }

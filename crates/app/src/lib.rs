@@ -8,6 +8,7 @@ pub mod images;
 pub mod jobs;
 pub(crate) mod official_catalog;
 pub mod product;
+pub mod recovery;
 pub mod review;
 pub mod task;
 #[cfg(feature = "ui")]

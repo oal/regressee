@@ -236,7 +236,7 @@ fn setup(
         cx,
         root,
         "custom-width",
-        &[("field-Custom width (CSS pixels)", Owner::Form)],
+        &[("field-Custom width (pixels)", Owner::Form)],
         ledger,
     );
     edit(&shell, cx, Control::CrawlField(8), "768");
@@ -245,7 +245,7 @@ fn setup(
         cx,
         root,
         "custom-height",
-        &[("field-Custom height (CSS pixels)", Owner::Form)],
+        &[("field-Custom height (pixels)", Owner::Form)],
         ledger,
     );
     activate(&shell, cx, Control::Guided(12));
@@ -332,7 +332,7 @@ fn setup(
         root,
         "invalid-advanced-revealed",
         &[
-            ("field-Parallel active pages", Owner::Form),
+            ("field-Pages at once", Owner::Form),
             ("field-correction", Owner::Form),
             ("setup-progress", Owner::Window),
         ],
@@ -551,7 +551,9 @@ fn renderer_capture_phase5(cx: &mut TestAppContext) {
                 &mut ledger,
             );
         }
-        activate(&shell, cx, Control::Guided(16));
+        activate(&shell, cx, Control::DiscardPageList);
+        cx.simulate_prompt_answer("Discard pages");
+        cx.run_until_parked();
         activate(&shell, cx, Control::Guided(17));
         shell.update(cx, |s, cx| {
             load_review(s, project, cx);

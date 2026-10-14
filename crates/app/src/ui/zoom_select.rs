@@ -19,6 +19,9 @@ pub enum ZoomChoice {
     Percent(u16),
 }
 
+/// A help request is not a zoom selection and must not change the transform.
+pub struct ImageControlsRequested;
+
 const OPTIONS: [ZoomChoice; 7] = [
     ZoomChoice::FitWidth,
     ZoomChoice::Percent(100),
@@ -44,8 +47,8 @@ fn current_index(fit: bool, zoom: f32) -> Option<usize> {
     })
 }
 
-fn popup_bounds(trigger: Bounds<Pixels>, viewport: Size<Pixels>) -> Bounds<Pixels> {
-    super::selector::popup_bounds(trigger, viewport, OPTIONS.len(), 256.)
+fn popup_bounds(trigger: Bounds<Pixels>, viewport: Size<Pixels>, rows: usize) -> Bounds<Pixels> {
+    super::selector::popup_bounds(trigger, viewport, rows, 256.)
 }
 
 pub struct ZoomSelect {
@@ -53,6 +56,7 @@ pub struct ZoomSelect {
     zoom: f32,
     enabled: bool,
     compact: bool,
+    image_controls_available: bool,
     open: bool,
     focus: FocusHandle,
     highlighted: usize,
@@ -62,6 +66,7 @@ pub struct ZoomSelect {
 }
 
 impl EventEmitter<ZoomChoice> for ZoomSelect {}
+impl EventEmitter<ImageControlsRequested> for ZoomSelect {}
 
 impl ZoomSelect {
     pub fn new(cx: &mut Context<Self>) -> Self {
@@ -70,6 +75,7 @@ impl ZoomSelect {
             zoom: 1.,
             enabled: false,
             compact: false,
+            image_controls_available: false,
             open: false,
             focus: cx.focus_handle().tab_stop(false),
             highlighted: 0,
@@ -86,6 +92,18 @@ impl ZoomSelect {
         self.open
     }
 
+    pub fn set_image_controls_available(&mut self, available: bool, cx: &mut Context<Self>) {
+        if self.image_controls_available != available {
+            self.image_controls_available = available;
+            self.highlighted = self.highlighted.min(self.option_count() - 1);
+            cx.notify();
+        }
+    }
+
+    fn option_count(&self) -> usize {
+        OPTIONS.len() + usize::from(self.compact && self.image_controls_available)
+    }
+
     pub fn sync(
         &mut self,
         fit: bool,
@@ -99,6 +117,7 @@ impl ZoomSelect {
             self.zoom = zoom;
             self.enabled = enabled;
             self.compact = compact;
+            self.highlighted = self.highlighted.min(self.option_count() - 1);
             self.focus = self.focus.clone().tab_stop(enabled);
             if !enabled {
                 self.open = false;
@@ -142,7 +161,7 @@ impl ZoomSelect {
             self.toggle(window, cx);
             return;
         }
-        self.highlighted = index.min(OPTIONS.len() - 1);
+        self.highlighted = index.min(self.option_count() - 1);
         self.scroll
             .scroll_to_item(self.highlighted, ScrollStrategy::Center);
         cx.notify();
@@ -156,27 +175,37 @@ impl ZoomSelect {
             let choice = *choice;
             self.dismiss(true, window, cx);
             cx.emit(choice);
+        } else if index == OPTIONS.len() && index < self.option_count() {
+            self.dismiss(true, window, cx);
+            cx.emit(ImageControlsRequested);
         }
     }
 
     fn popup(&self, trigger: Bounds<Pixels>, window: &Window, cx: &Context<Self>) -> AnyElement {
-        let bounds = popup_bounds(trigger, window.viewport_size());
+        let bounds = popup_bounds(trigger, window.viewport_size(), self.option_count());
         let current = current_index(self.fit, self.zoom);
         let highlighted = self.highlighted;
         let entity = cx.entity();
-        let list = uniform_list("zoom-options", OPTIONS.len(), move |range, _, _| {
+        let list = uniform_list("zoom-options", self.option_count(), move |range, _, _| {
             range
                 .map(|index| {
                     let target = entity.clone();
                     let selected = current == Some(index);
-                    let text = match OPTIONS[index] {
-                        ZoomChoice::FitWidth => "Fit width".to_owned(),
-                        ZoomChoice::Percent(100) => "Actual size (100%)".to_owned(),
-                        ZoomChoice::Percent(percent) => format!("{percent}%"),
+                    let text = match OPTIONS.get(index) {
+                        Some(ZoomChoice::FitWidth) => "Fit width".to_owned(),
+                        Some(ZoomChoice::Percent(100)) => "Actual size (100%)".to_owned(),
+                        Some(ZoomChoice::Percent(percent)) => format!("{percent}%"),
+                        None => "Image controls…".to_owned(),
                     };
                     div()
                         .id(("zoom-option", index))
-                        .debug_selector(move || format!("zoom-option-{index}"))
+                        .debug_selector(move || {
+                            if index == OPTIONS.len() {
+                                "zoom-image-controls".to_owned()
+                            } else {
+                                format!("zoom-option-{index}")
+                            }
+                        })
                         .w_full()
                         .h(px(CONTROL_HEIGHT))
                         .px(px(12.))
@@ -186,6 +215,13 @@ impl ZoomSelect {
                         .border_1()
                         .border_color(rgb(if highlighted == index { INK } else { SURFACE }))
                         .bg(rgb(if selected { SELECTED } else { SURFACE }))
+                        .when(index == OPTIONS.len(), |row| {
+                            row.border_t_1().border_color(rgb(if highlighted == index {
+                                INK
+                            } else {
+                                LINE
+                            }))
+                        })
                         .text_size(px(CONTROL_TEXT_SIZE))
                         .line_height(px(CONTROL_LINE_HEIGHT))
                         .font_weight(FontWeight::MEDIUM)
@@ -284,7 +320,7 @@ impl Render for ZoomSelect {
                 if !this.open {
                     this.toggle(window, cx);
                 }
-                this.navigate(OPTIONS.len() - 1, window, cx);
+                this.navigate(this.option_count() - 1, window, cx);
             }))
             .on_action(cx.listener(|this, _: &Choose, window, cx| {
                 if this.open {
@@ -414,6 +450,7 @@ mod tests {
         select: Entity<ZoomSelect>,
         after: FocusHandle,
         chosen: Vec<ZoomChoice>,
+        help_requests: usize,
         shell_enter: usize,
     }
 
@@ -459,10 +496,19 @@ mod tests {
                 cx.notify();
             })
             .detach();
+            cx.subscribe(
+                &select,
+                |this: &mut Host, _, _: &ImageControlsRequested, cx| {
+                    this.help_requests += 1;
+                    cx.notify();
+                },
+            )
+            .detach();
             Host {
                 select,
                 after: cx.focus_handle(),
                 chosen: vec![],
+                help_requests: 0,
                 shell_enter: 0,
             }
         })
@@ -482,10 +528,10 @@ mod tests {
     fn menu_geometry_stays_inside_small_windows_and_flips_above() {
         let viewport = size(px(820.), px(600.));
         let trigger = Bounds::new(point(px(700.), px(500.)), size(px(232.), px(40.)));
-        let popup = popup_bounds(trigger, viewport);
+        let popup = popup_bounds(trigger, viewport, OPTIONS.len());
         assert!(popup.right() <= viewport.width - px(8.));
         assert_eq!(popup.bottom() + px(4.), trigger.top());
-        let popup = popup_bounds(trigger, size(px(280.), px(220.)));
+        let popup = popup_bounds(trigger, size(px(280.), px(220.)), OPTIONS.len());
         assert!(popup.right() <= px(272.));
         assert!(popup.bottom() <= px(212.));
     }
@@ -577,5 +623,36 @@ mod tests {
             assert_eq!(line.size.height, px(16.));
             assert!(line.top() >= button.top() && line.bottom() <= button.bottom());
         }
+    }
+
+    #[gpui::test]
+    fn compact_help_is_a_separate_keyboard_and_pointer_action(cx: &mut TestAppContext) {
+        let (host, cx) = setup(cx);
+        let select = cx.update(|_, cx| host.read(cx).select.clone());
+        select.update(cx, |this, cx| {
+            this.sync(true, 0.52, true, true, cx);
+            this.set_image_controls_available(true, cx);
+        });
+        cx.simulate_keystrokes("enter end enter");
+        cx.update(|window, cx| {
+            let host = host.read(cx);
+            assert_eq!(host.help_requests, 1);
+            assert!(host.chosen.is_empty());
+            assert!(host.select.read(cx).focus.is_focused(window));
+            assert!(!host.select.read(cx).open);
+        });
+        cx.simulate_keystrokes("enter end");
+        let help = cx.debug_bounds("zoom-image-controls").unwrap();
+        cx.simulate_click(help.center(), Modifiers::none());
+        cx.update(|_, cx| {
+            assert_eq!(host.read(cx).help_requests, 2);
+            assert!(host.read(cx).chosen.is_empty());
+        });
+        select.update(cx, |this, cx| this.set_image_controls_available(false, cx));
+        cx.simulate_keystrokes("enter end enter");
+        cx.update(|_, cx| {
+            assert_eq!(host.read(cx).help_requests, 2);
+            assert_eq!(host.read(cx).chosen, [ZoomChoice::Percent(200)]);
+        });
     }
 }

@@ -221,7 +221,7 @@ impl AuthOwner {
         let binding = SessionBinding::intended(env);
         ensure!(
             worker_binding_matches(material.expose(), &binding.origins),
-            "Browser returned incompatible login binding. Log in again."
+            "The login does not match the approved websites. Log in again."
         );
         let bound = BoundSession {
             version: 2,
@@ -309,8 +309,8 @@ impl Product {
         let message=match saved {
             Some(_) if invalid.is_some()=>invalid.as_ref().unwrap().clone(),
             Some((s,true)) if auth.ephemeral.contains_key(&s.id)=>"Login is available only for this app session, until Regressee closes. Not saved to disk.".into(),
-            Some((_,true))=>"Ephemeral login ended. Log in again.".into(),
-            Some((_,false))=>"Encrypted saved login. Access is confirmed by probes/captures, not by its presence.".into(),
+            Some((_,true))=>"Your temporary login session ended. Log in again.".into(),
+            Some((_,false))=>"Login saved securely. Regressee checks that it still works when visiting pages.".into(),
             None if env.access==AccessPolicy::InteractiveLogin=>"Log in before finding or capturing pages.".into(),
             None=>"Public access selected. You can still set up consent in the browser.".into(),
         };
@@ -356,7 +356,7 @@ impl Product {
             && !reference.as_ref().is_some_and(|(s, _)| s == supplied)
         {
             return Err(needs_login(
-                "Saved login reference is invalid. Log in again.",
+                "The saved login could not be verified. Log in again.",
             ));
         }
         let Some((scope, ephemeral)) = reference else {
@@ -371,10 +371,10 @@ impl Product {
             let saved = owner
                 .ephemeral
                 .get(&scope.id)
-                .ok_or_else(|| needs_login("Ephemeral login ended. Log in again."))?;
+                .ok_or_else(|| needs_login("Your temporary login session ended. Log in again."))?;
             if saved.scope != scope {
                 return Err(needs_login(
-                    "Ephemeral login belongs to another environment. Log in again.",
+                    "This temporary login belongs to another environment. Log in again.",
                 ));
             }
             SessionMaterial::new(saved.material.expose().to_vec())?
@@ -386,7 +386,7 @@ impl Product {
         let bound = serde_json::from_slice::<BoundSession>(material.expose()).map_err(|_| {
             owner.probe = None;
             needs_login(
-                "Saved login has a legacy or incompatible binding. Log in again before visits.",
+                "This saved login is no longer compatible. Log in again before opening pages.",
             )
         })?;
         if bound.version != 2
@@ -395,7 +395,7 @@ impl Product {
         {
             owner.probe = None;
             return Err(needs_login(
-                "Saved login does not match this environment's origins or access policy. Log in again before visits.",
+                "The saved login does not match this environment's websites or access settings. Log in again before opening pages.",
             ));
         }
         Ok(Some(AuthState {
@@ -546,7 +546,7 @@ impl Product {
         );
         if let Err(e) = result {
             owner.login = Some(login);
-            return Err(e).context("Representative page did not confirm replay. Complete login/consent, then try I'm ready again; unsupported device-bound/rotating sessions may not replay.");
+            return Err(e).context("Your saved login could not open the test page in a separate browser session. Finish login or cookie consent, then choose I'm ready again. Some websites do not allow saved logins to be reused.");
         }
         let material = material.context("Browser did not return confirmed state")?;
         owner.replace_session(store, &scope, material, login.ephemeral)?;
@@ -676,7 +676,7 @@ impl Product {
             ensure!(
                 self.auth.lock().unwrap().probe.as_ref()
                     == Some(&probe_token(store, project, env)?),
-                "Preview mapped URLs and probe representative pages before the full check"
+                "Preview mapped URLs and check access to sample pages before running the full check"
             );
         }
         Ok(())

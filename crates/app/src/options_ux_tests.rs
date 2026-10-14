@@ -15,6 +15,196 @@ fn inside(inner: Bounds<Pixels>, outer: Bounds<Pixels>) {
 }
 
 #[gpui::test]
+fn discovery_selection_reveals_actions_and_navigation_inspects_pages(cx: &mut TestAppContext) {
+    discovery_selection(cx, false);
+}
+
+#[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+#[gpui::test]
+#[ignore = "bounded discovery selection offscreen capture with synthetic isolated data"]
+fn renderer_capture_discovery_selection(cx: &mut TestAppContext) {
+    discovery_selection(cx, true);
+}
+
+fn discovery_selection(cx: &mut TestAppContext, render: bool) {
+    #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+    let capture_root = render.then(|| {
+        let root = crate::ui_renderer_capture::output_root().unwrap();
+        cx.enable_offscreen_renderer().unwrap();
+        root
+    });
+    #[cfg(not(all(feature = "ui-renderer-capture", target_os = "linux")))]
+    assert!(
+        !render,
+        "offscreen capture requires the Linux renderer feature"
+    );
+    let dir = tempfile::tempdir().unwrap();
+    let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
+    let saved_project = store.load_project(project).unwrap();
+    let saved_evidence = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    shell.update(cx, |s, cx| {
+        load_review(s, project, cx);
+        options_ux::fixture_discovery(s);
+        let blocked = &mut s.preview.as_mut().unwrap().inventory.pages[1];
+        blocked.canonical = format!(
+            "https://other.test/login?return=https%3A%2F%2Fexample.test%2F{}",
+            "long-path%2F".repeat(8)
+        )
+        .parse()
+        .unwrap();
+        blocked.included = false;
+        blocked.reason =
+            Some("Website not approved — add and confirm it as a starting address".into());
+        cx.notify();
+    });
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        cx.simulate_resize(size(px(width), px(height)));
+        let (first, blocked, last) = shell.update(cx, |s, cx| {
+            s.configure_review_geometry(width);
+            s.result_filters_open = false;
+            s.discovery_details_open = false;
+            s.notice = None;
+            s.error = None;
+            s.search.clear();
+            let pages = &s.preview.as_ref().unwrap().inventory.pages;
+            let ids = (pages[0].id, pages[1].id, pages.last().unwrap().id);
+            s.selected_page = Some(ids.0);
+            s.preview_list_scroll
+                .scroll_to_item(0, gpui::ScrollStrategy::Top);
+            cx.notify();
+            ids
+        });
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        assert!(cx.debug_bounds("discovery-selection-help").is_some());
+        shell.read_with(cx, |s, _| assert!(!s.options_panel_open()));
+        // Clicking the real mounted row reveals its actions without a second
+        // trip through the Page options trigger.
+        let row = cx
+            .debug_bounds(format!("page-row-candidate-{first}").leak())
+            .unwrap();
+        cx.simulate_click(row.center(), gpui::Modifiers::none());
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        shell.read_with(cx, |s, cx| {
+            assert_eq!(s.selected_page, Some(first));
+            assert!(s.options_panel_open());
+            assert!(s.control_enabled(Control::Guided(22), cx));
+        });
+        inside(
+            cx.debug_bounds("action-Guided(22)").unwrap(),
+            cx.debug_bounds("page-options-panel-scroll").unwrap(),
+        );
+        #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+        if let Some(root) = &capture_root {
+            crate::ui_renderer_capture::capture(
+                cx,
+                root,
+                &format!("{width:.0}x{height:.0}-selected-included"),
+            )
+            .unwrap();
+        }
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.activate_control(Control::Guided(22), window, cx);
+                assert!(!s.preview.as_ref().unwrap().inventory.pages[0].included);
+                s.activate_control(Control::Guided(22), window, cx);
+                assert!(s.preview.as_ref().unwrap().inventory.pages[0].included);
+                s.activate_control(Control::CloseOptions, window, cx);
+                assert!(!s.options_panel_open());
+                s.activate_control(Control::Guided(24), window, cx);
+                assert_eq!(s.selected_page, Some(blocked));
+                assert!(
+                    s.options_panel_open(),
+                    "Next page reveals details, not just selection paint"
+                );
+                assert!(!s.control_enabled(Control::Guided(22), cx));
+                s.activate_control(Control::Guided(22), window, cx);
+                assert!(!s.preview.as_ref().unwrap().inventory.pages[1].included);
+            });
+            let _ = window.draw(cx);
+        });
+        // Font metrics and very long addresses can require scrolling the
+        // bounded details body; recovery must remain reachable in that body.
+        let recovery = cx.debug_bounds("discovery-inclusion-blocked-help").unwrap();
+        let viewport = cx.debug_bounds("page-options-panel-scroll").unwrap();
+        if recovery.bottom() > viewport.bottom() {
+            shell.update(cx, |s, cx| {
+                let offset = s.options_scroll.offset();
+                s.options_scroll.set_offset(gpui::point(
+                    offset.x,
+                    offset.y + viewport.bottom() - recovery.bottom(),
+                ));
+                cx.notify();
+            });
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+        }
+        inside(
+            cx.debug_bounds("discovery-inclusion-blocked-help").unwrap(),
+            viewport,
+        );
+        let address = cx.debug_bounds("discovery-selected-address").unwrap();
+        assert!(address.left() >= viewport.left() && address.right() <= viewport.right());
+        #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+        if let Some(root) = &capture_root {
+            crate::ui_renderer_capture::capture(
+                cx,
+                root,
+                &format!("{width:.0}x{height:.0}-selected-blocked"),
+            )
+            .unwrap();
+        }
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.options_scroll
+                    .set_offset(gpui::point(px(0.), -s.options_scroll.max_offset().height));
+                s.activate_control(Control::Guided(23), window, cx);
+                assert_eq!(s.selected_page, Some(first));
+                assert_eq!(s.options_scroll.offset(), gpui::point(px(0.), px(0.)));
+                // Navigation must reveal selections beyond the initial viewport.
+                s.selected_page = Some(last);
+                s.activate_control(Control::Guided(23), window, cx);
+            });
+            let _ = window.draw(cx);
+        });
+        let selected = shell.read_with(cx, |s, _| s.selected_page.unwrap());
+        inside(
+            cx.debug_bounds(format!("page-row-candidate-{selected}").leak())
+                .unwrap(),
+            cx.debug_bounds("inventory-preview").unwrap(),
+        );
+        // A stale click hidden by search cannot reopen the panel or steal selection.
+        shell.update(cx, |s, cx| {
+            s.result_filters_open = false;
+            s.search = "no-matches".into();
+            s.select_preview_page(first);
+            assert_eq!(s.selected_page, Some(selected));
+            assert!(!s.options_panel_open());
+            s.search.clear();
+            cx.notify();
+        });
+    }
+    owned.join_after_ui();
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        store.load_project(project).unwrap().project,
+        saved_project.project
+    );
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        saved_evidence
+    );
+}
+
+#[gpui::test]
 fn discovery_options_keep_the_list_and_close_reachable_with_long_notes(cx: &mut TestAppContext) {
     let dir = tempfile::tempdir().unwrap();
     let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
@@ -53,7 +243,7 @@ fn discovery_options_keep_the_list_and_close_reachable_with_long_notes(cx: &mut 
         let panel = cx.debug_bounds("page-options-panel").unwrap();
         let list = cx.debug_bounds("inventory-preview").unwrap();
         let close = cx.debug_bounds("action-CloseOptions").unwrap();
-        let dismiss = cx.debug_bounds("action-Guided(16)").unwrap();
+        let dismiss = cx.debug_bounds("action-DiscardPageList").unwrap();
         inside(panel, workspace);
         inside(list, workspace);
         inside(close, panel);
@@ -69,7 +259,7 @@ fn discovery_options_keep_the_list_and_close_reachable_with_long_notes(cx: &mut 
             let _ = window.draw(cx);
         });
         assert_eq!(cx.debug_bounds("action-CloseOptions").unwrap(), close);
-        assert_eq!(cx.debug_bounds("action-Guided(16)").unwrap(), dismiss);
+        assert_eq!(cx.debug_bounds("action-DiscardPageList").unwrap(), dismiss);
         cx.update(|window, cx| {
             shell.update(cx, |s, cx| {
                 s.reveal_review_control(Control::Guided(22), window, cx);

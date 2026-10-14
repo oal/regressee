@@ -265,7 +265,7 @@ pub(super) fn fixture_named(
     (store, project.id, latest.unwrap())
 }
 
-fn capture_only(s: &mut Shell, store: &regressee_storage::Store, state: &str) {
+pub(super) fn capture_only(s: &mut Shell, store: &regressee_storage::Store, state: &str) {
     let baseline = s.evidence.baseline.clone().unwrap();
     let record = store.load_run(baseline.references[0].run).unwrap();
     let mut tiles = Vec::new();
@@ -558,6 +558,46 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
     let mut manifest = Vec::new();
     for (width, height) in [(1280., 800.), (820., 600.)] {
         for label in scenes {
+            let clarity_pass = std::env::var_os("REGRESSEE_RENDERER_CLARITY").is_some();
+            if clarity_pass
+                && !matches!(
+                    label,
+                    "access-options"
+                        | "pages-images"
+                        | "pages-advanced-tail"
+                        | "review-analysis-advanced"
+                        | "review-analysis-switches-tail"
+                        | "app-settings-network"
+                        | "diagnostic-preview"
+                        | "about"
+                )
+            {
+                continue;
+            }
+            // Finite wording inspection at both desktop sizes. Keep earlier
+            // qualification batches and their scene selection unchanged.
+            let copy_pass = std::env::var_os("REGRESSEE_RENDERER_COPY").is_some();
+            if copy_pass
+                && !matches!(
+                    label,
+                    "access-login"
+                        | "mapping-preview"
+                        | "discovery-options"
+                        | "review-analysis"
+                        | "review-filters"
+                        | "review-approval-confirm"
+                        | "capture-saved"
+                        | "capture-gaps"
+                        | "history-baselines"
+                        | "history-storage"
+                        | "export-preview"
+                        | "import-preview"
+                        | "delete-preview"
+                        | "integrity-preview"
+                )
+            {
+                continue;
+            }
             let phase7 = std::env::var_os("REGRESSEE_RENDERER_PHASE7").is_some();
             if phase7
                 && !(label == "review-diagnostics-tail"
@@ -568,6 +608,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
             }
             // New supplemental scenes never silently expand earlier batches.
             if !phase7
+                && !clarity_pass
                 && (label == "review-diagnostics-tail"
                     || label.starts_with("review-analysis-field-")
                     || label == "review-analysis-switches-tail")
@@ -703,7 +744,10 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
             let owned = jobs.clone();
             let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
             cx.simulate_resize(size(px(width), px(height)));
-            let screen = if label.starts_with("projects") || label == "new-website" {
+            let screen = if label.starts_with("projects")
+                || label == "new-website"
+                || (copy_pass && label == "import-preview")
+            {
                 Screen::Projects
             } else if label.starts_with("history")
                 || matches!(label, "export-preview" | "delete-preview")
@@ -741,6 +785,17 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                         else if label.starts_with("pages-") { SetupStage::Pages } else { SetupStage::Settings };
                     s.focus.advanced = matches!(label, "pages-advanced" | "pages-advanced-tail" | "access-options" | "mapping-preview" | "timezone-popup");
                 }
+                if clarity_pass {
+                    match label {
+                        "access-options" => s.activate_control(Control::EnvironmentOptions, window, cx),
+                        "app-settings-network" => {
+                            s.activate_control(Control::Details(Detail::ManagedNetwork), window, cx);
+                            s.activate_control(Control::Details(Detail::Network), window, cx);
+                        },
+                        "diagnostic-preview" => s.activate_control(Control::Details(Detail::SupportTools), window, cx),
+                        _ => (),
+                    }
+                }
                 match label {
                     "projects-empty" => { s.projects.items.clear(); s.project = None; s.projects_dirty = false; },
                     "projects-loading" | "projects-failed" => {
@@ -775,7 +830,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     },
                     "access-status-loading" => { s.environment=None; },
                     "pages-invalid"=>{s.crawl_fields[4].update(cx,|f,cx|f.set_value("9",cx));s.activate_control(Control::Save,window,cx);assert_eq!(s.focus.setup_stage,SetupStage::Pages);assert!(s.pending.is_none());},
-                    "mapping-preview" => { s.show_mapping = true; s.environment.as_mut().unwrap().mapped = (0..40).map(|i| (format!("https://northline.example/products/item-{i}/"), format!("https://staging.northline.example/products/item-{i}/"))).collect(); },
+                    "mapping-preview" => { if copy_pass { s.setup_environment_open = true; } s.show_mapping = true; s.environment.as_mut().unwrap().mapped = (0..40).map(|i| (format!("https://northline.example/products/item-{i}/"), format!("https://staging.northline.example/products/item-{i}/"))).collect(); },
                     "pages-baseline" => { s.focus.review_surface = ReviewSurface::Pages; },
                     "discovery" | "discovery-options" | "discovery-no-matches" => { discovery(s); s.result_filters_open = label != "discovery"; if label.ends_with("no-matches") { s.crawl_fields[9].update(cx, |f, cx| f.set_value("nothing-matches", cx)); } },
                     "review-mobile" => { let key = s.evidence.latest.as_ref().unwrap().run.targets[1].key.clone(); s.selected_key = Some(key); s.reload_viewer(cx); finish_jobs(s, cx); },
@@ -832,7 +887,13 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                             assert!(s.approval_exact_open);
                         }
                     },
-                    "capture-gaps" | "capture-failed" | "capture-ready" | "capture-saved" => { capture_only(s, &store, label.strip_prefix("capture-").unwrap()); },
+                    "capture-gaps" | "capture-failed" | "capture-ready" | "capture-saved" => {
+                        if copy_pass && label == "capture-saved" {
+                            crate::ux_copy_tests::baseline_saved_reply(s, cx);
+                            finish_jobs(s, cx);
+                        }
+                        capture_only(s, &store, label.strip_prefix("capture-").unwrap());
+                    },
                     "capture-mobile" => {
                         capture_only(s, &store, "ready");
                         let record = s.evidence.latest.as_ref().unwrap();
@@ -901,7 +962,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
             }
             let anchor = match label {
                 "access-login-actions" => Some("action-Guided(31)"),
-                "access-options" => Some("field-Source origin or section base"),
+                "access-options" => Some("field-Original website or section"),
                 "mapping-preview" => Some("mapping-preview"),
                 "timezone-popup" => Some("field-Capture timezone"),
                 "pages-screen-sizes" => Some("section-Screen sizes"),
@@ -910,11 +971,10 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                 "pages-advanced" => Some("field-Links away from starting addresses"),
                 "pages-advanced-tail" => Some("field-Retries for temporary failures"),
                 "app-settings-network" => Some("managed-network-section"),
-                "app-settings-diagnostics" | "diagnostic-preview" => {
-                    Some("section-Private diagnostics")
-                }
+                "app-settings-diagnostics" | "diagnostic-preview" => Some("section-Support report"),
                 "history-provenance" => Some("action-Details(History)"),
                 "export-preview" => Some("action-Phase6(3)"),
+                "import-preview" if copy_pass => Some("portability-preview"),
                 "delete-preview" => Some("action-Phase6(6)"),
                 "integrity-preview" => Some("action-Phase6(14)"),
                 _ => None,
@@ -922,7 +982,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
             if let Some(anchor) = anchor {
                 let bounds = cx
                     .debug_bounds(anchor)
-                    .expect("review section must be rendered");
+                    .unwrap_or_else(|| panic!("{label}: {anchor} must be rendered"));
                 shell.update(cx, |s, cx| {
                     let context = if matches!(
                         label,
@@ -992,25 +1052,14 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                     })
                 });
             }
-            let advanced_labels = [
-                "Color tolerance (ΔE00)",
-                "Whole-page changed percentage",
-                "Local changed percentage",
-                "Local minimum changed pixels",
-                "Local minimum eligible pixels",
-                "Local window size (pixels)",
-                "Local window stride (pixels)",
-                "Connected region minimum pixels",
-                "Ignored-coverage warning percentage",
-            ];
             let field_selector = label.strip_prefix("review-analysis-field-").map(|n| {
                 // Debug selectors accept static strings; this bounded opt-in test
                 // allocates only nine selectors per window, never product data.
-                &*format!("field-{}", advanced_labels[n.parse::<usize>().unwrap()]).leak()
+                &*format!("analysis-parameter-field-{}", n.parse::<usize>().unwrap()).leak()
             });
             let disclosure_anchor = match label {
                 "review-diagnostics" => Some("capture-provenance-details"),
-                "review-analysis-advanced" => Some("field-Color tolerance (ΔE00)"),
+                "review-analysis-advanced" => Some("analysis-parameter-field-0"),
                 "review-analysis-switches-tail" => Some("check-Phase5(28)"),
                 _ if field_selector.is_some() => field_selector,
                 _ => None,
@@ -1060,7 +1109,9 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
                 });
             }
             if let Some(anchor) = disclosure_anchor {
-                let bounds = cx.debug_bounds(anchor).expect("disclosed content mounted");
+                let bounds = cx
+                    .debug_bounds(anchor)
+                    .unwrap_or_else(|| panic!("{label}: {anchor} must be mounted"));
                 shell.update(cx, |s, cx| {
                     let old = s.review_details_scroll.offset();
                     let delta = s.review_details_scroll.bounds().top() + px(8.) - bounds.top();
@@ -1180,7 +1231,7 @@ fn renderer_capture_whole_app(cx: &mut TestAppContext) {
             let selectors: &[&str] = match label {
                 "new-website" => &["field-Project name", "field-Starting addresses"],
                 "review-diagnostics" => &["capture-provenance-details"],
-                "review-analysis-advanced" => &["field-Color tolerance (ΔE00)"],
+                "review-analysis-advanced" => &["analysis-parameter-field-0"],
                 "review-zoom-menu" => &["zoom-popup", "zoom-option-0", "zoom-option-1"],
                 "review-overlay" => &["phase5-before"],
                 "review-heatmap" => &["phase5-difference"],

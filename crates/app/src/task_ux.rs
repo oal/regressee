@@ -2,6 +2,7 @@
 //! Exclusive tasks own their presentation, focus and stop lifecycle.
 use super::*;
 use regressee_app::{
+    recovery::{Destination, Problem},
     task::{CaptureDetails, CaptureStatus, Kind, Spec, State, Surface, capture_recovery},
     ui::{
         status_icon::{StatusIcon, status_icon},
@@ -23,6 +24,7 @@ pub(super) struct Task {
     pub started: std::time::Instant,
     pub elapsed: u64,
     pub result: Option<Outcome>,
+    pub settings_saved_before_task: bool,
     pub progress: Option<(String, u32, Option<u32>)>,
     pub capture: Option<CaptureStatus>,
     pub scroll: gpui::ScrollHandle,
@@ -31,11 +33,12 @@ pub(super) struct Task {
 }
 
 pub(super) struct Outcome {
-    title: String,
-    message: String,
-    action: &'static str,
+    pub(super) title: String,
+    pub(super) message: String,
+    pub(super) action: &'static str,
     failed: bool,
     destination: Option<(Screen, ReviewSurface)>,
+    pub(super) recovery: Option<Destination>,
     diagnostic: Option<String>,
     tone: Tone,
     icon: StatusIcon,
@@ -46,7 +49,11 @@ pub(super) struct Outcome {
 }
 
 enum Counts {
-    Discovery { included: usize, visited: usize },
+    Discovery {
+        included: usize,
+        excluded: usize,
+        visited: usize,
+    },
     Capture(crawl::TargetCounts),
 }
 
@@ -112,6 +119,7 @@ impl Task {
             action: "Continue",
             failed: false,
             destination: None,
+            recovery: None,
             diagnostic: None,
             tone: Tone::Neutral,
             icon: StatusIcon::Saved,
@@ -139,10 +147,11 @@ impl Task {
                 outcome.message = if limited {
                     "This list is incomplete or limited. Review the included pages before capturing screenshots."
                 } else {
-                    "Discovery finished within your website boundaries. Review the list before capturing screenshots."
+                    "Finished finding pages within your website boundaries. Review the list before capturing screenshots."
                 }.into();
                 outcome.counts = Some(Counts::Discovery {
                     included: preview.included(),
+                    excluded: preview.inventory.pages.len() - preview.included(),
                     visited: preview.visited as usize,
                 });
                 if limited {
@@ -200,8 +209,17 @@ impl Task {
                         JobState::Paused => "Return to the workspace to resume this paused capture.",
                         JobState::Cancelled => "Start a new capture from the workspace to capture the remaining pages.",
                         JobState::Interrupted => "Review the saved work and resume the interrupted capture from the workspace.",
-                        _ => "Review the captured pages and any gaps.",
+                        _ => "Review the screenshots and any pages that could not be captured.",
                     }.into();
+                    if run.run.state == JobState::CompletedWithErrors && counts.captured == 0 {
+                        outcome.title = "No screenshots captured".into();
+                        outcome.message = "None of the selected screenshots could be captured. Review the failures before trying again.".into();
+                        if let Some(TargetOutcome::Failed { code }) = run.run.targets.first().map(|t| &t.outcome)
+                            && run.run.targets.iter().all(|t| matches!(t.outcome, TargetOutcome::Failed { code: other } if other == *code))
+                        {
+                            outcome.message = format!("{} failed: {}. {}", workflow::count_label(counts.failed, "screenshot attempt", "screenshot attempts"), code.label(), capture_recovery(*code));
+                        }
+                    }
                     outcome.tone = if run.run.state == JobState::Completed {
                         Tone::Neutral
                     } else {
@@ -225,13 +243,21 @@ impl Task {
                     );
                 } else {
                     outcome.title = "Capture results unavailable".into();
-                    outcome.message = "The completed run could not be matched to this task. Return to the workspace and refresh its saved evidence.".into();
+                    outcome.message = "Results for this task could not be loaded. Return to the workspace and choose Refresh to load saved results.".into();
                     outcome.failed = true;
                     outcome.tone = Tone::Error;
                     outcome.icon = StatusIcon::Error;
                 }
                 if outcome.capture.is_some() {
-                    outcome.action = "Review captured pages";
+                    outcome.action = if outcome
+                        .capture
+                        .as_ref()
+                        .is_some_and(|c| c.setup.counts.captured == 0)
+                    {
+                        "Review capture failures"
+                    } else {
+                        "Review captured pages"
+                    };
                     outcome.destination = Some((Screen::Results, ReviewSurface::Inspect));
                     if self.spec.kind == Kind::Check {
                         outcome.action = "Review check results";
@@ -255,13 +281,13 @@ impl Task {
                     Kind::Discovery => "Stopped before a page list was ready. Your saved baseline stays unchanged.",
                     Kind::Capture | Kind::Check | Kind::Representative => "Active work stopped. Saved screenshots are kept; the saved baseline stays unchanged. Comparison analysis may be incomplete.",
                     Kind::Setup => "Browser setup stopped. Any browser already installed successfully is kept; your projects stay unchanged.",
-                    Kind::Import => "Import stopped before the project was saved. Complete unreferenced recovery files may remain in local storage.",
-                    Kind::Export => "Export stopped before the ZIP was published. Your project stays unchanged.",
+                    Kind::Import => "Import stopped before the project was saved. Files from this attempt may still be stored for recovery.",
+                    Kind::Export => "Export stopped before the ZIP was saved. Your project stays unchanged.",
                     Kind::ArchivePreview => "ZIP inspection stopped. No project was imported.",
-                    Kind::Diagnostics => "Diagnostic preparation or export stopped before publication. Nothing was sent.",
+                    Kind::Diagnostics => "Diagnostic preparation or export stopped before the file was saved. Nothing was sent.",
                     Kind::Login => "The browser or session check stopped. Any previously saved session is kept.",
                     Kind::Access => "The website access check stopped. No screenshots or baseline were changed.",
-                    _ => "The operation acknowledged cancellation.",
+                    _ => "The operation stopped.",
                 }.into();
                 outcome.action = "Return to workspace";
             }
@@ -275,12 +301,74 @@ impl Task {
             }
             Reply::ProductFailure(error) => {
                 outcome.title = format!("{} could not finish", self.spec.title);
-                outcome.message = "The operation could not finish. Your unsaved edits are kept. Review the details, then return to the workspace to try again. Earlier completed steps may already be saved.".into();
+                let explanation: String = error
+                    .lines()
+                    .next()
+                    .filter(|line| !line.trim().is_empty())
+                    .unwrap_or("The cause was not reported.")
+                    .chars()
+                    .take(1024)
+                    .map(|c| if c.is_control() { ' ' } else { c })
+                    .collect();
+                outcome.message = format!(
+                    "{explanation}\n{}",
+                    regressee_app::task::failure_recovery(self.spec.kind)
+                );
+                if error.starts_with(regressee_runtime::setup_diagnostics::FAILURE_PREFIX) {
+                    outcome.title = "Browser setup could not finish".into();
+                    outcome.message = format!(
+                        "{} Keep the error details below if setup fails again. Your projects and screenshots are unchanged.",
+                        error.lines().next().unwrap_or("Browser setup failed.")
+                    );
+                }
                 outcome.action = "Return to workspace";
                 outcome.failed = true;
                 outcome.tone = Tone::Error;
                 outcome.icon = StatusIcon::Error;
                 outcome.diagnostic = Some(error.clone());
+                if self.spec.kind == Kind::Setup
+                    || error.starts_with(regressee_runtime::setup_diagnostics::FAILURE_PREFIX)
+                {
+                    outcome.recovery = Some(Destination::AppSettings);
+                    outcome.action = "Open App settings";
+                }
+            }
+            Reply::ActionRequired(problem) => {
+                outcome.title = problem.title().into();
+                outcome.message = problem.message().into();
+                if self.spec.kind == Kind::Check && matches!(problem, Problem::Browser(_)) {
+                    outcome.message.push_str(" Checks need the browser version used for the baseline. Updating the browser may not be enough to compare against an older baseline. You can choose to capture a new baseline instead.");
+                }
+                outcome.recovery = Some(problem.destination());
+                outcome.action = problem.destination().label();
+                if self.project_id.is_none() && problem.destination() == Destination::History {
+                    outcome.recovery = Some(Destination::AppSettings);
+                    outcome.action = "Open App settings";
+                    outcome.message = "There is not enough free disk space to finish. Free space before retrying. App settings lists the local data and cache folders; no cleanup will run automatically.".into();
+                }
+                if matches!(self.spec.kind, Kind::Export | Kind::Diagnostics)
+                    && matches!(problem, Problem::PermissionDenied)
+                {
+                    outcome.recovery = Some(Destination::Workspace);
+                    outcome.action = "Return to workspace";
+                    outcome.message = "The selected destination is not writable. Return to the workspace and choose a different folder or fix its permissions before exporting again. Your local project is kept; nothing was uploaded.".into();
+                }
+                outcome.failed = true;
+                let prerequisite = matches!(
+                    problem,
+                    Problem::Browser(_)
+                        | Problem::Worker(regressee_runtime::protocol::FailureCode::NeedsLogin)
+                );
+                outcome.tone = if prerequisite {
+                    Tone::Warning
+                } else {
+                    Tone::Error
+                };
+                outcome.icon = if prerequisite {
+                    StatusIcon::Warning
+                } else {
+                    StatusIcon::Error
+                };
             }
             Reply::RuntimeReadiness(readiness) => {
                 outcome.title = "Browser setup finished".into();
@@ -316,6 +404,9 @@ impl Task {
                 outcome.message = "The diagnostic file is saved locally. Nothing was sent.".into();
             }
             _ => (),
+        }
+        if outcome.failed && self.settings_saved_before_task {
+            outcome.message = format!("Your project settings were saved. {}", outcome.message);
         }
         outcome
     }
@@ -436,6 +527,18 @@ fn task_context(shell: &Shell, cx: &mut Context<Shell>) -> Div {
                     el.child(format!("Environment: {}", task.environment))
                 }),
         )
+        .when(
+            task.result.as_ref().is_some_and(|result| result.failed),
+            |el| {
+                el.child(
+                    div()
+                        .text_size(px(13.))
+                        .line_height(px(18.))
+                        .text_color(rgb(MUTED))
+                        .child(format!("Task: {}", task.spec.title)),
+                )
+            },
+        )
 }
 
 fn detail_heading(title: &'static str) -> Div {
@@ -482,8 +585,15 @@ fn capture_setup(setup: &CaptureStatus) -> Div {
         .child(detail_heading("Capture setup"))
         .child(detail_row("Pages", setup.pages.to_string()))
         .child(detail_row(
+            "Excluded URLs",
+            format!("{} · not scheduled for capture", setup.excluded_pages),
+        ))
+        .child(detail_row(
             "Screenshots",
-            format!("{} targets · one per page and screen size", setup.total),
+            format!(
+                "{} planned screenshots · one per page and screen size",
+                setup.total
+            ),
         ))
         .child(detail_row("Environment", setup.environment.clone()));
     for profile in &setup.profiles {
@@ -561,7 +671,7 @@ fn task_details(shell: &Shell, cx: &mut Context<Shell>) -> AnyElement {
                     .flex()
                     .flex_col()
                     .gap_2()
-                    .child(detail_heading("Capture gaps"))
+                    .child(detail_heading("Screenshots not captured"))
                     .child(
                         div()
                             .text_color(rgb(MUTED))
@@ -630,7 +740,7 @@ fn task_details(shell: &Shell, cx: &mut Context<Shell>) -> AnyElement {
                 }
                 if capture.gap_count > capture.gaps.len() {
                     gaps = gaps.child(div().text_color(rgb(MUTED)).child(format!(
-                        "Showing {} of {} gaps. Review captured pages to inspect the complete list.", capture.gaps.len(), capture.gap_count)));
+                        "Showing {} of {} missing screenshots. Review captured pages to see the complete list.", capture.gaps.len(), capture.gap_count)));
                 }
                 details = details.child(gaps);
             }
@@ -662,7 +772,14 @@ fn task_details(shell: &Shell, cx: &mut Context<Shell>) -> AnyElement {
                     .flex_col()
                     .gap_2()
                     .child(detail_heading("Error details"))
-                    .child(div().w_full().flex().flex_col().child(diagnostic.clone())),
+                    .child(
+                        div()
+                            .debug_selector(|| "task-error-details".into())
+                            .w_full()
+                            .flex()
+                            .flex_col()
+                            .child(diagnostic.clone()),
+                    ),
             );
         }
     } else if let Some(setup) = &task.capture {
@@ -769,6 +886,19 @@ impl Shell {
     }
 
     pub(super) fn begin_task(&mut self, spec: Spec) {
+        if matches!(
+            spec.kind,
+            Kind::Discovery
+                | Kind::Capture
+                | Kind::Check
+                | Kind::Representative
+                | Kind::Setup
+                | Kind::Login
+                | Kind::Access
+        ) {
+            // The discovery instruction is no longer current once capture starts.
+            self.notice = None;
+        }
         let (project, website, environment) = self.project.as_ref().map_or_else(
             || ("Local workspace".into(), String::new(), String::new()),
             |p| {
@@ -808,6 +938,7 @@ impl Shell {
             started: std::time::Instant::now(),
             elapsed: 0,
             result: None,
+            settings_saved_before_task: false,
             progress: self.progress.clone(),
             capture: None,
             reveal_details: std::rc::Rc::new(std::cell::Cell::new(false)),
@@ -841,6 +972,16 @@ impl Shell {
             task.result = Some(result);
             task.progress = None;
             task.reveal_details.set(false);
+            if task
+                .result
+                .as_ref()
+                .and_then(|result| result.diagnostic.as_ref())
+                .is_some_and(|error| {
+                    error.starts_with(regressee_runtime::setup_diagnostics::FAILURE_PREFIX)
+                })
+            {
+                task.details = true;
+            }
             if !task.has_details() {
                 task.details = false;
             }
@@ -894,7 +1035,31 @@ impl Shell {
         }
         let task = self.task.take().unwrap();
         let mut restore = task.restore;
-        if let Some((screen, surface)) = task.result.and_then(|outcome| outcome.destination) {
+        let recovery = task.result.as_ref().and_then(|outcome| outcome.recovery);
+        if let Some(destination) =
+            recovery.filter(|destination| *destination != Destination::Workspace)
+        {
+            // The blocking task has already explained the problem. Do not let
+            // its banner prevent the destination's read-only status/settings load.
+            self.error = None;
+            self.notice = None;
+            self.focus.screen = match destination {
+                Destination::AppSettings => Screen::Settings,
+                Destination::ProjectSettings => {
+                    self.focus.setup_stage = SetupStage::Settings;
+                    Screen::Setup
+                }
+                Destination::History => {
+                    self.history_section = 2;
+                    Screen::History
+                }
+                Destination::Workspace => task.origin,
+            };
+            self.focus.choosing_project = false;
+            self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+            restore = None;
+        } else if let Some((screen, surface)) = task.result.and_then(|outcome| outcome.destination)
+        {
             self.focus.screen = screen;
             self.focus.review_surface = surface;
             restore = None;
@@ -955,10 +1120,22 @@ impl Shell {
             )
             .child(task_context(self, cx));
         if let Some(outcome) = &task.result {
+            if let Some(capture) = &outcome.capture {
+                body = body.child(
+                    div()
+                        .debug_selector(|| "task-capture-selection".into())
+                        .text_color(rgb(MUTED))
+                        .child(capture.setup.selection_summary()),
+                );
+            }
             if let Some(counts) = &outcome.counts {
                 body = body.child(match counts {
                     Counts::Capture(counts) => capture_counts(counts, false),
-                    Counts::Discovery { included, visited } => count_group()
+                    Counts::Discovery {
+                        included,
+                        excluded,
+                        visited,
+                    } => count_group()
                         .child(controls::labelled_count(
                             *included,
                             if *included == 1 {
@@ -968,6 +1145,12 @@ impl Shell {
                             },
                             StatusIcon::Pages,
                             INK,
+                        ))
+                        .child(controls::labelled_count(
+                            *excluded,
+                            "URLs excluded",
+                            StatusIcon::Skipped,
+                            MUTED,
                         ))
                         .child(controls::labelled_count(
                             *visited,
@@ -984,6 +1167,7 @@ impl Shell {
             body = body.child(
                 div()
                     .flex_shrink_0()
+                    .debug_selector(|| "task-outcome-message".into())
                     .w(px(560.))
                     .max_w_full()
                     .text_color(rgb(INK))
@@ -997,38 +1181,34 @@ impl Shell {
                 task.progress
                     .clone()
                     .unwrap_or((task.spec.title.into(), 0, None));
-            let mut activity = div()
-                .debug_selector(|| "task-activity".into())
-                .flex_shrink_0()
-                .flex()
-                .flex_col()
-                .gap_3()
-                .child(controls::progress(message, completed, total))
-                .child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .items_center()
-                        .gap_3()
-                        .text_size(px(13.))
-                        .line_height(px(18.))
-                        .text_color(rgb(MUTED))
-                        .child(
-                            div()
-                                .flex()
-                                .items_center()
-                                .gap_2()
-                                .child(status_icon(StatusIcon::Clock, MUTED, 16.))
-                                .child(format!(
+            // Counters may be bytes or other task-specific units. Readable
+            // amounts belong in the label, not a duplicate unitless counter.
+            let mut activity =
+                div()
+                    .debug_selector(|| "task-activity".into())
+                    .flex_shrink_0()
+                    .flex()
+                    .flex_col()
+                    .gap_3()
+                    .child(controls::progress(message, completed, total))
+                    .child(
+                        div()
+                            .debug_selector(|| "task-elapsed".into())
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .text_size(px(13.))
+                            .line_height(px(18.))
+                            .text_color(rgb(MUTED))
+                            .child(status_icon(StatusIcon::Clock, MUTED, 16.))
+                            .child(div().debug_selector(|| "task-elapsed-copy".into()).child(
+                                format!(
                                     "Elapsed: {}m {:02}s",
                                     task.elapsed / 60,
                                     task.elapsed % 60
-                                )),
-                        )
-                        .when_some(total.filter(|n| *n > 0), |el, total| {
-                            el.child(format!("Step progress: {} / {total}", completed.min(total)))
-                        }),
-                );
+                                ),
+                            )),
+                    );
             if let Some(capture) = &task.capture {
                 activity = activity
                     .child(
@@ -1243,6 +1423,261 @@ mod tests {
     use gpui::TestAppContext;
 
     #[gpui::test]
+    fn browser_download_keeps_readable_amount_bar_and_elapsed_time(cx: &mut TestAppContext) {
+        browser_download_progress(cx, false);
+    }
+
+    #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+    #[gpui::test]
+    #[ignore = "bounded browser-download offscreen inspection in an explicit private directory"]
+    fn renderer_capture_browser_download_progress(cx: &mut TestAppContext) {
+        browser_download_progress(cx, true);
+    }
+
+    fn browser_download_progress(cx: &mut TestAppContext, render: bool) {
+        #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+        let root = render.then(|| {
+            cx.enable_offscreen_renderer().unwrap();
+            crate::ui_renderer_capture::output_root().unwrap()
+        });
+        #[cfg(not(all(feature = "ui-renderer-capture", target_os = "linux")))]
+        assert!(!render);
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let record = store.load_project(project).unwrap();
+        drop(store);
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            for work in [
+                Work::SetupRuntime,
+                Work::Discover(project),
+                Work::OpenLogin(project),
+            ] {
+                for total in [Some(258_433_266), None] {
+                    let (jobs, events) =
+                        Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+                    let owned = jobs.clone();
+                    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+                    cx.simulate_resize(size(px(width), px(height)));
+                    shell.update(cx, drain_initial_read);
+                    let message = match total {
+                        Some(_) => "Downloading private browser · 55.4 MiB of 246.5 MiB received",
+                        None => "Downloading private browser · 55.4 MiB received",
+                    };
+                    cx.update(|_, cx| {
+                        shell.update(cx, |s, cx| {
+                            s.project = Some(record.clone());
+                            s.next_request = u64::MAX;
+                            s.pending = Some(u64::MAX);
+                            s.focus.busy = true;
+                            s.begin_task(Spec::for_work(&work).unwrap());
+                            s.apply_update(
+                                Update {
+                                    id: u64::MAX,
+                                    reply: Reply::Progress {
+                                        message: message.into(),
+                                        completed: 58_080_587,
+                                        total,
+                                    },
+                                },
+                                cx,
+                            );
+                            let task = s.task.as_mut().unwrap();
+                            task.elapsed = 4;
+                            assert_eq!(task.progress.as_ref().unwrap().0, message);
+                            assert_eq!(task.progress.as_ref().unwrap().1, 58_080_587);
+                            assert_eq!(task.progress.as_ref().unwrap().2, total);
+                            cx.notify();
+                        })
+                    });
+                    cx.update(|window, cx| {
+                        let _ = window.draw(cx);
+                    });
+                    let body = cx.debug_bounds("task-body").unwrap();
+                    let elapsed = cx.debug_bounds("task-elapsed-copy").unwrap();
+                    assert!(elapsed.top() >= body.top() && elapsed.bottom() <= body.bottom());
+                    assert!(elapsed.size.width <= px(180.));
+                    let track = cx.debug_bounds("progress-track").unwrap();
+                    if let Some(total) = total {
+                        let fill = cx.debug_bounds("progress-fill").unwrap();
+                        let fraction = f32::from(fill.size.width) / f32::from(track.size.width);
+                        assert!((fraction - 58_080_587_f32 / total as f32).abs() < 0.001);
+                    } else {
+                        assert!(cx.debug_bounds("progress-fill").is_none());
+                        assert!(cx.debug_bounds("progress-indeterminate").is_some());
+                    }
+                    assert!(cx.debug_bounds("action-CancelCapture").is_some());
+                    #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+                    if let Some(root) = &root
+                        && matches!(work, Work::SetupRuntime)
+                    {
+                        let total_label = if total.is_some() { "known" } else { "unknown" };
+                        crate::ui_renderer_capture::capture(
+                            cx,
+                            root,
+                            &format!("{width:.0}x{height:.0}-browser-download-{total_label}"),
+                        )
+                        .unwrap();
+                    }
+                    owned.join_after_ui();
+                }
+            }
+        }
+    }
+
+    #[gpui::test]
+    fn zero_capture_explains_failures_and_reconciles_the_full_url_list(cx: &mut TestAppContext) {
+        zero_capture_recovery(cx, false);
+    }
+
+    #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+    #[gpui::test]
+    #[ignore = "bounded zero-capture recovery offscreen inspection in an explicit private directory"]
+    fn renderer_capture_zero_capture_recovery(cx: &mut TestAppContext) {
+        zero_capture_recovery(cx, true);
+    }
+
+    fn zero_capture_recovery(cx: &mut TestAppContext, render: bool) {
+        #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+        let root = render.then(|| {
+            cx.enable_offscreen_renderer().unwrap();
+            crate::ui_renderer_capture::output_root().unwrap()
+        });
+        #[cfg(not(all(feature = "ui-renderer-capture", target_os = "linux")))]
+        assert!(!render);
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let mut evidence = store.project_evidence(project).unwrap();
+        let r = evidence.latest.as_mut().unwrap();
+        r.run.intent = RunIntent::NewBaseline;
+        r.run.state = JobState::CompletedWithErrors;
+        r.run.profiles.truncate(1);
+        let profile = r.run.profiles[0].id;
+        r.run.inventory.pages = (0..579)
+            .map(|index| regressee_core::domain::InventoryPage {
+                id: regressee_core::domain::PageId::new(),
+                canonical: format!("https://example.test/page-{index}")
+                    .parse()
+                    .unwrap(),
+                included: index < 5,
+                reason: (index >= 5).then(|| "Website not approved".into()),
+            })
+            .collect();
+        r.run.targets = r.run.inventory.pages[..5]
+            .iter()
+            .map(|page| regressee_core::domain::CaptureTarget {
+                key: regressee_core::domain::TargetKey {
+                    page: page.id,
+                    profile,
+                },
+                requested: page.canonical.clone(),
+                final_url: None,
+                attempts: 1,
+                outcome: TargetOutcome::Failed {
+                    code: regressee_core::domain::CaptureError::RedirectOutsideScope,
+                },
+                warnings: vec![],
+            })
+            .collect();
+        r.capture = None;
+        r.captures.clear();
+        evidence.comparison = None;
+        evidence.before = None;
+        evidence.baseline = None;
+        drop(store);
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    crate::workflow_refinement_tests::load_review(s, project, cx);
+                    s.notice = Some("Review included pages and coverage before capturing.".into());
+                    s.next_request += 1;
+                    s.pending = Some(s.next_request);
+                    s.focus.busy = true;
+                    s.begin_task(
+                        Spec::for_work(&Work::CaptureInventory {
+                            project,
+                            preview: None,
+                            check: false,
+                            resume: None,
+                        })
+                        .unwrap(),
+                    );
+                    assert!(
+                        s.notice.is_none(),
+                        "stale discovery instructions must not survive capture"
+                    );
+                    s.apply_update(
+                        Update {
+                            id: s.next_request,
+                            reply: Reply::Evidence(Box::new(evidence.clone())),
+                        },
+                        cx,
+                    );
+                    let result = s.task.as_ref().unwrap().result.as_ref().unwrap();
+                    assert_eq!(result.title, "No screenshots captured");
+                    assert_eq!(result.action, "Review capture failures");
+                    assert!(result.message.contains("Unexpected redirect"));
+                    assert!(!result.message.contains("RedirectOutsideScope"));
+                    assert!(
+                        result
+                            .capture
+                            .as_ref()
+                            .unwrap()
+                            .setup
+                            .selection_summary()
+                            .contains("5 of 579")
+                    );
+                    assert_eq!(result.capture.as_ref().unwrap().setup.excluded_pages, 574);
+                    cx.notify();
+                    let _ = window;
+                })
+            });
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            let body = cx.debug_bounds("task-body").unwrap();
+            let selection = cx.debug_bounds("task-capture-selection").unwrap();
+            assert!(selection.top() >= body.top() && selection.bottom() <= body.bottom());
+            #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+            if let Some(root) = &root {
+                crate::ui_renderer_capture::capture(
+                    cx,
+                    root,
+                    &format!("{width:.0}x{height:.0}-zero-capture-task"),
+                )
+                .unwrap();
+            }
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    s.activate_control(Control::TaskContinue, window, cx);
+                    assert!(s.task.is_none());
+                    assert_eq!(s.focus.review_surface, ReviewSurface::Inspect);
+                    assert!(!s.control_enabled(Control::SaveBaseline, cx));
+                    assert!(s.selected_capture_failed());
+                    assert!(s.notice.is_none());
+                })
+            });
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            assert!(cx.debug_bounds("unavailable-target-recovery").is_some());
+            #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+            if let Some(root) = &root {
+                crate::ui_renderer_capture::capture(
+                    cx,
+                    root,
+                    &format!("{width:.0}x{height:.0}-zero-capture-inspect"),
+                )
+                .unwrap();
+            }
+            owned.join_after_ui();
+        }
+    }
+
+    #[gpui::test]
     fn phase6_task_recovery_labels_dispatch_to_implemented_workspace(cx: &mut TestAppContext) {
         let dir = tempfile::tempdir().unwrap();
         let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
@@ -1301,6 +1736,53 @@ mod tests {
             let update = shell.events.recv_timeout(Duration::from_secs(3)).unwrap();
             shell.apply_update(update, cx);
         }
+    }
+
+    #[gpui::test]
+    fn browser_setup_failure_details_open_for_explicit_discovery_and_login_tasks(
+        cx: &mut TestAppContext,
+    ) {
+        use regressee_core::domain::ProjectId;
+        use regressee_runtime::{distribution::InstallProgress, setup_diagnostics::SetupAttempt};
+        let dir = tempfile::tempdir().unwrap();
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, vcx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        let mut attempt = SetupAttempt::default();
+        attempt.observe(InstallProgress::Downloading {
+            bytes: 1024,
+            total: Some(2048),
+        });
+        let message = attempt
+            .failure(anyhow::anyhow!("Synthetic download fault"))
+            .to_string();
+        vcx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                drain_initial_read(s, cx);
+                for work in [
+                    Work::SetupRuntime,
+                    Work::Discover(ProjectId::new()),
+                    Work::OpenLogin(ProjectId::new()),
+                ] {
+                    s.next_request += 1;
+                    s.begin_task(Spec::for_work(&work).unwrap());
+                    let request = s.next_request;
+                    s.finish_task(request, &Reply::ProductFailure(message.clone()));
+                    let task = s.task.as_ref().unwrap();
+                    assert_eq!(task.state, State::Finished);
+                    assert!(task.details && task.has_details());
+                    let result = task.result.as_ref().unwrap();
+                    assert_eq!(result.title, "Browser setup could not finish");
+                    assert!(result.message.contains("failed during download"));
+                    assert_eq!(result.diagnostic.as_deref(), Some(message.as_str()));
+                    assert!(s.control_enabled(Control::TaskDetails, cx));
+                    s.activate_control(Control::TaskDetails, window, cx);
+                    assert!(!s.task.as_ref().unwrap().details);
+                    s.task = None;
+                }
+            })
+        });
+        owned.join_after_ui();
     }
 
     #[gpui::test]

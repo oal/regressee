@@ -10,6 +10,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "ui_app_settings_capture.rs"]
+mod ui_app_settings_capture;
+#[path = "ui_brand_capture.rs"]
+mod ui_brand_capture;
+#[path = "ui_image_controls_capture.rs"]
+mod ui_image_controls_capture;
+#[path = "ui_loading_feedback_capture.rs"]
+mod ui_loading_feedback_capture;
 #[path = "ui_phase1_capture.rs"]
 mod ui_phase1_capture;
 #[path = "ui_phase2_capture.rs"]
@@ -22,6 +30,10 @@ mod ui_phase4_capture;
 mod ui_phase5_capture;
 #[path = "ui_review_matrix.rs"]
 mod ui_review_matrix;
+#[path = "ui_row_hints_capture.rs"]
+mod ui_row_hints_capture;
+#[path = "ui_sidebar_capture.rs"]
+mod ui_sidebar_capture;
 
 #[test]
 fn offscreen_extent_limits_without_gpu() {
@@ -134,6 +146,23 @@ fn write_frame(
               ,"phase3_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase3_capture.rs")))
         });
         for (key, source) in [
+            ("app_settings_source_sha256", include_bytes!("app_settings_ux.rs").as_slice()),
+            ("app_settings_test_source_sha256", include_bytes!("app_settings_tests.rs").as_slice()),
+            ("app_settings_harness_source_sha256", include_bytes!("ui_app_settings_capture.rs").as_slice()),
+            ("theme_source_sha256", include_bytes!("ui/theme.rs").as_slice()),
+            ("brand_source_sha256", include_bytes!("ui/brand.rs").as_slice()),
+            ("brand_light_asset_sha256", include_bytes!("../../../assets/brand/logo-light.png").as_slice()),
+            ("brand_dark_asset_sha256", include_bytes!("../../../assets/brand/logo-dark.png").as_slice()),
+            ("brand_harness_source_sha256", include_bytes!("ui_brand_capture.rs").as_slice()),
+            ("sidebar_harness_source_sha256", include_bytes!("ui_sidebar_capture.rs").as_slice()),
+            ("row_hints_harness_source_sha256", include_bytes!("ui_row_hints_capture.rs").as_slice()),
+            ("loading_feedback_source_sha256", include_bytes!("loading_ux.rs").as_slice()),
+            ("loading_feedback_tests_source_sha256", include_bytes!("loading_feedback_tests.rs").as_slice()),
+            ("loading_feedback_harness_source_sha256", include_bytes!("ui_loading_feedback_capture.rs").as_slice()),
+            ("image_controls_test_source_sha256", include_bytes!("image_controls_tests.rs").as_slice()),
+            ("image_controls_harness_source_sha256", include_bytes!("ui_image_controls_capture.rs").as_slice()),
+            ("recovery_policy_source_sha256", include_bytes!("recovery.rs").as_slice()),
+            ("recovery_journey_source_sha256", include_bytes!("recovery_ux_tests.rs").as_slice()),
             ("renderer_harness_source_sha256", include_bytes!("ui_renderer_capture.rs").as_slice()),
             ("phase5_harness_source_sha256", include_bytes!("ui_phase5_capture.rs").as_slice()),
             ("phase5_state_source_sha256", include_bytes!("phase5_state_tests.rs").as_slice()),
@@ -546,7 +575,7 @@ fn renderer_capture_options_ux(cx: &mut TestAppContext) {
                 workflow_visible_bounds(cx, "page-options-panel", width, height);
                 workflow_visible_action(cx, Control::CloseOptions, width, height);
                 if shell.read_with(cx, |s, _| s.preview.is_some()) {
-                    workflow_visible_action(cx, Control::Guided(16), width, height);
+                    workflow_visible_action(cx, Control::DiscardPageList, width, height);
                 }
                 if label == "filters-lower-controls" {
                     workflow_visible_bounds(cx, "check-Guided(19)", width, height);
@@ -1021,6 +1050,89 @@ fn renderer_capture_tasks(cx: &mut TestAppContext) {
         serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
         original
     );
+}
+
+#[gpui::test]
+#[ignore = "bounded browser-setup error capture; synthetic state, no downloads or browser launches"]
+fn renderer_capture_browser_setup_errors(cx: &mut TestAppContext) {
+    use regressee_core::domain::ProjectId;
+    use regressee_runtime::{distribution::InstallProgress, setup_diagnostics::SetupAttempt};
+    let root = output_root().unwrap();
+    let reviewed: serde_json::Value =
+        serde_json::from_slice(&fs::read(root.join("proof-reviewed.json")).unwrap()).unwrap();
+    assert_eq!(reviewed["personally_reviewed"], true);
+    assert_eq!(
+        reviewed["png_sha256"],
+        hex::encode(Sha256::digest(
+            fs::read(root.join("renderer-proof.png")).unwrap(),
+        ))
+    );
+    cx.enable_offscreen_renderer().unwrap();
+    let dir = tempfile::Builder::new()
+        .prefix("setup-error-fixture-")
+        .tempdir_in(&root)
+        .unwrap();
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        for (label, phase) in [
+            (
+                "download",
+                InstallProgress::Downloading {
+                    bytes: 78235044,
+                    total: Some(244691932),
+                },
+            ),
+            ("publication", InstallProgress::Publishing),
+        ] {
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            let (shell, vcx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            vcx.simulate_resize(size(px(width), px(height)));
+            vcx.update(|_, cx| {
+                shell.update(cx, |s, cx| {
+                    finish_jobs(s, cx);
+                    s.next_request = u64::MAX;
+                    s.begin_task(
+                        regressee_app::task::Spec::for_work(&Work::Discover(ProjectId::new()))
+                            .unwrap(),
+                    );
+                    let mut attempt = SetupAttempt::default();
+                    attempt.observe(InstallProgress::Downloading {
+                        bytes: 78235044,
+                        total: Some(244691932),
+                    });
+                    attempt.observe(phase);
+                    let source = if label == "download" {
+                        anyhow::anyhow!("Synthetic network request timed out")
+                            .context("Downloading Chromium from storage.googleapis.com")
+                    } else {
+                        anyhow::Error::new(std::io::Error::from_raw_os_error(5))
+                            .context("Cannot publish verified official runtime generation")
+                    };
+                    s.finish_task(
+                        u64::MAX,
+                        &Reply::ProductFailure(attempt.failure(source).to_string()),
+                    );
+                    assert!(s.task.as_ref().unwrap().details);
+                    cx.notify();
+                })
+            });
+            capture(
+                vcx,
+                &root,
+                &format!("setup-error-{width:.0}x{height:.0}-{label}"),
+            )
+            .unwrap();
+            let body = workflow_visible_bounds(vcx, "task-body", width, height);
+            let actions = workflow_visible_bounds(vcx, "task-actions", width, height);
+            assert!(body.bottom() <= actions.top());
+            workflow_visible_bounds(vcx, "task-title-copy", width, height);
+            workflow_visible_bounds(vcx, "action-TaskContinue", width, height);
+            workflow_visible_bounds(vcx, "action-TaskDetails", width, height);
+            let error = vcx.debug_bounds("task-error-details").unwrap();
+            assert!(error.size.width > px(300.) && error.right() <= body.right());
+            owned.join_after_ui();
+        }
+    }
 }
 
 #[gpui::test]

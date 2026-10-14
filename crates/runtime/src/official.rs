@@ -43,6 +43,18 @@ pub enum ArchiveFormat {
     TarGz,
 }
 
+/// A different release is installed, not proof that its files are damaged.
+/// This grants no trust or automatic replacement permission.
+#[derive(Debug)]
+pub struct InstalledReleaseMismatch;
+
+impl std::fmt::Display for InstalledReleaseMismatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Installed browser components do not match this app build")
+    }
+}
+impl std::error::Error for InstalledReleaseMismatch {}
+
 fn digest_valid(s: &str) -> bool {
     s.len() == 64
         && s.bytes()
@@ -315,11 +327,12 @@ fn verify(root: &Path, c: &Catalog, cancel: &AtomicBool) -> Result<Installed> {
     distribution::safe_directory(root)?;
     inventory(root, root, c, cancel)?;
     for (name, e) in &c.manifest.files {
-        let f = regular(&root.join(name), e.bytes)?;
+        let f = regular(&root.join(name), e.bytes)
+            .with_context(|| format!("Checking installed runtime file {name}"))?;
         let meta = f.metadata()?;
         ensure!(
             meta.len() == e.bytes && distribution::hash(f, cancel)? == e.sha256,
-            "official runtime damaged; repair required"
+            "official runtime damaged; repair required: {name}"
         );
         #[cfg(unix)]
         {
@@ -353,10 +366,22 @@ pub fn resolve(cache: &Path, c: &Catalog, cancel: &AtomicBool) -> Result<Install
         distribution::safe_name(&name) && !name.contains('/') && name.starts_with("runtime-"),
         "invalid official runtime pointer"
     );
-    let installed = verify(&cache.join(name), c, cancel)?;
+    let root = cache.join(name);
+    // Reading a different release's marker must not follow a linked runtime
+    // directory or grant it trust. Full inventory verification still follows
+    // for a matching release.
+    distribution::safe_directory(&root)?;
     let mut ready = String::new();
-    regular(&installed.root.join("READY"), 128)?.read_to_string(&mut ready)?;
+    regular(&root.join("READY"), 128)?.read_to_string(&mut ready)?;
+    if ready != c.manifest.id
+        && distribution::safe_name(&ready)
+        && ready.starts_with("official-")
+        && ready.ends_with(&format!("-{}-{}", c.manifest.os, c.manifest.arch))
+    {
+        return Err(InstalledReleaseMismatch.into());
+    }
     ensure!(ready == c.manifest.id, "official runtime smoke missing");
+    let installed = verify(&root, c, cancel)?;
     Ok(installed)
 }
 
@@ -378,7 +403,11 @@ fn write_file(
     );
     let path = root.join(name);
     distribution::private_directory(path.parent().context("official extraction parent")?)?;
-    let mut output = File::options().write(true).create_new(true).open(&path)?;
+    let mut output = File::options()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .with_context(|| format!("Creating runtime file {name}"))?;
     let mut digest = Sha256::new();
     let mut count = 0u64;
     let mut buf = [0; 65536];
@@ -392,7 +421,9 @@ fn write_file(
             .checked_add(n as u64)
             .context("official file size overflow")?;
         ensure!(count <= size, "official extraction exceeds file budget");
-        output.write_all(&buf[..n])?;
+        output
+            .write_all(&buf[..n])
+            .with_context(|| format!("Writing runtime file {name}"))?;
         digest.update(&buf[..n]);
     }
     ensure!(
@@ -404,7 +435,9 @@ fn write_file(
         use std::os::unix::fs::PermissionsExt;
         output.set_permissions(fs::Permissions::from_mode(m.modes[name]))?;
     }
-    output.sync_all()?;
+    output
+        .sync_all()
+        .with_context(|| format!("Saving runtime file {name}"))?;
     Ok(())
 }
 fn mapped(name: &str, a: &Component) -> Result<Option<String>> {
@@ -734,46 +767,52 @@ pub fn setup_network_with_progress(
     let mut links = BTreeSet::new();
     for a in &c.components {
         distribution::check_cancel(cancel)?;
+        let component = if a.only.is_some() { "Node" } else { "Chromium" };
+        let host = url::Url::parse(&a.url)?;
+        let host = host.host_str().context("official download host missing")?;
         let mut archive = tempfile::NamedTempFile::new_in(cache)?;
         progress(InstallProgress::Downloading {
             bytes,
             total: Some(total),
         });
-        runtime.block_on(async {
-            let client = network.download_client()?;
-            let mut response = await_cancel(client.get(&a.url).send(), cancel).await?;
-            ensure!(
-                response.status().is_success(),
-                "official source refused (redirects are not accepted)"
-            );
-            ensure!(
-                response.content_length().is_none_or(|n| n == a.bytes),
-                "official archive length mismatch"
-            );
-            let mut received = 0u64;
-            while let Some(chunk) = await_cancel(response.chunk(), cancel).await? {
-                received = received
-                    .checked_add(chunk.len() as u64)
-                    .context("official download overflow")?;
+        runtime
+            .block_on(async {
+                let client = network.download_client()?;
+                let mut response = await_cancel(client.get(&a.url).send(), cancel).await?;
                 ensure!(
-                    received <= a.bytes,
-                    "official download exceeds pinned length"
+                    response.status().is_success(),
+                    "official source returned HTTP {} (redirects are not accepted)",
+                    response.status()
                 );
-                archive.write_all(&chunk)?;
-                bytes += chunk.len() as u64;
-                progress(InstallProgress::Downloading {
-                    bytes,
-                    total: Some(total),
-                });
-            }
-            ensure!(received == a.bytes, "official download truncated");
-            Ok::<_, anyhow::Error>(())
-        })?;
+                ensure!(
+                    response.content_length().is_none_or(|n| n == a.bytes),
+                    "official archive length mismatch"
+                );
+                let mut received = 0u64;
+                while let Some(chunk) = await_cancel(response.chunk(), cancel).await? {
+                    received = received
+                        .checked_add(chunk.len() as u64)
+                        .context("official download overflow")?;
+                    ensure!(
+                        received <= a.bytes,
+                        "official download exceeds pinned length"
+                    );
+                    archive.write_all(&chunk)?;
+                    bytes += chunk.len() as u64;
+                    progress(InstallProgress::Downloading {
+                        bytes,
+                        total: Some(total),
+                    });
+                }
+                ensure!(received == a.bytes, "official download truncated");
+                Ok::<_, anyhow::Error>(())
+            })
+            .with_context(|| format!("Downloading {component} from {host}"))?;
         archive.as_file().sync_all()?;
         progress(InstallProgress::Verifying);
         ensure!(
             distribution::hash(regular(archive.path(), a.bytes)?, cancel)? == a.sha256,
-            "official archive checksum mismatch"
+            "{component} official archive checksum mismatch"
         );
         progress(InstallProgress::Extracting);
         match a.format {
@@ -785,7 +824,8 @@ pub fn setup_network_with_progress(
                 cancel,
                 &mut count,
                 &mut links,
-            )?,
+            )
+            .with_context(|| format!("Installing {component} archive files"))?,
             ArchiveFormat::TarGz => extract_tar(
                 regular(archive.path(), a.bytes)?,
                 a,
@@ -793,7 +833,8 @@ pub fn setup_network_with_progress(
                 &c.manifest,
                 cancel,
                 &mut count,
-            )?,
+            )
+            .with_context(|| format!("Installing {component} archive files"))?,
         }
     }
     runtime.shutdown_timeout(Duration::from_secs(1));
@@ -824,6 +865,8 @@ pub fn setup_network_with_progress(
     progress(InstallProgress::TestingBrowser);
     distribution::check_cancel(cancel)?;
     smoke(&installed)?;
+    distribution::check_cancel(cancel)?;
+    progress(InstallProgress::Publishing);
     distribution::check_cancel(cancel)?;
     let mut ready = File::options()
         .write(true)
@@ -971,6 +1014,61 @@ mod tests {
             Some("node/bin/node".into())
         );
         assert!(mapped("node-fixture/../bin/node", &c.components[0]).is_err());
+        Ok(())
+    }
+    #[test]
+    fn another_release_requires_update_but_never_becomes_verified() -> Result<()> {
+        let (mut c, bundled) = fixture()?;
+        c.manifest.id = format!("official-inert-new-{}-{}", c.manifest.os, c.manifest.arch);
+        let cache = tempfile::tempdir()?;
+        let root = cache.path().join("runtime-inert");
+        distribution::private_directory(&root)?;
+        let cancel = AtomicBool::new(false);
+        extract_zip(
+            Cursor::new(&bundled),
+            None,
+            &root,
+            &c.manifest,
+            &cancel,
+            &mut 0,
+            &mut BTreeSet::new(),
+        )?;
+        fs::write(cache.path().join("current"), b"runtime-inert")?;
+        let previous = format!("official-inert-old-{}-{}", c.manifest.os, c.manifest.arch);
+        fs::write(root.join("READY"), &previous)?;
+        let error = resolve(cache.path(), &c, &cancel).unwrap_err();
+        assert!(error.is::<InstalledReleaseMismatch>());
+        assert_eq!(fs::read_to_string(root.join("READY"))?, previous);
+        assert_eq!(fs::read(cache.path().join("current"))?, b"runtime-inert");
+        // Unknown/tampered markers are repair, not a release-update explanation.
+        for marker in ["tampered", "official-../unsafe", "official-other-platform"] {
+            fs::write(root.join("READY"), marker)?;
+            assert!(
+                !resolve(cache.path(), &c, &cancel)
+                    .unwrap_err()
+                    .is::<InstalledReleaseMismatch>()
+            );
+        }
+        // A matching marker still requires a complete file/hash verification.
+        fs::write(root.join("READY"), &c.manifest.id)?;
+        resolve(cache.path(), &c, &cancel)?;
+        fs::write(root.join("worker/index.js"), "changed")?;
+        assert!(resolve(cache.path(), &c, &cancel).is_err());
+        #[cfg(unix)]
+        {
+            fs::write(root.join("READY"), &previous)?;
+            std::os::unix::fs::symlink(&root, cache.path().join("runtime-linked"))?;
+            fs::write(cache.path().join("current"), "runtime-linked")?;
+            assert!(
+                !resolve(cache.path(), &c, &cancel)
+                    .unwrap_err()
+                    .is::<InstalledReleaseMismatch>()
+            );
+            assert_eq!(
+                fs::read_to_string(cache.path().join("current"))?,
+                "runtime-linked"
+            );
+        }
         Ok(())
     }
     #[test]

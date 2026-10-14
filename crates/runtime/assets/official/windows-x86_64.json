@@ -1,5 +1,5 @@
 {
-  "bundled_sha256": "0646531342f9a4c0c00253df68e4702dd9bc366fd487e8a299f2a492b3dd9fe9",
+  "bundled_sha256": "1ec9cc638579d0c47cde02c1f4be17777a186aa8949a05702c5a658fe66f0ce7",
   "components": [
     {
       "bytes": 37618919,
@@ -2445,9 +2445,9 @@
         "sha256": "8ed3cbfa6a0f1e98438f634d6e0806718e99d1f0dd2dad27700f0a6dca782f9b"
       },
       "worker/src/capture.mjs": {
-        "bytes": 18266,
+        "bytes": 19351,
         "executable": false,
-        "sha256": "9193a6a4661ea3dfbb40115b96b3f678c975482eb36dce0642143f62c9ab2951"
+        "sha256": "41afdf4533fcbc6ec60064c04a1d1cbd240008d0c26aa7b17dc186c114c8620f"
       },
       "worker/src/discover.mjs": {
         "bytes": 3546,
@@ -2460,9 +2460,9 @@
         "sha256": "c9234994102c37321da6eb51ca4172014f6d84b10669f015f1b4919d41b8dffa"
       },
       "worker/src/protocol.d.ts": {
-        "bytes": 3087,
+        "bytes": 3114,
         "executable": false,
-        "sha256": "47bd5b39d2f10b369b769d08766f65b5ce04dffe944e462972206b19758fa8f5"
+        "sha256": "df9ea5a2bc1136b2abf0c1d1b4fab75633b14b022482d5876e0bbdd415dd038d"
       },
       "worker/src/protocol.mjs": {
         "bytes": 5378,
@@ -2475,13 +2475,13 @@
         "sha256": "89dfa9d8b786e09eb2c8625d667da2438670b54ca72976e509dcfe36fe7a6f28"
       }
     },
-    "id": "official-24.21.0-1.64.0-windows-x86_64",
+    "id": "official-24.21.0-1.64.0-5.0.1-windows-x86_64",
     "identity": {
       "Pinned": {
         "browser": "156.0.8078.4",
         "node": "24.21.0",
         "playwright": "1.64.0",
-        "worker": "5.0.0"
+        "worker": "5.0.1"
       }
     },
     "links": {},

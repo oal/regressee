@@ -1,10 +1,10 @@
 {
   "as_of": "2026-10-10",
   "browser_verification": "Official Google HTTPS URL, cross-checked with Chrome for Testing metadata and Playwright browsers.json; computed SHA-256 pinned in app catalog, no independent publisher checksum/signature supplied",
-  "bundled_sha256": "0646531342f9a4c0c00253df68e4702dd9bc366fd487e8a299f2a492b3dd9fe9",
+  "bundled_sha256": "1ec9cc638579d0c47cde02c1f4be17777a186aa8949a05702c5a658fe66f0ce7",
   "catalogs": [
     {
-      "catalog_sha256": "bb68be7ecba7a8640e4eee58166a0b1c5285023d5bec8ba3319587991ca432ee",
+      "catalog_sha256": "b26ae1c52f3d6f02f5b1fadc7dfa8fb63ac25bdffcd288d5a021c9e508cbe06e",
       "components": [
         {
           "bytes": 58088022,
@@ -28,7 +28,7 @@
       "platform": "linux-x86_64"
     },
     {
-      "catalog_sha256": "9a544571f1a92aade03639cc4ded6eaf24a14b21ef02c74a7b320c6eb2b2ab2e",
+      "catalog_sha256": "bfc5875b0b6a097d4c803cd2d22ed664d97c862cc712ae347504e19375b8d82d",
       "components": [
         {
           "bytes": 37618919,
@@ -52,7 +52,7 @@
       "platform": "windows-x86_64"
     },
     {
-      "catalog_sha256": "969d6961bd458fe6ae0c3da1df3da953d94d34514097a5c7ba8c06969b726191",
+      "catalog_sha256": "82e3d2395de25438ade902a006e94bb90d1df375851be91c4e96bc40c02f523c",
       "components": [
         {
           "bytes": 52909993,
@@ -76,7 +76,7 @@
       "platform": "macos-aarch64"
     },
     {
-      "catalog_sha256": "919bca85ad394775e8e643811e8d9aca0b22f18220cf67d90f068a143e65bc72",
+      "catalog_sha256": "ac327afc83be371a14599d500b0b6c0329a8835e41a1829dd5bd964e07bda7e6",
       "components": [
         {
           "bytes": 54203979,
@@ -445,5 +445,9 @@
   },
   "playwright": "1.64.0",
   "schema": 1,
-  "worker": "5.0.0"
+  "worker": "5.0.1",
+  "worker_source_refresh": {
+    "previous_bundled_sha256": "32ebfc82f68539671dee6d63611fac20a1beb0c151e5b0f376971587da386b3f",
+    "verification": "Pinned dependency bytes and vendor component inventories retained; only local worker sources refreshed"
+  }
 }

@@ -2,21 +2,21 @@
 name: Regressee — Clear wayfinding
 description: User-approved direction, source-derived native Rust/GPUI system; native and release qualification pending
 colors:
-  ground: "#f6fafd"
+  ground: "#f5f9fa"
   surface: "#ffffff"
-  rail: "#183f65"
+  rail: "#082b50"
   rail-ink: "#ffffff"
-  rail-muted: "#d7e8f5"
-  rail-hover: "#23517a"
-  ink: "#22313d"
-  muted: "#536778"
-  line: "#ced9e2"
-  control-line: "#7e93a6"
-  action-surface: "#f7fafc"
-  action-hover: "#e7f2fa"
-  accent: "#1765ac"
-  accent-hover: "#12558f"
-  selected: "#e7f2fa"
+  rail-muted: "#d1e4f2"
+  rail-hover: "#123d65"
+  ink: "#1b3044"
+  muted: "#506579"
+  line: "#cddcdf"
+  control-line: "#7b919f"
+  action-surface: "#f4f8fa"
+  action-hover: "#e2f5f0"
+  accent: "#007970"
+  accent-hover: "#00685f"
+  selected: "#e2f5f0"
   error: "#9c3038"
   error-surface: "#fff2f2"
   warning: "#775311"
@@ -32,6 +32,10 @@ typography:
   title:
     fontSize: "21px"
     fontWeight: 600
+  brand-wordmark:
+    fontSize: "20px"
+    fontWeight: 600
+    lineHeight: "26px"
   section:
     fontSize: "18px"
     fontWeight: 600
@@ -109,16 +113,25 @@ components:
 
 **Creative North Star: "Clear wayfinding"**
 
-Make the next safe action obvious. Deep-blue project navigation anchors a bright,
+Make the next safe action obvious. Navy project navigation anchors a bright,
 precisely aligned working surface for non-developers reviewing website releases.
 The signature is self-labelling task state with baseline consequences attached,
 not a developer dashboard, decorative charts or a mobile-app shell.
 
 The user approved this direction and the full workflow brief on 2026-10-11.
 This document records the built source system, not approval of its usability,
-native accessibility or public release. The chosen HTML sketch is illustrative;
-production GPUI source supplies the normative tokens above. The extensions-only
-sidecar carries native behavior and geometry, not a browser implementation.
+native accessibility or public release. The chosen HTML sketch remains an
+illustrative composition reference, not authority for the approved 2026-10-14
+palette; production GPUI source supplies the normative tokens above. The
+extensions-only sidecar carries native behavior and geometry, not a browser
+implementation.
+
+**Logo and palette adaptation — 2026-10-14.** The user approved navy navigation,
+readable teal actions, pale mint selection and white workspaces, with supplied
+background-appropriate icons alongside the readable Regressee name. This narrow
+extension preserves structure, workflows, system UI fonts, error/warning roles,
+focus and immediate state changes; screenshot originals remain untinted. It does
+not introduce a full dark workspace theme.
 
 **Key Characteristics:**
 - Persistent project context and a clear next safe action.
@@ -128,9 +141,10 @@ sidecar carries native behavior and geometry, not a browser implementation.
 Authority: `PRODUCT.md`, `docs/workflow-revamp.md`,
 `.impeccable/surfaces/crates-app-src-main-rs.md` and the selected
 `.impeccable/mocks/decision/pick-6e22d8c4.html`. Implementation sources:
-`crates/app/src/ui/{theme,controls,text_input,timezone_select}.rs`,
-`crates/app/src/{main,workflow,workspace_history}.rs` and
-`crates/core/src/shell.rs`. Earlier direction remains in `docs/phase0-design.md`.
+`crates/app/src/ui/{brand,theme,controls,text_input,timezone_select}.rs`,
+`crates/app/src/{main,workflow,form_recovery,workspace_history}.rs` and
+`crates/core/src/shell.rs`. Asset authority: `assets/README.md` and
+`assets/brand/provenance.json`. Earlier direction remains in `docs/phase0-design.md`.
 
 Qualification boundary: Phases 4, 5 and 6 independently passed their bounded
 source/controller/offscreen gates. Phase 7 qualification infrastructure and its
@@ -150,13 +164,51 @@ integration and its independent verifier report are documented under
 `docs/research/ux-review-20261013/`. The behavior descriptions below include those
 shipped refinements without changing the qualification boundary.
 
+**Logo/palette finish record — 2026-10-14.** Independent finish review found no
+visual defects across ten Linux offscreen captures of Projects, Website, Access,
+About and Review at 1280×800 and 820×600. Its FIX disposition concerned only the
+missing design-system persistence updates recorded here.
+The subsequent scoped verdict scored that persistence fix **resolved** with
+disposition **ship**; all ten confirmation captures were pixel-identical to the
+inspected originals. This verdict covers the branding/documentation adaptation,
+not the whole application or its outstanding shell assertions. Artifact source:
+`crates/app/src/main.rs`; captures:
+`/var/home/olav/Data/opencode/tmp/opencode/regressee-brand-20261014-dvt066cs/inspection/brand-{1280x800,820x600}-{projects,website,access,about,review}.png`.
+These are actual GPUI pixels from synthetic offline states, not real project
+results or OS-input/accessibility/cross-platform/release qualification. Reported
+library UI checks: 110 passed, 2 ignored; shell checks: 160 passed, 10 failed,
+32 ignored, with unrelated workflow/copy assertions failing. No whole-suite PASS
+is claimed; older qualification records remain unchanged.
+
+This finish record is historical evidence for the earlier horizontal navigation
+lockup; its captures are not visual evidence for the stacked follow-up below.
+
+**Navigation lockup follow-up — 2026-10-14; capture verification deferred.**
+The user found the horizontal rail mark too small and requested a larger mark
+centered above the Regressee name on its own line. Source now records that
+two-line identity; About, the palette, assets, embedding and provenance are
+unchanged. Reported shared UI checks: **49 passed**, including logical GPUI
+component bounds at 1280×800 and 820×600. These component checks do not establish
+full-app navigation fit or control reachability.
+The recorded full-app build/capture attempt was blocked by the unrelated
+`crates/app/src/app_settings_ux.rs:89` `AnyElement.w_full` compile error. The user
+explicitly chose to leave it untouched and defer full-app verification.
+No new screenshot exists for this lockup. The extended
+`crates/app/src/ui_brand_capture.rs` guard awaits an unblocked build: check the
+larger stack in normal and read-only review, including navigation-button bounds
+and reachability with multiline saved-results context at both window sizes.
+Capture verification and that whole-navigation guard remain deferred, not a
+full visual PASS or native approval.
+
 ## Colors
 
 ### Primary
-Deep-blue `rail` is the navigation anchor; `accent` marks the next task action.
-`accent-hover` deepens action hover/press. Sky `selected` identifies the current
+Navy `rail` is the navigation anchor; readable teal `accent` marks the next task
+action. `accent-hover` deepens action hover/press. Pale mint `selected` identifies the current
 navigation, choice or page, never successful evidence by itself. Rail text uses
 `rail-ink` and `rail-muted`; unselected navigation hover uses `rail-hover`.
+The artwork's luminous turquoise is not a white-text action fill; source uses
+the darker teal accent for readability.
 
 ### Neutral
 `ground`, `surface` and `action-surface` separate the workspace, editable fields
@@ -168,7 +220,7 @@ native accessibility certification. Keep semantic aliases even when values match
 
 Error and warning ink/surface pairs always accompany explanatory words.
 Informational feedback stays neutral white, distinct from selected navigation;
-information status labels may use the sky tint.
+information status labels may use the mint tint.
 
 **The Evidence Rule.** A change classification is never rendered as a confirmed defect, and missing screenshots are never rendered as an unchanged result.
 
@@ -184,8 +236,14 @@ serves empty states/information dialogs, and `section` groups forms. Body copy i
 regular; actions, editable fields and page addresses share the medium `action`
 metrics. Help and page details use `help`. Keep long form explanations bounded
 (660–680 logical px). No decorative display face or technical monospace hierarchy.
+The navigation wordmark uses the dedicated `brand-wordmark` role; `section`
+remains unchanged for form groups. About retains the existing `title` role.
+Both lockups use semibold system type; branding adds no font family.
 
 **The Stable State Rule.** Focus, hover, press and selection change paint, never text metrics or control geometry.
+
+Screenshot switches keep the selected path/profile heading and inspection toolbar
+mounted during the matching image read; zoom stays disabled until pixels arrive.
 
 ## Layout
 
@@ -201,8 +259,15 @@ from **Edit settings** and identifies the selected project with words and paint.
 Comparison review remains side by side, including small desktop windows: queue width (200px)
 below viewport width (1100px), otherwise (272px), separated from the flexible
 viewer by (12px). Do not describe a stacking layout that is not implemented.
-Review now owns local **Hide navigation / Show navigation** and **Hide results /
-Show results** controls. At narrow sizes the project navigation starts collapsed;
+The logo/name lockup is always the first item in the project rail, at the same
+top position across sections. Its navigation-only title wrapper has padding
+above and below (12px each) inside the existing rail; the mark and name are
+centered on separate rows. Whole-navigation fit verification for this larger
+stack is deferred as recorded above. The review header owns **Hide sidebar / Show
+sidebar** in one consistent location, with a hint explaining the extra screenshot
+space. This control is absent from project choosers, where navigation stays
+visible. Review also owns local **Hide results / Show results** controls.
+At narrow sizes the project navigation starts collapsed;
 an explicit workspace preference survives resize. Selected project context remains
 visible. Working geometry uses the actual mounted rail width, not a permanent
 192px reservation. Ctrl/Cmd+F restores a hidden queue before focusing its search.
@@ -228,12 +293,44 @@ selection and hover preserve row height. Lists fill their bounded viewport, not
 a fixed five-row panel. Zero search matches show an explanation, not an empty
 bordered list. Capture profiles describe mobile **web emulation**, tablet and
 desktop websites—not app devices or a mobile product layout.
+Discovery selection opens **Page options** immediately, with the complete wrapped
+address, capture status and explicit Include/Exclude action. **Previous page** and
+**Next page** inspect these details and reveal the selected row in the list; they
+never change inclusion themselves. A row's hover hint explains this action instead
+of repeating its URL. Discovery-blocked pages retain their reason and explain the
+settings/rediscovery route, without enabling an unsafe inclusion override.
 Inspection result rows are now 84px, with path/query/fragment first and separate
-profile and status lines. The full URL remains in a native hover hint and the
-selected screenshot's keyboard-accessible Details. Discovery and History keep
-their previous row geometry. Authoritative empty captures reserve no blank queue.
+profile and status lines. Result rows have no redundant address tooltip obscuring
+the screenshots; the full URL remains in the selected screenshot's
+keyboard-accessible Details. Remaining page-list hints fit their content, capped
+at 480px and the window width rather than reserving a fixed width. Discovery and
+History keep their previous row geometry. Authoritative empty captures reserve
+no blank queue.
 Automatic capture-only overview fit is capped at 100%; manual enlargement remains
 available. Compact Zoom explicitly distinguishes Fit from Manual.
+
+**Destructive-action consent — 2026-10-14.** Page options offers **Discard
+discovered pages…**, not the ambiguous Dismiss page list. Its warning names the
+unsaved URL list and inclusion choices that will be lost, and the recorded
+screenshots/baseline that will be kept. Keep page list is the safe first choice;
+Close/Escape only closes the panel. After confirmed discard, recorded URLs still
+open read-only Page details with Previous/Next. **Use recorded pages** creates a
+new editable capture plan from the displayed run, even without a saved baseline,
+without visiting websites or weakening discovery exclusions. Settings saves keep
+the plan; changed settings disable capture until explicit rediscovery, whose
+replacement is also confirmed. Project switching/new-project entry and quitting
+warn before losing discovery choices; an otherwise clean quit offers Keep page
+list versus Discard pages and quit rather than pretending that the list can be
+saved as settings.
+
+Forget login, retained-baseline activation, permanent history deletion,
+interrupted-file cleanup, recovery-original deletion and private-browser
+repair/update now require warning popups. Existing whole-baseline save,
+selective-approval, unsaved-edit and save/discard-on-quit dialogs remain intact.
+Cancel dispatches no mutation; consent is checked against its preview/context
+before dispatch, with backend revision/reference protections retained. This is
+simulated controller and Linux offscreen-layout evidence, not OS-input or native
+accessibility qualification; see `docs/research/page-list-recovery-20261014.md`.
 
 ## Elevation & Depth
 
@@ -242,9 +339,10 @@ zero-blur spread paint provides a functional focus outline, not elevation.
 Information and approval dialogs dim the workspace; approval occludes background
 interaction. Folder/discard prompts use platform prompts where supported.
 No invented motion scale: state changes are immediate. Unknown-duration activity
-uses a seamless 1.2-second linear pattern, driven by native animation frames only
-while visible, independently of worker updates. This communicates activity, not
-completion. `REGRESSEE_REDUCED_MOTION=1` keeps the pattern static; automatic OS
+uses a seamless 1.2-second linear pattern for long tasks and a rotating native
+arc for compact reads, driven by native animation frames only while visible,
+independently of worker updates. This communicates activity, not completion.
+`REGRESSEE_REDUCED_MOTION=1` keeps both indicators static; automatic OS
 motion-preference integration, theme and high-contrast behavior remain
 qualification work.
 
@@ -253,7 +351,10 @@ qualification work.
 Use small control corners and straight horizontal list rules; status labels are
 slightly tighter. Dialogs share control corners. Draw radio dots, checkbox ticks
 and the timezone chevron with native geometry. No nested decorative card stacks
-or icon-tile dashboard. No shipping visual assets were added for this revamp.
+or icon-tile dashboard. Shipping branding now consists of two transparent,
+cropped/downsampled logo PNGs in `assets/brand/`, embedded in the native binary.
+The user-consented move kept the supplied originals untouched in `assets/`;
+`assets/brand/provenance.json` records source/output hashes and exact transforms.
 CAS screenshots are untinted product evidence with provenance—not decorative
 rasters, a fixed image library or synthetic demonstration results.
 
@@ -263,12 +364,34 @@ mounted search without escaping a dialog. Filtering never silently changes the
 inspected screenshot or discards ignored-area drafts; an outside-filter notice
 explains why the pair is still shown. Explicit navigation changes the target.
 Viewer reads coalesce independently of mutation work and reject stale identities.
+Discovery plans survive initial saved-evidence reads and Refresh, including empty
+projects and older captures; only a non-representative capture of the exact reviewed
+inventory consumes the plan. Pages & baseline shows a next-action empty state when
+neither a discovery plan nor a recorded page list exists, never a blank workspace.
 Historical environment context travels with its reference, not today's settings.
 History rows support direct selection; storage totals load separately and missing
 measurement is not zero. Local syntax/range feedback stays beside touched fields,
 while saving, browser visits, baseline changes, exports and deletion stay explicit.
 
 ## Components
+
+### Product identity — background-appropriate icon and readable name
+
+The noninteractive lockup pairs `assets/brand/logo-dark.png` with **Regressee**
+on the navy rail, and `assets/brand/logo-light.png` with **About Regressee** on
+white. The mark supplements, never replaces, the name. Navigation uses
+`navigation_lockup()`: a larger proportional mark (96px wide, approximately
+58.8px high) with matching height reservation, centered above the name with the
+related gap (8px) and `brand-wordmark` system type in `rail-ink`. About keeps the
+horizontal `lockup()`, logo width (36px), proportional painted height
+(approximately 22px), height reservation (24px), related gap (8px) and existing
+`title` system type in `ink`. Navigation retains the existing rail width and
+About the existing dialog structure. Derived PNGs are transparent RGBA
+(294×180px), with shared padding crop and Lanczos downsampling only; no
+recoloring or artwork changes.
+Compile-time embedded bytes and cached `Arc<Image>` identities let GPUI decode
+and cache off-thread; no filesystem/network lookup or image decoding occurs in
+the render callback.
 
 ### Guided setup — native connected progression
 
@@ -317,7 +440,7 @@ their available width with balanced `spacing.row` insets even when help wraps.
 Checkbox label owners now use a finite flexible column so long labels wrap rather
 than clip. The analysis noise-suppression label paints on two lines at both
 qualified logical window sizes (270×40px inner text, 326×66px complete control).
-Primary keeps its filled blue identity through focus; danger uses error ink and
+Primary keeps its filled teal identity through focus; danger uses error ink and
 surface, never primary fill. Secondary hover uses `action-hover`. Focus is distinct
 from selection: ordinary actions use ink outlines, rail navigation a white outer
 outline with a dark inner border on its selected light surface. Disabled controls
@@ -327,7 +450,7 @@ Keyboard reveal measures complete bordered choice/check/action rows, not their
 padded content alone. Disclosure focus handles are distinct from project rows.
 
 **Links.** Presented website/page addresses that offer navigation must be real
-links: blue accent ink plus an underline at rest, a pointer cursor, visible
+links: teal accent ink plus an underline at rest, a pointer cursor, visible
 keyboard focus and Tab/Enter activation. Do not rely on color or hover alone, and
 never make ordinary noninteractive text look like a link. External page links
 open the OS default browser only on activation; capture-session credentials are
@@ -350,18 +473,59 @@ current selection distinct from keyboard highlight. Arrows/Home/End navigate,
 Enter chooses, Escape dismisses/restores focus; Tab follows the shell order and
 outside dismissal does not steal its target's focus.
 
+**Interface wording — 2026-10-14.** Routine messages explain the outcome and next
+action in ordinary language, following `docs/ux-writing.md`. Baseline saving says
+what future checks compare against and keeps the same-page-list consequence.
+Setup, capture, review, History, ZIP sharing and cleanup use pages, screenshots,
+results and files rather than internal inventory, binding or object terminology.
+Current versus saved baseline versions remain distinct. Source records stay
+available as **Screenshot source details** or **Technical details**; exact IDs,
+diagnostics, privacy warnings and all operation/approval guards are preserved.
+
+**Plain-language follow-up — 2026-10-14.** Closing any viewer panel is **Close**,
+not a navigation instruction. Notes show **No changes**, **Unsaved changes** or
+**Saved**, without byte counts. Their helper explains draft retention and Save
+note; rejected edits explain how to recover without UTF-8 or storage budgets.
+Setup and advanced settings use pages at once, approved login websites,
+website/section addresses and small-area comparison settings with examples.
+Capture, History, browser recovery and the support report describe screenshots,
+files and actions rather than internal evidence, inventories, bindings or build
+phases. Exact source records and diagnostics remain in their named disclosures.
+The existing palette, controls, editing limits and explicit mutation boundaries
+are preserved. Copy regression coverage lives in `ux_copy_tests.rs` and the exact
+note-save/editor/quit tests.
+
 **Feedback and progress.** Dismiss belongs inside the feedback surface, centered
 beside the message. Long diagnostics scroll within a bounded area; errors retain
 their red treatment. Known nonzero totals alone produce a clamped completion
-fraction. Unknown/zero totals pair honest text with a smoothly moving patterned
+fraction. Download amounts appear once in readable byte units above the bar;
+the supporting row shows elapsed time, not a duplicate unitless step counter.
+Unknown/zero totals pair honest text with a smoothly moving patterned
 activity track;
 discovery shows the actual pages visited. No fabricated percentage or coverage.
+Routine discovery visits and short pacing pauses share a steady Finding pages
+status with the actual visit count. Only crawl-rule waits of at least two seconds
+show a waiting phase; retries, preparation and finishing retain explicit status.
 Short local reads use a compact activity label instead of a patterned completion
 track. Every queued operation names its task immediately, before worker updates.
 Projects, screenshots and History distinguish initial loading, authoritative
 empty results and failed reads. Opening a project never announces missing
 screenshots or an absent baseline before its saved evidence is read; refresh
 keeps already loaded evidence visible.
+
+**Loading feedback refinement — 2026-10-14.** Compact activity uses a 16px native
+stroke spinner beside readable, medium-weight task text, never a filled dot that
+resembles a list bullet. Global operations use a white, thin-bordered status
+surface with a 40px minimum height; longer labels wrap without moving the icon
+away from their first line. Projects, History, screenshot/evidence placeholders,
+browser verification and storage reads share this treatment. Placeholder help
+aligns with its heading text. An initial read has one visible status owner:
+suppress its duplicate global label when that same read is already explained in
+the page. Saves, errors and reads of already-loaded content retain their feedback.
+Known-total progress bars, passive status labels, error semantics, operation
+guards and screenshot originals are unchanged. Bounded Linux offscreen inspection
+and scoped tests passed; see `docs/research/loading-feedback-20261014.md` for the
+verdict, source-bound captures and unrelated full-suite failure.
 
 **Task workspaces and dialogs.** One shared panel separates compact project/site/
 environment context, current activity, labelled outcomes and a single safety note.
@@ -380,6 +544,37 @@ It never replays the progress label or repeats the base URL as its only extra fa
 Opening Details reveals its scroll anchor. Gap previews prioritize failures, cap
 at 20 rows and disclose truncation with a route to the full review workspace.
 No chronological activity log or fabricated active-target telemetry is supplied.
+
+Capture completion reconciles the frozen URL list with included/excluded counts;
+URLs excluded before capture are not failed or missing screenshot targets. Zero
+successful captures say **No screenshots captured**, expose a shared recorded
+failure cause when available, and offer **Review capture failures**, not a promise
+of saved screenshots. Inspection uses ordinary-language failure and recovery copy;
+starting capture removes stale discovery instructions. Blocked embedded frames
+produce a capture warning rather than a false main-page redirect failure.
+
+Browser-setup failures name the actual failed installer stage and open Error
+details automatically, including automatic setup during discovery or login.
+Local details retain elapsed time, received bytes, platform, app version and
+available nested HTTP/OS/worker causes; final installation publication is separate
+from the browser test. Request URLs and raw browser/site stacks are excluded.
+These on-screen errors are not added to the privacy-filtered diagnostic export;
+local paths can still appear and screenshots require review before sharing.
+
+**Failure recovery — 2026-10-14.** Known browser, worker and local-I/O causes
+cross the background-job boundary as structured categories, not guessed substrings.
+Different installed browser releases say **Browser update required**, while an
+unverifiable matching installation says repair; neither is trusted or replaced
+automatically. The main message explains the cause and next safe action, with
+**Open App settings**, **Open Project settings** or **Open History** as real local
+navigation. History recovery opens Storage. Navigation clears the dismissed
+blocking banner so read-only settings can load, but preserves drafts, evidence
+and explicit save/login/install/cleanup boundaries. Save-and-find failures
+explicitly confirm the preceding successful project save. Known causes do not
+require opening Details; unknown causes keep a bounded explanation and
+operation-specific recovery, with full available diagnostics separate. Installer
+recovery follows its actual stage. Updating does not make an old baseline
+automatically comparable: checks still require matching browser components.
 
 **Comparison and approval.** Coverage comes from actual inventory, captures and
 current analysis, including missing and unclassified evidence. Preserve before/
@@ -445,7 +640,16 @@ restores its trigger. Drawing an ignored area folds away the flyout and returns
 after a completed rectangle, with drafts still requiring explicit save.
 Image navigation is direct: drag or two-axis scroll to pan, Shift+scroll for
 horizontal movement, Ctrl/Cmd+scroll to zoom at the pointer. Before/after stay
-synchronized. A single focus stop provides +/− zoom, arrows/Page Up/Page Down,
+synchronized. Screenshot hover never opens navigation help. **Image controls**
+beside Zoom opens an explicit, bounded flyout with readable gesture/shortcut rows
+and an attached Close action; Escape restores its trigger, and an outside click
+closes without taking focus from the clicked control. At narrow widths the help
+action lives at the end of the Zoom menu rather than adding a toolbar row. One
+muted drag/zoom hint shares the existing caption only when there is room; no new
+strip reduces evidence height. macOS names Command, other hosts name Ctrl. Help
+shares the mutually exclusive inspector lifecycle, preserves drafts/scale/target,
+and never triggers a capture or baseline operation.
+A single focus stop provides +/− zoom, arrows/Page Up/Page Down,
 0 for fit width and 1 for actual size. One labelled Zoom menu combines fit width,
 actual size (100%) and percentage presets at both desktop widths. Its desktop
 trigger shows “Zoom: Fit width · 52%” in automatic mode and “Zoom: 75%” after manual zoom;
@@ -463,13 +667,17 @@ Phase 4 separates the selected disposition group from Review note and the primar
 Next unreviewed action. Baseline selection/preview remains a separate footer.
 Notes now use the owned temporary editor rather than a permanent evidence-height
 row. Details, notes and filters remove or disable review/baseline decisions while
-evidence is occluded; Return to evidence/Escape preserves unsaved note text.
+evidence is occluded; Close/Escape preserves unsaved note text without saving it.
 The finite V4 repair gives the inspector scroll body a finite content width;
 the actual note input is 326px wide (300px inner content). The current review-note
 editor is bounded and genuinely multiline, with wrapping, caret/selection and
 vertical scrolling. Pasted newlines are preserved. Editor, Save and save-on-exit
-share the **8,192 UTF-8 byte** storage limit: exact save or explicit rejection with
-the draft retained, never silent truncation. One draft/saved/invalid status sits
+share the internal **8,192 UTF-8 byte** storage limit: exact save or explicit rejection with
+the draft retained, never silent truncation. The interface never exposes that
+encoding or byte budget, nor relabels it as a character limit. Notes explain that
+closing keeps the draft and saving requires Save note. Length errors ask users
+to shorten the note or paste less and state whether anything was added or saved.
+One plain-language draft/saved/invalid status sits
 beside Save; overflow hints reflect actual overflow. Close/reopen preserves the
 owned draft and restores its trigger. Saved-project Results loading/failed-read
 candidates now permit local navigation restoration without bypassing task/modal guards.
@@ -509,7 +717,7 @@ remain distinct. Both reject zero-impact activation and leave disabled actions
 out of keyboard traversal. Both actual deletion actions use danger treatment.
 
 Recorded inspection uses its persistent read-only heading and Return to latest
-evidence, without a redundant notice banner. An authoritative empty capture
+results, without a redundant notice banner. An authoritative empty capture
 reserves neither an empty queue nor unloaded target/profile labels. Actual failed
 target outcomes (including a real before-only frame) show the local path, profile,
 known cause and recovery instead of an empty image or irrelevant Analysis/Zoom.
@@ -521,8 +729,10 @@ presentation until a successful image read. An initial unread project cannot
 invent an unknown target's metadata. Paused/interrupted task continuations say
 **Return to capture recovery**; completed checks say **Review check results**.
 The real workspace Resume control is retained, not fabricated by the task label.
-Failed task titles retain the operation name. No Open folder, targeted retry or
-installer-repair functionality was introduced.
+Failure headings name the known problem, with the operation retained in task
+context; unknown failures keep their operation-specific heading. No Open folder
+or targeted retry was introduced. Browser recovery links to the existing explicit
+installer in App settings, rather than automatically replacing components.
 
 **History and keyboard.** Runs, Baselines and Storage are separate sections.
 Baseline versions and capture/check runs are distinct,

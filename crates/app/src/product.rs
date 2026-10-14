@@ -31,8 +31,20 @@ pub enum RuntimeState {
     UnsupportedPlatform,
     NotInstalled,
     Ready,
+    UpdateRequired,
     RepairRequired,
 }
+
+/// Typed, UI-safe recovery survives extra anyhow context at the Jobs boundary.
+#[derive(Debug)]
+pub struct RuntimeBlocked(pub RuntimeState);
+
+impl std::fmt::Display for RuntimeBlocked {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(crate::recovery::Problem::Browser(self.0).message())
+    }
+}
+impl std::error::Error for RuntimeBlocked {}
 /// UI-safe explanation. Availability means validated app/override trust plus a
 /// supported adapter, NOT public release/platform qualification.
 #[derive(Debug, Clone, PartialEq)]
@@ -131,13 +143,42 @@ impl Product {
     /// Read-only verification. Never installs or substitutes a different runtime.
     pub fn resolve_runtime(&self, cancel: &AtomicBool) -> Result<Installed> {
         distribution::check_cancel(cancel)?;
-        if let Some(d) = &self.distribution {
+        self.checked_setup_capability()?;
+        let absent = distribution::current_absent(&self.runtime_cache)
+            .map_err(|error| error.context(RuntimeBlocked(RuntimeState::RepairRequired)))?;
+        let result = if let Some(d) = &self.distribution {
             distribution::resolve(&self.runtime_cache, d, cancel)
         } else if self.official_runtime {
             official::resolve(&self.runtime_cache, self.setup_catalog()?, cancel)
         } else {
             distribution::resolve(&self.runtime_cache, self.trust()?, cancel)
-        }
+        };
+        result
+            .map_err(|error| {
+                let state = if absent {
+                    RuntimeState::NotInstalled
+                } else if error.is::<official::InstalledReleaseMismatch>() {
+                    RuntimeState::UpdateRequired
+                } else {
+                    RuntimeState::RepairRequired
+                };
+                error.context(RuntimeBlocked(state))
+            })
+            .and_then(|installed| {
+                distribution::check_cancel(cancel)?;
+                Ok(installed)
+            })
+    }
+    fn checked_setup_capability(&self) -> Result<Scope> {
+        self.setup_capability().map_err(|error| {
+            let state = if supported_runtime_platform(std::env::consts::OS, std::env::consts::ARCH)
+            {
+                RuntimeState::UnavailableDistribution
+            } else {
+                RuntimeState::UnsupportedPlatform
+            };
+            error.context(RuntimeBlocked(state))
+        })
     }
     /// Blocking, read-only status for the background owner. Never downloads.
     pub fn readiness(&self, cancel: &AtomicBool) -> Result<RuntimeReadiness> {
@@ -216,13 +257,23 @@ impl Product {
                 identity: Some(installed.manifest.identity),
                 scope: Some(scope),
             },
-            Err(_) => RuntimeReadiness {
-                status: RuntimeState::RepairRequired,
-                setup_available: true,
-                message: "The private browser could not be verified. Automatic replacement is blocked. Review browser diagnostics and explicitly repair; existing evidence is unchanged.",
-                identity: None,
-                scope: Some(scope),
-            },
+            Err(error) => {
+                let status = if error
+                    .downcast_ref::<RuntimeBlocked>()
+                    .is_some_and(|blocked| blocked.0 == RuntimeState::UpdateRequired)
+                {
+                    RuntimeState::UpdateRequired
+                } else {
+                    RuntimeState::RepairRequired
+                };
+                RuntimeReadiness {
+                    status,
+                    setup_available: true,
+                    message: crate::recovery::Problem::Browser(status).message(),
+                    identity: None,
+                    scope: Some(scope),
+                }
+            }
         })
     }
     /// First use only: never turn damaged/expired/unsafe resolver errors into a
@@ -243,9 +294,9 @@ impl Product {
         setup: impl FnOnce() -> Result<()>,
     ) -> Result<Installed> {
         distribution::check_cancel(cancel)?;
-        self.setup_capability()?;
+        self.checked_setup_capability()?;
         let absent = distribution::current_absent(&self.runtime_cache)
-            .context("Browser installation paths could not be verified. Automatic setup is blocked; existing evidence is unchanged.")?;
+            .map_err(|error| error.context(RuntimeBlocked(RuntimeState::RepairRequired)))?;
         distribution::check_cancel(cancel)?;
         if absent {
             setup()?;
@@ -316,42 +367,56 @@ impl Product {
         progress: &mut dyn FnMut(InstallProgress),
     ) -> Result<String> {
         distribution::check_cancel(&cancel)?;
-        self.setup_capability()?;
-        let network = self.network().context("Browser network settings could not be validated. Setup is blocked; existing evidence is unchanged.")?;
-        // Handshake performs the owned headless screenshot smoke in memory.
-        // Both trust paths use the same supervisor and bounded shutdown.
-        let mut smoke = |runtime: &Installed| {
-            let mut worker = self.spawn_worker(runtime)?;
-            let ready = worker.handshake(RunId::new(), cancel.clone());
-            let stopped = worker.stop(Instant::now() + Duration::from_secs(5));
-            let (worker, browser) = ready?;
-            ensure!(
-                worker == worker_version(runtime)? && browser == browser_version(runtime)?,
-                "Browser setup smoke runtime identity mismatch"
-            );
-            stopped
-        };
-        let installed = if let Some(d) = &self.distribution {
-            distribution::setup_network_with_progress(
-                &self.runtime_cache,
-                d,
-                &cancel,
-                progress,
-                &mut smoke,
-                &network,
-            )
-        } else {
-            official::setup_network_with_progress(
-                &self.runtime_cache,
-                self.setup_catalog()?,
-                crate::official_catalog::bundled(),
-                &cancel,
-                progress,
-                &mut smoke,
-                &network,
-            )
-        };
-        Self::committed_setup_result(installed)
+        // Unsupported builds/configurations are not failed downloads. Preserve
+        // their actionable cause before an installer attempt is created.
+        self.checked_setup_capability()?;
+        let mut attempt = regressee_runtime::setup_diagnostics::SetupAttempt::default();
+        let result = (|| {
+            distribution::check_cancel(&cancel)?;
+            let network = self.network().context("Browser network settings could not be validated. Setup is blocked; existing evidence is unchanged.")?;
+            // Handshake performs the owned headless screenshot smoke in memory.
+            // Both trust paths use the same supervisor and bounded shutdown.
+            let mut smoke = |runtime: &Installed| {
+                let mut worker = self
+                    .spawn_worker(runtime)
+                    .context("Starting the private Node worker")?;
+                let ready = worker.handshake(RunId::new(), cancel.clone());
+                let stopped = worker.stop(Instant::now() + Duration::from_secs(5));
+                let (worker, browser) =
+                    ready.context("Launching Chromium and taking its test screenshot")?;
+                ensure!(
+                    worker == worker_version(runtime)? && browser == browser_version(runtime)?,
+                    "Browser setup smoke runtime identity mismatch"
+                );
+                stopped.context("Stopping the private browser test")
+            };
+            let mut observed_progress = |phase| {
+                attempt.observe(phase);
+                progress(phase);
+            };
+            let installed = if let Some(d) = &self.distribution {
+                distribution::setup_network_with_progress(
+                    &self.runtime_cache,
+                    d,
+                    &cancel,
+                    &mut observed_progress,
+                    &mut smoke,
+                    &network,
+                )
+            } else {
+                official::setup_network_with_progress(
+                    &self.runtime_cache,
+                    self.setup_catalog()?,
+                    crate::official_catalog::bundled(),
+                    &cancel,
+                    &mut observed_progress,
+                    &mut smoke,
+                    &network,
+                )
+            };
+            Self::committed_setup_result(installed)
+        })();
+        result.map_err(|error| attempt.failure(error).into())
     }
     pub fn capture(
         &self,
@@ -361,7 +426,34 @@ impl Product {
         cancel: Arc<AtomicBool>,
         progress: &mut dyn FnMut(&str, u32, Option<u32>),
     ) -> Result<RunRecord> {
-        let installed = self.resolve_runtime(&cancel)?;
+        self.capture_with_runtime(store, None, id, check, cancel, progress)
+    }
+    /// Reuse only a runtime verified by Jobs in this same operation. Direct
+    /// callers, checks and resumes still resolve; no verification is cached.
+    pub(crate) fn runtime_for_capture(
+        &self,
+        verified_runtime: Option<Installed>,
+        cancel: &AtomicBool,
+    ) -> Result<Installed> {
+        distribution::check_cancel(cancel)?;
+        let installed = match verified_runtime {
+            Some(installed) => installed,
+            None => self.resolve_runtime(cancel)?,
+        };
+        distribution::check_cancel(cancel)?;
+        Ok(installed)
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn capture_with_runtime(
+        &self,
+        store: &mut Store,
+        verified_runtime: Option<Installed>,
+        id: ProjectId,
+        check: bool,
+        cancel: Arc<AtomicBool>,
+        progress: &mut dyn FnMut(&str, u32, Option<u32>),
+    ) -> Result<RunRecord> {
+        let installed = self.runtime_for_capture(verified_runtime, &cancel)?;
         regressee_storage::require_space(&store.paths().data, 384 * 1024 * 1024)?;
         regressee_storage::require_space(&store.paths().cache, 384 * 1024 * 1024)?;
         let project = store.load_project(id)?.project;
@@ -842,6 +934,39 @@ mod automatic_runtime_tests {
 
     #[cfg(all(target_arch = "x86_64", any(target_os = "linux", windows)))]
     #[test]
+    fn older_official_installation_reports_update_and_never_replaces_automatically() -> Result<()> {
+        let temp = tempfile::tempdir()?;
+        let product = Product::configured_from(temp.path(), None)?;
+        let root = product.runtime_cache.join("runtime-previous");
+        fs::create_dir_all(&root)?;
+        let old = format!(
+            "official-24.21.0-1.64.0-{}-{}",
+            std::env::consts::OS,
+            std::env::consts::ARCH
+        );
+        fs::write(root.join("READY"), &old)?;
+        fs::write(product.runtime_cache.join("current"), "runtime-previous")?;
+        let cancel = AtomicBool::new(false);
+        let state = product.readiness(&cancel)?;
+        assert_eq!(state.status, RuntimeState::UpdateRequired);
+        assert!(state.setup_available);
+        assert!(state.message.contains("Update browser"));
+        let error = product
+            .ensure_runtime_with(&cancel, || panic!("update needs explicit consent"))
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<RuntimeBlocked>().unwrap().0,
+            RuntimeState::UpdateRequired
+        );
+        assert_eq!(fs::read_to_string(root.join("READY"))?, old);
+        assert_eq!(
+            fs::read_to_string(product.runtime_cache.join("current"))?,
+            "runtime-previous"
+        );
+        Ok(())
+    }
+    #[cfg(all(target_arch = "x86_64", any(target_os = "linux", windows)))]
+    #[test]
     fn default_catalog_blocks_damaged_pointer_and_cancellation_without_replacement() -> Result<()> {
         let root = tempfile::tempdir()?;
         let product = Product::configured_from(root.path(), None)?;
@@ -926,13 +1051,14 @@ mod automatic_runtime_tests {
         assert_eq!(status.status, RuntimeState::UnavailableDistribution);
         assert!(!status.setup_available);
         assert!(status.message.contains("build is incomplete"));
-        assert!(
-            product
-                .ensure_runtime_with(&cancel, || panic!("no trust"))
-                .unwrap_err()
-                .to_string()
-                .contains("build is incomplete")
+        let error = product
+            .ensure_runtime_with(&cancel, || panic!("no trust"))
+            .unwrap_err();
+        assert_eq!(
+            error.downcast_ref::<RuntimeBlocked>().unwrap().0,
+            RuntimeState::UnavailableDistribution
         );
+        assert!(error.to_string().contains("Install a supported version"));
         assert!(!product.runtime_cache.exists());
         Ok(())
     }
@@ -1055,6 +1181,127 @@ mod automatic_runtime_tests {
                 cancel,
                 &mut |_| Ok(()),
             )?;
+            Ok(())
+        }
+
+        #[test]
+        fn capture_handoff_reuses_verified_runtime_without_caching_or_ignoring_cancel() -> Result<()>
+        {
+            let root = tempfile::tempdir()?;
+            let (product, pack, _) = fixture(root.path(), Scope::DevelopmentLoopback)?;
+            let cancel = Arc::new(AtomicBool::new(false));
+            install_inert(&product, &pack, &cancel)?;
+            let installed =
+                product.ensure_runtime(cancel.clone(), &mut |_| panic!("redownload"))?;
+
+            // Make any second resolution fail. The already verified value is
+            // handed through this operation, not recovered from a global cache.
+            fs::remove_file(product.runtime_cache.join("current"))?;
+            let reused = product.runtime_for_capture(Some(installed.clone()), &cancel)?;
+            assert_eq!(reused.root, installed.root);
+            assert_eq!(reused.manifest.identity, installed.manifest.identity);
+            let error = product.runtime_for_capture(None, &cancel).unwrap_err();
+            assert_eq!(
+                error.downcast_ref::<RuntimeBlocked>().unwrap().0,
+                RuntimeState::NotInstalled
+            );
+
+            cancel.store(true, Ordering::Release);
+            let error = product
+                .runtime_for_capture(Some(installed), &cancel)
+                .unwrap_err();
+            assert_eq!(error.to_string(), "operation cancelled");
+            Ok(())
+        }
+
+        #[test]
+        fn capture_entry_points_use_handoff_but_direct_calls_checks_and_resumes_resolve()
+        -> Result<()> {
+            let root = tempfile::tempdir()?;
+            let (product, pack, _) = fixture(root.path(), Scope::DevelopmentLoopback)?;
+            let cancel = Arc::new(AtomicBool::new(false));
+            let pause = Arc::new(AtomicBool::new(false));
+            install_inert(&product, &pack, &cancel)?;
+            let installed =
+                product.ensure_runtime(cancel.clone(), &mut |_| panic!("redownload"))?;
+            fs::remove_file(product.runtime_cache.join("current"))?;
+
+            let mut store = Store::open(regressee_storage::AppPaths::isolated(
+                &root.path().join("store"),
+            ))?;
+            let mut project = Project::draft("Capture handoff".into(), "http://127.0.0.1:43210/")?;
+            project
+                .sources
+                .push("http://127.0.0.1:43210/second".parse()?);
+            store.save_project(&project, None)?;
+
+            // Both entry points reach their normal validation rather than
+            // resolving again. Inert fixtures stop before any browser launch.
+            let error = product
+                .capture_with_runtime(
+                    &mut store,
+                    Some(installed.clone()),
+                    project.id,
+                    false,
+                    cancel.clone(),
+                    &mut |_, _, _| {},
+                )
+                .unwrap_err();
+            assert!(error.to_string().contains("legacy single-page API"));
+            let error = product
+                .capture_inventory_with_status(
+                    &mut store,
+                    Some(installed),
+                    project.id,
+                    None,
+                    false,
+                    None,
+                    cancel.clone(),
+                    pause.clone(),
+                    &mut |_, _, _| {},
+                    &mut |_| {},
+                )
+                .unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("cannot capture logged-in pages with this app")
+            );
+
+            let error = product
+                .capture(
+                    &mut store,
+                    project.id,
+                    false,
+                    cancel.clone(),
+                    &mut |_, _, _| {},
+                )
+                .unwrap_err();
+            assert_eq!(
+                error.downcast_ref::<RuntimeBlocked>().unwrap().0,
+                RuntimeState::NotInstalled
+            );
+            for (check, resume) in [(false, None), (true, None), (false, Some(RunId::new()))] {
+                let error = product
+                    .capture_inventory_with_status(
+                        &mut store,
+                        None,
+                        project.id,
+                        None,
+                        check,
+                        resume,
+                        cancel.clone(),
+                        pause.clone(),
+                        &mut |_, _, _| {},
+                        &mut |_| {},
+                    )
+                    .unwrap_err();
+                assert_eq!(
+                    error.downcast_ref::<RuntimeBlocked>().unwrap().0,
+                    RuntimeState::NotInstalled
+                );
+            }
+            assert!(!product.runtime_cache.join("current").exists());
             Ok(())
         }
 

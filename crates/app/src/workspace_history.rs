@@ -46,7 +46,7 @@ impl Shell {
         // Refuse replacement rather than silently discarding either kind of draft.
         if self.unsaved(cx) || self.mask_dirty || self.mask_drag.is_some() {
             self.error = Some(
-                "Save or discard your draft before opening recorded evidence. Nothing was changed."
+                "Save or discard your draft before opening saved screenshots. Nothing was changed."
                     .into(),
             );
             return;
@@ -221,7 +221,7 @@ impl Shell {
             .text_size(px(15.))
             .child(self.heading(
                 "History",
-                "Saved runs and baseline versions. Cleanup is always explicit.",
+                "Saved captures, checks and baseline versions. Nothing is deleted automatically.",
             ));
         if self.project.is_none() {
             return body
@@ -344,9 +344,9 @@ impl Shell {
                                     "{} · {}",
                                     history_date(b.created_at),
                                     if active {
-                                        "Active baseline"
+                                        "Current baseline"
                                     } else {
-                                        "Retained baseline"
+                                        "Saved version"
                                     }
                                 ),
                                 format!(
@@ -368,7 +368,7 @@ impl Shell {
             );
         } else if !self.evidence.baselines.is_empty() {
             baselines = baselines.child(history_help(
-                "No loaded baseline versions match. Change or clear the search; saved evidence is unchanged.",
+                "No baseline versions on this history page match. Change or clear the search. Your saved screenshots are unchanged.",
             ));
         }
         if baseline_indices.len() > 4 {
@@ -394,7 +394,7 @@ impl Shell {
                                 .child(format!(
                                     "Baseline saved {} — {}",
                                     history_date(b.created_at),
-                                    if active { "Active reference" } else { "Retained version" },
+                                     if active { "Current baseline" } else { "Saved version" },
                                 )),
                         )
                         .child(format!(
@@ -406,22 +406,22 @@ impl Shell {
                             if first == last {
                                 format!("Reference screenshots captured {}", history_date(first))
                             } else {
-                                format!("Reference capture times: {} to {}. Exact times for each reference are in advanced provenance.", history_date(first), history_date(last))
+                                 format!("Screenshots captured between {} and {}. Show technical details for each screenshot's capture time.", history_date(first), history_date(last))
                             },
                         )))
                         .child(div().flex().flex_wrap().gap_2()
-                            .when(!active, |el| el.child(self.button(Control::Phase5(42), "Use this baseline", ActionStyle::Primary, cx)))
+                            .when(!active, |el| el.child(self.button(Control::Phase5(42), "Use this baseline…", ActionStyle::Primary, cx)))
                             .child(self.button(Control::Phase6(2), "Review ZIP export…", ActionStyle::Secondary, cx))
                             .child(self.button(Control::Phase6(4), "Review deletion…", ActionStyle::Danger, cx)))
                         .child(history_help(if active {
                             "Future checks use this version's fixed page list and screen sizes."
                         } else {
-                            "Use this version to make it the reference for future checks. This does not recapture the website or delete newer versions."
+                             "Use this version as the baseline for future checks. This does not recapture the website or delete newer versions."
                         })),
                 )
                 .when(b.parent.is_some(), |el| el.child(
                     controls::status(
-                        "Built from more than one capture time: approved screenshots replace selected references, while other references are inherited. This is not one simultaneous website snapshot.",
+                        "Some screenshots were updated; the others were kept from the previous baseline. They were not all captured at the same time.",
                         Tone::Warning,
                     )
                     .into_any_element()
@@ -430,11 +430,11 @@ impl Shell {
             baselines = baselines.child(if self.history.as_ref().is_some_and(|h| h.page > 0 || h.active_baseline.is_some()) {
                 controls::empty(
                     "No baseline versions on this history page",
-                    "Load another history page to find retained versions. This empty page does not change the saved active reference.",
+                    "Load another history page to find saved versions. Your current baseline is unchanged.",
                 )
             } else { controls::empty(
                 "No saved baseline versions",
-                "Open Pages & baseline to review pages, capture screenshots, then explicitly Save baseline. You can also inspect a baseline ZIP before importing it as a new project.",
+                "Open Pages & baseline to review pages, capture screenshots, then choose Save baseline. You can also import a baseline ZIP as a new project.",
             ) });
         } else if self.evidence.baselines.get(self.history_index).is_some() {
             baselines = baselines.child(history_help(
@@ -459,7 +459,7 @@ impl Shell {
                     )),
             )
             .child(history_help(
-                "ZIPs contain selected baseline evidence and project settings, never sessions or cookies. Review screenshots for private information before sharing.",
+                "ZIPs contain baseline screenshots and project settings, but no login sessions or cookies. Check screenshots for private information before sharing.",
             ));
         if self.history_section == 1 {
             body = body.child(baselines);
@@ -592,7 +592,7 @@ impl Shell {
                         r.run.finished_at.map(history_date).unwrap_or_else(|| "not recorded".into()),
                     )))
                     .child(history_help(if h.imported_runs.contains(&r.run.id) {
-                        "Imported evidence — not independently verified on this computer. Imported ignored areas need revalidation."
+                        "Imported screenshots — not verified on this computer. Check that imported ignored areas fit the screenshots before using them."
                     } else {
                         "Recorded locally on this computer."
                     })),
@@ -684,32 +684,32 @@ impl Shell {
             ));
         if let Some(s) = &self.project_storage {
             for (label, bytes) in [
-                ("Project evidence total", s.bytes),
+                ("Saved project files", s.bytes),
                 ("Original screenshots", s.original_bytes),
-                ("Rebuildable derivatives", s.derived_bytes),
-                ("Exclusive evidence", s.exclusive_bytes),
-                ("Shared evidence", s.shared_bytes),
+                ("Generated image files", s.derived_bytes),
+                ("Files used only by this project", s.exclusive_bytes),
+                ("Files shared with other projects", s.shared_bytes),
             ] {
                 storage = storage.child(history_storage_row(label, history_bytes(bytes)));
             }
             storage = storage.child(history_storage_row(
                 "Free disk space",
-                s.available_bytes.map(history_bytes).unwrap_or_else(|| {
-                    "Unavailable — free-space preflight cannot be claimed".into()
-                }),
+                s.available_bytes
+                    .map(history_bytes)
+                    .unwrap_or_else(|| "Could not measure available space".into()),
             ));
         } else if self.storage_pending.is_some() {
-            storage = storage.child(controls::loading("Measuring local storage…", "Calculating this project’s saved evidence size. History stays available while this runs."));
+            storage = storage.child(controls::loading("Measuring local storage…", "Calculating the space used by this project’s saved files. History stays available while this runs."));
         } else {
             storage = storage.child(history_help(
-                "Storage measurement is pending or not loaded. Refresh storage totals to request measured values; unavailable is not zero. History can be browsed without these totals.",
+                "Storage totals are not available yet. Choose Refresh storage totals to measure them. You can browse History while waiting.",
             ));
         }
         if self.history_section == 2 {
             body = body.child(
             storage
                 .child(history_help(
-                    "Shared originals stay protected. Exclusive storage is not automatically deletable. Replacing a whole baseline requires a new capture and explicit save; browser/cache repair is separate in App settings.",
+                    "Files shared with other projects are kept. Files used only by this project may still be needed by its saved baselines. Preview deletion in Runs or Baselines to see what can be removed. Browser repair is separate in App settings.",
                 ))
                 .child(self.button(
                     Control::Phase6(8),
@@ -731,9 +731,9 @@ impl Shell {
             .child(self.button(
                 Control::Details(Detail::History),
                 if self.details.contains(&Detail::History) {
-                    "Hide advanced provenance"
+                    "Hide technical details"
                 } else {
-                    "Show advanced provenance"
+                    "Show technical details"
                 },
                 ActionStyle::Secondary,
                 cx,
@@ -743,7 +743,7 @@ impl Shell {
                 provenance = provenance.child(history_help(format!("Exact storage: total {} bytes · originals {} bytes · derivatives {} bytes · exclusive {} bytes · shared {} bytes", s.bytes, s.original_bytes, s.derived_bytes, s.exclusive_bytes, s.shared_bytes)));
             }
             provenance = provenance.child(history_help(
-                "Technical source records for the selected baseline and run. Identifiers below are retained evidence links, not website names.",
+                "Source records for the selected baseline and run. The IDs below identify saved records and files, not website names.",
             ));
             // Direct rows are the browsing surface; retain serial controls only
             // as an optional keyboard fallback alongside technical inspection.
@@ -835,7 +835,7 @@ impl Shell {
                     )));
                 }
                 provenance = provenance.child(history_help(format!(
-                    "Showing {} of {} captured screenshots. Complete evidence and the fixed inventory remain retained.",
+                    "Showing {} of {} captured screenshots. All screenshots and the saved page list are kept.",
                     r.all_captures().count().min(32),
                     r.all_captures().count(),
                 )));
@@ -911,9 +911,9 @@ fn history_baseline_search(baseline: &BaselineVersion, active: bool) -> String {
         baseline.id,
         history_date(baseline.created_at),
         if active {
-            "Active reference"
+            "Current baseline Active reference"
         } else {
-            "Retained version"
+            "Saved version Retained version"
         },
         if baseline.parent.is_some() {
             "Composite inherited"
@@ -1096,7 +1096,9 @@ mod tests {
             &active
         ));
         assert!(!history_matches("retained", &active));
+        assert!(history_matches("current baseline", &active));
         assert!(history_matches("retained inherited 16:00", &retained));
+        assert!(history_matches("saved version", &retained));
         assert!(!history_matches("active", &retained));
         assert!(history_matches(&baseline.id.to_string(), &retained));
         assert!(history_matches(

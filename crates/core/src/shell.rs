@@ -30,6 +30,10 @@ pub enum Detail {
     IgnoredAreas,
     Network,
     Portability,
+    Browser,
+    LocalStorage,
+    ManagedNetwork,
+    SupportTools,
 }
 impl Choice {
     pub const SETUP: [Self; 9] = [
@@ -199,6 +203,8 @@ pub enum Control {
     CloseOptions,
     DiscoveryDetails,
     CloseMappingPreview,
+    DiscardPageList,
+    ImageControls,
 }
 #[derive(Debug, Clone)]
 pub struct FocusState {
@@ -275,7 +281,9 @@ impl FocusState {
             ];
         }
         let mut controls: Vec<_> = Screen::ALL.into_iter().map(Control::Navigate).collect();
-        controls.push(Control::Shortcuts);
+        if self.screen != Screen::Settings || self.busy {
+            controls.push(Control::Shortcuts);
+        }
         controls.push(Control::PagesBaseline);
         if !self.busy && self.project_saved && self.screen != Screen::Projects {
             controls.push(if self.choosing_project {
@@ -393,18 +401,35 @@ impl FocusState {
                 }
             }
             Screen::Settings => {
-                controls.extend((0..3).map(Control::Phase7));
-                controls.extend([1, 3, 6, 7, 13, 14, 15].map(Control::Phase6));
-                controls.push(Control::Details(Detail::Portability));
-                controls.extend([Control::SetupRuntime, Control::ChooseFolder, Control::About]);
+                // App settings follows its rendered groups. The app removes
+                // collapsed/disabled children without moving their next sibling.
                 controls.extend([
+                    Control::SetupRuntime,
+                    Control::Details(Detail::Browser),
+                    Control::Details(Detail::LocalStorage),
+                    Control::ChooseFolder,
+                    Control::Details(Detail::ManagedNetwork),
+                    Control::ValidationNext,
                     Control::CrawlField(17),
                     Control::CrawlField(18),
-                    Control::Guided(41),
                     Control::Guided(42),
+                    Control::Guided(41),
+                    Control::Details(Detail::Network),
+                    Control::Details(Detail::SupportTools),
+                    Control::Phase7(0),
+                    Control::Phase7(1),
+                    Control::Phase7(2),
+                    Control::Phase6(13),
+                    Control::Phase6(3),
+                    Control::Phase6(1),
+                    Control::Phase6(6),
+                    Control::Phase6(14),
+                    Control::Phase6(15),
+                    Control::Details(Detail::Portability),
+                    Control::Phase6(7),
+                    Control::About,
+                    Control::Shortcuts,
                 ]);
-                controls.push(Control::Details(Detail::Network));
-                controls.push(Control::ValidationNext);
             }
             Screen::Results => {
                 if self.project_saved {
@@ -420,6 +445,7 @@ impl FocusState {
                     controls.extend(Choice::RESULTS.into_iter().map(Control::Choice));
                     if self.preview {
                         controls.extend([
+                            Control::DiscardPageList,
                             Control::Guided(20),
                             Control::Guided(21),
                             Control::Guided(22),
@@ -437,6 +463,7 @@ impl FocusState {
                     controls.extend([Control::CloseOptions, Control::DiscoveryDetails]);
                     controls.extend([50, 51, 53, 54, 55, 56, 57].map(Control::Guided));
                     controls.push(Control::Phase5(39));
+                    controls.push(Control::ImageControls);
                     controls.extend([0, 1, 2, 4, 5, 26].map(Control::Phase5));
                     controls.push(Control::Details(Detail::IgnoredAreas));
                     controls.extend([14, 34].map(Control::Phase5));
@@ -502,9 +529,11 @@ impl FocusState {
                 | Control::Choice(_)
                 | Control::CloseOptions
                 | Control::DiscoveryDetails => 2,
+                Control::DiscardPageList => 2,
                 Control::Guided(54) => 3,
                 Control::Phase5(6..=9) | Control::Guided(55..=57) => 4,
                 Control::Guided(46)
+                | Control::ImageControls
                 | Control::Phase5(36)
                 | Control::Guided(44)
                 | Control::Viewer => 5,

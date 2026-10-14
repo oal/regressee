@@ -6,6 +6,216 @@ use super::*;
 use gpui::TestAppContext;
 use regressee_core::domain::{ProjectId, ReviewDecision, ReviewState};
 
+pub(super) fn screenshot_switch_fixture(path: &std::path::Path, comparison: bool) -> ProjectId {
+    use regressee_core::domain::{InventoryId, PageId, RunId};
+    let (mut store, project, _, _, _) = approval_fixture::fixture(path);
+    let baseline = store.project_evidence(project).unwrap().baseline.unwrap();
+    let mut run = store.load_run(baseline.references[0].run).unwrap();
+    run.run.id = RunId::new();
+    run.run.inventory.id = InventoryId::new();
+    run.run.environment.name = "Recorded website".into();
+    let mut page = run.run.inventory.pages[0].clone();
+    page.id = PageId::new();
+    page.canonical = url::Url::parse("http://127.0.0.1:43210/next?view=full#section").unwrap();
+    let mut target = run.run.targets[0].clone();
+    target.key.page = page.id;
+    target.requested = page.canonical.clone();
+    target.final_url = Some(page.canonical.clone());
+    let mut capture = run.captures[0].clone();
+    capture.metadata.key = target.key.clone();
+    capture.metadata.requested = page.canonical.to_string();
+    capture.metadata.final_url = page.canonical.to_string();
+    run.run.inventory.pages.push(page);
+    run.run.targets.push(target);
+    run.captures.push(capture);
+    store.freeze_inventory(&run.run.inventory).unwrap();
+    let save_run = |store: &mut regressee_storage::Store,
+                    run: &regressee_core::evidence::RunRecord| {
+        let mut pending = run.clone();
+        pending.run.state = JobState::Running;
+        pending.run.finished_at = None;
+        pending.captures.clear();
+        for target in &mut pending.run.targets {
+            target.outcome = TargetOutcome::Pending;
+        }
+        store.begin_run(&pending).unwrap();
+        store.finish_run(run).unwrap();
+    };
+    save_run(&mut store, &run);
+    if comparison {
+        let revision = store.load_project(project).unwrap().revision;
+        let saved = store.activate_baseline(run.run.id, revision).unwrap();
+        run.run.id = RunId::new();
+        run.run.intent = RunIntent::Check {
+            baseline: saved.project.active_baseline.unwrap(),
+        };
+        save_run(&mut store, &run);
+        regressee_app::review::analyze_run(
+            &mut store,
+            run.run.id,
+            regressee_app::review::preset(regressee_app::analysis_engine::Preset::Balanced),
+            &std::sync::atomic::AtomicBool::new(false),
+        )
+        .unwrap();
+    }
+    project
+}
+
+#[gpui::test]
+fn screenshot_switch_keeps_inspection_header_and_layout_during_image_reads(
+    cx: &mut TestAppContext,
+) {
+    for comparison in [false, true] {
+        let dir = tempfile::tempdir().unwrap();
+        let project = screenshot_switch_fixture(dir.path(), comparison);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, |s, cx| {
+            load_review(s, project, cx);
+            assert_eq!(s.evidence.comparison.is_some(), comparison);
+            assert_eq!(s.focus.candidate, !comparison);
+        });
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            for collapsed in [false, true] {
+                shell.update(cx, |s, cx| {
+                    s.review_queue_collapsed = collapsed;
+                    cx.notify();
+                });
+                cx.update(|w, cx| {
+                    let _ = w.draw(cx);
+                });
+                let heading = cx.debug_bounds("inspected-target-context").unwrap();
+                let toolbar = cx.debug_bounds("viewer-toolbar").unwrap();
+                let viewer = cx.debug_bounds("review-viewer").unwrap();
+                for (control, expected_path) in [
+                    (Control::Guided(24), "/next?view=full#section"),
+                    (Control::Guided(23), "/"),
+                ] {
+                    if !comparison && !collapsed && width >= 1100. && control == Control::Guided(24)
+                    {
+                        let row = cx.debug_bounds("page-row-target-1").unwrap();
+                        cx.simulate_click(row.center(), gpui::Modifiers::none());
+                    } else {
+                        cx.update(|w, cx| {
+                            shell.update(cx, |s, cx| {
+                                // Hidden queues use the same navigation route
+                                // without a mounted Previous/Next control.
+                                if collapsed {
+                                    s.guided(
+                                        if control == Control::Guided(24) {
+                                            24
+                                        } else {
+                                            23
+                                        },
+                                        cx,
+                                    );
+                                } else {
+                                    s.activate_control(control, w, cx);
+                                }
+                            });
+                        });
+                    }
+                    shell.read_with(cx, |s, _| {
+                        assert!(s.viewer.is_none(), "{width}: comparison={comparison}, hidden queue={collapsed}, {control:?}");
+                        assert!(s.viewer_pending.is_some());
+                        assert!(s.inspection_chrome_mounted());
+                        let (path, context) = s.inspection_identity();
+                        assert_eq!(path, expected_path);
+                        assert!(context.contains("Recorded website"));
+                    });
+                    cx.update(|w, cx| {
+                        let _ = w.draw(cx);
+                    });
+                    assert_eq!(
+                        cx.debug_bounds("inspected-target-context").unwrap(),
+                        heading
+                    );
+                    assert_eq!(cx.debug_bounds("viewer-toolbar").unwrap(), toolbar);
+                    assert_eq!(
+                        cx.debug_bounds("review-viewer").unwrap().origin,
+                        viewer.origin,
+                        "{width}x{height}, comparison={comparison}, hidden queue={collapsed}: loading must not replace the inspection header or collapse its toolbar"
+                    );
+                    shell.update(cx, |s, cx| {
+                        assert!(s.viewer_pending.is_some());
+                        assert!(!s.viewer_has_pixels());
+                        assert!(!s.control_enabled(Control::Guided(46), cx));
+                        finish_jobs(s, cx);
+                        assert!(s.viewer_current() && s.viewer_has_pixels());
+                        assert_eq!(s.inspection_identity().0, expected_path);
+                    });
+                    cx.update(|w, cx| {
+                        let _ = w.draw(cx);
+                    });
+                    assert_eq!(
+                        cx.debug_bounds("inspected-target-context").unwrap(),
+                        heading
+                    );
+                    assert_eq!(cx.debug_bounds("viewer-toolbar").unwrap(), toolbar);
+                    assert_eq!(
+                        cx.debug_bounds("review-viewer").unwrap().origin,
+                        viewer.origin
+                    );
+                }
+            }
+        }
+        owned.join_after_ui();
+    }
+}
+
+#[gpui::test]
+fn screenshot_loading_header_requires_current_selection_and_preserves_failure_recovery(
+    cx: &mut TestAppContext,
+) {
+    use crate::loading_ux::ScreenshotState;
+    let dir = tempfile::tempdir().unwrap();
+    let project = screenshot_switch_fixture(dir.path(), false);
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    shell.update(cx, |s, cx| {
+        load_review(s, project, cx);
+        let previous_key = s.selected_key.clone();
+        s.guided(24, cx);
+        let selected_key = s.selected_key.clone();
+        assert!(s.inspection_chrome_mounted());
+        s.selected_key = previous_key;
+        assert!(
+            !s.inspection_chrome_mounted(),
+            "stale reads cannot hold inspection chrome open"
+        );
+        s.selected_key = selected_key;
+        s.focus.review_surface = ReviewSurface::Pages;
+        assert!(!s.inspection_chrome_mounted());
+        s.focus.review_surface = ReviewSurface::Inspect;
+        let id = s.viewer_pending.as_ref().unwrap().0;
+        s.apply_update(
+            Update {
+                id,
+                reply: Reply::ProductFailure("Synthetic image read failure".into()),
+            },
+            cx,
+        );
+        assert!(!s.inspection_chrome_mounted());
+        assert_eq!(s.screenshot_state(), ScreenshotState::Unavailable);
+        assert!(!s.viewer_has_pixels());
+        assert!(s.control_mounted(Control::Phase5(36)));
+        assert!(!s.control_enabled(Control::Guided(46), cx));
+        s.evidence.latest.as_mut().unwrap().run.targets[1].outcome = TargetOutcome::Failed {
+            code: regressee_core::domain::CaptureError::Timeout,
+        };
+        s.reload_viewer(cx);
+        assert!(s.selected_capture_failed());
+        assert!(
+            !s.inspection_chrome_mounted(),
+            "failed targets keep their recovery header"
+        );
+    });
+    owned.join_after_ui();
+}
+
 #[gpui::test]
 fn dismissing_a_read_error_keeps_recovery_instead_of_an_idle_loading_state(
     cx: &mut TestAppContext,

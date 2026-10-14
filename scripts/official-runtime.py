@@ -28,7 +28,7 @@ OUT = ROOT / 'crates/runtime/assets/official'
 TEMP = Path('/path/to/private-tests/opencode')
 NODE = '24.21.0'
 PW = '1.64.0'
-WORKER = '5.0.0'
+WORKER = '5.0.1'
 NPM_KEY_ID = 'SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U'
 NPM_KEY = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEY6Ya7W++7aUPzvMTrezH6Ycx3c+HOKYCcNGybJZSCJq/fd7Qa8uuAKtdIkUQtQiEKERhAmE5lMMJhP8OkDOa2g=='
 # 2027-01-10 UTC: pin updates require a new reviewed catalog, never "latest".
@@ -370,7 +370,7 @@ def catalog(platform, work, sums, browser, cft, entries, bundled_sha):
     check_names(list(files) + list(links))
     identity = {'Pinned': {'node': NODE, 'playwright': PW, 'browser': browser['browserVersion'], 'worker': WORKER}}
     result = {
-        'manifest': {'version': 3, 'id': f'official-{NODE}-{PW}-{platform}', 'os': os_name, 'arch': arch, 'scope': 'OfficialPinned', 'support_until': SUPPORT_UNTIL, 'identity': identity, 'node': node_entry, 'worker': 'worker/src/index.mjs', 'browser_root': 'browsers', 'files': files, 'links': links, 'modes': modes},
+        'manifest': {'version': 3, 'id': f'official-{NODE}-{PW}-{WORKER}-{platform}', 'os': os_name, 'arch': arch, 'scope': 'OfficialPinned', 'support_until': SUPPORT_UNTIL, 'identity': identity, 'node': node_entry, 'worker': 'worker/src/index.mjs', 'browser_root': 'browsers', 'files': files, 'links': links, 'modes': modes},
         'components': [
             {'url': node_url, 'sha256': sums[node_name], 'bytes': node_path.stat().st_size, 'format': 'Zip' if os_name == 'windows' else 'TarGz', 'prefix': node_prefix, 'destination': 'node', 'only': 'node.exe' if os_name == 'windows' else 'bin/node'},
             {'url': chrome_url, 'sha256': digest_file(chrome_path), 'bytes': chrome_path.stat().st_size, 'format': 'Zip', 'prefix': chrome_prefix, 'destination': destination, 'only': None},

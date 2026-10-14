@@ -296,21 +296,25 @@ fn runtime_copy_covers_all_states_and_development_scope() {
         (
             NotInstalled,
             Some(regressee_runtime::distribution::Scope::DevelopmentLoopback),
-            "local fixtures only",
+            "local websites only",
         ),
-        (Ready, None, "verified"),
+        (Ready, None, "ready"),
         (
             Ready,
             Some(regressee_runtime::distribution::Scope::DevelopmentLoopback),
-            "local fixtures only",
+            "local websites only",
         ),
-        (RepairRequired, None, "explicit repair"),
+        (RepairRequired, None, "needs repair"),
+        (UpdateRequired, None, "update required"),
         (UnavailableDistribution, None, "incomplete"),
         (UnsupportedPlatform, None, "unavailable"),
     ] {
         let s = RuntimeReadiness {
             status: state,
-            setup_available: matches!(state, NotInstalled | Ready | RepairRequired),
+            setup_available: matches!(
+                state,
+                NotInstalled | Ready | UpdateRequired | RepairRequired
+            ),
             message: "Synthetic state",
             identity: None,
             scope,
@@ -321,6 +325,7 @@ fn runtime_copy_covers_all_states_and_development_scope() {
         assert!(
             help.contains("Local saving")
                 || help.contains("locally")
+                || help.contains("save projects")
                 || state == Ready
                 || state == NotInstalled
         );

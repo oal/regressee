@@ -19,7 +19,7 @@ fn validate_exit_pair(
 ) -> anyhow::Result<()> {
     request.validate().map_err(|e| {
         anyhow::anyhow!(
-            "Revalidate ignored areas explicitly for this capture pair before quitting: {e}"
+            "Check that ignored areas fit these screenshots before quitting. Open Analysis, then choose Check areas fit these screenshots. Details: {e}"
         )
     })
 }
@@ -253,17 +253,19 @@ impl Shell {
         if self.native_prompt || self.exit_guard.phase != Phase::Idle {
             return;
         }
-        let dirty = self.exit_project_dirty(cx)
+        let draft_dirty = self.exit_project_dirty(cx)
             || self.mask_dirty
             || self.exit_network_dirty(cx)
             || self.review_unsaved(cx)
             || self.mask_geometry_dirty(cx)
             || self.exit_note_dirty(cx)
             || self.exit_builder_dirty(cx);
+        let page_list_only = self.preview.is_some() && !draft_dirty;
+        let dirty = draft_dirty || self.preview.is_some();
         // A submitted mutation cannot be rolled back with Cancel or Discard.
         // Do not destroy its reply receiver before we know its committed result.
         if self.pending.is_some() && !self.focus.capturing {
-            self.notice = Some("Finish the current operation before quitting. Cancel here would not undo settings or evidence already saved.".into());
+            self.notice = Some("Wait for the current operation to finish before quitting. Cancelling would not undo settings or screenshots already saved.".into());
             cx.notify();
             return;
         }
@@ -281,15 +283,30 @@ impl Shell {
         self.exit_guard.return_focus = return_focus.clone();
         self.exit_guard.window = Some(window.window_handle());
         self.native_prompt = true;
-        let answer = window.prompt(
+        let answer = if page_list_only {
+            window.prompt(
+                PromptLevel::Warning,
+                "Discard discovered pages and quit?",
+                Some("The discovered page list and its include/exclude choices are unsaved and will be discarded when you quit. Saved settings, screenshots and baselines are kept. Keep the page list to continue reviewing."),
+                &["Keep page list", "Discard pages and quit"],
+                cx,
+            )
+        } else {
+            window.prompt(
             PromptLevel::Warning,
             "Save your edits before quitting?",
-            Some("Project and website settings, ignored areas, review notes and this computer's network edits will be checked and saved locally. This does not visit websites, approve results or save a baseline. Discard only drops unsaved edits; previously saved work stays saved."),
+            Some(if self.preview.is_some() {
+                "Discovered pages and inclusion choices are unsaved and will be discarded when you quit, even with Save and quit. Project settings, ignored areas, review notes and network edits can be saved locally. No website is visited and no baseline is changed. Cancel to keep the page list."
+            } else {
+                "Project and website settings, ignored areas, review notes and this computer's network edits will be checked and saved locally. This does not visit websites, approve results or save a baseline. Discard only drops unsaved edits; previously saved work stays saved."
+            }),
             &["Cancel", "Save and quit", "Discard and quit"],
             cx,
-        );
+            )
+        };
         cx.spawn_in(window, async move |this, cx| {
             let decision = match answer.await {
+                Ok(1) if page_list_only => Decision::Discard,
                 Ok(1) => Decision::Save,
                 Ok(2) => Decision::Discard,
                 _ => Decision::Cancel,
@@ -333,7 +350,7 @@ impl Shell {
             self.schedule_analysis(cx);
         }
         self.error = Some(format!(
-            "Not quitting: {} Your remaining edits are kept. Correct them and try Save and quit again, or explicitly discard them. Any earlier successful saves remain saved.",
+            "Could not save all edits: {} Your remaining edits are kept. Correct them and try Save and quit again, or discard them. Earlier successful saves are kept.",
             message.into()
         ));
         if self.presentation_focus.is_none()
@@ -403,7 +420,10 @@ impl Shell {
                 || self.exit_network_dirty(cx)
                 || self.exit_builder_dirty(cx)
             {
-                self.exit_save_failed("Some edits still need an explicit save.", cx);
+                self.exit_save_failed(
+                    "Some changes have not been saved. Save them before quitting.",
+                    cx,
+                );
                 return;
             }
             self.exit_guard.phase = Phase::Confirmed;
@@ -469,7 +489,7 @@ impl Shell {
                             && draft.key == note.key
                             && draft.note == note.note
                             && draft.state == note.state),
-                        "A pending review note or its saved disposition changed. Review it before trying Save and quit again."
+                        "A review note or decision changed while saving. Review it before trying Save and quit again."
                     );
                     note.reviewed_at = regressee_runtime::distribution::now();
                     self.exit_guard.pending_note = Some(note.clone());
@@ -712,7 +732,12 @@ mod tests {
                 assert_eq!(s.exit_guard.phase, Phase::Idle);
                 assert_eq!(s.next_request, requests);
                 assert!(s.pending.is_none());
-                assert!(s.error.as_ref().unwrap().contains("8,192 UTF-8 bytes"));
+                assert!(
+                    s.error
+                        .as_ref()
+                        .unwrap()
+                        .contains(regressee_core::domain::REVIEW_NOTE_LIMIT_MESSAGE)
+                );
                 assert_eq!(s.analysis_fields[9].read(cx).content.as_ref(), note);
             }
             let note = format!("{}\n", "é".repeat(4095)); // 8,191 bytes, exact exit snapshot
@@ -835,7 +860,7 @@ mod tests {
             validate_exit_pair(&request)
                 .unwrap_err()
                 .to_string()
-                .contains("Revalidate ignored areas explicitly")
+                .contains("Check that ignored areas fit these screenshots")
         );
         assert_eq!(request, original);
     }
@@ -874,7 +899,13 @@ mod controller_tests {
             assert_eq!(shell.exit_guard.phase, Phase::Idle);
             assert!(shell.pending.is_none());
             assert_eq!(shell.address.read(cx).content.as_ref(), "not an address");
-            assert!(shell.error.as_ref().unwrap().contains("Not quitting"));
+            assert!(
+                shell
+                    .error
+                    .as_ref()
+                    .unwrap()
+                    .contains("Could not save all edits")
+            );
         });
         owner.stop();
         owner.join_after_ui();
@@ -956,7 +987,7 @@ mod controller_tests {
                     .error
                     .as_ref()
                     .unwrap()
-                    .contains("earlier successful saves remain saved")
+                    .contains("Earlier successful saves are kept")
             );
         });
         owner.stop();

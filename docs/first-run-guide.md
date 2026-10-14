@@ -25,8 +25,12 @@ for the separate platform/clean-machine qualification limits.
    Chromium emulation, not actual Safari/iOS hardware. Advanced controls remain
    available. **Save settings** before finding pages.
 4. Use **Find pages & preview**, then inspect the included/excluded inventory in
-   **Pages & baseline** before capturing. A page limit is incomplete discovery,
-   not proof you found every page. An existing baseline remains unchanged.
+    **Pages & baseline** before capturing. A page limit is incomplete discovery,
+    not proof you found every page. An existing baseline remains unchanged.
+    Select a page to open its details and **Include page** / **Exclude page**
+    controls. **Previous page** and **Next page** inspect other pages without
+    changing inclusion. Pages blocked during discovery explain why; review project
+    settings and find pages again rather than overriding website boundaries here.
 5. Capture the reviewed pages, inspect coverage and warnings, then explicitly
    **Save baseline**.
     A baseline is the approved reference screenshots. Failed or missing targets
@@ -60,6 +64,28 @@ Switching projects does not change saved settings or start a capture; unsaved
 edits require confirmation before switching to a different project.
 
 ## When something goes wrong
+
+### Browser update or repair required
+
+If **Find pages & preview**, login or capture reports **Browser update required**,
+the installed private-browser components do not match this app build. Choose
+**Open App settings** → **Update browser**, then return to your project and retry.
+**Private browser needs repair** instead leads to **Repair browser**. Both actions
+require your explicit choice; neither deletes saved screenshots or changes your
+baseline. An update alone does not make an older baseline comparable: checks
+still require its matching browser components.
+
+Saving project settings is separate from visiting the website. If a save-and-find
+operation reports that settings were saved before discovery failed, the saved
+title and settings are kept; you do not need to enter them again. Unsaved drafts
+are also preserved when opening recovery settings. Missing setup configuration
+or an unsupported platform requires a supported build/platform, not repeated
+download retries.
+
+Other known failures explain their own next step: website login/access and
+request limits lead to Project settings; local low-space failures lead to
+History's Storage section when a project is selected. Nothing is installed,
+visited, exported or deleted merely by opening a recovery screen.
 
 ### Linux GPU initialization failure
 
@@ -134,6 +160,24 @@ rendering or public-site acceptance.
 
 ### Capture and storage problems
 
+- **URL count differs from screenshot count:** discovery lists included and
+  excluded URLs. Only included URLs are scheduled, once per selected screen size.
+  Off-site links, redirects, crawl rules, page limits and inspection failures can
+  exclude URLs before capture; these are separate from failed screenshot attempts.
+  Review the recorded page list for each exclusion reason. Refresh only reads
+  saved results—it does not retry capture.
+- **Page list was discarded:** **Discard discovered pages…** asks for confirmation
+  before removing the unsaved list and include/exclude choices. Close/Escape only
+  closes Page options. Recorded pages remain clickable with Previous/Next and
+  read-only details. Choose **Use recorded pages** to prepare another capture
+  without crawling again, even if no baseline has been saved, or **Find pages**
+  to crawl again. Neither action automatically captures or saves a baseline.
+- **Destructive actions:** warning dialogs explain what will change before page
+  list discard/replacement, login removal, retained-baseline activation, permanent
+  history deletion, temporary/recovery-file cleanup and browser repair/update.
+  Cancel keeps the existing work. Baseline save/approval and unsaved-edit discard
+  also retain their explicit confirmation dialogs. Quitting warns about losing
+  discovered pages; Save and quit saves supported edits, not the discovery list.
 - **Needs login:** reopen Project setup's browser/login controls and confirm the
   correct environment. Resume requires the same frozen settings; changed releases
   or origins need a new run/login rather than reused credentials.
@@ -150,6 +194,36 @@ rendering or public-site acceptance.
   download, check internet access, free space and Settings' browser diagnostics,
   then retry. Damaged installations require explicit **Repair browser**. Repair
   never deletes baselines, disables TLS or turns off Chromium's sandbox.
+
+### Retrying a failed browser setup on Windows
+
+Use a newly built preview containing the setup-diagnostics change; older downloads
+still show the generic error. Run as your normal user, with internet access. Do
+not disable antivirus, TLS verification or the browser sandbox.
+
+If setup fails, **Error details opens automatically**, including when setup was
+started by Find pages or login. Keep a screenshot before returning to the
+workspace. The details show the failed stage, elapsed seconds, received download
+bytes, OS/CPU, app version and the available nested error causes. Official
+download failures identify Node/Chromium and the source host; HTTP and filesystem
+errors retain their status/OS codes. A browser-test failure distinguishes worker
+startup, Chromium's test screenshot and shutdown, but may still provide only a
+typed worker failure rather than Chromium's raw stack.
+
+To help diagnose a retry, report the preview release tag, Windows version
+(`winver`), the error details, and whether another attempt fails at the same
+stage. Preparation points to configuration/storage checks; download to the
+network/server; file installation to extraction or filesystem access; browser
+startup test to the private worker/browser; saving the verified installation to
+final file/pointer publication. These stages identify where to investigate, not
+a confirmed cause. Check App settings for availability; use **Repair browser**
+only if the installation needs explicit repair. A failed first-use setup can be
+retried from the original action without deleting app data.
+
+These are local on-screen details, not the structured diagnostic export described
+below. Request URLs are omitted, but local paths/Windows account names can appear
+in OS errors. Review screenshots before sharing. Nothing is uploaded, and the
+privacy-filtered diagnostic export still excludes free-form errors and paths.
 
 Full-page capture has bounded height/readiness/image budgets; virtualized lists,
 hidden controls, frames, canvas/video and complex image replacement are not

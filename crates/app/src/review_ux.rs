@@ -140,6 +140,7 @@ impl Shell {
             Control::Phase5(index @ (0..=5 | 12..=19 | 26..=28 | 34..=35)) => index,
             Control::Details(Detail::Analysis) => 50,
             Control::Details(Detail::IgnoredAreas) => 51,
+            Control::ImageControls => 52,
             _ => return None,
         };
         self.review_action_bounds.get(index).cloned()
@@ -258,7 +259,7 @@ impl Shell {
             );
         } else if !self.analysis_fields[9].read(cx).content.is_empty() {
             return Err(
-                "The note has no active review binding. Reopen its original result before saving it.",
+                "This note is not linked to the open result. Reopen its original result before saving it.",
             );
         }
         let mut pending = Vec::new();
@@ -484,11 +485,11 @@ impl Shell {
             return ("Finish entering text before saving.".into(), false);
         }
         if self.review_note_dirty(cx) {
-            (format!("Unsaved · {} bytes", input.content.len()), false)
+            ("Unsaved changes".into(), false)
         } else if input.content.is_empty() {
-            ("No unsaved changes".into(), false)
+            ("No changes".into(), false)
         } else {
-            (format!("Saved · {} bytes", input.content.len()), false)
+            ("Saved".into(), false)
         }
     }
     pub(super) fn sync_review_note(&mut self, cx: &mut Context<Self>) {
@@ -687,6 +688,7 @@ impl Shell {
                 self.capture_details_open = !self.capture_details_open;
                 self.capture_diagnostics_open = false;
                 if self.capture_details_open {
+                    self.image_controls_open = false;
                     self.review_note_open = false;
                     self.review_tools = false;
                     self.mask_draw = false;
@@ -694,7 +696,9 @@ impl Shell {
             }
             38 => self.capture_diagnostics_open = !self.capture_diagnostics_open,
             39 => {
-                self.presentation_focus = Some(if self.capture_details_open {
+                self.presentation_focus = Some(if self.image_controls_open {
+                    self.image_controls_trigger()
+                } else if self.capture_details_open {
                     Control::Phase5(36)
                 } else if self.review_note_open {
                     Control::Phase5(37)
@@ -702,6 +706,7 @@ impl Shell {
                     Control::Guided(44)
                 });
                 self.capture_details_open = false;
+                self.image_controls_open = false;
                 self.review_note_open = false;
                 self.review_tools = false;
                 self.mask_draw = false;
@@ -710,6 +715,7 @@ impl Shell {
             37 => {
                 self.review_note_open = !self.review_note_open;
                 if self.review_note_open {
+                    self.image_controls_open = false;
                     self.review_focus_reveal.set(2);
                     self.presentation_focus = Some(Control::AnalysisField(9));
                     self.review_tools = false;
@@ -723,15 +729,26 @@ impl Shell {
         cx.notify();
     }
     pub(super) fn ordinary_review_bar(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.image_controls_open {
+            return div()
+                .text_size(px(HELP_TEXT_SIZE))
+                .text_color(rgb(MUTED))
+                .child("Close Image controls to return to review decisions.")
+                .into_any_element();
+        }
         if self.viewer_inspector_open() || self.options_panel_open() {
-            return div().text_size(px(13.)).text_color(rgb(MUTED)).child("Temporary editor · return to evidence before making a review or baseline decision.").into_any_element();
+            return div()
+                .text_size(px(13.))
+                .text_color(rgb(MUTED))
+                .child("Close this panel to review the screenshots or update the baseline.")
+                .into_any_element();
         }
         if self.history_inspection.is_some() {
             return div()
                 .text_size(px(13.))
                 .text_color(rgb(MUTED))
                 .child(format!(
-                    "Recorded decision: {} · Inspection only; baseline unchanged.",
+                    "Saved decision: {} · Read-only; baseline unchanged.",
                     self.ordinary_review_status()
                 ))
                 .into_any_element();
@@ -798,7 +815,7 @@ impl Shell {
                     .child(if self.narrow_workspace {
                         format!("{label} · {}", self.review_progress_summary())
                     } else {
-                        format!("Current review: {label} · displayed analysis only")
+                        format!("Review decision: {label} · for this comparison result")
                     }),
             )
             .when(!self.narrow_workspace, |bar| {
@@ -858,7 +875,7 @@ impl Shell {
         } else if self.analysis_pending.is_some() || self.analysis_due.is_some() {
             Some("Analysis is pending. Wait for results before review decisions.")
         } else if !self.review_result_valid() {
-            Some("This evidence is not comparable. Open Details for the cause.")
+            Some("These screenshots could not be compared reliably. Open Details for the reason.")
         } else if self.next_unreviewed_key().is_none() {
             Some("No other matching unreviewed result. Change filters or choose a result.")
         } else {

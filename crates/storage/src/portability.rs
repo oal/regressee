@@ -12,8 +12,8 @@ use std::{
 pub const ARCHIVE_BYTES: u64 = 1024 * 1024 * 1024;
 pub const MANIFEST_BYTES: u64 = 8 * 1024 * 1024;
 pub const ARCHIVE_ENTRIES: u16 = 10001;
-pub const PRIVACY: &str = "Original screenshots may contain confidential information. Ignored regions DO NOT redact raw screenshots. Addresses and private URL queries remain in this ZIP. No login sessions, cookies, browser profiles, secret references, logs, machine paths or runtime binaries are included.";
-pub const COMPATIBILITY: &str = "Imported portable provenance is not an independently verified local capture. Review environment mappings, establish your own login and install the exact matching runtime before explicitly checking the fixed targets. Other computers, fonts and operating systems can change rendering; caution mode is not a clean release check. Import never navigates or executes content.";
+pub const PRIVACY: &str = "Original screenshots may contain private information, including ignored areas. Page addresses and private URL parameters remain in this ZIP. Login sessions, cookies, browser profiles, saved-secret references, logs, local file paths and browser components are not included.";
+pub const COMPATIBILITY: &str = "These imported screenshots have not been verified on this computer. Review the website mappings, log in yourself and install matching browser components before running a check against the saved page list. Different computers, fonts and operating systems can change how pages look. Comparison warnings do not mean a release passed. Importing does not visit websites or run their content.";
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ExportPreview {
     pub project: ProjectId,

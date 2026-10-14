@@ -167,9 +167,9 @@ impl Shell {
     pub(super) fn review_title(&self) -> &'static str {
         if self.history_inspection.is_some() {
             return if self.evidence.comparison.is_some() {
-                "Recorded check · inspection only"
+                "Saved check · read-only"
             } else {
-                "Recorded capture · inspection only"
+                "Saved capture · read-only"
             };
         }
         if self.focus.review_surface == ReviewSurface::Pages || self.preview.is_some() {
@@ -202,17 +202,20 @@ impl Shell {
         }
         Some(match run.run.intent {
             RunIntent::NewBaseline => match run.run.state {
+                JobState::CompletedWithErrors if self.page_list_workspace() => {
+                    "Capture incomplete · Inspect capture for failures, or Use recorded pages to prepare another capture."
+                }
                 JobState::Completed if self.evidence.baseline.is_some() => {
-                    "Choose Save baseline to replace the current reference."
+                    "Choose Save baseline to use these screenshots for future comparisons. The current baseline will be replaced."
                 }
                 JobState::Completed => {
-                    "Choose Save baseline to use these screenshots as your reference."
+                    "Choose Save baseline to use these screenshots for future comparisons."
                 }
                 JobState::CompletedWithErrors if self.evidence.baseline.is_some() => {
-                    "Baseline unchanged · Filter → Gaps, then Find pages to retry."
+                    "Baseline unchanged. Filter by Missing or not compared to review failures, then Find pages to try again."
                 }
                 JobState::CompletedWithErrors => {
-                    "Baseline not saved · Filter → Gaps, then Find pages to retry."
+                    "Baseline not saved. Filter by Missing or not compared to review failures, then Find pages to try again."
                 }
                 JobState::Paused | JobState::Interrupted => {
                     "Capture unfinished · Resume or Find pages to start again."
@@ -231,13 +234,13 @@ impl Shell {
 
     fn baseline_rail_status(&self) -> String {
         if self.history_inspection.is_some() {
-            return "Recorded evidence\nActive baseline unchanged".into();
+            return "Saved results · read-only\nCurrent baseline unchanged".into();
         }
         if self.initial_evidence_loading() {
-            return "Loading saved evidence…".into();
+            return "Loading saved results…".into();
         }
         if self.initial_evidence_unavailable() {
-            return "Saved evidence unavailable".into();
+            return "Could not load saved results".into();
         }
         if let Some(baseline) = &self.evidence.baseline {
             count_label(
@@ -347,7 +350,7 @@ impl Shell {
     }
 
     pub(super) fn review_queue_width(&self) -> f32 {
-        if self.preview.is_some() && self.options_panel_open() {
+        if self.page_list_workspace() && self.options_panel_open() {
             self.working_width - self.options_panel_width() - 12.
         } else if self.page_list_workspace() && !self.discovery_image_mounted() {
             self.working_width
@@ -436,6 +439,9 @@ impl Shell {
             Control::CloseOptions | Control::DiscoveryDetails if results => {
                 self.options_panel_open()
             }
+            Control::DiscardPageList if results => {
+                self.preview.is_some() && self.options_panel_open()
+            }
             Control::Phase5(0..=19 | 26..=28 | 34..=39)
             | Control::AnalysisField(0..=8 | 10..=13)
             | Control::Viewer
@@ -472,7 +478,7 @@ impl Shell {
             {
                 false
             }
-            Control::Guided(19 | 23 | 24 | 45)
+            Control::Guided(19)
                 if results && self.page_list_workspace() && self.preview.is_none() =>
             {
                 false
@@ -497,7 +503,6 @@ impl Shell {
                 results && !self.page_list_workspace() && self.evidence.latest.is_some()
             }
             Control::Guided(51) => results && self.discovery_image_mounted(),
-            Control::Guided(16) if self.preview.is_some() => self.result_filters_open,
             Control::Guided(17 | 19..=24 | 45) | Control::CrawlField(9)
                 if results && !self.page_list_workspace() && self.review_queue_collapsed =>
             {
@@ -507,12 +512,17 @@ impl Shell {
         }
     }
 
+    pub(super) fn review_navigation_available(&self) -> bool {
+        self.focus.screen == Screen::Results
+            && self.project.is_some()
+            && !self.focus.shows_project_picker()
+    }
+
     /// Offscreen fixtures must call this with their capture width too; the
     /// native render path calls it with the actual desktop viewport width.
     pub(super) fn configure_review_geometry(&mut self, width: f32) {
         self.narrow_workspace = width < 1100.;
-        self.navigation_collapsed = self.focus.screen == Screen::Results
-            && self.project.is_some()
+        self.navigation_collapsed = self.review_navigation_available()
             && self.navigation_preference.unwrap_or(self.narrow_workspace);
         self.working_width = (width - if self.navigation_collapsed { 48. } else { 240. }).max(1.);
         if self.viewer_fit && self.viewer.is_some() {
@@ -586,8 +596,12 @@ impl Shell {
                 cx,
             ));
         }
-        if pages && self.evidence.baseline.is_some() && self.preview.is_none() {
-            actions = actions.child(self.guided_button(16, "Page list", cx));
+        if pages
+            && self.evidence.latest.is_some()
+            && self.preview.is_none()
+            && self.history_inspection.is_none()
+        {
+            actions = actions.child(self.guided_button(16, "Use recorded pages", cx));
         }
         if self.preview.is_some() {
             actions = actions.child(self.button(
@@ -601,9 +615,9 @@ impl Shell {
             Control::RefreshEvidence,
             if self.history_inspection.is_some() {
                 if self.narrow_workspace {
-                    "Latest evidence"
+                    "Latest results"
                 } else {
-                    "Return to latest evidence"
+                    "Return to latest results"
                 }
             } else {
                 "Refresh"
@@ -635,7 +649,7 @@ impl Shell {
                             .items_center()
                             .justify_between()
                             .gap_2()
-                            .child(if !pages && self.viewer.is_some() && !self.selected_capture_failed() {
+                            .child(if self.inspection_chrome_mounted() {
                                 div().flex_1().min_w_0().child(self.inspection_heading()).into_any_element()
                             } else {
                                 div().text_size(px(if self.narrow_workspace { 21. } else { 24. }))
@@ -644,7 +658,7 @@ impl Shell {
                             .child(actions),
                     )
                     .when_some(self.preview.as_ref(), |header, preview| {
-                        header.child(div().debug_selector(|| "discovery-capture-plan".into()).w_full().text_size(px(13.)).line_height(px(18.)).text_color(rgb(MUTED)).child(format!("{} included pages × {} sizes = {} screenshots. {} Adjust settings and find pages again to expand this list.", preview.included(), preview.settings.profiles.len(), preview.included() * preview.settings.profiles.len(), preview.inventory.coverage.label())))
+                        header.child(div().debug_selector(|| "discovery-capture-plan".into()).w_full().text_size(px(13.)).line_height(px(18.)).text_color(rgb(MUTED)).child(format!("{} included × {} = {}. {} {}", count_label(preview.included(), "page", "pages"), count_label(preview.settings.profiles.len(), "screen size", "screen sizes"), count_label(preview.included() * preview.settings.profiles.len(), "screenshot", "screenshots"), preview.inventory.coverage.label(), if preview.included() == 0 { "Include at least one eligible page before capturing." } else if !self.discovery_plan_current() { "Settings changed. In Project settings, choose Find pages again before capturing." } else { "Adjust settings and find pages again to expand this list." })))
                     })
                     .when_some(self.capture_next_step(), |header, next| {
                         header.child(
@@ -678,7 +692,7 @@ impl Shell {
                     }),
             )
             .when(!pages, |body| body.child(self.coverage_summary()))
-            .when(!pages && self.viewer.is_some() && !self.selected_capture_failed(), |body| {
+            .when(self.inspection_chrome_mounted(), |body| {
                 body.child(self.evidence_toolbar(cx))
             })
             .child(
@@ -722,7 +736,7 @@ impl Shell {
                                     .flex_col()
                                     .gap_2()
                                     .when(self.review_queue_collapsed
-                                        && (self.viewer.is_none() || self.selected_capture_failed())
+                                        && !self.inspection_chrome_mounted()
                                         && !self.authoritative_empty_capture(), |viewer| {
                                         viewer.child(self.guided_button(50, "Show results", cx))
                                     })
@@ -845,7 +859,7 @@ impl Shell {
                     .iter()
                     .find(|p| Some(p.id) == key.map(|k| k.profile))
             })
-            .map(|p| format!("{} · {} × {} CSS px", p.name, p.width, p.height))
+            .map(|p| format!("{} · {} × {} pixels", p.name, p.width, p.height))
             .unwrap_or_else(|| "Profile record not loaded".into());
         if pane == 0 && self.evidence.comparison.is_some() {
             let reference = self
@@ -1025,7 +1039,7 @@ impl Shell {
             .child("Capture times may differ; this is not one simultaneous site snapshot.")
             .child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Inspecting {role} · screenshot {} of {rows}", self.approval_reference_index + 1)))
             .child(format!("{} · {} · {environment} · {}", index.target_labels.get(&inspected.key).map(|url| controls::page_path(url)).unwrap_or_else(|| inspected.key.page.to_string()), index.profile_labels.get(&inspected.key.profile).cloned().unwrap_or_else(|| inspected.key.profile.to_string()), capture_time(inspected.captured_at)))
-            .child(self.guided_button(52, if self.approval_exact_open { "Hide exact provenance" } else { "Show exact provenance for inspected screenshot" }, cx))
+            .child(self.guided_button(52, if self.approval_exact_open { "Hide screenshot source details" } else { "Show screenshot source details" }, cx))
             .when(self.approval_exact_open, |body| body.child(div().id("approval-exact-provenance").debug_selector(|| "approval-exact-provenance".into()).text_size(px(14.)).line_height(px(20.)).child(exact)));
         // Bound mounted rows, without dropping any unchanged reference. Previous/
         // Next visits every reference and switches the visible 32-row page.
@@ -1096,16 +1110,71 @@ impl Shell {
                     })),
             );
         }
-        div().id("approval-modal-backdrop").occlude().absolute().inset_0().bg(rgba(0x183f6588)).flex().items_center().justify_center()
-            .child(div().debug_selector(|| "approval-decision".into()).w(px(if self.narrow_workspace { 740. } else { 760. })).max_w_full().h(px(520.)).max_h_full().p_4().bg(rgb(SURFACE)).border_1().border_color(rgb(LINE)).rounded(px(4.)).flex().flex_col().gap_2()
-                .child(div().text_size(px(22.)).font_weight(FontWeight::SEMIBOLD).child(format!("Update the baseline for {} screenshot{}?", preview.selected.len(), if preview.selected.len() == 1 { "" } else { "s" })))
-                .child(div().id("approval-reference-list").debug_selector(|| "approval-reference-list".into()).flex_1().min_h_0().w_full().overflow_y_scroll().track_scroll(&self.approval_provenance_scroll).child(flow))
-                .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Scroll for more · exact provenance and all unchanged screenshots remain available."))
-                .child(div().flex().flex_wrap().justify_between().gap_2()
-                    .child(self.guided_button(48, "Previous", cx))
-                    .child(self.guided_button(49, "Next", cx))
-                    .child(self.guided_button(47, "Keep reviewing", cx))
-                    .child(self.button(Control::Phase5(25), "Confirm baseline", ActionStyle::Primary, cx))))
+        div()
+            .id("approval-modal-backdrop")
+            .occlude()
+            .absolute()
+            .inset_0()
+            .bg(rgba(0x183f6588))
+            .flex()
+            .items_center()
+            .justify_center()
+            .child(
+                div()
+                    .debug_selector(|| "approval-decision".into())
+                    .w(px(if self.narrow_workspace { 740. } else { 760. }))
+                    .max_w_full()
+                    .h(px(520.))
+                    .max_h_full()
+                    .p_4()
+                    .bg(rgb(SURFACE))
+                    .border_1()
+                    .border_color(rgb(LINE))
+                    .rounded(px(4.))
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(
+                        div()
+                            .text_size(px(22.))
+                            .font_weight(FontWeight::SEMIBOLD)
+                            .child(format!(
+                                "Update the baseline for {} screenshot{}?",
+                                preview.selected.len(),
+                                if preview.selected.len() == 1 { "" } else { "s" }
+                            )),
+                    )
+                    .child(
+                        div()
+                            .id("approval-reference-list")
+                            .debug_selector(|| "approval-reference-list".into())
+                            .flex_1()
+                            .min_h_0()
+                            .w_full()
+                            .overflow_y_scroll()
+                            .track_scroll(&self.approval_provenance_scroll)
+                            .child(flow),
+                    )
+                    .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(
+                        "Scroll to see more screenshots. Source details are available above.",
+                    ))
+                    .child(
+                        div()
+                            .flex()
+                            .flex_wrap()
+                            .justify_between()
+                            .gap_2()
+                            .child(self.guided_button(48, "Previous", cx))
+                            .child(self.guided_button(49, "Next", cx))
+                            .child(self.guided_button(47, "Keep reviewing", cx))
+                            .child(self.button(
+                                Control::Phase5(25),
+                                "Confirm baseline",
+                                ActionStyle::Primary,
+                                cx,
+                            )),
+                    ),
+            )
             .into_any_element()
     }
 
@@ -1160,7 +1229,7 @@ impl Shell {
             != Some(comparison.revision.baseline)
         {
             return Some(
-                "This check uses a retained baseline; run a check against the active baseline to update it.",
+                "This check used an earlier baseline. Run a check against the current baseline before updating it.",
             );
         }
         let Some(key) = key else {
@@ -1173,12 +1242,14 @@ impl Shell {
             return Some("Analysis is not available for this screenshot.");
         };
         match result.classification {
-            Classification::CouldNotCapture => Some("Missing capture cannot update the baseline."),
+            Classification::CouldNotCapture => Some(
+                "This screenshot was not captured, so it cannot replace a baseline screenshot.",
+            ),
             Classification::NotComparable => {
-                Some("Incompatible evidence cannot update the baseline.")
+                Some("These screenshots could not be compared, so they cannot update the baseline.")
             }
             _ => Some(
-                "Capture warnings, missing source evidence or incompatible analysis prevent a baseline update.",
+                "This screenshot cannot update the baseline because of capture warnings, missing originals or comparison problems. Open Details to learn more.",
             ),
         }
     }
@@ -1213,19 +1284,19 @@ impl Shell {
                 progress.reviewed,
                 progress.remaining,
                 if progress.gaps + progress.awaiting > 0 {
-                    format!(" · {} gaps / awaiting", progress.gaps + progress.awaiting)
+                    format!(" · {} not compared", progress.gaps + progress.awaiting)
                 } else {
                     String::new()
                 },
                 if baseline_saved {
-                    "Explicit updates saved"
+                    "Baseline updates saved"
                 } else {
                     "Baseline unchanged by review"
                 }
             );
         }
         format!(
-            "{} reviewed · {} left · {} need fix · {} gaps{}. {}",
+            "{} reviewed · {} left · {} need fix · {} not compared{}. {}",
             progress.reviewed,
             progress.remaining,
             progress.needs_fix,
@@ -1236,7 +1307,7 @@ impl Shell {
                 String::new()
             },
             if baseline_saved {
-                "Explicitly saved updates included."
+                "Saved baseline updates included."
             } else {
                 "Baseline unchanged by review."
             }
@@ -1299,14 +1370,14 @@ impl Shell {
             .child(
                 div().text_size(px(13.)).text_color(rgb(MUTED)).child(
                     if self.narrow_workspace { "Baseline changes only after confirmation." }
-                    else { "Review decisions do not approve. Unselected references stay." },
+                    else { "Review decisions do not change the baseline. Unselected screenshots stay unchanged." },
                 ),
             )
             .when_some(self.approval_unavailable_reason(self.selected_key.as_ref()), |bar, reason| {
                 bar.child(div().text_size(px(13.)).text_color(rgb(WARNING)).child(reason))
             })
             .when(!self.approval_selection.is_empty() && !self.approval_selection_eligible(), |bar| {
-                bar.child(div().text_size(px(13.)).text_color(rgb(WARNING)).child("A selected screenshot is no longer eligible. Remove it or refresh valid evidence before approval."))
+                bar.child(div().text_size(px(13.)).text_color(rgb(WARNING)).child("A selected screenshot can no longer update the baseline. Remove it from the selection or refresh results before confirming."))
             })
             .into_any_element()
     }
@@ -1525,7 +1596,7 @@ impl Shell {
                     } else if self.unsaved(cx) {
                         "Save before visiting the website. Existing baseline unchanged."
                     } else {
-                        "Settings saved locally. Capture and baseline activation remain explicit."
+                "Settings saved. Capture screenshots, then choose Save baseline to use them for comparisons."
                     }),
             )
             .into_any_element()
@@ -1534,6 +1605,7 @@ impl Shell {
     pub(super) fn project_rail(&self, cx: &mut Context<Self>) -> AnyElement {
         let project = self.project.is_some();
         div()
+            .debug_selector(|| "project-rail".into())
             .w(px(192.))
             .flex_shrink_0()
             .h_full()
@@ -1543,18 +1615,7 @@ impl Shell {
             .flex()
             .flex_col()
             .gap_2()
-            .when(self.focus.screen == Screen::Results, |rail| {
-                rail.child(self.guided_button(53, "Hide navigation", cx))
-            })
-            .child(
-                div()
-                    .px_3()
-                    .pt_3()
-                    .pb_5()
-                    .text_size(px(22.))
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Regressee"),
-            )
+            .child(div().px_2().pt_3().pb_3().child(brand::navigation_lockup()))
             .child(self.button(
                 Control::Navigate(Screen::Projects),
                 "Projects",
@@ -1668,7 +1729,7 @@ impl Shell {
                 ),
                 (
                     coverage.missing.saturating_sub(pending).to_string(),
-                    "gaps",
+                    "not captured",
                     coverage.missing > pending,
                 ),
             ];
@@ -1684,17 +1745,27 @@ impl Shell {
                     "no significant change",
                     false,
                 ),
-                (coverage.missing.to_string(), "gaps", coverage.missing > 0),
+                (
+                    coverage.missing.to_string(),
+                    "not compared",
+                    coverage.missing > 0,
+                ),
             ];
             if coverage.unclassified > 0 {
-                metrics.push((coverage.unclassified.to_string(), "awaiting", false));
+                metrics.push((
+                    coverage.unclassified.to_string(),
+                    "awaiting analysis",
+                    false,
+                ));
             }
             metrics
         };
         let scope = match run.run.inventory.coverage {
             regressee_core::domain::DiscoveryCoverage::Complete => None,
-            regressee_core::domain::DiscoveryCoverage::Limited { .. } => Some("Limited inventory"),
-            regressee_core::domain::DiscoveryCoverage::Interrupted => Some("Discovery interrupted"),
+            regressee_core::domain::DiscoveryCoverage::Limited { .. } => Some("Limited page list"),
+            regressee_core::domain::DiscoveryCoverage::Interrupted => {
+                Some("Page search interrupted")
+            }
         };
         let kind = if self.evidence.comparison.is_some() {
             "Comparison"
@@ -1741,18 +1812,31 @@ impl Shell {
                     )
                     .child(label)
             }))
-            .when(!self.narrow_workspace, |summary| {
-                summary.child(div().text_color(rgb(MUTED)).child(format!(
-                        "{} pages · {} screen sizes",
-                        run.run
-                            .inventory
-                            .pages
-                            .iter()
-                            .filter(|p| p.included)
-                            .count(),
-                        run.run.profiles.len()
-                    )))
-            })
+            .when(
+                !self.narrow_workspace || run.run.inventory.pages.iter().any(|p| !p.included),
+                |summary| {
+                    let included = run
+                        .run
+                        .inventory
+                        .pages
+                        .iter()
+                        .filter(|p| p.included)
+                        .count();
+                    let excluded = run.run.inventory.pages.len() - included;
+                    let selection = if excluded > 0 {
+                        format!(
+                            "{included} / {} URLs included · {excluded} excluded before capture",
+                            run.run.inventory.pages.len()
+                        )
+                    } else {
+                        format!(
+                            "{included} pages · {}",
+                            count_label(run.run.profiles.len(), "screen size", "screen sizes")
+                        )
+                    };
+                    summary.child(div().text_color(rgb(MUTED)).child(selection))
+                },
+            )
             .when_some(scope, |summary, scope| {
                 summary.child(div().text_color(rgb(WARNING)).child(scope))
             })
@@ -1766,14 +1850,14 @@ pub(super) fn count_label(count: usize, singular: &str, plural: &str) -> String 
 
 fn compact_profile(profile: &regressee_core::domain::CaptureProfile) -> String {
     format!(
-        "{} · {} × {} CSS px",
+        "{} · {} × {} pixels",
         profile.name, profile.width, profile.height
     )
 }
 
 fn discovery_summary(preview: &DiscoveryPreview) -> String {
     format!(
-        "{} included · {} excluded · {} · {}. Review the list before capturing; baseline unchanged.",
+        "{} included · {} excluded · {} · {} Review the list before capturing; baseline unchanged.",
         count_label(preview.included(), "page", "pages"),
         preview
             .inventory
@@ -2149,7 +2233,11 @@ mod tests {
                 s.baseline_rail_status(),
                 "Incomplete capture\nNo baseline saved"
             );
-            assert!(s.capture_next_step().unwrap().contains("Filter → Gaps"));
+            assert!(
+                s.capture_next_step()
+                    .unwrap()
+                    .contains("Filter by Missing or not compared")
+            );
             assert!(s.comparison_context().contains("no comparison performed"));
             assert_eq!(
                 s.captured_target_label(&key),
@@ -2593,7 +2681,7 @@ mod tests {
             assert!(
                 s.approval_unavailable_reason(s.selected_key.as_ref())
                     .unwrap()
-                    .contains("retained baseline")
+                    .contains("earlier baseline")
             );
         });
         owned.join_after_ui();
@@ -2691,7 +2779,7 @@ mod tests {
             assert!(!s.discovery_image_mounted());
             assert_eq!(s.review_queue_width(), 772.);
             assert_eq!(s.viewer_pane_indices(), &[1]);
-            assert!(!s.workspace_control_mounted(Control::Guided(16)));
+            assert!(!s.control_mounted(Control::Guided(16)));
         });
         cx.simulate_resize(size(px(820.), px(600.)));
         cx.update(|window, cx| {
@@ -2699,6 +2787,7 @@ mod tests {
         });
         let queue = cx.debug_bounds("review-queue").unwrap();
         assert!(queue.size.width >= px(580.));
+        assert!(cx.debug_bounds("action-Guided(16)").is_none());
         // The inventory viewport, not merely its containing queue, reserves two rows.
         let list = cx.debug_bounds("inventory-preview").unwrap();
         assert!(list.size.height >= px(PAGE_ROW_HEIGHT * 2.));
@@ -2723,14 +2812,18 @@ mod tests {
                 Classification::CouldNotCapture;
             assert_eq!(
                 s.approval_unavailable_reason(Some(&key)),
-                Some("Missing capture cannot update the baseline.")
+                Some(
+                    "This screenshot was not captured, so it cannot replace a baseline screenshot."
+                )
             );
             assert_eq!(ReviewProgress::from_evidence(&s.evidence).gaps, 1);
             s.evidence.comparison.as_mut().unwrap().revision.results[0].classification =
                 Classification::NotComparable;
             assert_eq!(
                 s.approval_unavailable_reason(Some(&key)),
-                Some("Incompatible evidence cannot update the baseline.")
+                Some(
+                    "These screenshots could not be compared, so they cannot update the baseline."
+                )
             );
             s.evidence.comparison.as_mut().unwrap().revision.results[0].classification =
                 classification;

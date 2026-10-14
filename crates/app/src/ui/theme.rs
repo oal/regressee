@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: MPL-2.0
 //! User-selected Clear wayfinding palette; shared control metrics live here.
-//! System UI type, light working surfaces and dark project navigation.
-pub const GROUND: u32 = 0xf6fafd;
+//! Logo-derived navy/teal identity, light workspaces and untinted evidence.
+pub const GROUND: u32 = 0xf5f9fa;
 pub const SURFACE: u32 = 0xffffff;
-pub const RAIL: u32 = 0x183f65;
+pub const RAIL: u32 = 0x082b50;
 pub const RAIL_INK: u32 = 0xffffff;
-pub const RAIL_MUTED: u32 = 0xd7e8f5;
-pub const RAIL_HOVER: u32 = 0x23517a;
-pub const INK: u32 = 0x22313d;
-pub const MUTED: u32 = 0x536778;
-pub const LINE: u32 = 0xced9e2;
-pub const CONTROL_LINE: u32 = 0x7e93a6;
-pub const ACTION_SURFACE: u32 = 0xf7fafc;
-pub const ACTION_HOVER: u32 = 0xe7f2fa;
-pub const ACCENT: u32 = 0x1765ac;
-pub const ACCENT_HOVER: u32 = 0x12558f;
-pub const SELECTED: u32 = 0xe7f2fa;
+pub const RAIL_MUTED: u32 = 0xd1e4f2;
+pub const RAIL_HOVER: u32 = 0x123d65;
+pub const INK: u32 = 0x1b3044;
+pub const MUTED: u32 = 0x506579;
+pub const LINE: u32 = 0xcddcdf;
+pub const CONTROL_LINE: u32 = 0x7b919f;
+pub const ACTION_SURFACE: u32 = 0xf4f8fa;
+pub const ACTION_HOVER: u32 = 0xe2f5f0;
+// The artwork's luminous turquoise is too light for white button text.
+pub const ACCENT: u32 = 0x007970;
+pub const ACCENT_HOVER: u32 = 0x00685f;
+pub const SELECTED: u32 = 0xe2f5f0;
 pub const ERROR: u32 = 0x9c3038;
 pub const ERROR_SURFACE: u32 = 0xfff2f2;
 pub const WARNING: u32 = 0x775311;
@@ -66,12 +67,17 @@ mod tests {
             (RAIL_INK, RAIL),
             (RAIL_INK, RAIL_HOVER),
             (RAIL_MUTED, RAIL),
+            (RAIL_MUTED, RAIL_HOVER),
             (RAIL, SELECTED),
             (INK, SURFACE),
             (MUTED, SURFACE),
             (MUTED, GROUND),
             (MUTED, ACTION_SURFACE),
             (INK, ACTION_HOVER),
+            (MUTED, SELECTED),
+            (ACCENT, SURFACE),
+            (ACCENT, GROUND),
+            (ACCENT, SELECTED),
             (SURFACE, ACCENT),
             (SURFACE, ACCENT_HOVER),
             (ACCENT_HOVER, SELECTED),
@@ -85,5 +91,7 @@ mod tests {
         assert_ne!(ERROR, WARNING);
         assert!(contrast(CONTROL_LINE, SURFACE) >= 3.);
         assert!(contrast(CONTROL_LINE, ACTION_SURFACE) >= 3.);
+        assert!(contrast(ACCENT, ACTION_SURFACE) >= 3.);
+        assert!(contrast(ACCENT, SELECTED) >= 3.);
     }
 }

@@ -101,6 +101,7 @@ pub enum InstallProgress {
     Verifying,
     Extracting,
     TestingBrowser,
+    Publishing,
     Ready,
 }
 
@@ -595,6 +596,8 @@ pub fn install_with_progress(
     progress(InstallProgress::TestingBrowser);
     check_cancel(cancel)?;
     smoke(&installed)?;
+    check_cancel(cancel)?;
+    progress(InstallProgress::Publishing);
     check_cancel(cancel)?;
     let ready = stage.path().join("READY");
     let mut f = File::options().create_new(true).write(true).open(ready)?;

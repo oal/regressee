@@ -6,7 +6,8 @@ use regressee_app::product::{RuntimeReadiness, RuntimeState};
 pub(super) fn runtime_copy(
     status: Option<&RuntimeReadiness>,
 ) -> (&'static str, Tone, &'static str) {
-    let local = "You can still save projects locally and inspect retained evidence.";
+    let local =
+        "You can still save projects on this computer and view saved screenshots and results.";
     match status.map(|s| s.status) {
         None => (
             "Checking browser setup",
@@ -16,11 +17,14 @@ pub(super) fn runtime_copy(
         Some(RuntimeState::UnavailableDistribution) => (
             "Browser setup incomplete in this build",
             Tone::Warning,
-            local,
+            regressee_app::recovery::Problem::Browser(RuntimeState::UnavailableDistribution)
+                .message(),
         ),
-        Some(RuntimeState::UnsupportedPlatform) => {
-            ("Browser unavailable on this platform", Tone::Warning, local)
-        }
+        Some(RuntimeState::UnsupportedPlatform) => (
+            "Browser unavailable on this platform",
+            Tone::Warning,
+            regressee_app::recovery::Problem::Browser(RuntimeState::UnsupportedPlatform).message(),
+        ),
         Some(RuntimeState::NotInstalled)
             if status.is_some_and(|s| {
                 s.setup_available
@@ -28,9 +32,9 @@ pub(super) fn runtime_copy(
             }) =>
         {
             (
-                "Development browser — local fixtures only",
+                "Test browser — local websites only",
                 Tone::Warning,
-                "This development build installs a browser for authorized local fixtures only. Internet is required; local saving is available.",
+                "This development build can only visit approved local test websites, not public websites. Internet is required to install its browser. You can still save projects on this computer.",
             )
         }
         Some(RuntimeState::NotInstalled) if status.is_some_and(|s| s.setup_available) => (
@@ -47,20 +51,25 @@ pub(super) fn runtime_copy(
             }) =>
         {
             (
-                "Development browser — local fixtures only",
+                "Test browser — local websites only",
                 Tone::Warning,
-                "Website capture and login are restricted to authorized local fixtures. Local saving is available.",
+                "This browser can only capture and log in to approved local test websites, not public websites. You can still save projects on this computer.",
             )
         }
         Some(RuntimeState::Ready) => (
-            "Private browser verified",
+            "Browser ready",
             Tone::Information,
-            "Login and website visits start only with your explicit action.",
+            "Ready for login, finding pages and capturing screenshots. Saving settings does not open a website.",
         ),
         Some(RuntimeState::RepairRequired) => (
-            "Browser needs explicit repair",
+            "Browser needs repair",
             Tone::Warning,
-            "Use App settings to repair the browser before login or capture. Local saving and retained evidence remain available.",
+            "Open App settings and choose Repair browser before logging in or capturing pages. You can still save projects and view saved results.",
+        ),
+        Some(RuntimeState::UpdateRequired) => (
+            "Browser update required",
+            Tone::Warning,
+            "Open App settings and choose Update browser before login or capture. Local saving remains available; saved screenshots and baselines are kept.",
         ),
     }
 }
@@ -76,7 +85,7 @@ impl Shell {
             (
                 "Browser availability could not be read",
                 Tone::Warning,
-                "See App settings for details. Local saving remains available; no installation is promised.",
+                "See App settings for details. You can still save projects; browser setup is not available until its status is known.",
             )
         } else {
             runtime_copy(self.runtime_readiness.as_ref())
@@ -122,6 +131,7 @@ impl Shell {
             },
             Reply::Runtime(status) => self.runtime_status = Some(status.clone()),
             Reply::ProductFailure(message) => self.runtime_status = Some(format!("Browser availability could not be read: {message}")),
+            Reply::ActionRequired(problem) => self.runtime_status = Some(problem.message().into()),
             _ => self.runtime_status = Some("Browser availability could not be read. See App settings; local saving remains available.".into()),
         }
         // No save continuation, environment hydration, selection or focus changes.

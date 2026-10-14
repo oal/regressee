@@ -236,9 +236,9 @@ impl TextInput {
             if note {
                 self.correction = Some(
                     if too_large {
-                        "Not inserted · 8,192-byte limit. Shorten the note or paste less."
+                        "This note is too long. Shorten it or paste less. Nothing was added."
                     } else {
-                        "Not inserted · unsupported control characters. Paste plain text."
+                        "This text could not be added. Try copying it as plain text."
                     }
                     .into(),
                 );

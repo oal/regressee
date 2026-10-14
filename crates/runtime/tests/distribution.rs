@@ -154,6 +154,42 @@ fn install_verify_repair_and_bad_smoke_preserve_old_generation() -> Result<()> {
     Ok(())
 }
 #[test]
+fn publication_progress_follows_smoke_and_cancellation_keeps_the_old_pointer() -> Result<()> {
+    use std::cell::Cell;
+    use std::sync::atomic::Ordering;
+    let root = tempfile::tempdir()?;
+    let (pack, distribution) = fixture(root.path(), "valid")?;
+    let cache = root.path().join("cache");
+    let cancel = AtomicBool::new(false);
+    let old = install(&pack, &cache, &distribution, &cancel, &mut |_| Ok(()))?;
+    let pointer = fs::read(cache.join("current"))?;
+    let smoked = Cell::new(false);
+    let published = Cell::new(false);
+    let result = install_with_progress(
+        &pack,
+        &cache,
+        &distribution,
+        &cancel,
+        &mut |phase| {
+            if phase == InstallProgress::Publishing {
+                assert!(smoked.get());
+                published.set(true);
+                cancel.store(true, Ordering::Release);
+            }
+        },
+        &mut |_| {
+            smoked.set(true);
+            Ok(())
+        },
+    );
+    assert!(published.get());
+    assert!(result.is_err());
+    assert_eq!(fs::read(cache.join("current"))?, pointer);
+    verify(&old.root, &distribution, &AtomicBool::new(false))?;
+    Ok(())
+}
+
+#[test]
 fn trust_transport_and_literal_loopback_are_fail_closed() -> Result<()> {
     for name in [
         "CON",

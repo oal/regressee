@@ -36,6 +36,16 @@ fn help(copy: impl Into<SharedString>) -> Div {
 }
 
 impl Shell {
+    pub(super) fn discovery_plan_current(&self) -> bool {
+        self.preview
+            .as_ref()
+            .zip(self.project.as_ref())
+            .is_some_and(|(preview, project)| {
+                preview.project_revision == project.revision
+                    && preview.settings == project.project
+                    && preview.included() > 0
+            })
+    }
     pub(super) fn environment_draft_signature(&self, cx: &App) -> EnvironmentDraftSignature {
         EnvironmentDraftSignature {
             project: self.project.as_ref().map(|p| p.project.id),
@@ -47,7 +57,7 @@ impl Shell {
     }
     pub(super) fn options_panel_open(&self) -> bool {
         self.result_filters_open
-            && (self.preview.is_some()
+            && (self.page_list_inventory().is_some()
                 || (!self.page_list_workspace()
                     && !self.review_queue_collapsed
                     && self.evidence.latest.is_some()))
@@ -88,7 +98,7 @@ impl Shell {
     pub(super) fn discovery_coverage_hint(&self) -> &'static str {
         use regressee_core::domain::DiscoveryCoverage;
         match self.preview.as_ref().map(|p| &p.inventory.coverage) {
-            Some(DiscoveryCoverage::Interrupted) => "Discovery interrupted · incomplete page list",
+            Some(DiscoveryCoverage::Interrupted) => "Page search interrupted · incomplete list",
             Some(DiscoveryCoverage::Limited { .. }) => {
                 "Limited coverage · some pages may be missing"
             }
@@ -98,8 +108,11 @@ impl Shell {
 
     pub(super) fn options_panel(&self, cx: &mut Context<Self>) -> AnyElement {
         let discovery = self.preview.is_some();
+        let recorded = !discovery && self.page_list_workspace();
         let body = if discovery {
             self.discovery_options(cx)
+        } else if recorded {
+            self.recorded_page_details()
         } else {
             div()
                 .flex()
@@ -116,6 +129,8 @@ impl Shell {
             "page-options-panel",
             if discovery {
                 "Page options"
+            } else if recorded {
+                "Page details"
             } else {
                 "Result filters"
             },
@@ -140,12 +155,53 @@ impl Shell {
                         .flex()
                         .flex_col()
                         .gap_2()
-                        .child(help(
-                            "Dismiss this list without changing the saved baseline.",
-                        ))
-                        .child(self.guided_button(16, "Dismiss page list", cx)),
+                        .child(help("Discard this unsaved list and its inclusion choices. Saved screenshots and the baseline are kept."))
+                        .child(self.button(Control::DiscardPageList, "Discard discovered pages…", ActionStyle::Danger, cx)),
                 )
             })
+            .into_any_element()
+    }
+
+    fn recorded_page_details(&self) -> AnyElement {
+        let inventory = self.page_list_inventory().unwrap();
+        let selected = inventory
+            .pages
+            .iter()
+            .find(|p| Some(p.id) == self.selected_page);
+        let mut selected_group = group("Selected page");
+        if let Some(page) = selected {
+            selected_group = selected_group
+                .child(
+                    div()
+                        .debug_selector(|| "recorded-selected-address".into())
+                        .w_full()
+                        .min_w_0()
+                        .text_size(px(14.))
+                        .line_height(px(20.))
+                        .child(page.canonical.to_string()),
+                )
+                .child(help(if page.included {
+                    "Included in this recorded capture list"
+                } else {
+                    "Excluded from this recorded capture list"
+                }));
+            if let Some(reason) = &page.reason {
+                selected_group = selected_group.child(help(reason.clone()));
+            }
+        } else {
+            selected_group =
+                selected_group.child(help("Select a page to view its recorded details."));
+        }
+        div()
+            .flex_shrink_0()
+            .flex()
+            .flex_col()
+            .gap_4()
+            .child(selected_group)
+            .child(help(
+                "Recorded list · read-only. Saved screenshots and the baseline are unchanged.",
+            ))
+            .child(group("How complete is this page list?").child(help(inventory.coverage.label())))
             .into_any_element()
     }
 
@@ -158,14 +214,17 @@ impl Shell {
             .find(|p| Some(p.id) == self.selected_page);
         let matches = self.preview_page_ids().len();
         let targets = p.included() * p.settings.profiles.len();
-        let mut selected_group = group("Selected page");
+        let mut selected_group =
+            group("Selected page").debug_selector(|| "discovery-selected-page".into());
         if let Some(page) = selected {
             selected_group = selected_group
                 .child(
                     div()
+                        .debug_selector(|| "discovery-selected-address".into())
                         .w_full()
-                        .truncate()
+                        .min_w_0()
                         .text_size(px(14.))
+                        .line_height(px(20.))
                         .child(page.canonical.to_string()),
                 )
                 .child(help(if page.included {
@@ -177,6 +236,12 @@ impl Shell {
                 && let Some(reason) = &page.reason
             {
                 selected_group = selected_group.child(help(reason.clone()));
+            }
+            if !page.included && page.reason.as_deref() != Some("Excluded in preview") {
+                selected_group = selected_group.child(
+                    help("This page can't be included here. Review project settings and find pages again.")
+                        .debug_selector(|| "discovery-inclusion-blocked-help".into()),
+                );
             }
         } else {
             selected_group =
@@ -252,11 +317,18 @@ impl Shell {
             .flex_col()
             .gap_4()
             .child(selected_group)
+            .when(!self.discovery_plan_current(), |body| {
+                body.child(help(if p.included() == 0 {
+                    "Include at least one eligible page before capturing."
+                } else {
+                    "Settings changed since this list was found. In Project settings, choose Find pages again before capturing. Your current inclusion choices are kept until you confirm replacing this list."
+                }))
+            })
             .child(matches_group)
             .child(estimate)
             .child(self.button(
                 Control::DiscoveryDetails,
-                "Discovery details",
+                "Page search details",
                 ActionStyle::Choice {
                     selected: self.discovery_details_open,
                 },
@@ -264,10 +336,10 @@ impl Shell {
             ));
         if self.discovery_details_open {
             body = body.child(
-                group("Discovery coverage")
+                group("How complete is this page list?")
                     .debug_selector(|| "discovery-coverage-details".into())
                     .child(help(format!(
-                        "{} · {} candidates",
+                        "{} · {} listed addresses",
                         workflow::count_label(p.visited as usize, "page visit", "page visits"),
                         p.inventory.pages.len()
                     )))
@@ -313,8 +385,8 @@ impl Shell {
         body = body.child(group("Preview scope")
             .debug_selector(|| "mapping-preview-scope".into())
             .child(help(format!("{} · showing first {}", workflow::count_label(e.mapped.len(), "page mapping", "page mappings"), e.mapped.len().min(16))))
-            .child(help("Uses saved environment settings. A probe visits at most 3 pages, not the whole website.")))
-            .child(controls::status(if e.probed { "Representative probe confirmed" } else { "Representative probe not confirmed" }, Tone::Neutral));
+            .child(help("Uses saved environment settings. The access check visits at most 3 sample pages, not the whole website.")))
+            .child(controls::status(if e.probed { "Access confirmed for sample pages" } else { "Access not yet confirmed for sample pages" }, Tone::Neutral));
         controls::disclosure_panel(
             "mapping-preview",
             "Mapped URL preview",

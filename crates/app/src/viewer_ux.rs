@@ -3,6 +3,42 @@
 use super::*;
 
 impl Shell {
+    pub(super) fn image_controls_trigger(&self) -> Control {
+        if self.control_mounted(Control::ImageControls) {
+            Control::ImageControls
+        } else {
+            Control::Guided(46)
+        }
+    }
+
+    pub(super) fn open_image_controls(&mut self, cx: &mut Context<Self>) {
+        self.image_controls_open = true;
+        self.capture_details_open = false;
+        self.review_note_open = false;
+        self.review_tools = false;
+        self.viewer_mode_open = false;
+        self.result_filters_open = false;
+        self.pan_drag = None;
+        self.review_details_scroll
+            .set_offset(gpui::point(px(0.), px(0.)));
+        self.presentation_focus = Some(Control::Phase5(39));
+        cx.notify();
+    }
+
+    pub(super) fn close_image_controls(
+        &mut self,
+        restore: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.image_controls_open = false;
+        self.presentation_focus = None;
+        if restore {
+            window.focus(&self.handle(self.image_controls_trigger(), cx));
+        }
+        cx.notify();
+    }
+
     pub(super) fn choose_viewer_zoom(&mut self, choice: ZoomChoice, cx: &mut Context<Self>) {
         if !self.viewer_input_allowed() {
             return;
@@ -33,7 +69,10 @@ impl Shell {
     }
 
     pub(super) fn viewer_inspector_open(&self) -> bool {
-        self.review_note_open || self.capture_details_open || (self.review_tools && !self.mask_draw)
+        self.image_controls_open
+            || self.review_note_open
+            || self.capture_details_open
+            || (self.review_tools && !self.mask_draw)
     }
 
     fn viewer_input_allowed(&self) -> bool {
@@ -193,7 +232,9 @@ impl Shell {
             .flex()
             .flex_col()
             .gap_4();
-        if self.review_note_open {
+        if self.image_controls_open {
+            body = body.child(evidence_workspace::image_controls_help());
+        } else if self.review_note_open {
             body = body.child(
                 div()
                     .id("review-note-field")
@@ -206,7 +247,7 @@ impl Shell {
                     .child(self.record_review_field_bounds(9))
                     .child(controls::field(
                         "Note",
-                        "8,192 UTF-8 bytes maximum. Closing keeps unsaved text.",
+                        "Closing keeps your draft. Choose Save note to save it.",
                         self.analysis_fields[9].clone().into_any_element(),
                     )),
             );
@@ -261,6 +302,19 @@ impl Shell {
             .border_1()
             .border_color(rgb(CONTROL_LINE))
             .occlude()
+            .when(self.image_controls_open, |panel| {
+                panel.on_mouse_down_out(cx.listener(|s, event: &MouseDownEvent, window, cx| {
+                    // Let the toolbar trigger toggle itself, but do not steal
+                    // focus from the image or another clicked control on exit.
+                    if !s
+                        .review_action_bounds(Control::ImageControls)
+                        .and_then(|b| b.get())
+                        .is_some_and(|b| !s.narrow_workspace && b.contains(&event.position))
+                    {
+                        s.close_image_controls(false, window, cx);
+                    }
+                }))
+            })
             .child(
                 div()
                     .flex_shrink_0()
@@ -272,7 +326,9 @@ impl Shell {
                     .border_b_1()
                     .border_color(rgb(LINE))
                     .child(div().font_weight(FontWeight::SEMIBOLD).child(
-                        if self.review_note_open {
+                        if self.image_controls_open {
+                            "Image controls"
+                        } else if self.review_note_open {
                             "Review note"
                         } else if details {
                             "Capture details"
@@ -280,16 +336,7 @@ impl Shell {
                             "Analysis"
                         },
                     ))
-                    .child(self.button(
-                        Control::Phase5(39),
-                        if self.review_note_open {
-                            "Return to evidence"
-                        } else {
-                            "Close"
-                        },
-                        ActionStyle::Secondary,
-                        cx,
-                    )),
+                    .child(self.button(Control::Phase5(39), "Close", ActionStyle::Secondary, cx)),
             )
             .child(
                 div()

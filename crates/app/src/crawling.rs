@@ -23,7 +23,7 @@ use std::{
 fn scoped(installed: &Installed, url: &url::Url) -> Result<()> {
     ensure!(
         installed.manifest.scope != Scope::DevelopmentLoopback || distribution::loopback(url),
-        "This development browser may visit owned literal-loopback fixtures only. Qualified public runtime is pending."
+        "This test browser can only visit approved local test websites, not public websites. Use a browser build that supports public websites."
     );
     Ok(())
 }
@@ -100,7 +100,7 @@ fn robots_for(
             if let EventKind::RobotsFound { text, status } = event {
                 ensure!(
                     [200, 404, 410].contains(&status),
-                    "robots.txt is unavailable (HTTP {status}); respect policy stops this website. An authorized override must be explicit."
+                    "The website's robots.txt rules could not be read (HTTP {status}), so Regressee stopped visiting it. Only override these rules in Project settings if you have permission."
                 );
                 result = Some(Robots::parse(&text));
             }
@@ -135,7 +135,7 @@ impl Product {
         let installed = self.resolve_runtime(&cancel)?;
         ensure!(
             worker_version(&installed)? == regressee_runtime::protocol::WORKER_VERSION,
-            "Repair to a trusted Phase 3 worker before discovery. Historical evidence remains intact."
+            "The installed browser components cannot find pages with this app. Check the browser status in App settings before repairing or updating it. Saved screenshots are kept."
         );
         for u in &p.sources {
             scoped(&installed, u)?;
@@ -205,7 +205,9 @@ impl Product {
                 continue;
             }
             if pages.len() >= MAX_CANDIDATES {
-                notes.push("10,000 candidate safety budget reached".into());
+                notes.push(
+                    "The page search stopped after checking 10,000 possible addresses.".into(),
+                );
                 limited = true;
                 break;
             }
@@ -242,18 +244,14 @@ impl Product {
                         .unwrap_or(0),
                 );
                 if let Some(start) = last.get(&origin(&u)) {
-                    if *start + Duration::from_millis(delay) > Instant::now() {
-                        progress(
-                            "Waiting between page visits to respect website crawl limits…",
-                            visited,
-                            None,
-                        );
+                    let until: Instant = *start + Duration::from_millis(delay);
+                    if let Some(message) = discovery_wait_message(
+                        until.saturating_duration_since(Instant::now()),
+                        visited,
+                    ) {
+                        progress(&message, visited, None);
                     }
-                    wait(
-                        *start + Duration::from_millis(delay),
-                        &cancel,
-                        &AtomicBool::new(false),
-                    );
+                    wait(until, &cancel, &AtomicBool::new(false));
                 }
                 last.insert(origin(&u), Instant::now());
                 let mut links = None;
@@ -387,22 +385,15 @@ impl Product {
                         limited = true;
                         page.included = false;
                         page.reason = Some(format!(
-                            "Could not inspect rendered page: {:?}",
-                            map_failure(&e)
+                            "Could not inspect page: {}",
+                            map_failure(&e).label()
                         ));
                     }
                 }
             }
             pages.push(page);
             if p.discovery.mode == DiscoveryMode::AddressesAndLinks && visited > 0 {
-                let page_word = if visited == 1 { "page" } else { "pages" };
-                progress(
-                    &format!(
-                        "Finding rendered links · {visited} {page_word} visited — no clicking or forms"
-                    ),
-                    visited,
-                    None,
-                );
+                progress(&discovery_loading_message(visited, 1), visited, None);
             }
         }
         if pages.iter().any(|p| !p.included) {
@@ -410,12 +401,12 @@ impl Product {
         }
         if p.discovery.mode == DiscoveryMode::OnlyAddresses {
             notes.push(
-                "List-only discovery: no links were explored. robots.txt policy still applies."
+                "Only the starting addresses were checked; no links were followed. The website's robots.txt rules still apply."
                     .into(),
             );
         }
         if p.discovery.advanced.max_depth.is_some() {
-            notes.push("Link depth is bounded; deeper pages may exist.".into());
+            notes.push("Your link-depth limit may leave pages further from the starting addresses out of this list.".into());
             limited = true;
         }
         progress(
@@ -433,7 +424,7 @@ impl Product {
                 identity_version: 2,
                 pages,
                 coverage: if limited {
-                    DiscoveryCoverage::Limited { reason: "Some candidates were excluded, unavailable, cancelled or bounded. This is not proof of all website pages.".into() }
+                    DiscoveryCoverage::Limited { reason: "Some pages were excluded, could not be opened or were not checked before a limit or stop. Other website pages may be missing.".into() }
                 } else {
                     DiscoveryCoverage::Complete
                 },
@@ -459,6 +450,7 @@ impl Product {
     ) -> Result<RunRecord> {
         self.capture_inventory_inner(
             store,
+            None,
             project,
             preview,
             check,
@@ -476,6 +468,7 @@ impl Product {
     pub(crate) fn capture_inventory_with_status(
         &self,
         store: &mut Store,
+        verified_runtime: Option<Installed>,
         project: ProjectId,
         preview: Option<DiscoveryPreview>,
         check: bool,
@@ -486,7 +479,17 @@ impl Product {
         status: &mut dyn FnMut(&CaptureRun),
     ) -> Result<RunRecord> {
         self.capture_inventory_inner(
-            store, project, preview, check, resume, cancel, pause, progress, false, status,
+            store,
+            verified_runtime,
+            project,
+            preview,
+            check,
+            resume,
+            cancel,
+            pause,
+            progress,
+            false,
+            status,
         )
     }
     pub fn preview_images(
@@ -519,6 +522,7 @@ impl Product {
         preview.inventory.id = InventoryId::new();
         self.capture_inventory_inner(
             store,
+            None,
             project,
             Some(preview),
             false,
@@ -534,6 +538,7 @@ impl Product {
     fn capture_inventory_inner(
         &self,
         store: &mut Store,
+        verified_runtime: Option<Installed>,
         project: ProjectId,
         preview: Option<DiscoveryPreview>,
         check: bool,
@@ -544,10 +549,10 @@ impl Product {
         preview_only: bool,
         status: &mut dyn FnMut(&CaptureRun),
     ) -> Result<RunRecord> {
-        let installed = self.resolve_runtime(&cancel)?;
+        let installed = self.runtime_for_capture(verified_runtime, &cancel)?;
         ensure!(
             worker_version(&installed)? == regressee_runtime::protocol::WORKER_VERSION,
-            "Repair to a trusted Phase 4 worker for authenticated multi-page jobs. Older baselines require their matching runtime or an explicit replacement."
+            "The installed browser components cannot capture logged-in pages with this app. Check the browser status in App settings before repairing or updating it. Older baselines still require their original browser version or a new baseline capture."
         );
         let saved = store.load_project(project)?;
         let mut record = if let Some(run) = resume {
@@ -565,14 +570,14 @@ impl Product {
                 queue.project_revision == saved.revision
                     && (matches!(r.run.intent, RunIntent::Check { .. })
                         || queue.discovery == saved.project.discovery),
-                "Project settings changed. Keep this evidence and start a fresh run."
+                "Project settings changed. Saved screenshots are kept. Start a new capture."
             );
             ensure!(
                 r.run
                     .profiles
                     .iter()
                     .all(|p| p.runtime == installed.manifest.identity),
-                "Matching browser runtime is required to resume"
+                "To resume, use the same browser version as the original capture."
             );
             ensure!(
                 r.run.rendering.os == std::env::consts::OS
@@ -581,7 +586,7 @@ impl Product {
             );
             ensure!(
                 r.run.rendering == crate::product::rendering_environment(&installed)?,
-                "Rendering environment or fonts changed. Keep this evidence and start a fresh run."
+                "The computer, browser settings or fonts changed. Saved screenshots are kept. Start a new capture."
             );
             for target in &r.run.targets {
                 scoped(&installed, &target.requested)?;
@@ -606,7 +611,7 @@ impl Product {
                 {
                     ensure!(
                         target.attempts < 8,
-                        "Login retries exhausted. Start a fresh run; prior evidence is retained."
+                        "Login still failed after retrying. Log in again and start a new capture. Saved screenshots are kept."
                     );
                     target.outcome = TargetOutcome::Pending;
                     target
@@ -642,7 +647,7 @@ impl Product {
                 )
             } else {
                 let preview = preview
-                    .context("Find pages and review the exact inventory before capturing")?;
+                    .context("Choose Find pages and review the page list before capturing.")?;
                 ensure!(
                     preview.project_revision == saved.revision
                         && preview.settings == saved.project
@@ -679,7 +684,7 @@ impl Product {
                     profiles
                         .iter()
                         .all(|p| p.runtime == installed.manifest.identity),
-                    "The baseline needs its matching browser runtime"
+                    "This baseline needs the browser version used to capture it."
                 );
             } else {
                 for p in &mut profiles {
@@ -1192,8 +1197,19 @@ fn discovery_loading_message(visited: u32, attempt: u8) -> String {
     } else if visited == 0 {
         "Loading the first page and looking for links…".into()
     } else {
-        format!("Loading the next page and looking for links · {visited} {page_word} visited…")
+        format!("Finding pages · {visited} {page_word} visited…")
     }
+}
+fn discovery_wait_message(remaining: Duration, visited: u32) -> Option<String> {
+    // Routine sub-second pacing (including Gentle's one-second interval) is
+    // part of finding pages, not a new user-visible phase on every visit. Keep
+    // genuine longer crawl-rule waits visible without changing their timing.
+    (remaining >= Duration::from_secs(2)).then(|| {
+        let page_word = if visited == 1 { "page" } else { "pages" };
+        format!(
+            "Waiting between page visits to respect website crawl limits · {visited} {page_word} visited…"
+        )
+    })
 }
 fn preflight(store: &Store, targets: usize, initial: bool) -> Result<()> {
     space_check(
@@ -1374,15 +1390,53 @@ mod tests {
         );
         assert_eq!(
             discovery_loading_message(1, 1),
-            "Loading the next page and looking for links · 1 page visited…"
+            "Finding pages · 1 page visited…"
         );
         assert_eq!(
             discovery_loading_message(23, 1),
-            "Loading the next page and looking for links · 23 pages visited…"
+            "Finding pages · 23 pages visited…"
         );
         assert_eq!(
             discovery_loading_message(0, 2),
             "Retrying the page and looking for links · 0 pages visited…"
+        );
+    }
+
+    #[test]
+    fn discovery_status_stays_steady_through_routine_pacing() {
+        let expected = "Finding pages · 13 pages visited…";
+        for delay in [0, 350, 1000, 1999] {
+            let loading = discovery_loading_message(13, 1);
+            let during_wait = discovery_wait_message(Duration::from_millis(delay), 13)
+                .unwrap_or_else(|| loading.clone());
+            let next_page = discovery_loading_message(13, 1);
+            assert_eq!(loading, expected);
+            assert_eq!(during_wait, expected);
+            assert_eq!(next_page, expected);
+        }
+        assert_eq!(
+            discovery_loading_message(14, 1),
+            "Finding pages · 14 pages visited…"
+        );
+    }
+
+    #[test]
+    fn longer_discovery_waits_and_retries_keep_their_reason_and_actual_count() {
+        for seconds in [2, 10, 60] {
+            assert_eq!(
+                discovery_wait_message(Duration::from_secs(seconds), 13).as_deref(),
+                Some(
+                    "Waiting between page visits to respect website crawl limits · 13 pages visited…"
+                )
+            );
+        }
+        assert_eq!(
+            discovery_wait_message(Duration::from_secs(2), 1).as_deref(),
+            Some("Waiting between page visits to respect website crawl limits · 1 page visited…")
+        );
+        assert_eq!(
+            discovery_loading_message(13, 2),
+            "Retrying the page and looking for links · 13 pages visited…"
         );
     }
 

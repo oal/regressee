@@ -741,10 +741,22 @@ fn repair_v5_all_setup_capabilities_tab_reveal_and_dispatch_with_current_clips(
                 }
             });
             reach!(c);
+            let id = shell.read_with(cx, |s, _| s.next_request);
             cx.update(|w, cx| {
                 shell.update(cx, |s, cx| {
-                    let id = s.next_request;
                     s.activate_control(c, w, cx);
+                    if c == Control::Guided(34) {
+                        assert!(s.native_prompt);
+                        assert_eq!(s.next_request, id);
+                    }
+                })
+            });
+            if c == Control::Guided(34) {
+                cx.simulate_prompt_answer("Forget login");
+                cx.run_until_parked();
+            }
+            cx.update(|_, cx| {
+                shell.update(cx, |s, cx| {
                     assert!(s.next_request > id);
                     let request = s.pending.unwrap();
                     let reply = terminal(s, request, cx);

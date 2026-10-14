@@ -170,7 +170,7 @@ pub(super) fn mapping_base(value: &str) -> Option<&'static str> {
     url::Url::parse(value.trim())
         .ok()
         .is_none_or(|u| u.query().is_some() || u.fragment().is_some())
-        .then_some("Use an http(s) origin or section base without a query or fragment.")
+        .then_some("Use a complete website or section address, such as https://example.com/app. Leave out endings starting with ? or #.")
 }
 pub(super) fn proxy_origin(value: &str) -> Option<&'static str> {
     if value.trim().is_empty() {
@@ -179,7 +179,7 @@ pub(super) fn proxy_origin(value: &str) -> Option<&'static str> {
     if let Some(error) = optional_address(value) {
         return Some(error);
     }
-    url::Url::parse(value.trim()).ok().is_none_or(|u| u.path() != "/" || u.query().is_some() || u.fragment().is_some()).then_some("Use only the proxy's http(s) origin, such as http://proxy.example:3128, without a path, query or password.")
+    url::Url::parse(value.trim()).ok().is_none_or(|u| u.path() != "/" || u.query().is_some() || u.fragment().is_some()).then_some("Use the proxy's server address, such as http://proxy.example:3128. Leave out page paths, endings starting with ? or #, and login details.")
 }
 pub(super) fn crawl_validator(index: usize) -> Option<fn(&str) -> Option<&'static str>> {
     Some(match index {
@@ -190,17 +190,17 @@ pub(super) fn crawl_validator(index: usize) -> Option<fn(&str) -> Option<&'stati
         },
         4 => |s| {
             (!integer(s, 1, 8, true))
-                .then_some("Use 1–8 parallel pages, or leave blank for the speed preset.")
+                .then_some("Use 1–8 pages at once, or leave blank for the speed preset.")
         },
-        5 => |s| (!integer(s, 1, 8, false)).then_some("Use 1–8 parallel pages per website."),
+        5 => |s| (!integer(s, 1, 8, false)).then_some("Use 1–8 pages at once per website."),
         6 => |s| (!integer(s, 0, 3, false)).then_some("Use 0–3 retries."),
         7 => |s| {
             (!integer(s, 1, 4096, false))
-                .then_some("Use a whole-number width from 1 to 4,096 CSS pixels.")
+                .then_some("Use a whole-number width from 1 to 4,096 pixels.")
         },
         8 => |s| {
             (!integer(s, 1, 8192, false))
-                .then_some("Use a whole-number height from 1 to 8,192 CSS pixels.")
+                .then_some("Use a whole-number height from 1 to 8,192 pixels.")
         },
         10 | 11 => optional_address,
         13 | 14 => mapping_base,
@@ -226,16 +226,12 @@ pub(super) fn analysis_validator(index: usize) -> Option<fn(&str) -> Option<&'st
     Some(match index {
         0 | 8 => percent,
         1 | 2 => optional_percent,
-        3 | 4 => {
-            |s| {
-                (!integer(s, 1, 65_536, false)).then_some("Use a whole-number pixel count from 1 to 65,536; it must fit the local window.")
-            }
-        }
-        5 | 6 => {
-            |s| {
-                (!integer(s, 1, 256, false)).then_some("Use 1–256 pixels. Stride must fit the window and cover it in at most four steps.")
-            }
-        }
+        3 | 4 => |s| {
+            (!integer(s, 1, 65_536, false)).then_some("Use a whole-number pixel count from 1 to 65,536. It must fit within the small-area size.")
+        },
+        5 | 6 => |s| {
+            (!integer(s, 1, 256, false)).then_some("Use 1–256 pixels. Spacing must be no more than the small-area size and no less than one quarter of it, rounded up.")
+        },
         7 => |s| {
             (!integer(s, 1, 64_000_000, true))
                 .then_some("Use 1–64,000,000 pixels, or leave blank to disable this threshold.")
