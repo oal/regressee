@@ -75,6 +75,10 @@ path repaired by the concurrent keyboard work.
 
 ### Integration verification
 
+- The final native shell suite passed: **197 passed, 0 failed, 1 opt-in test
+  ignored**. This includes every disclosure, full key press/release behavior,
+  saved-data result ownership, screenshot recovery and the previously failing
+  complete keyboard-help layout test at both supported sizes.
 - Strict workspace Clippy passed with all features and targets and `-D warnings`.
   The scoped shared-fixture allowance and equivalent form-width clamp removed
   the two integration warnings without changing behavior. Cargo still reports
