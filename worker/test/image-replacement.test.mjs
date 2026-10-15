@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import {launch,replay,capture,replaceImages,IMAGE_ALGORITHM} from '../src/capture.mjs';
 import {solidRaster,decodeScreenshot} from './png-helpers.mjs';
 
@@ -24,7 +25,8 @@ async function fixture(run) {
     res.end(`<!doctype html><style>body{margin:24px;background:white}img{display:block;width:${url.pathname==='/selector'?'80':'160'}px;height:40px;object-fit:${fit};object-position:${position}}${url.pathname==='/selector'?'img[src="/asset.png"]{width:160px}':''}</style><img src="${url.searchParams.has('wide')?'/wide.png':'/asset.png'}">`);
   });
   await new Promise(r=>server.listen(0,'127.0.0.1',r));
-  const scratch=await fs.mkdtemp('/tmp/opencode/ri-'),keys=['TMPDIR','TMP','TEMP'],previous=keys.map(k=>process.env[k]);
+  // Linux Chromium needs a short socket path, independent of the test runner.
+  const scratch=await fs.mkdtemp(path.join(process.platform==='linux'?'/tmp':os.tmpdir(),'regressee-image-')),keys=['TMPDIR','TMP','TEMP'],previous=keys.map(k=>process.env[k]);
   for(const k of keys)process.env[k]=scratch;
   let browser,context;
   try{browser=await launch(false);context=await replay(browser);await run(context,'http://127.0.0.1:'+server.address().port);}

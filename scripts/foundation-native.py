@@ -16,6 +16,7 @@ import subprocess
 import time
 import zlib
 import struct
+from development_tools import require_developer_binary
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
@@ -25,6 +26,7 @@ def main():
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
+    require_developer_binary(ROOT / 'target/debug/regressee', output / 'native-data')
     spec = importlib.util.spec_from_file_location('bench_native_helpers', ROOT / 'scripts/ui-smoke.py')
     helper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helper)

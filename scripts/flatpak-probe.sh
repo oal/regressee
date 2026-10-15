@@ -8,10 +8,10 @@ actual="$(flatpak info --show-commit org.freedesktop.Sdk//25.08)"
 timeout --signal=TERM 35s flatpak run --die-with-parent --filesystem="$PWD:ro" \
   --env="REGRESSEE_PROBE_ROOT=$PWD" \
   --env="PLAYWRIGHT_BROWSERS_PATH=$PWD/.runtime/source/browsers" \
-  --env=TMPDIR=/tmp/opencode \
+  --env=TMPDIR=/tmp/regressee-sdk-probe \
   --command="$PWD/.runtime/source/node/bin/node" org.freedesktop.Sdk//25.08 --input-type=module <<'JS'
 import fs from 'node:fs/promises';
-await fs.mkdir('/tmp/opencode',{recursive:true,mode:0o700});
+await fs.mkdir('/tmp/regressee-sdk-probe',{recursive:true,mode:0o700});
 const root=process.env.REGRESSEE_PROBE_ROOT;
 const {launch,replay,capture}=await import('file://'+root+'/.runtime/source/worker/src/capture.mjs');
 const {fixtureServer}=await import('file://'+root+'/.runtime/source/worker/src/fixtures.mjs');

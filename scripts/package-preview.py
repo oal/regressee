@@ -11,6 +11,7 @@ import re
 import stat
 import subprocess
 import tarfile
+import tempfile
 import tomllib
 import zipfile
 
@@ -26,8 +27,10 @@ HELP_FILES = (
 )
 
 
-def command(root, *args):
-    return subprocess.check_output(args, cwd=root, text=True, encoding="utf-8").strip()
+def command(root, *args, timeout=None, env=None):
+    return subprocess.check_output(
+        args, cwd=root, text=True, encoding="utf-8", timeout=timeout, env=env,
+    ).strip()
 
 
 def json_bytes(value):
@@ -98,12 +101,22 @@ def package(root, output, target, revision):
     data = binary.read_bytes()
     if not data:
         raise ValueError("The application binary is empty")
-    inventory, notices = dependency_notices(root, target)
     version = tomllib.loads((root / "crates/app/Cargo.toml").read_text(encoding="utf-8"))["package"]["version"]
+    # Metadata is data-free in current builds. Isolate and bound an accidentally
+    # supplied older executable too, before it can be accepted for packaging.
+    with tempfile.TemporaryDirectory(prefix="regressee-preview-check-") as isolated:
+        build = json.loads(command(root, str(binary), "--build-info", timeout=15,
+                                   env={**os.environ, "REGRESSEE_DEV_DATA": isolated}))
+    if build != {"version": version, "features": {
+            "ui": True, "developer-tools": False, "test-support": False,
+            "ui-inspection": False, "ui-renderer-capture": False}}:
+        raise ValueError("Preview requires the matching production UI build without developer/test features")
+    inventory, notices = dependency_notices(root, target)
     files = {
         executable: (data, 0o755),
         "build-info.json": (json_bytes({
             "kind": "unsigned-test-preview", "version": version,
+            "compiled_features": build["features"],
             "source_commit": revision, "target": target, "features": ["ui"],
             "rustc": command(root, "rustc", "--version"),
             "binary_sha256": hashlib.sha256(data).hexdigest(),

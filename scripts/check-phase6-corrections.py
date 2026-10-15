@@ -15,6 +15,8 @@ import selectors
 import signal
 import subprocess
 import time
+import tempfile
+from development_tools import private_directory
 
 p = argparse.ArgumentParser()
 p.add_argument('--output', required=True, type=Path)
@@ -51,10 +53,14 @@ def reap():
         records.append([pid, status])
     return records
 
-env = dict(os.environ, TMPDIR='/tmp/opencode', RUST_TEST_THREADS='1',
+env = dict(os.environ, RUST_TEST_THREADS='1',
            CARGO_BUILD_JOBS='4', LIBRARY_PATH=str(root / '.runtime/link-libs'))
+lock_root = Path(tempfile.gettempdir()).resolve(strict=True) / f'regressee-checks-{os.geteuid()}'
+lock_root.mkdir(mode=0o700, exist_ok=True)
+private_directory(lock_root)
 start = time.monotonic()
-with Path('/tmp/opencode/regressee-phase6-corrections.lock').open('a') as lock:
+with os.fdopen(os.open(lock_root / 'phase6-corrections.lock',
+                      os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600), 'a') as lock:
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     with (out / 'command.log').open('xb') as log:
         child = subprocess.Popen(command, cwd=root, env=env, stdout=log,

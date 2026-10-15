@@ -60,6 +60,7 @@ jobs:
         run: |
           python -B scripts/test_ci_run.py
           python -B scripts/test_package_preview.py
+          python -B scripts/test_environment_boundaries.py
       - name: Run application contract tests
         # Retain the full bulk suite with the same cold-host budget as CI.
         timeout-minutes: 45

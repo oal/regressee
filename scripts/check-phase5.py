@@ -14,7 +14,7 @@ args = parser.parse_args()
 root = Path(__file__).resolve().parent.parent
 args.output.mkdir(parents=True, exist_ok=False)
 output = args.output.resolve()
-env = dict(os.environ, TMPDIR='/tmp/opencode', RUST_TEST_THREADS='1',
+env = dict(os.environ, RUST_TEST_THREADS='1',
            CARGO_BUILD_JOBS='4', LIBRARY_PATH=str(root / '.runtime/link-libs'))
 env.update(REGRESSEE_PHASE5_EVIDENCE=str(output / 'phase5-product'),
            REGRESSEE_PHASE5_DISTRIBUTION=str(output / 'signed-safety/product-flow/distribution.json'),

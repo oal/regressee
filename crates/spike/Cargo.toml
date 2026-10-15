@@ -21,6 +21,7 @@ zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
 png = "=0.17.16"
 libc = "=0.2.177"
 gpui = { version = "=0.2.2", optional = true }
+tempfile.workspace = true
 
 [[bin]]
 name = "regressee-spike"
@@ -30,6 +31,3 @@ path = "src/main.rs"
 name = "regressee-ui"
 path = "src/ui.rs"
 required-features = ["ui"]
-
-[dev-dependencies]
-tempfile.workspace = true

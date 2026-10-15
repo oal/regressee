@@ -23,7 +23,7 @@ if args.policy_corrections_only and (args.active_cancel_only or args.retained_fl
     parser.error('policy corrections require a fresh signed pack and no other suite')
 args.output.mkdir(parents=True, exist_ok=False)
 root = Path(__file__).resolve().parent.parent
-env = dict(os.environ, TMPDIR='/tmp/opencode', LIBRARY_PATH=str(root / '.runtime/link-libs'), RUST_TEST_THREADS='1', CARGO_BUILD_JOBS='4')
+env = dict(os.environ, LIBRARY_PATH=str(root / '.runtime/link-libs'), RUST_TEST_THREADS='1', CARGO_BUILD_JOBS='4')
 commands = []
 if not args.runtime_only:
     commands += [('format', ['cargo', 'fmt', '--all', '--', '--check']), ('locked-ui-tests-clippy', ['bash', 'scripts/check-foundation.sh']), ('protocol', [str(root / '.runtime/installed/node/bin/node'), '--test', 'worker/product/test/protocol.test.mjs'])]

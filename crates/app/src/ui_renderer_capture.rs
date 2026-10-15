@@ -6,7 +6,7 @@ use gpui::{TestAppContext, VisualTestContext};
 use sha2::{Digest, Sha256};
 use std::{
     fs,
-    os::unix::fs::{OpenOptionsExt, PermissionsExt},
+    os::unix::fs::{MetadataExt, OpenOptionsExt},
     path::{Path, PathBuf},
 };
 
@@ -58,17 +58,26 @@ pub(super) fn output_root() -> Result<PathBuf> {
         std::env::var_os("REGRESSEE_RENDERER_CAPTURE_DIR")
             .context("explicit private renderer capture directory required")?,
     );
-    // Keep the private default, but let an explicitly authorized diagnostic run
-    // supply its physical scratch root without baking a developer's home path
-    // into source. This remains an opt-in test, never a production setting.
+    // Both roots are explicit; diagnostic code has no host-specific default.
     let approved = PathBuf::from(
         std::env::var_os("REGRESSEE_RENDERER_APPROVED_ROOT")
-            .unwrap_or_else(|| "/path/to/private-tests/opencode".into()),
+            .context("explicit private renderer approved root required")?,
     );
     ensure!(approved.is_absolute() && fs::canonicalize(&approved)? == approved);
+    let approved_meta = fs::metadata(&approved)?;
+    ensure!(
+        approved_meta.is_dir()
+            && approved_meta.mode() & 0o7777 == 0o700
+            && approved_meta.uid() == unsafe { libc::geteuid() }
+    );
     ensure!(root.is_absolute() && root.starts_with(&approved));
     ensure!(fs::canonicalize(&root)? == root);
-    ensure!(fs::metadata(&root)?.permissions().mode() & 0o777 == 0o700);
+    let root_meta = fs::metadata(&root)?;
+    ensure!(
+        root_meta.is_dir()
+            && root_meta.mode() & 0o7777 == 0o700
+            && root_meta.uid() == unsafe { libc::geteuid() }
+    );
     Ok(root)
 }
 

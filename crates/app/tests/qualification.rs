@@ -2,6 +2,8 @@
 //! Storage-scale safety qualification; generated PNGs are not browser captures.
 #[path = "support/bulk_fixture.rs"]
 mod bulk_fixture;
+#[path = "support/private_paths.rs"]
+mod private_paths;
 use regressee_storage::{AppPaths, Store};
 use std::{collections::BTreeSet, sync::atomic::AtomicBool};
 
@@ -163,11 +165,7 @@ fn phase7_distinct_persisted_100_and_1000_page_selective_approval_privacy_and_re
         );
         if let Some(parent) = std::env::var_os("REGRESSEE_PHASE7_STORAGE_EVIDENCE") {
             let parent = std::path::PathBuf::from(parent);
-            assert!(
-                parent.is_absolute()
-                    && parent.starts_with("/var/home/olav/Data/opencode/tmp/opencode")
-            );
-            assert_eq!(std::fs::canonicalize(&parent).unwrap(), parent);
+            private_paths::private_directory(&parent).unwrap();
             let destination = parent.join(format!("storage-{pages}"));
             assert!(
                 !destination.exists(),

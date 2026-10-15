@@ -4,24 +4,17 @@
 
 #[path = "support/approval_fixture.rs"]
 mod approval_fixture;
+#[path = "support/private_paths.rs"]
+mod private_paths;
 
 #[test]
 #[ignore = "prepares only an explicitly authorized private native-inspection fixture"]
 fn prepare_owned_native_inspection_fixture() {
-    use std::{
-        fs,
-        os::unix::fs::{OpenOptionsExt, PermissionsExt},
-        path::PathBuf,
-    };
+    use std::{fs, os::unix::fs::OpenOptionsExt, path::PathBuf};
     let root = PathBuf::from(std::env::var_os("REGRESSEE_NATIVE_FIXTURE_ROOT").unwrap());
-    assert!(root.starts_with("/path/to/private-tests/opencode"));
-    assert_eq!(fs::canonicalize(&root).unwrap(), root);
-    assert_eq!(
-        fs::metadata(&root).unwrap().permissions().mode() & 0o777,
-        0o700
-    );
+    private_paths::private_directory(&root).unwrap();
     let store_path = root.join("store");
-    assert_eq!(fs::canonicalize(&store_path).unwrap(), store_path);
+    private_paths::private_directory(&store_path).unwrap();
     assert!(fs::read_dir(&store_path).unwrap().next().is_none());
     let (store, project, run, analysis, masked) = approval_fixture::fixture(&store_path);
     drop(store);

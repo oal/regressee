@@ -82,15 +82,22 @@ disabled.
 ## Linux worker scratch policy
 
 Product workers do **not** inherit `TMPDIR`/`TMP`/`TEMP` for browser scratch.
-They use a per-user 0700 namespace `/tmp/rg2-EUID`; if the real, current-user-owned
-`/tmp/opencode` harness directory exists, its approved `/tmp/opencode/rg2-EUID`
-is used instead. Only that namespace is inspected for dead-owner recovery.
+They use Regressee's per-user 0700 namespace `/tmp/rg2-EUID`, independent of
+development tools or other applications' temporary directories.
+Only that namespace is inspected for dead-owner recovery.
 An optional installation override, `REGRESSEE_WORKER_SCRATCH_PARENT`, names the
 **complete namespace**, not project data. It must be absolute, non-symlink,
 current-user-owned mode 0700, with safe ancestors and at most 40 path bytes.
 Missing final directories are created privately; invalid paths fail explicitly,
 not by permission repair or silent fallback. Each unique `w-XXXXXX` worker path
 is limited to 49 bytes, leaving room for Chromium's Linux socket/profile suffix.
+
+Earlier previews incorrectly preferred `/tmp/opencode` when that directory existed
+and belonged to the current user. Unsafe ancestor permissions could then block
+browser setup after the download completed. That automatic preference is removed;
+Regressee has no runtime dependency on OpenCode. No existing temporary directories
+are migrated, deleted or permission-repaired by this change. Explicit overrides
+still undergo the same strict validation and do not silently fall back.
 
 The private 0600 v3 marker binds UID, exact scratch path, app/worker PID and
 canonical runtime executable/browser root. Cancellation, shutdown, Drop and
@@ -107,7 +114,7 @@ malicious same-user filesystem racer, nor Windows/macOS ownership qualification.
 # Requires the already verified historical development source pack, never a
 # system Node/npm. Builds UI/headless binaries first, then runs serially.
 bash scripts/build-ui.sh
-REGRESSEE_PHASE2_EVIDENCE=/tmp/opencode/regressee-product-flow-UNIQUE \
+REGRESSEE_PHASE2_EVIDENCE=/absolute/path/to/new-private-evidence \
   cargo test --locked -p regressee-app --features ui-tests --test product_flow \
   actual_signed_http_product_flow -- --ignored --nocapture --test-threads=1
 ```

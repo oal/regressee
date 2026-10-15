@@ -22,10 +22,10 @@ import tarfile
 import tempfile
 import urllib.request
 import zipfile
+from development_tools import private_directory
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'crates/runtime/assets/official'
-TEMP = Path('/path/to/private-tests/opencode')
 NODE = '24.21.0'
 PW = '1.64.0'
 WORKER = '5.0.1'
@@ -392,9 +392,11 @@ def main():
     parser.add_argument('--platform', action='append', choices=PLATFORMS, help='Default: all four platforms')
     args = parser.parse_args()
     os.umask(0o077)
-    work = args.work_dir or Path(tempfile.mkdtemp(prefix='regressee-official-assets-', dir=TEMP))
-    if not work.is_dir() or work.is_symlink() or work.parent != TEMP or not work.name.startswith('regressee-official-assets-') or stat.S_IMODE(work.stat().st_mode) != 0o700:
-        raise ValueError('Downloads require the approved private 0700 directory')
+    work = args.work_dir or Path(tempfile.mkdtemp(
+        prefix='regressee-official-assets-', dir=Path(tempfile.gettempdir()).resolve(strict=True)))
+    private_directory(work)
+    if not work.name.startswith('regressee-official-assets-'):
+        raise ValueError('Downloads require a private regressee-official-assets-* directory')
     if shutil.disk_usage(work).free < 3 * 1024 ** 3:
         raise ValueError('At least 3 GiB free required')
     print(f'Private archive directory: {work}', flush=True)

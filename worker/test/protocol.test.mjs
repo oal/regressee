@@ -1,11 +1,17 @@
-import test from 'node:test';
+import test, {after} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+
+const artifacts=await fs.mkdtemp(path.join(os.tmpdir(),'regressee-protocol-'));
+after(()=>fs.rm(artifacts,{recursive:true,force:true}));
 
 function probe(input, {end=false, stopAfter}={}) {
   return new Promise((resolve,reject)=>{
-    const child=spawn(process.execPath,[fileURLToPath(new URL('../src/index.mjs',import.meta.url))],{env:{...process.env,REGRESSEE_ARTIFACTS:'/tmp/opencode/regressee-protocol-tests'}});
+    const child=spawn(process.execPath,[fileURLToPath(new URL('../src/index.mjs',import.meta.url))],{env:{...process.env,REGRESSEE_ARTIFACTS:artifacts}});
     let stdout='',stderr='';const events=[];let pending='';
     const timer=setTimeout(()=>{child.kill('SIGTERM');reject(new Error('protocol probe deadline'));},5000);
     child.stdout.on('data',data=>{stdout+=data;pending+=data;let n;while((n=pending.indexOf('\n'))>=0){events.push(JSON.parse(pending.slice(0,n)));pending=pending.slice(n+1);}if(stopAfter&&events.length>=stopAfter)child.stdin.end();});

@@ -28,9 +28,6 @@ use std::{
 };
 
 const URL: &str = "https://example.test/";
-const APPROVED: &str = "/path/to/private-tests/opencode";
-const RETAINED: &str =
-    "/path/to/private-tests/opencode/regressee-official-independent-_8cn2hk9/first-use-store";
 
 fn physical_private(path: &Path) -> Result<()> {
     let meta = fs::symlink_metadata(path)?;
@@ -170,10 +167,6 @@ fn authorized_blog_discovery_baseline_fixed_check_analysis_review() -> Result<()
     );
     physical_private(&root)?;
     ensure!(
-        root.starts_with(APPROVED) && root != Path::new(APPROVED),
-        "root outside approved parent"
-    );
-    ensure!(
         fs::read_dir(&root)?.next().is_none(),
         "evidence root must be fresh and empty"
     );
@@ -222,9 +215,17 @@ fn authorized_blog_discovery_baseline_fixed_check_analysis_review() -> Result<()
     let outcome = (|| -> Result<()> {
         if let Some(cache) = std::env::var_os("REGRESSEE_TEST_RUNTIME_CACHE") {
             let cache = PathBuf::from(cache);
-            let retained_paths = AppPaths::isolated(Path::new(RETAINED));
+            let retained_root =
+                PathBuf::from(std::env::var_os("REGRESSEE_TEST_RETAINED_STORE").context(
+                    "explicit retained store root required when reusing a runtime cache",
+                )?);
+            physical_private(&retained_root)?;
+            let retained_paths = AppPaths::isolated(&retained_root);
+            physical_private(&cache)?;
             ensure!(
-                cache == retained_paths.cache && fs::canonicalize(&cache)? == cache,
+                cache == retained_paths.cache
+                    && !cache.starts_with(&root)
+                    && !root.starts_with(&retained_root),
                 "only the explicitly retained physical official AppPaths cache is permitted"
             );
             let retained = Product::configured(&cache)?;

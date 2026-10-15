@@ -1327,8 +1327,7 @@ fn capture_one(
         "unsafe screenshot output"
     );
     warnings.extend(wire_warnings);
-    if let Some(directory) = std::env::var_os("REGRESSEE_CAPTURE_TRACE_EVIDENCE") {
-        let directory = std::path::PathBuf::from(directory);
+    if let Some(directory) = regressee_runtime::capture_diagnostics::trace_directory() {
         let source = worker.output_path(token).with_extension("trace.json");
         regressee_runtime::protocol::retain_capture_trace(&directory, &source, job, token)?;
         fs::remove_file(source)?;

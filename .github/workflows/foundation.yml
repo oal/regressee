@@ -36,6 +36,7 @@ jobs:
         run: |
           python -B scripts/test_ci_run.py
           python -B scripts/test_package_preview.py
+          python -B scripts/test_environment_boundaries.py
       - name: Linux-only private source archive contracts
         if: runner.os == 'Linux'
         shell: bash

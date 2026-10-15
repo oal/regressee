@@ -1275,9 +1275,13 @@ fn actual_phase4_auth_environment_and_capture() -> Result<()> {
             "signed bytes differ from maintained source"
         );
     }
+    #[cfg(target_os = "linux")]
+    let temporary = PathBuf::from("/tmp");
+    #[cfg(not(target_os = "linux"))]
+    let temporary = std::env::temp_dir();
     let scratch = tempfile::Builder::new()
         .prefix("p4-suite-")
-        .tempdir_in("/tmp/opencode")?;
+        .tempdir_in(temporary)?;
     let suite = std::process::Command::new(installed.root.join("node/bin/node"))
         .args(["--test", "--test-concurrency=1"])
         .arg(installed.root.join("worker/test/protocol.test.mjs"))
@@ -1996,11 +2000,7 @@ fn retained_worker_long_and_short_tmpdir_regression() -> Result<()> {
     use std::os::unix::fs::PermissionsExt;
     let evidence = PathBuf::from(std::env::var("REGRESSEE_PHASE2_CORRECTION_EVIDENCE")?);
     fs::create_dir(&evidence)?;
-    let base = if Path::new("/tmp/opencode").is_dir() {
-        "/tmp/opencode"
-    } else {
-        "/tmp"
-    };
+    let base = "/tmp";
     for case in ["long", "short"] {
         let output = evidence.join(case);
         fs::create_dir(&output)?;

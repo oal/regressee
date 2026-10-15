@@ -6,6 +6,7 @@ pub mod diagnostics;
 pub mod formatting;
 pub mod images;
 pub mod jobs;
+pub mod launch;
 pub(crate) mod official_catalog;
 pub mod product;
 pub mod recovery;

@@ -17,6 +17,7 @@ import subprocess
 import tempfile
 import time
 import zlib
+from development_tools import private_directory, require_developer_binary
 
 
 def main():
@@ -25,10 +26,10 @@ def main():
     parser.add_argument("--parent", required=True, type=Path)
     parser.add_argument("--backend", choices=["x11", "wayland"], default="x11")
     args = parser.parse_args()
-    parent = args.parent.resolve(strict=True)
-    assert parent == Path("/var/home/olav/Data/opencode/tmp/opencode")
+    parent = private_directory(args.parent)
     binary = args.binary.resolve(strict=True)
     root = Path(tempfile.mkdtemp(prefix="regressee-phase7-native-", dir=parent))
+    require_developer_binary(binary, root / "app")
     report = {"root": str(root), "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
               "kind": "real X11/XTEST OS input on an isolated owned process; not human qualification",
               "events": [], "native_acceptance": "NOT TESTED until painted outcomes inspected"}

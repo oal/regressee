@@ -9,12 +9,14 @@ import os
 import pathlib
 import subprocess
 import time
+from development_tools import require_developer_binary
 
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=pathlib.Path,required=True);a=p.parse_args()
     output=a.output.resolve();output.mkdir(parents=True,exist_ok=False)
+    require_developer_binary(ROOT/'target/debug/regressee', output/'native-data')
     spec=importlib.util.spec_from_file_location('owned_x11',ROOT/'scripts/ui-smoke.py');h=importlib.util.module_from_spec(spec);spec.loader.exec_module(h)
     h.bind('XCloseDisplay',C.c_int,[h.Display]);x=h.x
     result={'scope':'One X11/lavapipe developer inspection; not ordinary native qualification','outcome':'FAIL / native evidence open','forced_mapping':False,'input':'NOT RUN','human_visual_approval':'PENDING'}

@@ -14,7 +14,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-const APPROVED: &str = "/path/to/private-tests/opencode";
 const NAME: &str = "Native inspection saved project";
 const LIMIT: Duration = Duration::from_secs(15 * 60);
 
@@ -105,15 +104,12 @@ const STAGES: &[(&str, Scene, [u32; 2])] = &[
 ];
 
 fn private_directory(path: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-    ensure!(
-        path.is_absolute() && path.starts_with(APPROVED),
-        "outside approved scratch"
-    );
+    use std::os::unix::fs::MetadataExt;
+    ensure!(path.is_absolute(), "absolute private scratch required");
     ensure!(fs::canonicalize(path)? == path, "nonphysical path");
     let meta = fs::symlink_metadata(path)?;
     ensure!(
-        meta.is_dir() && meta.permissions().mode() & 0o777 == 0o700,
+        meta.is_dir() && meta.mode() & 0o7777 == 0o700 && meta.uid() == unsafe { libc::geteuid() },
         "not private directory"
     );
     Ok(())

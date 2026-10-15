@@ -14,7 +14,7 @@ p.add_argument('--runtime-only',action='store_true')
 args=p.parse_args()
 root=Path(__file__).resolve().parent.parent
 args.output.mkdir(parents=True,exist_ok=False)
-env=dict(os.environ,TMPDIR='/tmp/opencode',LIBRARY_PATH=str(root/'.runtime/link-libs'),RUST_TEST_THREADS='1',CARGO_BUILD_JOBS='4',REGRESSEE_PHASE4_EVIDENCE=str(args.output.resolve()/'product-flow'))
+env=dict(os.environ,LIBRARY_PATH=str(root/'.runtime/link-libs'),RUST_TEST_THREADS='1',CARGO_BUILD_JOBS='4',REGRESSEE_PHASE4_EVIDENCE=str(args.output.resolve()/'product-flow'))
 commands=[] if args.runtime_only else [('locked-ui-tests-clippy',['bash','scripts/check-foundation.sh']),('owned-os-store',['cargo','test','--locked','-p','regressee-runtime','secrets::tests::actual_owned_os_store_availability','--','--exact','--ignored','--nocapture','--test-threads=1'])]
 commands.append(('signed-auth-capture',['cargo','test','--locked','-p','regressee-app','--features','ui-tests','--test','product_flow','actual_phase4_auth_environment_and_capture','--','--exact','--ignored','--nocapture','--test-threads=1']))
 records=[]

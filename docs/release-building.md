@@ -105,6 +105,46 @@ Owner/native `codesign --verify --deep --strict`, Gatekeeper, Developer ID,
 notarization/stapling and approved JIT entitlements are separate required work;
 no automatic signing or vendor submission is authorized.
 
+## Developer-only tools
+
+Normal builds (`--features ui`), including downloadable previews, ignore
+`REGRESSEE_DEV_DATA` and `REGRESSEE_CAPTURE_TRACE_EVIDENCE`. These hooks require
+the explicit `developer-tools` Cargo feature; inspection and renderer-capture
+features enable it as well. Do not package an `--all-features` build as a preview.
+`regressee --build-info` reports compiled features without initializing graphics
+or storage. Preview packaging checks this metadata and rejects developer/test
+features or a version mismatch.
+
+For a source-only isolated launch, create a fresh owner-private directory without
+symlink ancestors, then run:
+
+```sh
+REGRESSEE_DEV_DATA="/absolute/path/to/private-test-directory" \
+  cargo run --locked -p regressee-app --features ui,developer-tools --bin regressee
+```
+
+Do not point developer overrides at existing user data. Normal runtime download
+configuration, browser scratch overrides, reduced motion and GPU diagnostics are
+separate supported interfaces, not developer storage/tracing hooks.
+
+Automated checks need no special development-host paths or temporary-directory
+overrides:
+
+```sh
+cargo test --locked --workspace --all-features -- --test-threads=1
+```
+
+Deliberately ignored live-browser, native and scale tests require their explicit
+fixture inputs and fresh private output directories. Do not run them as part of
+an ordinary check. Diagnostic scripts accept caller-selected physical directories;
+none requires a particular home directory or development tool.
+
+Renderer tests require both `REGRESSEE_RENDERER_APPROVED_ROOT` and
+`REGRESSEE_RENDERER_CAPTURE_DIR` explicitly; there is no machine-specific fallback.
+The opt-in authorized-site test requires `REGRESSEE_TEST_RETAINED_STORE` when
+`REGRESSEE_TEST_RUNTIME_CACHE` is supplied, so reuse is bound to the caller's
+explicit retained store rather than a historical developer directory.
+
 ## Source and artifact binding
 
 `scripts/source_release.py` is the integrated independently checked Linux-only

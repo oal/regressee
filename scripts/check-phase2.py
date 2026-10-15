@@ -32,7 +32,7 @@ def resources(evidence):
     # The v3 per-user namespace itself is stable infrastructure, not a leaked
     # worker. Report entries, never delete them or inspect unrelated temp roots.
     scratch=[];namespaces=[]
-    parents={pathlib.Path('/tmp/opencode')/f'rg2-{os.geteuid()}',pathlib.Path('/tmp')/f'rg2-{os.geteuid()}'}
+    parents={pathlib.Path('/tmp')/f'rg2-{os.geteuid()}'}
     if os.environ.get('REGRESSEE_WORKER_SCRATCH_PARENT'):
         parents.add(pathlib.Path(os.environ['REGRESSEE_WORKER_SCRATCH_PARENT']))
     for parent in sorted(parents):
@@ -55,7 +55,7 @@ def main():
     # Snapshot only the specific pipeline/checklist files we intend to overwrite.
     for name in ['docs/IMPLEMENTATION_STATUS.md','docs/phases/02-vertical-slice.md']:
         (evidence/pathlib.Path(name).name).write_bytes((ROOT/name).read_bytes())
-    env=dict(os.environ,TMPDIR='/tmp/opencode',LIBRARY_PATH=str(ROOT/'.runtime/link-libs'),RUST_TEST_THREADS='1')
+    env=dict(os.environ,LIBRARY_PATH=str(ROOT/'.runtime/link-libs'),RUST_TEST_THREADS='1')
     env['REGRESSEE_PHASE2_EVIDENCE']=str(evidence/'product-flow')
     commands=[
         ['cargo','fmt','--all'],

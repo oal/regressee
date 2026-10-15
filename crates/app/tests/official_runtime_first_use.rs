@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Explicit real-network first-use check. Never runs with the ordinary test suite.
+#[path = "support/private_paths.rs"]
+mod private_paths;
 use anyhow::{Context, Result, ensure};
 use regressee_app::{
     jobs::{Jobs, Reply, Request, Update, Work},
@@ -142,12 +144,7 @@ fn fresh_default_discovery_installs_and_reopens_verified_browser() -> Result<()>
         std::env::var_os("REGRESSEE_OFFICIAL_CHECK_DIR")
             .context("explicit private verification directory required")?,
     );
-    ensure!(
-        root.is_absolute()
-            && fs::canonicalize(&root)? == root
-            && root.starts_with("/path/to/private-tests/opencode"),
-        "verification must use its owned private directory"
-    );
+    private_paths::private_directory(&root)?;
     let paths = AppPaths::isolated(&root.join("first-use-store"));
     let mut store = Store::open(paths.clone())?;
     let site = Site::start()?;

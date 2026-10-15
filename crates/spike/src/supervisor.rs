@@ -16,8 +16,91 @@ pub const MAX_LINE: usize = 1024 * 1024;
 #[cfg(test)]
 pub(crate) static SPAWN_ATTEMPTS: std::sync::atomic::AtomicUsize =
     std::sync::atomic::AtomicUsize::new(0);
-#[cfg(target_os = "linux")]
-const LINUX_SCRATCH: &str = "/tmp/opencode/r0";
+pub(crate) fn scratch_parent() -> std::path::PathBuf {
+    #[cfg(target_os = "linux")]
+    {
+        Path::new("/tmp").join(format!("rg0-{}", unsafe { libc::geteuid() }))
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let temporary = std::env::temp_dir();
+        temporary
+            .canonicalize()
+            .unwrap_or(temporary)
+            .join("regressee-p0")
+    }
+}
+
+fn prepare_scratch_parent(parent: &Path) -> Result<()> {
+    #[cfg(unix)]
+    let builder = {
+        use std::os::unix::fs::DirBuilderExt;
+        let mut builder = std::fs::DirBuilder::new();
+        builder.mode(0o700);
+        builder
+    };
+    #[cfg(not(unix))]
+    let builder = std::fs::DirBuilder::new();
+    match builder.create(parent) {
+        Ok(()) => (),
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => (),
+        Err(error) => return Err(error.into()),
+    }
+    let metadata = std::fs::symlink_metadata(parent)?;
+    ensure!(
+        metadata.is_dir() && !metadata.file_type().is_symlink() && parent.canonicalize()? == parent,
+        "prototype scratch parent must be a physical directory"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        ensure!(
+            metadata.uid() == unsafe { libc::geteuid() } && metadata.mode() & 0o7777 == 0o700,
+            "prototype scratch parent must be current-user-owned mode 0700"
+        );
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::MetadataExt;
+        ensure!(
+            metadata.file_attributes() & 0x400 == 0,
+            "prototype scratch parent is a reparse point"
+        );
+    }
+    Ok(())
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod scratch_path_tests {
+    use super::*;
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    #[test]
+    fn prototype_has_its_own_short_per_user_namespace() {
+        assert_eq!(
+            scratch_parent(),
+            Path::new("/tmp").join(format!("rg0-{}", unsafe { libc::geteuid() }))
+        );
+    }
+
+    #[test]
+    fn prototype_refuses_linked_and_nonprivate_namespaces() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let parent = root.path().canonicalize()?.join("private");
+        prepare_scratch_parent(&parent)?;
+        let link = root.path().join("link");
+        symlink(&parent, &link)?;
+        assert!(prepare_scratch_parent(&link).is_err());
+        std::fs::set_permissions(&parent, std::fs::Permissions::from_mode(0o755))?;
+        assert!(prepare_scratch_parent(&parent).is_err());
+        assert_eq!(
+            std::fs::metadata(parent)?.permissions().mode() & 0o7777,
+            0o755
+        );
+        Ok(())
+    }
+}
+
 pub struct Worker {
     child: Child,
     input: ChildStdin,
@@ -77,7 +160,11 @@ fn kill_private_browsers(scratch: &Path, browser_root: &Path) {
 /// Only marked scratch owned by this application process is eligible.
 #[cfg(target_os = "linux")]
 pub fn emergency_stop(pid: u32) {
-    let Ok(entries) = std::fs::read_dir(LINUX_SCRATCH) else {
+    let parent = scratch_parent();
+    if prepare_scratch_parent(&parent).is_err() {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(parent) else {
         return;
     };
     for entry in entries.flatten() {
@@ -122,7 +209,7 @@ pub fn emergency_stop(pid: u32) {
 }
 
 fn recover_scratch(parent: &Path) -> Result<()> {
-    std::fs::create_dir_all(parent)?;
+    prepare_scratch_parent(parent)?;
     #[cfg(target_os = "linux")]
     for entry in std::fs::read_dir(parent)? {
         let path = entry?.path();
@@ -195,10 +282,7 @@ impl Worker {
         let root = root.canonicalize()?;
         // Chromium's Unix-domain socket names must fit sockaddr_un. Long project
         // paths plus Playwright profile names can otherwise abort Chromium.
-        #[cfg(target_os = "linux")]
-        let scratch_parent = std::path::PathBuf::from(LINUX_SCRATCH);
-        #[cfg(not(target_os = "linux"))]
-        let scratch_parent = std::env::temp_dir().join("regressee-p0");
+        let scratch_parent = scratch_parent();
         recover_scratch(&scratch_parent)?;
         let scratch = scratch_parent.join(format!(
             "worker-{:x}-{:x}",

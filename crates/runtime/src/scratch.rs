@@ -82,22 +82,15 @@ fn uid() -> u32 {
 }
 
 pub(crate) fn parent() -> Result<PathBuf> {
-    let path = if let Some(path) = std::env::var_os("REGRESSEE_WORKER_SCRATCH_PARENT") {
-        PathBuf::from(path)
-    } else {
-        // OpenCode's approved writable root is optional, not an OS dependency.
-        // Outside that harness the ordinary Linux sticky /tmp is the default.
-        let base = if std::fs::symlink_metadata("/tmp/opencode")
-            .is_ok_and(|m| m.is_dir() && m.uid() == uid())
-        {
-            Path::new("/tmp/opencode")
-        } else {
-            Path::new("/tmp")
-        };
-        base.join(format!("rg2-{}", uid()))
-    };
+    let path = parent_path(std::env::var_os("REGRESSEE_WORKER_SCRATCH_PARENT").map(PathBuf::from));
     prepare_parent(&path)?;
     Ok(path)
+}
+
+fn parent_path(override_path: Option<PathBuf>) -> PathBuf {
+    // Product defaults must not depend on another application's directories or
+    // the development environment. Keep the path short for Linux socket limits.
+    override_path.unwrap_or_else(|| Path::new("/tmp").join(format!("rg2-{}", uid())))
 }
 
 pub(crate) fn prepare_parent(path: &Path) -> Result<()> {
@@ -667,15 +660,50 @@ mod tests {
         std::env::var_os("REGRESSEE_WORKER_SCRATCH_PARENT")
             .map(PathBuf::from)
             .and_then(|path| path.parent().map(Path::to_owned))
-            .unwrap_or_else(|| {
-                PathBuf::from(
-                    if std::fs::symlink_metadata("/tmp/opencode").is_ok_and(|m| m.is_dir()) {
-                        "/tmp/opencode"
-                    } else {
-                        "/tmp"
-                    },
-                )
-            })
+            .unwrap_or_else(|| PathBuf::from("/tmp"))
+    }
+    #[test]
+    fn scratch_parent_defaults_to_own_namespace_and_preserves_explicit_overrides() {
+        let default = parent_path(None);
+        assert_eq!(default, Path::new("/tmp").join(format!("rg2-{}", uid())));
+        assert!(default.as_os_str().as_encoded_bytes().len() <= MAX_PARENT_BYTES);
+        // Selection neither normalizes nor silently replaces invalid overrides;
+        // prepare_parent must still reject them before launch.
+        for path in [
+            PathBuf::from("/tmp/custom-private"),
+            PathBuf::from("relative"),
+            PathBuf::from("/tmp").join("x".repeat(50)),
+        ] {
+            assert_eq!(parent_path(Some(path.clone())), path);
+        }
+    }
+    #[test]
+    fn unsafe_override_is_rejected_without_permission_repair_or_fallback() -> Result<()> {
+        let base = tempfile::Builder::new()
+            .prefix("t")
+            .rand_bytes(1)
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir_in(test_base())?;
+        let parent = base.path().join("p");
+        let sentinel = base.path().join("keep");
+        std::fs::write(&sentinel, b"unrelated directory contents")?;
+        for mode in [0o775, 0o777] {
+            std::fs::set_permissions(base.path(), std::fs::Permissions::from_mode(mode))?;
+            let selected = parent_path(Some(parent.clone()));
+            let error = prepare_parent(&selected).unwrap_err();
+            assert!(
+                error
+                    .to_string()
+                    .contains("ancestor has unsafe ownership/permissions")
+            );
+            assert!(!parent.try_exists()?);
+            assert_eq!(std::fs::metadata(base.path())?.mode() & 0o7777, mode);
+            assert_eq!(std::fs::read(&sentinel)?, b"unrelated directory contents");
+        }
+        std::fs::set_permissions(base.path(), std::fs::Permissions::from_mode(0o700))?;
+        prepare_parent(&parent)?;
+        assert!(private_dir(&parent));
+        Ok(())
     }
     #[test]
     fn lifecycle_reentrancy_and_concurrent_cleanup_are_serialized() -> Result<()> {

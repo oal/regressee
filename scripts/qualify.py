@@ -5,6 +5,7 @@ from evidence import inspect_captures
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 BIN = ROOT / 'target/debug/regressee-spike'
 ARTIFACTS = ROOT / 'artifacts'
+SCRATCH = pathlib.Path('/tmp') / f'rg0-{os.geteuid()}'
 
 def proc_table():
     table = {}
@@ -37,7 +38,7 @@ def scoped_audit():
             if data['exe'].startswith(str(base/'browsers')+'/') or (data['exe']==str(base/'node/bin/node') and str(base/'worker').encode() in cmd): owned=True
         if data['exe'] in [str(ROOT/'target/debug/regressee-spike'),str(ROOT/'target/debug/regressee-ui')]: owned=True
         if owned:live.append(pid)
-    scratch=[str(p) for p in pathlib.Path('/tmp/opencode/r0').glob('worker-*')]
+    scratch=[str(p) for p in SCRATCH.glob('worker-*')]
     pending=[str(p) for p in [ROOT/'.runtime/installed.stage',ROOT/'.runtime/installed.lock',ROOT/'.runtime/installed.previous'] if p.exists()]
     return {'live_private_processes':live,'scratch':scratch,'setup_paths':pending}
 
@@ -120,7 +121,7 @@ def main():
             assert not live, f'Parent-death left live processes: {live}'
             results.append({'command':['parent-hang','SIGKILL parent'],'exit':p.returncode,'live_owned_processes_after':0,'observed_process_count':len(children)})
             results.append(run(['protocol-test']))  # restart also recovers app-owned dead scratch
-            assert not list(pathlib.Path('/tmp/opencode/r0').glob('worker-*')), 'private browser scratch remains after recovery'
+            assert not list(SCRATCH.glob('worker-*')), 'private browser scratch remains after recovery'
         finally:
             if p.poll() is None: p.kill();p.wait()
     audit=scoped_audit()

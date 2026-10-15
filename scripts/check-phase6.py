@@ -14,7 +14,7 @@ args = parser.parse_args()
 root = Path(__file__).resolve().parent.parent
 args.output.mkdir(parents=True, exist_ok=False)
 output = args.output.resolve()
-env = dict(os.environ, TMPDIR='/tmp/opencode', RUST_TEST_THREADS='1',
+env = dict(os.environ, RUST_TEST_THREADS='1',
            CARGO_BUILD_JOBS='4', LIBRARY_PATH=str(root / '.runtime/link-libs'))
 for phase in (5, 6):
     env.update({f'REGRESSEE_PHASE{phase}_EVIDENCE': str(output / f'phase{phase}-product'),

@@ -5,6 +5,7 @@ Run from the repository root. Logs/results are preserved in a new private root.
 Warnings are retained; clippy does not silently impose a new -D warnings policy.
 Ignored OS/browser/runtime tests remain ignored, never relabelled PASS.
 """
+import argparse
 import json
 import hashlib
 import os
@@ -13,13 +14,17 @@ import subprocess
 import signal
 import tempfile
 import time
+from development_tools import private_directory
 
 ROOT = Path(__file__).resolve().parents[1]
-PARENT = Path("/var/home/olav/Data/opencode/tmp/opencode")
 
 
 def main():
-    output = Path(tempfile.mkdtemp(prefix="regressee-phase7-checks-", dir=PARENT))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--parent", type=Path, help="Existing private physical output parent; default: OS temporary directory")
+    args = parser.parse_args()
+    parent = private_directory(args.parent) if args.parent else Path(tempfile.gettempdir()).resolve(strict=True)
+    output = Path(tempfile.mkdtemp(prefix="regressee-phase7-checks-", dir=parent))
     sources = {str(p.relative_to(ROOT)): hashlib.sha256(p.read_bytes()).hexdigest()
                for p in sorted((ROOT / "crates").rglob("*.rs"))}
     (output / "source-start.json").write_text(json.dumps(sources, indent=2))
@@ -27,7 +32,7 @@ def main():
     for key in list(env):
         if key.startswith("REGRESSEE_"):
             env.pop(key)
-    env.update(LIBRARY_PATH=str(ROOT / ".runtime/link-libs"), TMPDIR=str(PARENT))
+    env.update(LIBRARY_PATH=str(ROOT / ".runtime/link-libs"))
     commands = [
         ("workspace-all", ["cargo", "test", "--locked", "--offline", "--workspace", "--all-features"]),
         ("workspace-default", ["cargo", "test", "--locked", "--offline", "--workspace", "--no-default-features"]),
@@ -56,7 +61,7 @@ def main():
                     process.wait()
                 code = "TIMEOUT"
         results.append({"name": name, "command": command, "exit": code, "seconds": time.monotonic() - start})
-        (output / "results.json").write_text(json.dumps({"environment": {k:env[k] for k in ["LIBRARY_PATH","TMPDIR"]}, "results": results}, indent=2))
+        (output / "results.json").write_text(json.dumps({"environment": {k:env.get(k) for k in ["LIBRARY_PATH","TMPDIR"]}, "results": results}, indent=2))
         print(name, code, flush=True)
     print(output, flush=True)
     raise SystemExit(any(r["exit"] != 0 for r in results))

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 pub mod bundle;
+pub mod capture_diagnostics;
 pub mod distribution;
 #[cfg(target_os = "linux")]
 mod linux_guardian;

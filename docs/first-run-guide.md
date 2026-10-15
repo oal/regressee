@@ -87,27 +87,44 @@ request limits lead to Project settings; local low-space failures lead to
 History's Storage section when a project is selected. Nothing is installed,
 visited, exported or deleted merely by opening a recovery screen.
 
+### Linux browser setup mentions `/tmp/opencode`
+
+Earlier previews mistakenly preferred a development tool's temporary directory.
+If setup reports `worker scratch ancestor has unsafe ownership/permissions:
+/tmp/opencode`, use a build with that preference removed. Do not change that
+directory's permissions or disable browser security.
+
+For an affected build, close Regressee and launch the extracted Linux executable
+with an explicit Regressee-owned namespace, then retry browser setup in App settings:
+
+```sh
+REGRESSEE_WORKER_SCRATCH_PARENT="/tmp/rg2-$(id -u)" ./regressee
+```
+
+The app creates the final directory with mode 0700 if missing and validates its
+ownership and ancestors. This override applies only to that launch and does not
+change project or screenshot storage. Windows uses a different scratch mechanism;
+similar setup failures there need their own error details.
+
 ### Linux GPU initialization failure
 
 Start with a plain launch:
 
 ```sh
-./target/debug/regressee
+./regressee
 ```
 
-The user reported that this now opens and allows project creation. That is user
-evidence, not a diagnosed fix for the earlier startup failure. Do not add GPU
-overrides when the plain launch works.
+Do not add GPU overrides when the plain launch works.
 
 If startup reports `Unable to init GPU context:
 Platform(Init(ERROR_INITIALIZATION_FAILED))`, GPUI/Blade failed Vulkan
-initialization before displaying the app. That is a native startup blocker;
-successful backend tests do not qualify the GUI or identify the driver cause.
+initialization before displaying the app. Check that your system has a working
+graphics driver and meets the [platform requirements](support-matrix.md).
 
 The current build has a bounded, data-free backend diagnostic:
 
 ```sh
-./target/debug/regressee --check-renderer
+./regressee --check-renderer
 ```
 
 It initializes the same GPUI backend as the app, with filtered GPU logs, before
@@ -115,19 +132,8 @@ opening project storage or background jobs. Passing it does **not** verify
 swapchain presentation, visible pixels or input. For logs during a normal launch:
 
 ```sh
-REGRESSEE_GPU_DIAGNOSTICS=1 ./target/debug/regressee
+REGRESSEE_GPU_DIAGNOSTICS=1 ./regressee
 ```
-
-Earlier process-only Mesa software-driver attempts also failed for the user with
-`NoSupportedDeviceFound` on both Wayland and X11. Those commands are not a known
-workaround and are no longer recommended as the next startup step. Neither
-VRAM exhaustion nor a particular driver fault has been proved. Keep the original
-errors rather than relabeling them as fixed.
-
-The independent UI sweep also tried one private X11/software-rendered window:
-it mapped, but its owned-client capture was entirely black. No input was sent
-and no native visual pass was claimed. This separate test route is not the
-user's working desktop and does not establish why either route behaves that way.
 
 GPUI chooses Wayland when `WAYLAND_DISPLAY`
 is nonempty, then X11 when `DISPLAY` is nonempty; there is no `ZED_DISPLAY`
@@ -140,23 +146,12 @@ configuration. A GPU/backtrace log is not the sanitized diagnostic export.
 
 Once a window opens, first test Create project → Save settings → View results,
 keyboard focus and Settings' diagnostic preview/save cancellation. No website
-navigation or browser installation is needed for these actions. To keep these
-checks separate from your real data, set `REGRESSEE_DEV_DATA` to a fresh physical
-private directory before launch; it must not have symlink ancestors.
+navigation or browser installation is needed for these actions. Use a new test
+project rather than changing an existing baseline.
 
-The automated non-native suite can be run without opening a desktop window:
-
-```sh
-TMPDIR="$(realpath /path/to/private-tests/opencode)" \
-  LIBRARY_PATH="$PWD/.runtime/link-libs${LIBRARY_PATH:+:$LIBRARY_PATH}" \
-  cargo test --locked --workspace --all-features -- --test-threads=1
-```
-
-That TMPDIR is this development host's approved disk-backed scratch, not a portable
-installation requirement. Deliberately ignored real-browser/scale tests do not
-run with this command. Those require their explicit signed fixture inputs; see
-`docs/phases/07-guardian-verification.md`. The ordinary suite is not human/native
-rendering or public-site acceptance.
+Source-build isolation and automated test instructions are in the
+[build guide](release-building.md#developer-only-tools). Downloaded previews do not
+enable developer storage overrides or private capture tracing.
 
 ### Capture and storage problems
 

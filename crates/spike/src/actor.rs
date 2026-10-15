@@ -190,15 +190,12 @@ pub fn lifecycle_tests(root: &Path) -> Result<()> {
     let ready = std::fs::read(root.join("READY"))?;
     let evidence = std::fs::read("artifacts/public-before.png")?;
     let hash = hex::encode(Sha256::digest(&evidence));
-    let make = || {
-        Controller::start(
-            root.into(),
-            ".runtime/pack.zip".into(),
-            "/tmp/opencode/regressee-actor-tiles".into(),
-        )
-    };
+    let tiles = tempfile::Builder::new()
+        .prefix("regressee-actor-tiles-")
+        .tempdir()?;
+    let make = || Controller::start(root.into(), ".runtime/pack.zip".into(), tiles.path().into());
     let owned_scratch = || -> Vec<PathBuf> {
-        std::fs::read_dir("/tmp/opencode/r0")
+        std::fs::read_dir(crate::supervisor::scratch_parent())
             .into_iter()
             .flatten()
             .flatten()

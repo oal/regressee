@@ -7,10 +7,11 @@ license.workspace = true
 [features]
 default = []
 ui = ["dep:gpui", "dep:image", "dep:log"]
+developer-tools = ["regressee-runtime/developer-tools"]
 test-support = []
 ui-tests = ["ui", "test-support", "gpui/test-support"]
-ui-inspection = ["ui"]
-ui-renderer-capture = ["ui-tests", "gpui/offscreen-capture"]
+ui-inspection = ["ui", "developer-tools", "dep:libc"]
+ui-renderer-capture = ["ui-tests", "developer-tools", "gpui/offscreen-capture"]
 
 [dependencies]
 regressee-core = { path = "../core" }
@@ -29,6 +30,7 @@ image = { version = "=0.25.10", default-features = false, optional = true }
 gpui = { workspace = true, optional = true }
 log = { version = "=0.4.34", optional = true }
 zeroize = "=1.9.1"
+libc = { version = "=0.2.177", optional = true }
 
 [dev-dependencies]
 ed25519-dalek = "=2.2.0"

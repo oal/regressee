@@ -17,6 +17,10 @@ spec = importlib.util.spec_from_file_location("package_preview", Path(__file__).
 preview = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(preview)
 REVISION = "a" * 40
+BUILD_INFO = {"version": "0.1.0", "features": {
+    "ui": True, "developer-tools": False, "test-support": False,
+    "ui-inspection": False, "ui-renderer-capture": False,
+}}
 
 
 class PreviewTests(unittest.TestCase):
@@ -40,10 +44,11 @@ class PreviewTests(unittest.TestCase):
         (self.root / ".runtime").mkdir()
         (self.root / ".runtime/private.key").write_text("not for distribution")
 
-    def build(self, target, revision=REVISION):
+    def build(self, target, revision=REVISION, build_info=None):
         inventory = {"target": target, "release_approved": False}
         texts = {"notices/fixture/LICENSE": (b"dependency license", 0o644)}
-        with patch.object(preview, "command", side_effect=[REVISION, "rustc fixture"]), \
+        metadata = BUILD_INFO if build_info is None else build_info
+        with patch.object(preview, "command", side_effect=[REVISION, json.dumps(metadata), "rustc fixture"]), \
                 patch.object(preview, "dependency_notices", return_value=(inventory, texts)):
             return preview.package(self.root, self.output, target, revision)
 
@@ -53,6 +58,7 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(info["binary_sha256"], hashlib.sha256(b"native binary fixture").hexdigest())
         self.assertFalse(info["runtime_bundled"])
         self.assertFalse(info["signed"])
+        self.assertEqual(info["compiled_features"], BUILD_INFO["features"])
         self.assertEqual(files[f"{prefix}/{executable}"], b"native binary fixture")
         self.assertEqual(files[f"{prefix}/notices/fixture/LICENSE"], b"dependency license")
         self.assertIn(f"{prefix}/LICENSE", files)
@@ -96,6 +102,29 @@ class PreviewTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.build("x86_64-pc-windows-msvc")
         self.assertFalse(self.output.exists())
+
+    def test_developer_test_and_mismatched_builds_are_rejected(self):
+        for feature in ("developer-tools", "test-support", "ui-inspection", "ui-renderer-capture"):
+            info = {"version": "0.1.0", "features": {**BUILD_INFO["features"], feature: True}}
+            with self.subTest(feature=feature), self.assertRaises(ValueError):
+                self.build("x86_64-unknown-linux-gnu", build_info=info)
+            self.assertFalse(self.output.exists())
+        for info in ({}, {**BUILD_INFO, "version": "other"}):
+            with self.subTest(info=info), self.assertRaises(ValueError):
+                self.build("x86_64-unknown-linux-gnu", build_info=info)
+        self.assertFalse(self.output.exists())
+
+    def test_native_metadata_probe_is_bounded_and_isolated(self):
+        inventory = {"target": "x86_64-unknown-linux-gnu"}
+        with patch.object(preview, "command", side_effect=[REVISION, json.dumps(BUILD_INFO), "rustc fixture"]) as command, \
+                patch.object(preview, "dependency_notices", return_value=(inventory, {})):
+            preview.package(self.root, self.output, "x86_64-unknown-linux-gnu", REVISION)
+        probe = command.call_args_list[1]
+        self.assertEqual(probe.args[-1], "--build-info")
+        self.assertEqual(probe.kwargs["timeout"], 15)
+        isolated = Path(probe.kwargs["env"]["REGRESSEE_DEV_DATA"])
+        self.assertFalse(isolated.exists(), "private metadata-probe scratch must be removed")
+        self.assertNotEqual(isolated, self.root)
 
     def test_required_help_is_not_silently_omitted(self):
         for name in ("first-run-guide.md", "preview-release-notes.md"):

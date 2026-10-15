@@ -231,7 +231,7 @@ impl Worker {
         } else {
             command.env_remove("NODE_EXTRA_CA_CERTS");
         }
-        if std::env::var_os("REGRESSEE_CAPTURE_TRACE_EVIDENCE").is_some() {
+        if crate::capture_diagnostics::trace_directory().is_some() {
             command.env("REGRESSEE_PRIVATE_CAPTURE_DIAGNOSTICS", "1");
         }
         command
@@ -883,13 +883,7 @@ mod scratch_tests {
         let base = std::env::var_os("REGRESSEE_WORKER_SCRATCH_PARENT")
             .map(PathBuf::from)
             .and_then(|path| path.parent().map(std::path::Path::to_owned))
-            .unwrap_or_else(|| {
-                if std::fs::symlink_metadata("/tmp/opencode").is_ok_and(|m| m.is_dir()) {
-                    "/tmp/opencode".into()
-                } else {
-                    "/tmp".into()
-                }
-            });
+            .unwrap_or_else(|| PathBuf::from("/tmp"));
         let parent = tempfile::Builder::new()
             .prefix("t")
             .rand_bytes(3)

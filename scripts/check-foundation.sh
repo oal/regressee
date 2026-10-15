@@ -6,7 +6,6 @@ cd "$(dirname "$0")/.."
 bash scripts/build-ui.sh
 if [[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]]; then
   export LIBRARY_PATH="$PWD/.runtime/link-libs${LIBRARY_PATH:+:$LIBRARY_PATH}"
-  if [[ -d /tmp/opencode ]]; then export TMPDIR=/tmp/opencode; fi
 fi
 cargo fmt --all -- --check
 cargo test --locked --workspace --all-features -j 4

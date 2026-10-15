@@ -31,7 +31,9 @@ use regressee_core::{
         Choice, Control, Detail, FocusState, ReviewSurface, Screen, SettingsSection, SetupStage,
     },
 };
-use regressee_storage::{AppPaths, ProjectPage, ProjectRecord, StorageSummary};
+#[cfg(test)]
+use regressee_storage::AppPaths;
+use regressee_storage::{ProjectPage, ProjectRecord, StorageSummary};
 use std::{
     sync::{Arc, mpsc::Receiver},
     time::Duration,
@@ -8092,6 +8094,13 @@ fn job_label(state: JobState) -> &'static str {
     }
 }
 fn main() -> anyhow::Result<()> {
+    if std::env::args_os()
+        .skip(1)
+        .any(|argument| argument == "--build-info")
+    {
+        println!("{}", regressee_app::launch::build_info());
+        return Ok(());
+    }
     let inspect_ui = std::env::args_os().any(|argument| argument == "--inspect-ui");
     if inspect_ui {
         anyhow::ensure!(
@@ -8122,10 +8131,7 @@ fn main() -> anyhow::Result<()> {
     }
     // Path discovery is pure OS/environment resolution; all preparation, SQLite,
     // artifact and image I/O belongs to the background owner.
-    let paths = match std::env::var_os("REGRESSEE_DEV_DATA") {
-        Some(root) => AppPaths::isolated(std::path::Path::new(&root)),
-        None => AppPaths::discover()?,
-    };
+    let paths = regressee_app::launch::app_paths()?;
     let (jobs, events) = Jobs::start(paths);
     let after_ui = jobs.clone();
     application.run(move |cx: &mut App| {
