@@ -366,7 +366,7 @@ impl Spec {
                 false,
                 true,
             ),
-            Work::InspectStorage | Work::ProjectStorage(_) | Work::RepairPreview => (
+            Work::ProjectStorage(_) | Work::RepairPreview => (
                 Storage,
                 Dialog,
                 "Checking local storage",
@@ -428,6 +428,7 @@ impl Spec {
             | Work::InspectRun { .. }
             | Work::RuntimeStatus
             | Work::NetworkStatus
+            | Work::InspectStorage
             | Work::Evidence(_)
             | Work::ExistingInventory(_)
             | Work::EnvironmentStatus(_)
@@ -681,8 +682,14 @@ mod tests {
             Work::Evidence(project),
             Work::History { project, page: 0 },
             Work::RuntimeStatus,
+            Work::NetworkStatus,
+            Work::InspectStorage,
         ] {
             assert!(Spec::for_work(&work).is_none());
         }
+        assert_eq!(
+            Spec::for_work(&Work::RepairPreview).unwrap().surface,
+            Surface::Dialog
+        );
     }
 }

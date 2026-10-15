@@ -6,9 +6,6 @@ use regressee_app::{
     ui::status_icon::{StatusIcon, status_icon},
 };
 
-pub(super) const FOLDER_PREVIEW_LABEL: &str = "Preview a folder path…";
-pub(super) const FOLDER_PREVIEW_HELP: &str = "Opens a folder picker and shows the path you choose. It does not inspect files or move project data. Changing the data location is not available yet.";
-
 pub(super) struct BrowserPresentation {
     pub(super) title: &'static str,
     tone: Tone,
@@ -100,45 +97,6 @@ impl Shell {
         }
     }
 
-    fn settings_disclosure(
-        &self,
-        detail: Detail,
-        title: &'static str,
-        cx: &mut Context<Self>,
-    ) -> gpui::Stateful<Div> {
-        let open = self.details.contains(&detail);
-        self.action_control(Control::Details(detail), title, ActionStyle::Secondary, cx)
-            .w_full()
-            .justify_between()
-            .gap_3()
-            .child(
-                canvas(
-                    |_, _, _| (),
-                    move |bounds, _, window, _| {
-                        let at = |x: f32, y: f32| {
-                            bounds.origin
-                                + gpui::point(bounds.size.width * x, bounds.size.height * y)
-                        };
-                        let mut path = gpui::PathBuilder::stroke(px(1.8));
-                        if open {
-                            path.move_to(at(0.2, 0.65));
-                            path.line_to(at(0.5, 0.35));
-                            path.line_to(at(0.8, 0.65));
-                        } else {
-                            path.move_to(at(0.2, 0.35));
-                            path.line_to(at(0.5, 0.65));
-                            path.line_to(at(0.8, 0.35));
-                        }
-                        if let Ok(path) = path.build() {
-                            window.paint_path(path, rgb(INK));
-                        }
-                    },
-                )
-                .size(px(16.))
-                .flex_shrink_0(),
-            )
-    }
-
     fn settings_browser(&self, cx: &mut Context<Self>) -> Div {
         let view = self.settings_browser_presentation();
         let attention = matches!(view.tone, Tone::Warning);
@@ -149,7 +107,7 @@ impl Shell {
             StatusIcon::Information
         };
         let enabled = self.control_enabled(Control::SetupRuntime, cx);
-        let mut section = controls::section(
+        let section = controls::section(
             "Private browser",
             "Used for website login and screenshots, separate from your system browser.",
         )
@@ -221,23 +179,19 @@ impl Shell {
                                 .child(view.action_help),
                         ),
                 ),
-        )
-        .child(self.settings_disclosure(Detail::Browser, "Browser details", cx));
-        if self.details.contains(&Detail::Browser) {
-            let mut details = div()
-                .debug_selector(|| "settings-browser-details".into())
-                .flex()
-                .flex_col()
-                .gap_2()
-                .text_size(px(13.))
-                .line_height(px(18.))
-                .text_color(rgb(MUTED));
-            if let Some(status) = &self.runtime_status {
-                details = details.child(status.clone());
-            }
-            section = section.child(details.child("Regressee uses its own verified browser components, not your system browser. Updating or repairing keeps saved screenshots and baselines. Checks still require the baseline’s matching browser components; capture a new baseline only if you choose."));
+        );
+        let mut details = div()
+            .debug_selector(|| "settings-browser-details".into())
+            .flex()
+            .flex_col()
+            .gap_2()
+            .text_size(px(13.))
+            .line_height(px(18.))
+            .text_color(rgb(MUTED));
+        if let Some(status) = &self.runtime_status {
+            details = details.child(status.clone());
         }
-        section
+        section.child(self.inline_disclosure(Control::Details(Detail::Browser), "Browser details", "", self.details.contains(&Detail::Browser), details.child("Regressee uses its own verified browser components, not your system browser. Updating or repairing keeps saved screenshots and baselines. Checks still require the baseline’s matching browser components; capture a new baseline only if you choose."), cx))
     }
 
     fn settings_storage(&self, cx: &mut Context<Self>) -> Div {
@@ -250,68 +204,69 @@ impl Shell {
         };
         section = section
             .child(self.setting_line("Saved projects", &summary.projects.to_string()))
-            .child(self.setting_line("Screenshots & data", &human_bytes(summary.artifact_bytes)))
-            .child(self.settings_disclosure(
-                Detail::LocalStorage,
-                "Storage locations & folder preview",
-                cx,
-            ));
-        if self.details.contains(&Detail::LocalStorage) {
-            section = section.child(
+            .child(self.setting_line("Screenshots & data", &human_bytes(summary.artifact_bytes)));
+        section.child(self.inline_disclosure(Control::Details(Detail::LocalStorage), "Storage locations", "", self.details.contains(&Detail::LocalStorage),
                 div().debug_selector(|| "settings-storage-details".into()).flex().flex_col().gap_3()
                     .child(storage_path("Project data", summary.paths.data.display().to_string()))
                     .child(storage_path("App cache", summary.paths.cache.display().to_string()))
-                    .child(settings_help(format!("{} stored files. Totals exclude the database and browser/login caches. Browser repair never deletes screenshot history.", summary.artifacts)))
-                    .child(div().border_t_1().border_color(rgb(LINE)).pt_3().flex().flex_col().gap_2()
-                        .child(div().font_weight(FontWeight::MEDIUM).child("Folder picker preview"))
-                        .child(settings_help(FOLDER_PREVIEW_HELP))
-                        .child(self.button(Control::ChooseFolder, FOLDER_PREVIEW_LABEL, ActionStyle::Secondary, cx))),
-            );
-        }
-        section
+                    .child(settings_help(format!("{} stored files. Totals exclude the database and browser/login caches. Browser repair never deletes screenshot history.", summary.artifacts))),
+            cx))
     }
 
     fn settings_network(&self, cx: &mut Context<Self>) -> Div {
-        let mut section = optional_group()
-            .debug_selector(|| "managed-network-section".into())
-            .child(self.settings_disclosure(Detail::ManagedNetwork, "Network settings", cx))
-            .child(settings_help(
-                "Optional · Only needed for a proxy server or custom trusted certificate.",
-            ));
-        if !self.form_errors(cx).is_empty() {
-            section = section.child(self.form_error_summary(cx));
-        }
+        let mut fields = div().w_full().flex().flex_col().gap_3();
         if self.details.contains(&Detail::ManagedNetwork) {
-            section = section
+            fields = fields
                 .child(self.crawl_field(17, "Proxy server (optional)", "Enter a server address such as http://proxy.example:3128, without login details. Leave blank to use your computer's network settings."))
                 .child(self.crawl_field(18, "Trusted certificate file (optional)", "Path to a PEM certificate file for downloads and website access. The browser must also trust this certificate through your computer's settings. Connection security checks stay enabled."))
                 .child(div().flex().flex_wrap().gap_2()
                     .when(self.network_status.is_none() && self.pending.is_none(), |el| el.child(self.guided_button(42, "Retry loading saved settings", cx)))
                     .child(self.guided_button(41, "Save network settings", cx)))
-                .child(settings_help(if self.network_status.is_some() { "Network settings loaded. Choose Save to apply any changes." } else { "Reading saved network settings…" }))
-                .child(self.button(Control::Details(Detail::Network), if self.details.contains(&Detail::Network) { "Hide network limitations" } else { "Network limitations" }, ActionStyle::Secondary, cx));
-            if self.details.contains(&Detail::Network) {
-                section = section
+                .child(settings_help(if self.network_status.is_some() { "Network settings loaded. Choose Save to apply any changes." } else { "Reading saved network settings…" }));
+            let limitations = div().flex().flex_col().gap_2()
                     .when_some(self.network_status.clone(), |el, status| el.child(settings_help(status)))
                     .child(div().debug_selector(|| "network-limitations-copy".into()).text_size(px(14.)).line_height(px(20.)).text_color(rgb(WARNING)).child("The development browser cannot read a website's robots.txt rules through a proxy. Only override these rules if you have permission. VPN and company networks are not fully tested. Custom certificates must also be trusted in your computer's browser settings. Connection security checks are never disabled."));
-            }
+            fields = fields.child(self.inline_disclosure(
+                Control::Details(Detail::Network),
+                "Network limitations",
+                "",
+                self.details.contains(&Detail::Network),
+                limitations,
+                cx,
+            ));
         }
-        section
+        optional_group()
+            .debug_selector(|| "managed-network-section".into())
+            .child(self.inline_disclosure(
+                Control::Details(Detail::ManagedNetwork),
+                "Network settings",
+                "Optional · Only needed for a proxy server or custom trusted certificate.",
+                self.details.contains(&Detail::ManagedNetwork),
+                fields,
+                cx,
+            ))
+            .when(!self.form_errors(cx).is_empty(), |section| {
+                section.child(self.form_error_summary(cx))
+            })
     }
 
     pub(super) fn app_settings(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut support = optional_group()
-            .debug_selector(|| "settings-support-tools".into())
-            .child(self.settings_disclosure(Detail::SupportTools, "Troubleshooting tools", cx))
-            .child(settings_help("Preview a support report or check saved data for interrupted saves and damaged files."));
+        let mut support_body = div().w_full().flex().flex_col().gap_4();
         if self.details.contains(&Detail::SupportTools) {
-            support = support
+            support_body = support_body
                 .child(self.diagnostic_panel(cx))
                 .child(div().flex().flex_col().gap_2()
                     .child(div().font_weight(FontWeight::MEDIUM).child("Check saved data"))
                     .child(settings_help("Looks for interrupted saves and damaged files. Review the results before choosing any cleanup; nothing is deleted by this check."))
                     .child(self.button(Control::Phase6(13), "Check saved data…", ActionStyle::Secondary, cx)));
         }
+        let support = optional_group().debug_selector(|| "settings-support-tools".into())
+            .child(self.inline_disclosure(Control::Details(Detail::SupportTools), "Troubleshooting tools", "Preview a support report or check saved data for interrupted saves and damaged files.", self.details.contains(&Detail::SupportTools), support_body, cx))
+            // Requested results remain available even if the optional tools are
+            // collapsed while the asynchronous saved-data check finishes.
+            .when(self.repair_preview.is_some(), |group| group.child(div().pl(px(32.)).flex().flex_col().gap_3()
+                .child(div().font_weight(FontWeight::MEDIUM).child("Saved-data check results"))
+                .child(self.portability_confirmation(cx))));
         div()
             .debug_selector(|| "app-settings-body".into())
             .w(px(680.))
@@ -330,7 +285,6 @@ impl Shell {
             .child(self.settings_storage(cx))
             .child(self.settings_network(cx))
             .child(support)
-            .child(self.portability_confirmation(cx))
             .child(
                 div()
                     .border_t_1()

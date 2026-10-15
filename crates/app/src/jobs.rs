@@ -108,6 +108,7 @@ pub enum Work {
     Activate {
         run: RunId,
         revision: u64,
+        confirm_partial: bool,
     },
     Reanalyze {
         run: RunId,
@@ -873,8 +874,16 @@ fn product_work(
                 )?;
                 Ok(Reply::Evidence(Box::new(store.project_evidence(project)?)))
             }
-            Work::Activate { run, revision } => Ok(Reply::Project(Box::new(
-                product.activate(store, run, revision)?,
+            Work::Activate {
+                run,
+                revision,
+                confirm_partial,
+            } => Ok(Reply::Project(Box::new(
+                store.activate_baseline_with_partial_confirmation(
+                    run,
+                    revision,
+                    confirm_partial,
+                )?,
             ))),
             #[cfg(feature = "ui")]
             Work::Viewer {
@@ -1464,6 +1473,7 @@ mod tests {
             Work::Activate {
                 run: RunId::new(),
                 revision: 1,
+                confirm_partial: false,
             },
             Work::Capture {
                 project,

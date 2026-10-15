@@ -72,15 +72,25 @@ pub(super) fn focus_outline(
 ) -> StyleRefinement {
     // GPUI 0.2.2 replaces Style.text wholesale, rather than recursively merging
     // it. Never set text_color (or any text property) in an interaction state.
-    // This is a functional focus outline, not decorative elevation. Its paint
-    // extends outside the existing 1px border without changing layout metrics.
+    // Functional focus paint, not elevation: a 3px ring separated from the
+    // control by a 2px contrasting gap. Both light/dark edges remain visible on
+    // filled actions, selection and the rail without changing layout or text.
     style = style.border_color(rgb(border));
-    style.box_shadow = Some(vec![BoxShadow {
-        color: rgb(outline).into(),
-        offset: point(px(0.), px(0.)),
-        blur_radius: px(0.),
-        spread_radius: px(2.),
-    }]);
+    let gap = if outline == RAIL_INK { RAIL } else { SURFACE };
+    style.box_shadow = Some(vec![
+        BoxShadow {
+            color: rgb(outline).into(),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(5.),
+        },
+        BoxShadow {
+            color: rgb(gap).into(),
+            offset: point(px(0.), px(0.)),
+            blur_radius: px(0.),
+            spread_radius: px(2.),
+        },
+    ]);
     style
 }
 
@@ -315,6 +325,131 @@ pub fn section(title: &'static str, help: &'static str) -> Div {
                     el.child(help_copy().max_w(px(660.)).child(help))
                 }),
         )
+}
+
+/// Inline expansion is not a selected value: a leading right/down marker and
+/// explicit Show/Hide replace the field-shaped trigger used by real selectors.
+pub fn disclosure_toggle(
+    id: impl Into<ElementId>,
+    title: impl Into<SharedString>,
+    focus: &FocusHandle,
+    open: bool,
+    enabled: bool,
+    section: bool,
+) -> Stateful<Div> {
+    let id = id.into();
+    let action_selector = id.clone();
+    let title_selector = id.clone();
+    let state_selector = id.clone();
+    interaction(
+        div()
+            .id(id)
+            .w_full()
+            .min_w_0()
+            .min_h(px(CONTROL_HEIGHT))
+            .flex_shrink_0()
+            .px(px(8.))
+            .py(px(8.))
+            .border_1()
+            .border_color(gpui::transparent_black())
+            .rounded(px(4.))
+            .flex()
+            .items_start()
+            .gap(px(8.))
+            .text_color(rgb(INK))
+            .text_size(px(if section { 18. } else { CONTROL_TEXT_SIZE }))
+            .line_height(px(if section { 24. } else { CONTROL_LINE_HEIGHT }))
+            .font_weight(FontWeight::SEMIBOLD),
+        focus,
+        enabled,
+        ACTION_HOVER,
+    )
+    // Preserve action selectors so native focus/reveal probes measure the same
+    // complete interactive bounds for both ordinary actions and disclosures.
+    .debug_selector(move || format!("action-{action_selector}"))
+    .child(
+        div()
+            .flex_shrink_0()
+            .pt(px(if section { 4. } else { 2. }))
+            .child(
+                canvas(
+                    |_, _, _| (),
+                    move |bounds, _, window, _| {
+                        let at = |x: f32, y: f32| {
+                            bounds.origin + point(bounds.size.width * x, bounds.size.height * y)
+                        };
+                        let mut path = PathBuilder::stroke(px(1.8));
+                        if open {
+                            path.move_to(at(0.2, 0.35));
+                            path.line_to(at(0.5, 0.65));
+                            path.line_to(at(0.8, 0.35));
+                        } else {
+                            path.move_to(at(0.35, 0.2));
+                            path.line_to(at(0.65, 0.5));
+                            path.line_to(at(0.35, 0.8));
+                        }
+                        if let Ok(path) = path.build() {
+                            window.paint_path(path, rgb(INK));
+                        }
+                    },
+                )
+                .size(px(16.)),
+            ),
+    )
+    .child(
+        div()
+            .debug_selector(move || format!("disclosure-title-{title_selector}"))
+            .min_w_0()
+            .flex_1()
+            .flex()
+            .flex_col()
+            .child(title.into()),
+    )
+    .child(
+        help_copy()
+            .debug_selector(move || format!("disclosure-state-{state_selector}"))
+            .flex_shrink_0()
+            .pt(px(if section { 3. } else { 1. }))
+            .child(if open { "Hide" } else { "Show" }),
+    )
+}
+
+/// One subtree owns header, persistent help and revealed content. There is no
+/// separator or new scroll owner between the trigger and its indented body.
+pub fn disclosure_group(
+    id: impl Into<SharedString>,
+    trigger: AnyElement,
+    help: impl Into<SharedString>,
+    body: Option<AnyElement>,
+) -> Div {
+    let id = id.into();
+    let body_id = id.clone();
+    let help = help.into();
+    div()
+        .debug_selector(move || format!("disclosure-group-{id}"))
+        .w_full()
+        .min_w_0()
+        .flex_shrink_0()
+        .flex()
+        .flex_col()
+        .gap(px(4.))
+        .child(trigger)
+        .when(!help.is_empty(), |group| {
+            group.child(help_copy().pl(px(32.)).child(help))
+        })
+        .when_some(body, |group, body| {
+            group.child(
+                div()
+                    .debug_selector(move || format!("disclosure-body-{body_id}"))
+                    .w_full()
+                    .min_w_0()
+                    .flex_shrink_0()
+                    .pl(px(32.))
+                    .pt(px(8.))
+                    .pb(px(8.))
+                    .child(body),
+            )
+        })
 }
 #[derive(Clone, Copy)]
 pub enum Tone {
@@ -597,6 +732,140 @@ pub fn empty(title: &'static str, explanation: &'static str) -> Div {
                 .child(explanation),
         )
 }
+
+/// Reserve the screenshot stage when its image is missing. The message centers
+/// in spare space, but grows from the top and scrolls when it exceeds the stage.
+pub fn image_placeholder(
+    title: &'static str,
+    explanation: impl Into<SharedString>,
+    help: &'static str,
+    tone: Tone,
+    scroll: &ScrollHandle,
+    stage_width: f32,
+) -> Div {
+    let scrollbar = scroll.clone();
+    // Measure wrapped text at its final width. Percentage/max-width sizing can
+    // otherwise underreport the message height and scroll extent in GPUI.
+    let message_width = (stage_width - 50.).clamp(1., 440.);
+    div()
+        .debug_selector(|| "screenshot-placeholder".into())
+        .w_full()
+        .min_w_0()
+        .flex_1()
+        .min_h_0()
+        .flex()
+        .flex_col()
+        .overflow_hidden()
+        .border_1()
+        .border_color(rgb(LINE))
+        .bg(rgb(SURFACE))
+        .child(
+            div()
+                .id("screenshot-placeholder-scroll")
+                .debug_selector(|| "screenshot-placeholder-scroll".into())
+                .track_scroll(scroll)
+                .w_full()
+                .min_w_0()
+                .flex_1()
+                .min_h_0()
+                .overflow_y_scroll()
+                .p(px(24.))
+                .flex()
+                .flex_col()
+                .items_center()
+                .child(
+                    div()
+                        .debug_selector(|| "screenshot-placeholder-message".into())
+                        .w(px(message_width))
+                        .my_auto()
+                        .flex_shrink_0()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .gap(px(16.))
+                        .text_center()
+                        .child(
+                            div()
+                                .debug_selector(|| "screenshot-placeholder-icon".into())
+                                .size(px(48.))
+                                .flex_shrink_0()
+                                .child(status_icon(
+                                    StatusIcon::MissingImage,
+                                    if matches!(tone, Tone::Error) {
+                                        ERROR
+                                    } else {
+                                        MUTED
+                                    },
+                                    48.,
+                                )),
+                        )
+                        .child(
+                            div()
+                                .w_full()
+                                .min_w_0()
+                                .flex_shrink_0()
+                                .flex()
+                                .flex_col()
+                                .gap(px(8.))
+                                .child(
+                                    div()
+                                        .debug_selector(|| "screenshot-placeholder-title".into())
+                                        .text_size(px(18.))
+                                        .line_height(px(24.))
+                                        .font_weight(FontWeight::SEMIBOLD)
+                                        .text_color(rgb(INK))
+                                        .child(title),
+                                )
+                                .child(
+                                    div()
+                                        .debug_selector(|| "screenshot-placeholder-reason".into())
+                                        .text_size(px(14.))
+                                        .line_height(px(20.))
+                                        .text_color(rgb(INK))
+                                        .child(explanation.into()),
+                                ),
+                        )
+                        .child(
+                            help_copy()
+                                .debug_selector(|| "screenshot-placeholder-help".into())
+                                .w_full()
+                                .flex_shrink_0()
+                                .pt(px(16.))
+                                .border_t_1()
+                                .border_color(rgb(LINE))
+                                .child(help),
+                        ),
+                ),
+        )
+        .child(
+            canvas(
+                |_, _, _| (),
+                move |_, _, window, _| {
+                    let viewport = scrollbar.bounds();
+                    let overflow = f32::from(scrollbar.max_offset().height);
+                    let height = f32::from(viewport.size.height) - 8.;
+                    if overflow <= 0. || height <= 0. {
+                        return;
+                    }
+                    let thumb = (height * height / (height + overflow)).max(24.).min(height);
+                    let progress = (-f32::from(scrollbar.offset().y) / overflow).clamp(0., 1.);
+                    window.paint_quad(fill(
+                        Bounds::new(
+                            point(
+                                viewport.right() - px(6.),
+                                viewport.top() + px(4. + progress * (height - thumb)),
+                            ),
+                            size(px(4.), px(thumb)),
+                        ),
+                        rgb(CONTROL_LINE),
+                    ));
+                },
+            )
+            .h(px(0.))
+            .w_full(),
+        )
+}
+
 pub fn field(label: &'static str, hint: &'static str, input: AnyElement) -> Div {
     div()
         .debug_selector(move || format!("field-{label}"))
@@ -1097,37 +1366,16 @@ pub fn progress(label: impl Into<SharedString>, completed: u32, total: Option<u3
 }
 /// Protected information dialog only. Root shell traps/restores focus and Escape.
 pub fn dialog(title: impl IntoElement, body: &'static str, close: AnyElement) -> Div {
-    div()
+    super::dialog::overlay()
         .debug_selector(|| "information-dialog-overlay".into())
-        .occlude()
-        .absolute()
-        .inset_0()
-        .flex()
-        .items_center()
-        .justify_center()
-        .p_4()
-        .bg(rgba((INK << 8) | 0x66))
         .child(
-            div()
+            super::dialog::surface(520.)
                 .debug_selector(|| "information-dialog".into())
-                .w(px(480.))
-                .max_w_full()
-                .max_h_full()
-                .min_h_0()
                 .p_6()
-                .bg(rgb(SURFACE))
-                .border_1()
-                .border_color(rgb(CONTROL_LINE))
-                .rounded(px(4.))
-                .flex()
-                .flex_col()
                 .gap_4()
                 .child(
-                    div()
+                    super::dialog::heading()
                         .debug_selector(|| "information-dialog-title".into())
-                        .flex_shrink_0()
-                        .text_size(px(21.))
-                        .font_weight(FontWeight::SEMIBOLD)
                         .child(title),
                 )
                 .child(
@@ -1135,18 +1383,18 @@ pub fn dialog(title: impl IntoElement, body: &'static str, close: AnyElement) ->
                         .id("information-dialog-body")
                         .debug_selector(|| "information-dialog-body".into())
                         .min_h_0()
-                        .max_h(px(320.))
+                        .max_h(px(360.))
                         .overflow_y_scroll()
                         .text_color(rgb(MUTED))
-                        .text_size(px(14.))
-                        .line_height(px(20.))
+                        .text_size(px(15.))
+                        .line_height(px(22.))
                         .child(
                             div()
                                 .debug_selector(|| "information-dialog-copy".into())
                                 .child(body),
                         ),
                 )
-                .child(div().flex_shrink_0().child(close)),
+                .child(super::dialog::footer().child(close)),
         )
 }
 
@@ -1259,8 +1507,19 @@ mod tests {
                         _ => INK,
                     };
                     assert_eq!(merged.border_color, Some(rgb(border).into()));
-                    assert_eq!(merged.box_shadow.len(), 1);
-                    assert_eq!(merged.box_shadow[0].spread_radius, px(2.));
+                    assert_eq!(merged.box_shadow.len(), 2);
+                    assert_eq!(merged.box_shadow[0].spread_radius, px(5.));
+                    assert_eq!(merged.box_shadow[1].spread_radius, px(2.));
+                    let gap = match variant {
+                        ActionStyle::Navigation { .. } => RAIL,
+                        _ => SURFACE,
+                    };
+                    assert_eq!(merged.box_shadow[1].color, rgb(gap).into());
+                    let ring = match variant {
+                        ActionStyle::Navigation { .. } => RAIL_INK,
+                        _ => INK,
+                    };
+                    assert!(contrast(ring, gap) >= 3.);
                 }
                 if matches!(variant, ActionStyle::Primary) {
                     assert_eq!(inherited_text(&merged).color, rgb(SURFACE).into());
@@ -1474,6 +1733,51 @@ mod ui_tests {
     use gpui::TestAppContext;
 
     const SELECTORS: [&str; 5] = ["primary", "secondary", "danger", "radio", "checkbox"];
+
+    struct MissingImageView(ScrollHandle);
+
+    impl Render for MissingImageView {
+        fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .flex()
+                .flex_col()
+                .font_family(FONT)
+                .child(image_placeholder(
+                "Screenshot unavailable",
+                "A deliberately long diagnostic must scroll without losing the recovery message. "
+                    .repeat(20),
+                "Use Refresh to read the saved screenshot again. Your baseline is unchanged.",
+                Tone::Error,
+                &self.0,
+                f32::from(window.viewport_size().width),
+            ))
+        }
+    }
+
+    #[gpui::test]
+    fn missing_image_message_scrolls_within_a_fixed_frame(cx: &mut TestAppContext) {
+        let (_, cx) = cx.add_window_view(|_, _| MissingImageView(ScrollHandle::new()));
+        cx.simulate_resize(size(px(360.), px(240.)));
+        cx.run_until_parked();
+        let frame = cx.debug_bounds("screenshot-placeholder").unwrap();
+        assert_eq!(frame.size, size(px(360.), px(240.)));
+        let viewport = cx.debug_bounds("screenshot-placeholder-scroll").unwrap();
+        let before = cx.debug_bounds("screenshot-placeholder-help").unwrap();
+        assert!(before.bottom() > viewport.bottom());
+        cx.simulate_event(ScrollWheelEvent {
+            position: viewport.center(),
+            delta: ScrollDelta::Pixels(point(px(0.), px(-10000.))),
+            ..Default::default()
+        });
+        cx.run_until_parked();
+        let help = cx.debug_bounds("screenshot-placeholder-help").unwrap();
+        assert!(
+            help.top() >= viewport.top() && help.bottom() <= viewport.bottom(),
+            "{help:?} outside {viewport:?}"
+        );
+        assert_eq!(cx.debug_bounds("screenshot-placeholder").unwrap(), frame);
+    }
 
     struct NavigationView {
         focus: FocusHandle,
@@ -1777,6 +2081,61 @@ mod ui_tests {
                 } else {
                     assert_eq!(cx.debug_bounds("progress-indeterminate").unwrap(), track);
                 }
+            }
+        }
+    }
+
+    struct DisclosureView {
+        focus: FocusHandle,
+        open: bool,
+        enabled: bool,
+        width: f32,
+    }
+
+    impl Render for DisclosureView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div().w(px(self.width)).child(disclosure_group("probe",
+                disclosure_toggle("probe", "An optional section with a deliberately long wrapping title", &self.focus, self.open, self.enabled, false).into_any_element(),
+                "This explanation belongs to the section, even when its contents are hidden.",
+                self.open.then(|| div().debug_selector(|| "disclosure-probe-content".into()).w_full().min_w_0().child("Related content stays under its heading and wraps inside the available width.").into_any_element()),
+            ))
+        }
+    }
+
+    #[gpui::test]
+    fn disclosure_long_titles_keep_state_text_and_indented_content_in_bounds(
+        cx: &mut TestAppContext,
+    ) {
+        let (view, cx) = cx.add_window_view(|_, cx| DisclosureView {
+            focus: cx.focus_handle(),
+            open: true,
+            enabled: true,
+            width: 240.,
+        });
+        for width in [240., 294., 552., 680.] {
+            view.update(cx, |v, cx| {
+                v.width = width;
+                cx.notify();
+            });
+            cx.run_until_parked();
+            let header = cx.debug_bounds("action-probe").unwrap();
+            let title = cx.debug_bounds("disclosure-title-probe").unwrap();
+            let state = cx.debug_bounds("disclosure-state-probe").unwrap();
+            let content = cx.debug_bounds("disclosure-probe-content").unwrap();
+            assert_eq!(header.size.width, px(width));
+            assert!(header.size.height >= px(CONTROL_HEIGHT));
+            assert!(title.right() < state.left());
+            assert!(state.right() <= header.right());
+            assert!((content.left() - title.left()).abs() <= px(1.));
+            assert!(content.right() <= header.right());
+            for enabled in [false, true] {
+                view.update(cx, |v, cx| {
+                    v.enabled = enabled;
+                    cx.notify();
+                });
+                cx.update(|window, cx| view.read(cx).focus.focus(window));
+                cx.run_until_parked();
+                assert_eq!(header, cx.debug_bounds("action-probe").unwrap());
             }
         }
     }

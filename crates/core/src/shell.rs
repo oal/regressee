@@ -183,11 +183,12 @@ pub enum Control {
     CancelProjectChoice,
     PreviousPage,
     NextPage,
-    ChooseFolder,
     About,
+    AboutRepository,
     CloseDialog,
     CaptureBaseline,
     SaveBaseline,
+    ReviewCaptureFailures,
     CheckChanges,
     CancelCapture,
     SetupRuntime,
@@ -226,6 +227,7 @@ pub enum Control {
     CloseMappingPreview,
     DiscardPageList,
     ImageControls,
+    CopyCaptureDiagnostics,
 }
 #[derive(Debug, Clone)]
 pub struct FocusState {
@@ -290,7 +292,8 @@ impl FocusState {
     }
     pub fn controls(&self) -> Vec<Control> {
         if self.dialog {
-            return vec![Control::CloseDialog];
+            // The native shell filters the repository link out of keyboard help.
+            return vec![Control::AboutRepository, Control::CloseDialog];
         }
         if self.approval_dialog {
             return vec![
@@ -302,6 +305,11 @@ impl FocusState {
             ];
         }
         let mut controls: Vec<_> = Screen::ALL.into_iter().map(Control::Navigate).collect();
+        if self.busy && self.screen == Screen::Settings {
+            // Read-only app information remains available during background reads,
+            // alongside keyboard help and in the same order as the footer.
+            controls.push(Control::About);
+        }
         if self.screen != Screen::Settings || self.busy {
             controls.push(Control::Shortcuts);
         }
@@ -444,7 +452,6 @@ impl FocusState {
                     Control::SetupRuntime,
                     Control::Details(Detail::Browser),
                     Control::Details(Detail::LocalStorage),
-                    Control::ChooseFolder,
                     Control::Details(Detail::ManagedNetwork),
                     Control::ValidationNext,
                     Control::CrawlField(17),
@@ -511,11 +518,13 @@ impl FocusState {
                     controls.push(Control::Details(Detail::Analysis));
                     controls.extend([12, 13].map(Control::Phase5));
                     controls.extend((20..26).chain([32, 33, 36, 37, 38]).map(Control::Phase5));
+                    controls.push(Control::CopyCaptureDiagnostics);
                     controls.push(Control::AnalysisField(9));
                 }
                 if self.candidate {
                     controls.push(Control::SaveBaseline);
                 }
+                controls.push(Control::ReviewCaptureFailures);
                 if self.baseline {
                     controls.push(Control::CheckChanges);
                 }
@@ -554,30 +563,47 @@ impl FocusState {
             });
         }
         if self.screen == Screen::Results {
-            controls.sort_by_key(|control| match control {
-                Control::Guided(53) => 0,
-                Control::Navigate(_)
-                | Control::ChooseProject
-                | Control::CancelProjectChoice
-                | Control::PagesBaseline
-                | Control::DismissFeedback => 1,
-                Control::Guided(50 | 51 | 45 | 16..=24)
-                | Control::CrawlField(9)
-                | Control::Choice(_)
-                | Control::CloseOptions
-                | Control::DiscoveryDetails => 2,
-                Control::DiscardPageList => 2,
-                Control::Guided(54) => 3,
-                Control::Phase5(6..=9) | Control::Guided(55..=57) => 4,
-                Control::Guided(46)
-                | Control::ImageControls
-                | Control::Phase5(36)
-                | Control::Guided(44)
-                | Control::Viewer => 5,
-                Control::Phase5(20..=22) => 7,
-                Control::Phase5(37 | 33) => 8,
-                Control::Phase5(23..=25) => 9,
-                _ => 6,
+            controls.sort_by_key(|control| {
+                let group = match control {
+                    Control::SaveBaseline
+                    | Control::ReviewCaptureFailures
+                    | Control::CheckChanges
+                    | Control::CaptureBaseline
+                    | Control::RefreshEvidence => 1,
+                    Control::Guided(53) => 0,
+                    Control::Navigate(_)
+                    | Control::ChooseProject
+                    | Control::CancelProjectChoice
+                    | Control::PagesBaseline
+                    | Control::DismissFeedback => 1,
+                    Control::Guided(50 | 51 | 45 | 16..=24)
+                    | Control::CrawlField(9)
+                    | Control::Choice(_)
+                    | Control::CloseOptions
+                    | Control::DiscoveryDetails => 2,
+                    Control::DiscardPageList => 2,
+                    Control::Guided(54) => 3,
+                    Control::Phase5(6..=9) | Control::Guided(55..=57) => 4,
+                    Control::Guided(46)
+                    | Control::ImageControls
+                    | Control::Phase5(36)
+                    | Control::Guided(44)
+                    | Control::Viewer => 5,
+                    Control::Phase5(20..=22) => 7,
+                    Control::Phase5(37 | 33) => 8,
+                    Control::Phase5(23..=25) => 9,
+                    _ => 6,
+                };
+                // The task heading's actions precede the queue, in painted order.
+                let action = match control {
+                    Control::SaveBaseline => 1,
+                    Control::ReviewCaptureFailures => 2,
+                    Control::CheckChanges => 3,
+                    Control::CaptureBaseline => 4,
+                    Control::RefreshEvidence => 5,
+                    _ => 0,
+                };
+                (group, action)
             });
         }
         controls
@@ -604,6 +630,35 @@ impl FocusState {
 mod tests {
     use super::*;
     #[test]
+    fn busy_settings_keep_about_and_keyboard_help_without_unlocking_mutations() {
+        let mut state = FocusState {
+            screen: Screen::Settings,
+            busy: true,
+            ..Default::default()
+        };
+        for busy in [true, false] {
+            state.busy = busy;
+            assert!(state.can_activate(Control::About));
+            assert!(state.can_activate(Control::Shortcuts));
+            assert_eq!(state.next(Control::About, false), Some(Control::Shortcuts));
+            assert_eq!(state.next(Control::Shortcuts, true), Some(Control::About));
+        }
+        state.busy = true;
+        for control in [
+            Control::SetupRuntime,
+            Control::Save,
+            Control::Guided(41),
+            Control::CaptureBaseline,
+            Control::Phase6(14),
+        ] {
+            assert!(!state.can_activate(control), "{control:?}");
+        }
+        state.dialog = true;
+        assert!(!state.can_activate(Control::About));
+        assert!(!state.can_activate(Control::Shortcuts));
+    }
+
+    #[test]
     fn history_rows_are_bounded_distinct_and_modal_safe() {
         let mut state = FocusState {
             screen: Screen::History,
@@ -628,7 +683,10 @@ mod tests {
         assert!(!state.can_activate(Control::HistoryRefresh));
         state.busy = false;
         state.dialog = true;
-        assert_eq!(state.controls(), vec![Control::CloseDialog]);
+        assert_eq!(
+            state.controls(),
+            [Control::AboutRepository, Control::CloseDialog]
+        );
     }
     #[test]
     fn approval_decision_traps_navigation_and_mutations_until_dismissed() {
@@ -831,7 +889,10 @@ mod tests {
             dialog: true,
             ..Default::default()
         };
-        assert_eq!(s.controls(), [Control::CloseDialog]);
+        assert_eq!(
+            s.controls(),
+            [Control::AboutRepository, Control::CloseDialog]
+        );
         assert!(!s.can_activate(Control::NewProject));
         s.dialog = false;
         assert!(s.can_activate(Control::NewProject));
@@ -869,7 +930,10 @@ mod tests {
             assert!(!s.can_activate(control));
         }
         s.dialog = true;
-        assert_eq!(s.controls(), [Control::CloseDialog]);
+        assert_eq!(
+            s.controls(),
+            [Control::AboutRepository, Control::CloseDialog]
+        );
         s.dialog = false;
         s.screen = Screen::Setup;
         assert!(!s.can_activate(Control::CrawlField(9)));

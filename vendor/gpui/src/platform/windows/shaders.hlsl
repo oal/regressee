@@ -862,6 +862,12 @@ ShadowVertexOutput shadow_vertex(uint vertex_id: SV_VertexID, uint shadow_id: SV
 float4 shadow_fragment(ShadowFragmentInput input): SV_TARGET {
     Shadow shadow = shadows[input.shadow_id];
 
+    // Match Metal's hard-edge path; sigma=0 is not a valid Gaussian kernel.
+    if (shadow.blur_radius == 0.) {
+        float distance = quad_sdf(input.position.xy, shadow.bounds, shadow.corner_radii);
+        return input.color * float4(1., 1., 1., saturate(0.5 - distance));
+    }
+
     float2 half_size = shadow.bounds.size / 2.;
     float2 center = shadow.bounds.origin + half_size;
     float2 point0 = input.position.xy - center;

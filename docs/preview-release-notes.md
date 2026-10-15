@@ -1,6 +1,7 @@
-# Project settings wayfinding test preview
+# Clearer expandable sections test preview
 
-This preview adds clearer Project settings navigation and includes the earlier
+This preview makes expandable sections distinct from selection menus and includes
+the latest browser recovery, capture and settings improvements, plus the earlier
 whole-app UI implementation and feasible validation from Phases 1–7 on
 2026-10-12–13. It remains an **unsigned experimental prerelease**, not a supported
 release. The release's source commit and each archive's `build-info.json` identify
@@ -8,6 +9,27 @@ the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
 
+- Optional sections now use leading disclosure arrows and explicit **Show / Hide**
+  labels throughout settings, setup, analysis, History and confirmation previews.
+  Revealed content is indented directly under its heading, without a divider that
+  makes it look like a separate section. True selection menus remain unchanged.
+- Expanding a section brings its heading and the start of its content into view.
+  Collapsing restores focus to the heading and preserves drafts. Task details now
+  opens beside its content rather than from the unrelated action footer.
+- Troubleshooting keeps support-report tools together. Requested saved-data check
+  results stay available even if the optional tools are subsequently collapsed.
+- Enter and Space activate controls once per full key press, without immediately
+  reversing an expansion or closing a newly opened dialog. Keyboard focus has a
+  stronger contrasting outline, including a Linux renderer correction.
+- Confirmations, About, keyboard help and task dialogs share consistent styling
+  while keeping safe initial focus and explicit consent. About includes the
+  repository link; external links have clearer hover feedback and compact hints.
+- Browser setup failures retain useful local diagnostics and name the failed step.
+  Missing screenshots have a clear, bounded explanation and recovery guidance.
+- A partially successful baseline capture can be saved with explicit confirmation
+  of skipped screenshots. Future checks retain its reduced, truthful coverage.
+- Storage locations show the actual data and cache paths; the unused folder-picker
+  preview has been removed. About and keyboard help remain explicit actions.
 - Project settings now keeps a labelled **Jump to** row visible for Website,
   Capture plan, and Access & environments. It is one continuous form with one
   explicit Save action, not separate tabs.

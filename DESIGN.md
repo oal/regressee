@@ -332,6 +332,35 @@ before dispatch, with backend revision/reference protections retained. This is
 simulated controller and Linux offscreen-layout evidence, not OS-input or native
 accessibility qualification; see `docs/research/page-list-recovery-20261014.md`.
 
+### Shared dialogs — 2026-10-15
+
+All in-app confirmations, information dialogs, selective baseline approvals and
+task dialogs share `ui::dialog`'s white surface, control boundary, 4px corners,
+16px window clearance and ink-colored scrim. Content uses 24px insets, 16px
+section gaps, a 21px/28px semibold heading and 15px/22px body copy. Actions use
+the existing 40px-minimum shared controls, with a ruled, pinned footer. Task
+workspaces retain their larger page headings; their modal variants use dialog
+heading metrics. Information dialogs cap at 520px wide, confirmations at 560px;
+task and approval dialogs retain their task-appropriate bounded dimensions.
+Keyboard help fits its 360px reading body at the supported minimum window.
+
+GPUI's unstyled fallback is replaced with the app-owned prompt renderer on all
+desktop targets; OS file pickers remain native. Confirmation call sites declare
+Cancel (secondary), Ok (teal primary) or destructive warning actions (error ink
+and surface), rather than guessing roles from labels. Cancel/Keep reviewing
+receives initial focus, including selective approval. Tab/Shift-Tab wrap in
+painted order, Enter/Space activate only the focused choice, Escape selects the
+safe dismissal and the original trigger regains focus. Backdrop clicks do not
+confirm or dismiss. Three-way quit places Discard, Cancel, Save in that order
+without changing the returned answer indices or existing save/exit guards.
+Long confirmation prose scrolls independently with an overflow-only interactive
+scrollbar, wheel and keyboard scrolling; actions stay visible. Existing consent
+copy, snapshot checks and background mutation boundaries are preserved.
+
+Scoped verification and qualification limits:
+`docs/research/shared-dialogs-20261015.md`. No new palette tokens, decorative
+assets or shipping rasters were introduced.
+
 ## Elevation & Depth
 
 Flat tonal layering and precise boundaries, not decorative shadows. GPUI's
@@ -386,7 +415,10 @@ related gap (8px) and `brand-wordmark` system type in `rail-ink`. About keeps th
 horizontal `lockup()`, logo width (36px), proportional painted height
 (approximately 22px), height reservation (24px), related gap (8px) and existing
 `title` system type in `ink`. Navigation retains the existing rail width and
-About the existing dialog structure. Derived PNGs are transparent RGBA
+About the existing dialog structure. Exclusive task workspaces (finding pages,
+capturing screenshots, checking for changes and browser setup) use the same
+`navigation_lockup()` in their 192px rail, not a separate text-only heading.
+Derived PNGs are transparent RGBA
 (294×180px), with shared padding crop and Lanczos downsampling only; no
 recoloring or artwork changes.
 Compile-time embedded bytes and cached `Arc<Image>` identities let GPUI decode
@@ -463,17 +495,63 @@ Primary keeps its filled teal identity through focus; danger uses error ink and
 surface, never primary fill. Secondary hover uses `action-hover`. Focus is distinct
 from selection: ordinary actions use ink outlines, rail navigation a white outer
 outline with a dark inner border on its selected light surface. Disabled controls
-fade, leave the focus model and reject activation. Shared outlines extend (2px)
-without changing layout or replacing inherited GPUI text refinements.
+fade, leave the focus model and reject activation. Shared focus rings use a
+3px outline beyond a 2px contrasting gap (5px total extent): ink/white on light
+surfaces, white/navy on the rail. Focus remains visible through hover without
+changing layout, selection, primary/danger identity or inherited GPUI text.
 Keyboard reveal measures complete bordered choice/check/action rows, not their
 padded content alone. Disclosure focus handles are distinct from project rows.
 
+**Keyboard activation repair — 2026-10-15.** Shell Enter/Space key bindings are
+the single keyboard activation owner; click wiring accepts pointer clicks only.
+GPUI's synthesized key-release click must not re-toggle a section, undo a check
+or activate the newly focused Close button after opening a dialog. Text spaces,
+explicit saves, disabled/mounted guards and selector-owned keys are unchanged.
+The Linux Blade shader handles zero-blur outlines explicitly rather than
+evaluating a zero-width Gaussian. Full press/release tests and source-bound
+offscreen focus pixels are recorded in `docs/research/keyboard-focus-20261015.md`;
+these do not establish OS-input or assistive-technology qualification.
+
+**Inline expandable sections — 2026-10-15.** Optional content uses a shared
+disclosure heading, not the bordered field shape or trailing chevron of a select.
+A native-drawn leading chevron points right when closed and down when open;
+the stable title is paired with explicit **Show / Hide** text. Neutral headers
+have a 40px minimum target, wrapping titles, existing hover treatment and visible
+focus. App-settings section headers use 18px/24px; compact nested headings use
+14px/20px. Selection tint means selection, not expansion.
+
+Header, persistent explanation and expanded body share one layout owner. Help
+and content align below the title with a 32px marker gutter; 4px separates related
+rows and the body uses an 8px inset above/below. Section rules belong before
+independent groups, never between a disclosure and its first child. Ordinary
+expanded content stays in its existing screen/inspector/dialog scroller. Expansion
+reveals the heading with the beginning of the body; collapse restores its focus
+without saving or discarding drafts. Independent sections remain independently
+openable. Real timezone/zoom/View selectors and bounded flyouts keep their
+selection, keyboard and dismissal behavior.
+
+This pattern covers App settings, capture/setup options, ignored areas, advanced
+analysis, metrics, capture diagnostics, History, exact preview details, baseline
+source details, page-search details and task details. Task details is located
+above its content in the reading body, while Stop/Pause/Continue remain pinned.
+Requested saved-data check results remain available under Troubleshooting even
+after its optional tools collapse. Support-report children no longer start a new
+ruled section or outrank their owner. No new colors, rasters, motion, backend
+operations or approval permissions are introduced. Verification and its native
+qualification limits are recorded in `docs/research/disclosures-20261015.md`.
+
 **Links.** Presented website/page addresses that offer navigation must be real
 links: teal accent ink plus an underline at rest, a pointer cursor, visible
-keyboard focus and Tab/Enter activation. Do not rely on color or hover alone, and
+keyboard focus and Tab/Enter activation. Hover/press changes only the link ink to
+`ink` and thickens its underline from 1px to 2px, never filling its row or changing
+text metrics. Do not rely on color or hover alone, and
 never make ordinary noninteractive text look like a link. External page links
 open the OS default browser only on activation; capture-session credentials are
-not transferred. Truncated addresses disclose the full destination on hover.
+not transferred. Link hints say **Open in default browser**, without repeating
+the URL. They fit the text (13px/18px, 8px horizontal and 6px vertical insets),
+appear after the standard 500ms delay, and stay at the resting pointer with a 12px
+clearance. They flip inside window edges, rather than chasing the cursor or
+covering the link. Website settings and page details retain complete addresses.
 Only complete HTTP(S) addresses without embedded credentials are openable;
 unsupported schemes remain plain data. Editable URL fields, literal code and raw
 diagnostics are not automatically linkified. Task context and gap links share
@@ -513,6 +591,15 @@ phases. Exact source records and diagnostics remain in their named disclosures.
 The existing palette, controls, editing limits and explicit mutation boundaries
 are preserved. Copy regression coverage lives in `ux_copy_tests.rs` and the exact
 note-save/editor/quit tests.
+
+**No-op controls — 2026-10-15.** App settings exposes actual data/cache paths under
+**Storage locations**. The former folder-picker preview and its activation/focus
+wiring are removed: choosing an unused path is not a product task. Do not expose
+picker demos, disabled future features or success notices without a useful result.
+Keep genuine previews that inspect real data, capture a sample, or lead to an
+explicit import/export/baseline/cleanup decision. The existing settings hierarchy,
+native controls, palette and keyboard reveal remain unchanged; no new tokens or
+shipping rasters. See `docs/research/no-op-controls-20261015.md`.
 
 **Feedback and progress.** Dismiss belongs inside the feedback surface, centered
 beside the message. Long diagnostics scroll within a bounded area; errors retain
@@ -595,6 +682,23 @@ operation-specific recovery, with full available diagnostics separate. Installer
 recovery follows its actual stage. Updating does not make an old baseline
 automatically comparable: checks still require matching browser components.
 
+**Partial baseline recovery — 2026-10-15.** A finished baseline capture with at
+least one successful screenshot keeps **Save baseline…** available even when
+other captures failed. The compact amber next step states actual saved/intended
+counts and the option to skip missing screenshots; **Review failures** filters
+the queue without changing inspection or drafts. Explicit native confirmation
+names saved/skipped counts, exclusion from future checks, replacement consequences
+and retained History. Keep reviewing never saves. After saving, **Run check** is
+the primary next action; coverage remains truthful without repeating the warning
+across several persistent surfaces. Checks visit exactly the saved page/size
+pairs, with reduced baseline coverage visible in subsequent results and History.
+Original discovery, failed outcomes and prior versions are retained. Empty,
+unfinished, interrupted, cancelled, preview and check runs remain ineligible;
+corrupt evidence and stale revisions still fail closed. This separate whole-
+baseline workflow does not approve failed evidence or loosen selective approval.
+No new tokens or shipping rasters. See `docs/research/partial-baseline-20261015.md`
+for scoped tests, native offscreen evidence and qualification limits.
+
 **Comparison and approval.** Coverage comes from actual inventory, captures and
 current analysis, including missing and unclassified evidence. Preserve before/
 after origins, screen size, warnings, sensitivity and ignored-area revisions.
@@ -640,6 +744,13 @@ visible. One concise next action replaces repeated cautions; exact context/URLs
 are disclosed in Details. The default summary names the page, screen size,
 capture status, readable UTC run time and recovery advice. Exact IDs, source
 records and descriptors are opt-in Technical diagnostics, not default copy.
+Technical diagnostics uses ruled, labelled groups and indented monospace JSON
+instead of Rust debug output. Dates show UTC with the exact Unix seconds retained;
+missing records are explicit, never inferred from current settings. An expanded
+diagnostics panel pins **Copy diagnostics** and a full-URL/settings sharing caution
+below its one reading scroller. Copy takes the complete report, including offscreen
+records, and confirms inline without moving the button. It does not save, export
+files, run a capture, alter evidence or replace the privacy-filtered support report.
 Single-image captions combine capture identity
 and screen size, with one origin line.
 Keyboard ignored-area creation/editing uses original integer coordinates, explicit
@@ -752,6 +863,18 @@ Failure headings name the known problem, with the operation retained in task
 context; unknown failures keep their operation-specific heading. No Open folder
 or targeted retry was introduced. Browser recovery links to the existing explicit
 installer in App settings, rather than automatically replacing components.
+
+**Missing screenshot treatment — 2026-10-15.** Failed captures and unavailable
+images reserve the remaining screenshot stage, with the same white surface and
+thin boundary as the image panes. A 48px native missing-image mark accompanies
+an 18px heading, the recorded reason and quieter recovery guidance separated by
+a rule. Failure marks retain error ink. The message centers within a 440px maximum
+measure with 24px insets; long explanations start at the top and scroll inside
+the fixed frame with an overflow-only thumb. Finite final-width text measurement
+keeps the full recovery guidance reachable. Path/profile context and Details remain outside the placeholder;
+truncated context discloses its full text on hover. No retry action, screenshot
+pixels, capture operation or approval rule changes. See
+`docs/research/screenshot-placeholder-20261015.md` for scoped verification.
 
 **History and keyboard.** Runs, Baselines and Storage are separate sections.
 Baseline versions and capture/check runs are distinct,

@@ -208,6 +208,7 @@ impl Shell {
     pub(super) fn viewer_inspector(&self, cx: &mut Context<Self>) -> AnyElement {
         let available = (self.working_width - self.review_queue_width() - 12.).max(1.);
         let details = self.capture_details_open;
+        let diagnostics = details && self.capture_diagnostics_open;
         let fields = self.analysis_fields[..14].to_vec();
         let field_bounds = self.review_field_bounds.clone();
         let action_bounds: Vec<_> = self
@@ -216,7 +217,7 @@ impl Shell {
             .filter(|c| self.control_mounted(*c))
             .filter_map(|c| {
                 self.review_action_bounds(c)
-                    .map(|b| (self.handle(c, cx), b))
+                    .map(|b| (c, self.handle(c, cx), b))
             })
             .collect();
         let scroll = self.review_details_scroll.clone();
@@ -262,26 +263,21 @@ impl Shell {
                         .child(div().child(value)),
                 );
             }
-            body = body.child(self.button(
+            let diagnostics = if self.capture_diagnostics_open {
+                div()
+                    .debug_selector(|| "capture-provenance-details".into())
+                    .child(self.capture_diagnostics().element())
+            } else {
+                div()
+            };
+            body = body.child(self.inline_disclosure(
                 Control::Phase5(38),
-                if self.capture_diagnostics_open {
-                    "Hide technical diagnostics"
-                } else {
-                    "Technical diagnostics"
-                },
-                ActionStyle::Secondary,
+                "Technical diagnostics",
+                "",
+                self.capture_diagnostics_open,
+                diagnostics,
                 cx,
             ));
-            if self.capture_diagnostics_open {
-                body = body.child(
-                    div()
-                        .debug_selector(|| "capture-provenance-details".into())
-                        .border_t_1()
-                        .border_color(rgb(LINE))
-                        .pt_4()
-                        .child(self.capture_provenance_details()),
-                );
-            }
         } else {
             body = body.child(self.selected_capture_details(cx));
         }
@@ -363,7 +359,7 @@ impl Shell {
                             return;
                         }
                         reveal.set(reveal.get() - 1);
-                        for (focus, bounds) in &action_bounds {
+                        for (control, focus, bounds) in &action_bounds {
                             if !focus.is_focused(window) {
                                 continue;
                             }
@@ -371,7 +367,11 @@ impl Shell {
                                 continue;
                             };
                             let viewport = scroll.bounds();
-                            let delta = if bounds.bottom() > viewport.bottom() - px(8.) {
+                            // Expansion must expose the new content, not leave
+                            // the disclosure parked at the bottom of the clip.
+                            let delta = if diagnostics && *control == Control::Phase5(38) {
+                                viewport.top() + px(8.) - bounds.top()
+                            } else if bounds.bottom() > viewport.bottom() - px(8.) {
                                 viewport.bottom() - px(8.) - bounds.bottom()
                             } else if bounds.top() < viewport.top() + px(8.) {
                                 viewport.top() + px(8.) - bounds.top()
@@ -485,6 +485,51 @@ impl Shell {
                                 .line_height(px(HELP_LINE_HEIGHT))
                                 .text_color(rgb(if invalid { ERROR } else { MUTED }))
                                 .child(status),
+                        ),
+                )
+            })
+            .when(details && self.capture_diagnostics_open, |panel| {
+                let copied = self
+                    .copied_capture_diagnostics
+                    .as_ref()
+                    .is_some_and(|text| *text == self.capture_diagnostics().text());
+                panel.child(
+                    div()
+                        .debug_selector(|| "capture-diagnostics-footer".into())
+                        .flex_shrink_0()
+                        .flex()
+                        .flex_col()
+                        .gap_2()
+                        .p_3()
+                        .border_t_1()
+                        .border_color(rgb(LINE))
+                        .child(
+                            div()
+                                .flex()
+                                .items_center()
+                                .gap_3()
+                                .child(self.button(
+                                    Control::CopyCaptureDiagnostics,
+                                    "Copy diagnostics",
+                                    ActionStyle::Secondary,
+                                    cx,
+                                ))
+                                .when(copied, |row| {
+                                    row.child(
+                                        div()
+                                            .debug_selector(|| "capture-diagnostics-copied".into())
+                                            .text_size(px(HELP_TEXT_SIZE))
+                                            .line_height(px(HELP_LINE_HEIGHT))
+                                            .child("Copied."),
+                                    )
+                                }),
+                        )
+                        .child(
+                            div()
+                                .text_size(px(HELP_TEXT_SIZE))
+                                .line_height(px(HELP_LINE_HEIGHT))
+                                .text_color(rgb(MUTED))
+                                .child(capture_diagnostics::SHARING_NOTE),
                         ),
                 )
             })

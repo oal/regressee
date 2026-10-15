@@ -64,7 +64,8 @@ Seed challengers, evaluated against identification / clarity respectively:
 - **History:** no runs or baselines now; future baseline/run list → impact preview
   → explicit delete, restore or export. Nothing auto-deletes history.
 - **Settings:** actual paths/storage totals; runtime explicitly not configured.
-  Native folder picker lets the user inspect a location without moving evidence.
+  The original folder-picker demo did not inspect files; it was removed on
+  2026-10-15. Current settings disclose actual storage locations without a picker.
 - **Sharing, later:** selected baseline → privacy/coverage preview → ZIP export;
   import as new project → separate environment/login → fixed-target check.
 

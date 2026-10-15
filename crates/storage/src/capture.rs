@@ -227,6 +227,9 @@ impl Store {
     }
     pub fn begin_run(&mut self, record: &RunRecord) -> Result<()> {
         record.run.validate()?;
+        if matches!(record.run.intent, RunIntent::Check { .. }) {
+            self.validate_check_coverage(&record.run)?;
+        }
         ensure!(
             record.run.state == JobState::Running
                 && record.capture.is_none()
@@ -248,6 +251,23 @@ impl Store {
                 std::process::id()
             ],
         )?;
+        Ok(())
+    }
+    fn validate_check_coverage(&self, run: &CaptureRun) -> Result<()> {
+        if let RunIntent::Check { baseline } = run.intent {
+            let baseline = self.load_baseline(baseline)?;
+            ensure!(
+                baseline.project == run.project
+                    && baseline.inventory == run.inventory.id
+                    && run
+                        .targets
+                        .iter()
+                        .map(|t| &t.key)
+                        .collect::<std::collections::BTreeSet<_>>()
+                        == baseline.references.iter().map(|r| &r.key).collect(),
+                "check must use exactly the saved baseline screenshots"
+            );
+        }
         Ok(())
     }
     pub fn load_run(&self, id: RunId) -> Result<RunRecord> {
@@ -446,19 +466,29 @@ impl Store {
         run: RunId,
         expected_revision: u64,
     ) -> Result<ProjectRecord> {
+        self.activate_baseline_with_partial_confirmation(run, expected_revision, false)
+    }
+
+    /// `confirm_partial` must come from explicit consent to skip unsuccessful
+    /// targets. The original intended coverage and failures remain immutable.
+    pub fn activate_baseline_with_partial_confirmation(
+        &mut self,
+        run: RunId,
+        expected_revision: u64,
+        confirm_partial: bool,
+    ) -> Result<ProjectRecord> {
         let record = self.load_run(run)?;
         ensure!(
             !self.is_imported_run(run)?,
             "Imported origins are portable provenance, not a new independently captured baseline. Set the imported version active or make a fresh capture."
         );
+        let (captured, intended) = record
+            .baseline_save_counts()
+            .context("only a finished baseline capture with successful screenshots can be saved")?;
+        let partial = captured < intended;
         ensure!(
-            record.run.state == JobState::Completed
-                && matches!(record.run.intent, RunIntent::NewBaseline),
-            "only a successful complete baseline capture can be activated"
-        );
-        ensure!(
-            record.all_captures().count() == record.run.targets.len(),
-            "successful target evidence missing"
+            !partial || confirm_partial,
+            "saving partial coverage requires explicit confirmation"
         );
         let cancel = std::sync::atomic::AtomicBool::new(false);
         let mut originals = std::collections::BTreeSet::new();
@@ -504,7 +534,7 @@ impl Store {
                 })
                 .collect(),
             intended_count: record.run.targets.len() as u32,
-            explicitly_partial: false,
+            explicitly_partial: partial,
         };
         baseline.validate()?;
         let tx = self

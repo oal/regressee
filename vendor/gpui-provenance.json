@@ -199,9 +199,12 @@
     "src/platform/blade/blade_context.rs": "2d0879f5bfdaf7437a87af10c5f2555cf854a2903c65e91647f8f4fdeb062104",
     "src/platform/blade/blade_renderer.rs": "41c113d9f416472ff5fb0de8b6b5b0eec6fbb581ac75199060509b09274cc122",
     "src/platform/test/platform.rs": "438992e05c69c288f4ea24c0e4343e17687e1563484b94e12a2100e457e556c3",
-    "src/platform/test/window.rs": "5f0f3899f100a5843240f039b6c84782058d05418367fc24508e86eb1f635b4d"
+    "src/platform/test/window.rs": "5f0f3899f100a5843240f039b6c84782058d05418367fc24508e86eb1f635b4d",
+    "src/platform/blade/shaders.wgsl": "35d67d317397a358a79c5425a74f94daa8e05de78166fa2e0abeda82c3599569",
+    "src/platform/windows/shaders.hlsl": "8b866e77af55faa159f5cc019346b881237bba2bb67e0e87e8dccf0d7b9b00fa",
+    "src/taffy.rs": "519afe0f4369cfb0cebd8442898dd11c52b52825d3e7128adcec71d841091e22"
   },
-  "unmodified_file_count": 174,
+  "unmodified_file_count": 171,
   "local_selection": {
     "manifest_patch": "[patch.crates-io] gpui.path = vendor/gpui",
     "version": "0.2.2",

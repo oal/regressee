@@ -105,14 +105,24 @@ fn renderer_capture_app_settings(cx: &mut TestAppContext) {
             });
             if matches!(scene, "storage" | "network" | "support") {
                 let control = match scene {
-                    "storage" => Control::ChooseFolder,
+                    "storage" => Control::Details(Detail::LocalStorage),
                     "network" => Control::CrawlField(17),
                     _ => Control::Phase6(13),
                 };
+                let storage_bounds = (scene == "storage")
+                    .then(|| cx.debug_bounds("settings-storage-details").unwrap());
                 cx.update(|window, cx| {
                     shell.update(cx, |s, cx| {
                         window.focus(&s.handle(control, cx));
-                        s.reveal_form_control(control, true, window, cx);
+                        if let Some(bounds) = storage_bounds {
+                            let clip = s.screen_scroll.bounds();
+                            let offset = s.screen_scroll.offset();
+                            let delta = (clip.bottom() - px(8.) - bounds.bottom()).min(px(0.));
+                            s.screen_scroll
+                                .set_offset(gpui::point(offset.x, offset.y + delta));
+                        } else {
+                            s.reveal_form_control(control, true, window, cx);
+                        }
                         cx.notify();
                     })
                 });
@@ -123,7 +133,7 @@ fn renderer_capture_app_settings(cx: &mut TestAppContext) {
                     let _ = window.draw(cx);
                 });
                 let selector = match scene {
-                    "storage" => "action-ChooseFolder",
+                    "storage" => "settings-storage-details",
                     "network" => "field-Proxy server (optional)",
                     _ => "action-Phase6(13)",
                 };

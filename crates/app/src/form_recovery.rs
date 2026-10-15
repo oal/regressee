@@ -2,6 +2,20 @@
 //! Local, read-only validation wayfinding and discoverable keyboard help.
 use super::*;
 
+pub(super) const REPOSITORY_URL: &str = "https://github.com/oal/regressee";
+
+const ABOUT_TEXT: &str = concat!(
+    "Regressee ",
+    env!("CARGO_PKG_VERSION"),
+    " · MPL-2.0\n\n",
+    "Compare website screenshots with a saved baseline to spot changes.\n\n",
+    "Your projects, screenshots and review history stay on your computer. ",
+    "Shared baseline ZIPs exclude logins and cookies, but screenshots may contain private information.\n\n",
+    "In development: accessibility and platform support are not fully tested. ",
+    "Development browsers are limited to approved local websites. ",
+    "Website capture is not yet supported on macOS."
+);
+
 /// Shared controls have a one-pixel border. Their explicitly top/left-anchored
 /// absolute canvas measures the padding box, so include the border for reveal.
 pub(super) fn bordered_control_bounds(painted: Bounds<Pixels>) -> Bounds<Pixels> {
@@ -63,7 +77,6 @@ impl Shell {
                     | Control::CrawlField(17 | 18)
                     | Control::Guided(41 | 42)
                     | Control::SetupRuntime
-                    | Control::ChooseFolder
                     | Control::About
                     | Control::Shortcuts
             );
@@ -340,14 +353,7 @@ impl Shell {
         let (title, body) = if self.help_dialog {
             ("Keyboard shortcuts", keyboard_help())
         } else {
-            (
-                "About Regressee",
-                concat!(
-                    "Regressee ",
-                    env!("CARGO_PKG_VERSION"),
-                    " · MPL-2.0\n\nRegressee finds pages on approved websites, captures screenshots at your chosen screen sizes and compares them with a baseline you have saved. Projects, screenshots and review history stay on your computer. Shared baseline ZIPs never include logins or cookies, but screenshots may contain private information.\n\nThis app is still in development. Development-only browsers can visit approved local test websites, not public websites. Accessibility and support across operating systems are not yet fully tested. Website capture on macOS is not yet supported."
-                ),
-            )
+            ("About Regressee", ABOUT_TEXT)
         };
         let heading = if self.help_dialog {
             div().child(title).into_any_element()
@@ -357,7 +363,34 @@ impl Shell {
         controls::dialog(
             heading,
             body,
-            self.button(Control::CloseDialog, "Close", ActionStyle::Primary, cx),
+            div()
+                .w_full()
+                .flex()
+                .flex_col()
+                .gap_3()
+                .when(!self.help_dialog, |footer| {
+                    let control = Control::AboutRepository;
+                    footer.child(
+                        regressee_app::ui::web_link::web_link(
+                            "AboutRepository",
+                            REPOSITORY_URL,
+                            &self.handle(control, cx),
+                            self.control_enabled(control, cx),
+                        )
+                        .on_click(cx.listener(
+                            move |this, event, window, cx| {
+                                this.click_control(control, event, window, cx);
+                            },
+                        )),
+                    )
+                })
+                .child(div().w_full().flex().justify_end().child(self.button(
+                    Control::CloseDialog,
+                    "Close",
+                    ActionStyle::Primary,
+                    cx,
+                )))
+                .into_any_element(),
         )
         .into_any_element()
     }
@@ -377,6 +410,26 @@ fn keyboard_help() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn about_copy_is_concise_without_losing_privacy_or_development_limits() {
+        assert!(ABOUT_TEXT.split_whitespace().count() < 90);
+        for required in [
+            env!("CARGO_PKG_VERSION"),
+            "MPL-2.0",
+            "saved baseline",
+            "stay on your computer",
+            "ZIPs exclude logins and cookies",
+            "screenshots may contain private information",
+            "accessibility and platform support are not fully tested",
+            "limited to approved local websites",
+            "not yet supported on macOS",
+        ] {
+            assert!(ABOUT_TEXT.contains(required), "Missing: {required}");
+        }
+        assert_eq!(REPOSITORY_URL, "https://github.com/oal/regressee");
+    }
+
     #[test]
     fn corrections_cycle_without_a_submission_or_hidden_target() {
         let errors = [Control::Name, Control::Address, Control::CrawlField(0)];
@@ -394,5 +447,185 @@ mod tests {
             Some(Control::Address)
         );
         assert_eq!(next_correction(&[], Some(Control::Name)), None);
+    }
+}
+
+#[cfg(all(test, feature = "ui-tests"))]
+mod ui_tests {
+    use super::*;
+    use crate::phase1_setup_tests::inside as assert_bounds_inside;
+    use crate::workflow_refinement_tests::finish_jobs;
+    use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn about_repository_supports_pointer_keyboard_and_dialog_guards(cx: &mut TestAppContext) {
+        let dir = tempfile::tempdir().unwrap();
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, finish_jobs);
+        assert!(cx.opened_url().is_none());
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    s.focus.screen = Screen::Settings;
+                    assert!(!s.control_enabled(Control::AboutRepository, cx));
+                    s.activate_control(Control::About, window, cx);
+                    assert_eq!(s.focused(window, cx), Some(Control::CloseDialog));
+                    assert!(!s.control_enabled(Control::SetupRuntime, cx));
+                });
+                let _ = window.draw(cx);
+            });
+            let dialog = cx.debug_bounds("information-dialog").unwrap();
+            let body = cx.debug_bounds("information-dialog-body").unwrap();
+            let copy = cx.debug_bounds("information-dialog-copy").unwrap();
+            let link = cx.debug_bounds("link-AboutRepository").unwrap();
+            let close = cx.debug_bounds("action-CloseDialog").unwrap();
+            assert_bounds_inside(
+                dialog,
+                Bounds::new(gpui::point(px(0.), px(0.)), size(px(width), px(height))),
+            );
+            for bounds in [body, copy, link, close] {
+                assert_bounds_inside(bounds, dialog);
+            }
+            assert_bounds_inside(copy, body);
+            assert!(body.bottom() <= link.top() && link.bottom() <= close.top());
+            cx.simulate_click(
+                gpui::point(link.left() + px(80.), link.center().y),
+                gpui::Modifiers::none(),
+            );
+            assert_eq!(cx.opened_url().as_deref(), Some(REPOSITORY_URL));
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    let request = s.next_request;
+                    assert_eq!(s.focused(window, cx), Some(Control::AboutRepository));
+                    s.move_focus(false, window, cx);
+                    assert_eq!(s.focused(window, cx), Some(Control::CloseDialog));
+                    s.move_focus(false, window, cx);
+                    assert_eq!(s.focused(window, cx), Some(Control::AboutRepository));
+                    s.activate(&Activate, window, cx);
+                    s.move_focus(true, window, cx);
+                    assert_eq!(s.focused(window, cx), Some(Control::CloseDialog));
+                    s.native_prompt = true;
+                    assert!(!s.control_enabled(Control::AboutRepository, cx));
+                    s.native_prompt = false;
+                    s.dismiss(&Dismiss, window, cx);
+                    assert_eq!(s.focused(window, cx), Some(Control::About));
+                    assert!(!s.control_enabled(Control::AboutRepository, cx));
+                    s.show_keyboard_help(window, cx);
+                    assert!(!s.control_enabled(Control::AboutRepository, cx));
+                    assert!(!s.control_mounted(Control::AboutRepository));
+                    s.move_focus(false, window, cx);
+                    assert_eq!(s.focused(window, cx), Some(Control::CloseDialog));
+                    assert_eq!(s.next_request, request);
+                });
+                let _ = window.draw(cx);
+            });
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| s.dismiss(&Dismiss, window, cx));
+            });
+        }
+        owned.join_after_ui();
+    }
+
+    #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+    #[gpui::test]
+    #[ignore = "explicit two-size native offscreen About dialog and link-hover inspection"]
+    fn renderer_capture_about_dialog(cx: &mut TestAppContext) {
+        let root = crate::ui_renderer_capture::output_root().unwrap();
+        cx.enable_offscreen_renderer().unwrap();
+        let dir = tempfile::tempdir_in(&root).unwrap();
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, finish_jobs);
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    s.focus.screen = Screen::Settings;
+                    s.activate_control(Control::About, window, cx);
+                });
+                let _ = window.draw(cx);
+            });
+            cx.run_until_parked();
+            let link = cx.debug_bounds("link-AboutRepository").unwrap();
+            crate::ui_renderer_capture::capture(
+                cx,
+                &root,
+                &format!("about-{width:.0}x{height:.0}-repository-rest"),
+            )
+            .unwrap();
+            let rest = cx.update(|window, _| window.capture_offscreen_frame().unwrap());
+            cx.simulate_mouse_move(
+                gpui::point(link.left() + px(80.), link.center().y),
+                None,
+                gpui::Modifiers::none(),
+            );
+            cx.run_until_parked();
+            crate::ui_renderer_capture::capture(
+                cx,
+                &root,
+                &format!("about-{width:.0}x{height:.0}-repository-hover"),
+            )
+            .unwrap();
+            let hover = cx.update(|window, _| window.capture_offscreen_frame().unwrap());
+            let mut changed_ink = 0;
+            let mut dark_ink_delta = 0;
+            for y in f32::from(link.top()) as u32..f32::from(link.bottom()) as u32 {
+                for x in f32::from(link.left()) as u32..f32::from(link.right()) as u32 {
+                    let offset = ((y * rest.width + x) * 4) as usize;
+                    let before = &rest.rgba[offset..offset + 4];
+                    let after = &hover.rgba[offset..offset + 4];
+                    // Underline thickening may paint an extra glyph row, but
+                    // the empty trailing part of the control must stay white.
+                    if x > f32::from(link.right() - px(100.)) as u32 {
+                        assert_eq!(before, [255, 255, 255, 255]);
+                        assert_eq!(before, after, "link hover must not fill its row");
+                    }
+                    if before != after {
+                        changed_ink += 1;
+                    }
+                    dark_ink_delta += i32::from(after == [0x1b, 0x30, 0x44, 255])
+                        - i32::from(before == [0x1b, 0x30, 0x44, 255]);
+                }
+            }
+            assert!(changed_ink > 100, "hover must visibly change the link ink");
+            assert!(dark_ink_delta > 100, "hover ink must be visibly darker");
+            assert_eq!(link, cx.debug_bounds("link-AboutRepository").unwrap());
+            cx.executor()
+                .advance_clock(std::time::Duration::from_millis(600));
+            cx.run_until_parked();
+            crate::ui_renderer_capture::capture(
+                cx,
+                &root,
+                &format!("about-{width:.0}x{height:.0}-repository-hint"),
+            )
+            .unwrap();
+            let hint = cx.debug_bounds("web-link-hint").unwrap();
+            assert!(hint.size.width < px(200.) && hint.size.height <= px(32.));
+            assert!(hint.top() >= link.bottom());
+            assert_bounds_inside(
+                hint,
+                Bounds::new(gpui::point(px(0.), px(0.)), size(px(width), px(height))),
+            );
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| s.move_focus(false, window, cx));
+            });
+            crate::ui_renderer_capture::capture(
+                cx,
+                &root,
+                &format!("about-{width:.0}x{height:.0}-repository-focused"),
+            )
+            .unwrap();
+            assert_eq!(link, cx.debug_bounds("link-AboutRepository").unwrap());
+            cx.simulate_mouse_move(gpui::point(px(0.), px(0.)), None, gpui::Modifiers::none());
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| s.dismiss(&Dismiss, window, cx));
+            });
+        }
+        assert!(cx.opened_url().is_none());
+        owned.join_after_ui();
     }
 }

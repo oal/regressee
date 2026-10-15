@@ -23,7 +23,10 @@ impl Shell {
             PromptLevel::Warning,
             &prompt.title,
             Some(&prompt.message),
-            &[prompt.keep, prompt.confirm],
+            &[
+                PromptButton::cancel(prompt.keep),
+                PromptButton::new(prompt.confirm),
+            ],
             cx,
         );
         cx.spawn_in(window, async move |this, cx| {

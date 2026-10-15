@@ -16,6 +16,201 @@ pub(super) fn readiness(status: RuntimeState, setup_available: bool) -> RuntimeR
 }
 
 #[gpui::test]
+fn browser_integrity_check_keeps_about_and_shortcuts_available(cx: &mut TestAppContext) {
+    settings_information_during_browser_check(cx, false);
+}
+
+#[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+#[gpui::test]
+#[ignore = "explicit two-size App settings help inspection during browser verification"]
+fn renderer_capture_settings_information_during_browser_check(cx: &mut TestAppContext) {
+    settings_information_during_browser_check(cx, true);
+}
+
+fn settings_information_during_browser_check(cx: &mut TestAppContext, render: bool) {
+    use crate::phase4_hierarchy_tests::draw;
+    use crate::workflow_refinement_tests::finish_jobs;
+    #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+    let capture_root = render.then(|| {
+        cx.enable_offscreen_renderer().unwrap();
+        crate::ui_renderer_capture::output_root().unwrap()
+    });
+    #[cfg(not(all(feature = "ui-renderer-capture", target_os = "linux")))]
+    assert!(!render);
+    let dir = tempfile::tempdir().unwrap();
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    shell.update(cx, |s, cx| {
+        finish_jobs(s, cx);
+        s.focus.screen = Screen::Settings;
+        s.refresh_visible(cx);
+        finish_jobs(s, cx);
+        assert!(s.project.is_none());
+    });
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        cx.simulate_resize(size(px(width), px(height)));
+        let request = cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                // Hold a read in flight so worker timing cannot hide the busy guard.
+                s.next_request += 1;
+                s.pending = Some(s.next_request);
+                s.focus.busy = true;
+                s.runtime_readiness = None;
+                s.runtime_status = Some("Checking installed browser integrity…".into());
+                s.progress = Some((Work::RuntimeStatus.activity_label().into(), 0, None));
+                assert!(s.settings_browser_presentation().checking);
+                assert!(s.control_enabled(Control::About, cx));
+                assert!(s.control_enabled(Control::Shortcuts, cx));
+                for control in [
+                    Control::SetupRuntime,
+                    Control::Guided(41),
+                    Control::CaptureBaseline,
+                ] {
+                    assert!(!s.control_enabled(control, cx));
+                }
+                window.focus(&s.handle(Control::Navigate(Screen::Settings), cx));
+                s.move_focus(false, window, cx);
+                assert_eq!(s.focused(window, cx), Some(Control::About));
+                s.move_focus(false, window, cx);
+                assert_eq!(s.focused(window, cx), Some(Control::Shortcuts));
+                s.move_focus(true, window, cx);
+                assert_eq!(s.focused(window, cx), Some(Control::About));
+                s.next_request
+            })
+        });
+        draw(cx);
+        let about = cx.debug_bounds("action-About").unwrap();
+        crate::phase1_setup_tests::inside(about, cx.debug_bounds("screen-scroll").unwrap());
+        #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+        if let Some(root) = &capture_root {
+            crate::ui_renderer_capture::capture(
+                cx,
+                root,
+                &format!("settings-check-{width:.0}x{height:.0}-information-actions"),
+            )
+            .unwrap();
+        }
+        cx.simulate_click(about.center(), gpui::Modifiers::none());
+        #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+        if let Some(root) = &capture_root {
+            crate::ui_renderer_capture::capture(
+                cx,
+                root,
+                &format!("settings-check-{width:.0}x{height:.0}-about-open"),
+            )
+            .unwrap();
+        }
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                assert!(s.focus.dialog && !s.help_dialog);
+                assert_eq!(s.focused(window, cx), Some(Control::CloseDialog));
+                assert_eq!(s.pending, Some(request));
+                assert_eq!(s.next_request, request);
+                assert!(s.focus.busy);
+                s.dismiss(&Dismiss, window, cx);
+                assert_eq!(s.focused(window, cx), Some(Control::About));
+                s.move_focus(false, window, cx);
+                s.activate(&Activate, window, cx);
+                assert!(s.focus.dialog && s.help_dialog);
+                s.dismiss(&Dismiss, window, cx);
+                assert_eq!(s.focused(window, cx), Some(Control::Shortcuts));
+                s.native_prompt = true;
+                assert!(!s.control_enabled(Control::About, cx));
+                assert!(!s.control_enabled(Control::Shortcuts, cx));
+                s.native_prompt = false;
+                s.move_focus(true, window, cx);
+                s.activate(&Activate, window, cx);
+                assert!(s.focus.dialog && !s.help_dialog);
+                assert_eq!(s.next_request, request);
+                s.apply_update(
+                    Update {
+                        id: request,
+                        reply: Reply::RuntimeReadiness(readiness(RuntimeState::Ready, true)),
+                    },
+                    cx,
+                );
+                assert!(!s.focus.busy && s.pending.is_none());
+                assert!(s.focus.dialog && !s.help_dialog);
+                assert_eq!(s.focused(window, cx), Some(Control::CloseDialog));
+                s.dismiss(&Dismiss, window, cx);
+                assert_eq!(s.focused(window, cx), Some(Control::About));
+                assert!(s.control_enabled(Control::About, cx));
+                assert!(s.control_enabled(Control::Shortcuts, cx));
+            })
+        });
+    }
+    owned.join_after_ui();
+}
+
+#[gpui::test]
+fn entering_app_settings_loads_inline_without_a_modal_or_focus_jump(cx: &mut TestAppContext) {
+    use crate::workflow_refinement_tests::finish_jobs;
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        let dir = tempfile::tempdir().unwrap();
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        cx.simulate_resize(size(px(width), px(height)));
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                finish_jobs(s, cx);
+                s.navigate(Screen::Settings, window, cx);
+            });
+        });
+        let mut reads = Vec::new();
+        for _ in 0..32 {
+            let pending = cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    assert!(
+                        s.task.is_none(),
+                        "Automatic settings reads must not open a task dialog"
+                    );
+                    assert!(!s.focus.dialog && !s.focus.approval_dialog && !s.native_prompt);
+                    assert!(s.presentation_focus.is_none());
+                    assert_eq!(
+                        s.focused(window, cx),
+                        Some(Control::Navigate(Screen::Settings))
+                    );
+                    let Some(request) = s.pending else {
+                        return false;
+                    };
+                    reads.push(s.progress.as_ref().unwrap().0.clone());
+                    assert!(s.control_enabled(Control::About, cx));
+                    assert!(s.control_enabled(Control::Shortcuts, cx));
+                    let update = s.events.recv_timeout(Duration::from_secs(10)).unwrap();
+                    assert_eq!(update.id, request);
+                    assert!(!matches!(
+                        update.reply,
+                        Reply::Failure(_) | Reply::ProductFailure(_)
+                    ));
+                    s.apply_update(update, cx);
+                    true
+                })
+            });
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            if !pending {
+                break;
+            }
+        }
+        shell.read_with(cx, |s, _| {
+            assert!(s.pending.is_none() && !s.focus.busy && s.task.is_none());
+            assert!(s.summary.is_some() && s.runtime_readiness.is_some());
+        });
+        for work in [
+            Work::NetworkStatus,
+            Work::InspectStorage,
+            Work::RuntimeStatus,
+        ] {
+            assert!(reads.iter().any(|label| label == work.activity_label()));
+        }
+        owned.join_after_ui();
+    }
+}
+
+#[gpui::test]
 fn browser_settings_explains_waiting_and_preserves_installer_capabilities(cx: &mut TestAppContext) {
     let dir = tempfile::tempdir().unwrap();
     let (_, project, _, _, _) = approval_fixture::fixture(dir.path());
@@ -105,7 +300,6 @@ fn settings_disclosures_remove_hidden_controls_and_retain_network_drafts(cx: &mu
             s.details.clear();
             let request = s.next_request;
             for (detail, children) in [
-                (Detail::LocalStorage, vec![Control::ChooseFolder]),
                 (
                     Detail::ManagedNetwork,
                     vec![
@@ -167,17 +361,93 @@ fn settings_disclosures_remove_hidden_controls_and_retain_network_drafts(cx: &mu
     owned.join_after_ui();
 }
 
-#[test]
-fn folder_preview_copy_describes_the_actual_no_op() {
+#[gpui::test]
+fn storage_locations_disclose_real_paths_without_extra_actions_or_side_effects(
+    cx: &mut TestAppContext,
+) {
+    use crate::phase4_hierarchy_tests::draw;
+    let dir = tempfile::tempdir().unwrap();
+    let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
+    let before = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    shell.update(cx, |s, cx| {
+        load_review(s, project, cx);
+        s.focus.screen = Screen::Settings;
+        s.summary = Some(store.summary().unwrap());
+        s.details.clear();
+        s.notice = None;
+    });
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        cx.simulate_resize(size(px(width), px(height)));
+        let (controls, request) =
+            shell.read_with(cx, |s, _| (s.visible_controls(), s.next_request));
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.activate_control(Control::Details(Detail::LocalStorage), window, cx);
+                assert!(s.details.contains(&Detail::LocalStorage));
+                assert_eq!(
+                    s.visible_controls(),
+                    controls,
+                    "paths are information, not actions"
+                );
+                assert_eq!(s.next_request, request);
+                assert!(!s.native_prompt);
+                assert!(s.notice.is_none());
+            })
+        });
+        cx.run_until_parked();
+        draw(cx);
+        assert!(cx.debug_bounds("settings-storage-details").is_some());
+        let expanded_network_top = cx.debug_bounds("managed-network-section").unwrap().top();
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.activate_control(Control::Details(Detail::LocalStorage), window, cx);
+                assert!(!s.details.contains(&Detail::LocalStorage));
+                assert_eq!(s.visible_controls(), controls);
+                assert_eq!(s.next_request, request);
+            })
+        });
+        cx.run_until_parked();
+        draw(cx);
+        // GPUI retains historical debug selectors; verify that the following
+        // section actually moves up rather than treating a cached bound as mounted.
+        assert!(cx.debug_bounds("managed-network-section").unwrap().top() < expanded_network_top);
+    }
+    owned.join_after_ui();
     assert_eq!(
-        app_settings_ux::FOLDER_PREVIEW_LABEL,
-        "Preview a folder path…"
+        before,
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap()
     );
-    assert!(
-        app_settings_ux::FOLDER_PREVIEW_HELP
-            .contains("does not inspect files or move project data")
-    );
-    assert!(app_settings_ux::FOLDER_PREVIEW_HELP.contains("not available yet"));
+}
+
+#[gpui::test]
+fn saved_data_results_remain_attached_and_available_when_tools_collapse(cx: &mut TestAppContext) {
+    use crate::phase4_hierarchy_tests::draw;
+    let dir = tempfile::tempdir().unwrap();
+    let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    shell.update(cx, |s, cx| {
+        load_review(s, project, cx);
+        s.focus.screen = Screen::Settings;
+        s.repair_preview = Some(store.repair_preview().unwrap());
+        s.details.remove(&Detail::SupportTools);
+        cx.notify();
+    });
+    draw(cx);
+    assert!(cx.debug_bounds("portability-preview").is_some());
+    cx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            assert!(s.control_enabled(Control::Phase6(7), cx));
+            assert!(s.control_enabled(Control::Details(Detail::Portability), cx));
+            s.activate_control(Control::Phase6(7), window, cx);
+            assert!(s.repair_preview.is_none());
+        })
+    });
+    owned.join_after_ui();
 }
 
 #[gpui::test]
@@ -226,9 +496,6 @@ fn settings_tab_and_reverse_tab_follow_rendered_groups_at_both_sizes(cx: &mut Te
                 Control::Details(Detail::Browser),
                 Control::Details(Detail::LocalStorage),
             ];
-            if expanded {
-                expected.push(Control::ChooseFolder);
-            }
             expected.push(Control::Details(Detail::ManagedNetwork));
             if expanded {
                 expected.extend([

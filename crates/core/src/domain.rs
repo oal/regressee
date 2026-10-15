@@ -652,9 +652,14 @@ impl CaptureRun {
             );
         }
         ensure!(
-            self.targets.len() == pages.len() * profiles.len(),
+            self.targets.len() == pages.len() * profiles.len()
+                || (matches!(self.intent, RunIntent::Check { .. })
+                    && self.targets.len() < pages.len() * profiles.len()),
             "run must account for the fixed intended target list"
         );
+        // Checks of an explicitly partial baseline use its exact reference keys,
+        // not the original page × profile product. Storage binds this subset to
+        // the saved baseline before starting work; membership is checked below.
         let mut keys = BTreeSet::new();
         for target in &self.targets {
             ensure!(

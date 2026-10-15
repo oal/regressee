@@ -18,31 +18,175 @@ pub fn web_url(value: &str) -> Option<url::Url> {
     .then_some(url)
 }
 
-struct DestinationHint(SharedString);
-impl Render for DestinationHint {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+const LINK_HINT: &str = "Open in default browser";
+
+struct LinkHint;
+impl Render for LinkHint {
+    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let text_style = TextStyle {
+            font_family: FONT.into(),
+            font_weight: FontWeight::NORMAL,
+            ..Default::default()
+        };
+        let text_width = window
+            .text_system()
+            .shape_line(
+                LINK_HINT.into(),
+                px(HELP_TEXT_SIZE),
+                &[text_style.to_run(LINK_HINT.len())],
+                None,
+            )
+            .width;
+        let width =
+            (text_width.ceil() + px(18.)).min((window.viewport_size().width - px(16.)).max(px(1.)));
+        // GPUI anchors to the resting pointer and flips at window edges. A
+        // transparent gutter keeps the visible bubble away from the cursor
+        // in either direction, without changing other tooltips' placement.
+        div().px(px(8.)).py(px(12.)).child(
+            div()
+                .debug_selector(|| "web-link-hint".into())
+                .w(width)
+                .px(px(8.))
+                .py(px(6.))
+                .flex()
+                .flex_col()
+                .bg(rgb(SURFACE))
+                .border_1()
+                .border_color(rgb(CONTROL_LINE))
+                .rounded(px(3.))
+                .font_family(FONT)
+                .font_weight(FontWeight::NORMAL)
+                .text_size(px(HELP_TEXT_SIZE))
+                .line_height(px(HELP_LINE_HEIGHT))
+                .text_color(rgb(INK))
+                .text_decoration_none()
+                .child(LINK_HINT),
+        )
+    }
+}
+
+#[cfg(all(test, feature = "ui-tests"))]
+mod ui_tests {
+    use super::*;
+    use core::prelude::v1::test;
+    use gpui::TestAppContext;
+    use std::time::Duration;
+
+    struct LinkView {
+        focus: FocusHandle,
+        enabled: bool,
+        edge: bool,
+    }
+
+    impl Render for LinkView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .bg(rgb(SURFACE))
+                .font_family(FONT)
+                .p(px(4.))
+                .flex()
+                .flex_col()
+                .when(self.edge, |el| el.items_end().justify_end())
+                .child(div().w(px(280.)).child(web_link(
+                    "TooltipTest",
+                    "https://example.test/",
+                    &self.focus,
+                    self.enabled,
+                )))
+        }
+    }
+
+    #[gpui::test]
+    fn hints_are_delayed_compact_stationary_and_flip_away_from_the_link(cx: &mut TestAppContext) {
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            for edge in [false, true] {
+                for enabled in [true, false] {
+                    let (_, cx) = cx.add_window_view(|_, cx| LinkView {
+                        focus: cx.focus_handle(),
+                        enabled,
+                        edge,
+                    });
+                    cx.simulate_resize(size(px(width), px(height)));
+                    cx.update(|window, cx| {
+                        let _ = window.draw(cx);
+                    });
+                    let link = cx.debug_bounds("link-TooltipTest").unwrap();
+                    let pointer = point(link.right() - px(12.), link.center().y);
+                    cx.simulate_mouse_move(pointer, None, Modifiers::none());
+                    cx.executor().advance_clock(Duration::from_millis(200));
+                    cx.run_until_parked();
+                    cx.update(|window, cx| {
+                        let _ = window.draw(cx);
+                    });
+                    assert!(cx.debug_bounds("web-link-hint").is_none());
+                    cx.executor().advance_clock(Duration::from_millis(400));
+                    cx.run_until_parked();
+                    cx.update(|window, cx| {
+                        let _ = window.draw(cx);
+                    });
+                    let hint = cx.debug_bounds("web-link-hint");
+                    assert_eq!(hint.is_some(), enabled);
+                    if let Some(hint) = hint {
+                        assert!(hint.size.width < px(200.) && hint.size.height <= px(32.));
+                        assert!(!hint.contains(&pointer));
+                        assert!(hint.top() >= link.bottom() || hint.bottom() <= link.top());
+                        assert!(hint.left() >= px(0.) && hint.right() <= px(width));
+                        assert!(hint.top() >= px(0.) && hint.bottom() <= px(height));
+                        cx.simulate_mouse_move(
+                            point(pointer.x - px(40.), pointer.y),
+                            None,
+                            Modifiers::none(),
+                        );
+                        cx.run_until_parked();
+                        cx.update(|window, cx| {
+                            let _ = window.draw(cx);
+                        });
+                        assert_eq!(Some(hint), cx.debug_bounds("web-link-hint"));
+                    }
+                    assert_eq!(link, cx.debug_bounds("link-TooltipTest").unwrap());
+                }
+            }
+        }
+    }
+}
+
+#[derive(IntoElement)]
+struct LinkLabel {
+    address: SharedString,
+    enabled: bool,
+}
+
+impl RenderOnce for LinkLabel {
+    fn render(self, window: &mut Window, cx: &mut App) -> impl IntoElement {
+        let hovered = window.use_state(cx, |_, _| false);
+        let hot = self.enabled && *hovered.read(cx);
         div()
-            .w(px(440.))
-            .max_w_full()
-            .p_3()
+            .id("web-link-label")
+            .w_full()
+            .min_w_0()
             .flex()
             .flex_col()
-            .gap_1()
-            .bg(rgb(SURFACE))
-            .border_1()
-            .border_color(rgb(CONTROL_LINE))
-            .rounded(px(3.))
-            .text_size(px(13.))
-            .line_height(px(18.))
-            .text_color(rgb(INK))
-            .child("Open in your default browser")
-            .child(div().w_full().flex().flex_col().child(self.0.clone()))
+            // GPUI shapes text before applying interaction refinements. Set
+            // ink before layout, inheriting typography/ellipsis from the owner.
+            .text_color(rgb(ACCENT))
+            .underline()
+            .when(hot, |el| el.text_color(rgb(INK)).text_decoration_2())
+            .when(self.enabled, |el| {
+                el.on_hover(move |value, _, cx| {
+                    hovered.update(cx, |hovered, cx| {
+                        *hovered = *value;
+                        cx.notify();
+                    });
+                })
+            })
+            .child(self.address)
     }
 }
 
 /// Keeps the URL legible and link-like at rest, not just on hover. Columns give
 /// long destinations a definite wrapping measure in GPUI. A context caller can
-/// opt into ellipsis; the destination hint still shows the complete address.
+/// opt into ellipsis. Hints explain activation, never repeat the address.
 pub fn web_link(
     id: impl Into<ElementId>,
     address: impl Into<SharedString>,
@@ -50,7 +194,6 @@ pub fn web_link(
     enabled: bool,
 ) -> Stateful<Div> {
     let address = address.into();
-    let hint = address.clone();
     let id = id.into();
     let selector = id.clone();
     div()
@@ -75,14 +218,11 @@ pub fn web_link(
         .when(enabled, |el| {
             el.track_focus(focus)
                 .cursor_pointer()
-                // Interaction refinements cannot replace inherited GPUI text style.
                 .focus(|s| focus_outline(s, INK, INK))
-                .hover(|s| s.bg(rgb(ACTION_HOVER)))
-                .active(|s| s.bg(rgb(SELECTED)))
-                .tooltip(move |_, cx| cx.new(|_| DestinationHint(hint.clone())).into())
+                .tooltip(|_, cx| cx.new(|_| LinkHint).into())
         })
         .when(!enabled, |el| el.opacity(0.5))
-        .child(address)
+        .child(LinkLabel { address, enabled })
 }
 
 #[cfg(test)]

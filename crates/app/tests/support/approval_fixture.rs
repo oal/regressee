@@ -4,6 +4,84 @@ use regressee_core::{domain::*, evidence::*};
 use regressee_storage::{AppPaths, Store};
 use std::{path::Path, sync::atomic::AtomicBool};
 
+/// Two pages × two sizes; only the second page's second size fails. Synthetic
+/// metadata over the saved corpus PNGs, never a browser-capture claim.
+#[allow(dead_code)] // This shared module is also used by complete-only fixtures.
+pub fn partial_fixture(path: &Path) -> (Store, ProjectId, RunId) {
+    let (mut store, project, _, _, _) = fixture(path);
+    let saved = store.load_project(project).unwrap();
+    let baseline = store.project_evidence(project).unwrap().baseline.unwrap();
+    let mut run = store.load_run(baseline.references[0].run).unwrap();
+    let original = run.captures[0].clone();
+    run.run.id = RunId::new();
+    run.run.inventory.id = InventoryId::new();
+    run.run.inventory.pages[0].id = PageId::new();
+    let mut page = run.run.inventory.pages[0].clone();
+    page.id = PageId::new();
+    page.canonical = page.canonical.join("second-page").unwrap();
+    run.run.inventory.pages.push(page);
+    let mut profile = run.run.profiles[0].clone();
+    profile.id = ProfileId::new();
+    profile.name = "Mobile fixture".into();
+    run.run.profiles.push(profile);
+    run.run.targets.clear();
+    run.captures.clear();
+    run.run.state = JobState::Running;
+    run.run.finished_at = None;
+    run.queue = Some(QueueSettings {
+        discovery: saved.project.discovery,
+        project_revision: saved.revision,
+        resumed_at: vec![],
+    });
+    for page in &run.run.inventory.pages {
+        for profile in &run.run.profiles {
+            run.run.targets.push(CaptureTarget {
+                key: TargetKey {
+                    page: page.id,
+                    profile: profile.id,
+                },
+                requested: page.canonical.clone(),
+                final_url: None,
+                attempts: 1,
+                outcome: TargetOutcome::Pending,
+                warnings: vec![],
+            });
+        }
+    }
+    store.freeze_inventory(&run.run.inventory).unwrap();
+    store.begin_run(&run).unwrap();
+    for (index, target) in run.run.targets.iter_mut().enumerate() {
+        if index == 3 {
+            target.outcome = TargetOutcome::Failed {
+                code: CaptureError::Timeout,
+            };
+            continue;
+        }
+        let mut capture = original.clone();
+        capture.metadata.key = target.key.clone();
+        capture.metadata.requested = target.requested.to_string();
+        capture.metadata.final_url = target.requested.to_string();
+        capture.metadata.profile = run
+            .run
+            .profiles
+            .iter()
+            .find(|p| p.id == target.key.profile)
+            .unwrap()
+            .clone();
+        target.final_url = Some(target.requested.clone());
+        target.outcome = TargetOutcome::Captured {
+            artifact: capture.image.original.clone(),
+            width: capture.image.width,
+            height: capture.image.height,
+        };
+        run.captures.push(capture);
+    }
+    run.run.state = JobState::CompletedWithErrors;
+    run.run.finished_at = Some(102);
+    store.finish_run(&run).unwrap();
+    (store, project, run.run.id)
+}
+
 pub fn fixture(path: &Path) -> (Store, ProjectId, RunId, AnalysisId, AnalysisId) {
     let mut store = Store::open(AppPaths::isolated(path)).unwrap();
     let mut project =

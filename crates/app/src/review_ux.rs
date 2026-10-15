@@ -141,6 +141,7 @@ impl Shell {
             Control::Details(Detail::Analysis) => 50,
             Control::Details(Detail::IgnoredAreas) => 51,
             Control::ImageControls => 52,
+            Control::Phase5(38) => 53,
             _ => return None,
         };
         self.review_action_bounds.get(index).cloned()
@@ -155,6 +156,7 @@ impl Shell {
             Control::AnalysisField(index @ (0..=13)) => 36 + index,
             Control::Details(Detail::Analysis) => 50,
             Control::Details(Detail::IgnoredAreas) => 51,
+            Control::Phase5(38) => 53,
             _ => return None,
         };
         self.review_anchors.get(index).cloned()
@@ -206,7 +208,7 @@ impl Shell {
             return;
         }
         if self.focus.screen == Screen::Results
-            && (self.review_tools || self.review_note_open)
+            && (self.review_tools || self.review_note_open || self.capture_details_open)
             && self.control_mounted(control)
             && let Some(anchor) = self.review_anchor(control)
         {
@@ -214,7 +216,9 @@ impl Shell {
             self.review_focus_reveal.set(2);
             if let Some(bounds) = self.review_action_bounds(control).and_then(|b| b.get()) {
                 let viewport = self.review_details_scroll.bounds();
-                let delta = if bounds.bottom() > viewport.bottom() - px(8.) {
+                let delta = if control == Control::Phase5(38) && self.capture_diagnostics_open {
+                    viewport.top() + px(8.) - bounds.top()
+                } else if bounds.bottom() > viewport.bottom() - px(8.) {
                     viewport.bottom() - px(8.) - bounds.bottom()
                 } else if bounds.top() < viewport.top() + px(8.) {
                     viewport.top() + px(8.) - bounds.top()
@@ -373,86 +377,6 @@ impl Shell {
                     .parse::<u32>()
                     != Ok(n)
             })
-    }
-    pub(super) fn capture_provenance_details(&self) -> AnyElement {
-        let mut details = div().flex().flex_col().gap_2().text_size(px(13.));
-        details = details.child(
-            div()
-                .text_color(rgb(MUTED))
-                .child(self.comparison_context()),
-        );
-        if let Some(a) = &self.evidence.comparison {
-            details = details.child(format!(
-                "Baseline {} · run {} · analysis {}",
-                a.revision.baseline, a.revision.run, a.revision.id
-            ));
-        }
-        if let Some(key) = &self.selected_key {
-            details = details.child(format!("Page {} · profile {}", key.page, key.profile));
-            let baseline_id = self
-                .evidence
-                .comparison
-                .as_ref()
-                .map(|a| a.revision.baseline);
-            let baseline = self
-                .evidence
-                .baseline
-                .as_ref()
-                .filter(|b| Some(b.id) == baseline_id)
-                .or_else(|| {
-                    self.evidence
-                        .baselines
-                        .iter()
-                        .find(|b| Some(b.id) == baseline_id)
-                });
-            if let Some(reference) =
-                baseline.and_then(|b| b.references.iter().find(|r| &r.key == key))
-            {
-                details = details.child(format!(
-                    "Before: source run {} · captured {} UTC Unix seconds · original {}",
-                    reference.run,
-                    reference.captured_at,
-                    reference.artifact.as_str()
-                ));
-                let capture = self
-                    .history
-                    .as_ref()
-                    .and_then(|h| h.runs.iter().find(|r| r.run.id == reference.run))
-                    .and_then(|r| r.evidence(key))
-                    .or_else(|| {
-                        self.evidence.before.as_ref().filter(|c| {
-                            &c.metadata.key == key && c.image.original == reference.artifact
-                        })
-                    });
-                details = details.child(capture.map(|c| format!("Before requested URL: {}\nBefore final URL: {}\nBefore capture metadata: {:?}", c.metadata.requested, c.metadata.final_url, c.metadata)).unwrap_or_else(|| "Before full URL/capture record is not loaded; no URL inferred from today's project settings.".into()));
-            }
-            let run_id = self.evidence.comparison.as_ref().map(|a| a.revision.run);
-            let run = self
-                .evidence
-                .latest
-                .as_ref()
-                .filter(|r| run_id.is_none_or(|id| id == r.run.id))
-                .or_else(|| {
-                    self.history
-                        .as_ref()
-                        .and_then(|h| h.runs.iter().find(|r| Some(r.run.id) == run_id))
-                });
-            if let Some(run) = run {
-                details = details.child(format!(
-                    "After: run {} · started {:?} · finished {:?}",
-                    run.run.id, run.run.started_at, run.run.finished_at
-                ));
-                if let Some(c) = run.evidence(key) {
-                    details = details.child(format!("After original {}\nAfter requested URL: {}\nAfter final URL: {}\nAfter capture metadata: {:?}", c.image.original.as_str(), c.metadata.requested, c.metadata.final_url, c.metadata));
-                }
-            }
-            if let Some(request) = self.viewer.as_ref().and_then(|v| v.request.as_ref()) {
-                details = details.child(format!(
-                    "Exact pair descriptors and ignored-area revision: {request:?}"
-                ));
-            }
-        }
-        details.into_any_element()
     }
     fn review_identity(&self) -> Option<(AnalysisId, TargetKey)> {
         Some((
@@ -687,6 +611,7 @@ impl Shell {
             36 => {
                 self.capture_details_open = !self.capture_details_open;
                 self.capture_diagnostics_open = false;
+                self.copied_capture_diagnostics = None;
                 if self.capture_details_open {
                     self.image_controls_open = false;
                     self.review_note_open = false;
@@ -694,7 +619,10 @@ impl Shell {
                     self.mask_draw = false;
                 }
             }
-            38 => self.capture_diagnostics_open = !self.capture_diagnostics_open,
+            38 => {
+                self.capture_diagnostics_open = !self.capture_diagnostics_open;
+                self.copied_capture_diagnostics = None;
+            }
             39 => {
                 self.presentation_focus = Some(if self.image_controls_open {
                     self.image_controls_trigger()

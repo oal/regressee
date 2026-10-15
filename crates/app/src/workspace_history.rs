@@ -720,24 +720,7 @@ impl Shell {
         );
         }
 
-        let mut provenance = div()
-            .w_full()
-            .border_t_1()
-            .border_color(rgb(LINE))
-            .pt_5()
-            .flex()
-            .flex_col()
-            .gap_3()
-            .child(self.button(
-                Control::Details(Detail::History),
-                if self.details.contains(&Detail::History) {
-                    "Hide technical details"
-                } else {
-                    "Show technical details"
-                },
-                ActionStyle::Secondary,
-                cx,
-            ));
+        let mut provenance = div().w_full().flex().flex_col().gap_3();
         if self.details.contains(&Detail::History) {
             if let Some(s) = &self.project_storage {
                 provenance = provenance.child(history_help(format!("Exact storage: total {} bytes · originals {} bytes · derivatives {} bytes · exclusive {} bytes · shared {} bytes", s.bytes, s.original_bytes, s.derived_bytes, s.exclusive_bytes, s.shared_bytes)));
@@ -841,7 +824,25 @@ impl Shell {
                 )));
             }
         }
-        body = body.child(provenance);
+        body = body.child(
+            div()
+                .w_full()
+                .min_w_0()
+                .flex_shrink_0()
+                .flex()
+                .flex_col()
+                .border_t_1()
+                .border_color(rgb(LINE))
+                .pt_5()
+                .child(self.inline_disclosure(
+                    Control::Details(Detail::History),
+                    "Technical details",
+                    "",
+                    self.details.contains(&Detail::History),
+                    provenance,
+                    cx,
+                )),
+        );
         body.into_any_element()
     }
 
@@ -867,9 +868,9 @@ impl Shell {
         )
         .debug_selector(move || format!("history-row-{control:?}"))
         .when(enabled, |el| {
-            el.on_click(
-                cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
-            )
+            el.on_click(cx.listener(move |this, event, window, cx| {
+                this.click_control(control, event, window, cx)
+            }))
         })
         .into_any_element()
     }

@@ -2404,6 +2404,7 @@ fn actual_signed_http_product_flow() -> Result<()> {
         work: Work::Activate {
             run: baseline.run.id,
             revision: 1,
+            confirm_partial: false,
         },
     })
     .unwrap();

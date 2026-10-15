@@ -155,7 +155,8 @@ impl Shell {
         self.evidence.latest.as_ref().is_some_and(|run| {
             self.evidence.baseline.as_ref().is_some_and(|baseline| {
                 !baseline.references.is_empty()
-                    && baseline.references.len() == run.run.targets.len()
+                    && baseline.references.len() == run.all_captures().count()
+                    && baseline.intended_count as usize == run.run.targets.len()
                     && baseline
                         .references
                         .iter()
@@ -189,7 +190,48 @@ impl Shell {
         }
     }
 
-    fn capture_next_step(&self) -> Option<&'static str> {
+    pub(super) fn partial_baseline_capture(&self) -> bool {
+        self.history_inspection.is_none()
+            && self.preview.is_none()
+            && self
+                .evidence
+                .latest
+                .as_ref()
+                .and_then(|r| r.baseline_save_counts())
+                .is_some_and(|(captured, intended)| captured < intended)
+    }
+
+    pub(super) fn baseline_save_confirmation(
+        &self,
+        captured: usize,
+        intended: usize,
+    ) -> (String, String, &'static str) {
+        let retained = if self.evidence.baseline.is_some() {
+            "This replaces your current baseline. Earlier baseline versions and all capture results are kept in History."
+        } else {
+            "All capture results, including failures, are kept in History."
+        };
+        if captured < intended {
+            let missing = count_label(intended - captured, "screenshot", "screenshots");
+            (
+                format!("Save baseline and skip {missing}?"),
+                format!(
+                    "{captured} of {intended} screenshots will be saved. {missing} could not be captured and will be skipped. Future checks will compare only the saved screenshots; skipped page and screen-size pairs will not be checked. To include them later, capture and save a replacement baseline. {retained}"
+                ),
+                "Save & skip missing",
+            )
+        } else {
+            (
+                "Save these screenshots as the baseline?".into(),
+                format!(
+                    "Future checks will compare against these screenshots using the same page list. {retained}"
+                ),
+                "Save baseline",
+            )
+        }
+    }
+
+    fn capture_next_step(&self) -> Option<String> {
         if self.history_inspection.is_some() {
             return None;
         }
@@ -198,7 +240,19 @@ impl Shell {
         }
         let run = self.evidence.latest.as_ref()?;
         if self.capture_is_saved_baseline() {
-            return Some("Baseline saved · Run check to compare.");
+            return Some("Baseline saved · Run check to compare.".into());
+        }
+        if let Some((captured, intended)) = run.baseline_save_counts()
+            && captured < intended
+        {
+            return Some(format!(
+                "{captured} of {intended} screenshots captured. Save baseline to keep these and skip {}, or review failures.",
+                count_label(
+                    intended - captured,
+                    "missing screenshot",
+                    "missing screenshots"
+                )
+            ));
         }
         Some(match run.run.intent {
             RunIntent::NewBaseline => match run.run.state {
@@ -229,7 +283,7 @@ impl Shell {
             RunIntent::Check { .. } => {
                 "No comparison available · Run check to retry; baseline unchanged."
             }
-        })
+        }.into())
     }
 
     fn baseline_rail_status(&self) -> String {
@@ -255,6 +309,8 @@ impl Shell {
                 .is_some_and(|p| p.project.active_baseline.is_some())
         {
             "Saved baseline".into()
+        } else if self.focus.candidate && self.partial_baseline_capture() {
+            "Ready to save baseline\nSome screenshots will be skipped".into()
         } else if self.focus.candidate {
             "Ready to save baseline".into()
         } else if self.evidence.latest.as_ref().is_some_and(|run| {
@@ -442,7 +498,8 @@ impl Shell {
             Control::DiscardPageList if results => {
                 self.preview.is_some() && self.options_panel_open()
             }
-            Control::Phase5(0..=19 | 26..=28 | 34..=39)
+            Control::CopyCaptureDiagnostics
+            | Control::Phase5(0..=19 | 26..=28 | 34..=39)
             | Control::AnalysisField(0..=8 | 10..=13)
             | Control::Viewer
             | Control::Guided(44 | 46)
@@ -576,11 +633,23 @@ impl Shell {
                 cx,
             ));
         }
+        if self.partial_baseline_capture() && !pages {
+            actions = actions.child(self.button(
+                Control::ReviewCaptureFailures,
+                "Review failures",
+                ActionStyle::Secondary,
+                cx,
+            ));
+        }
         if self.focus.baseline && !pages {
             actions = actions.child(self.button(
                 Control::CheckChanges,
                 "Run check",
-                ActionStyle::Secondary,
+                if self.focus.candidate {
+                    ActionStyle::Secondary
+                } else {
+                    ActionStyle::Primary
+                },
                 cx,
             ));
         }
@@ -667,7 +736,7 @@ impl Shell {
                                 .text_size(px(14.))
                                 .line_height(px(20.))
                                 .when(
-                                    self.evidence.latest.as_ref().is_some_and(|run| {
+                                    !self.capture_is_saved_baseline() && self.evidence.latest.as_ref().is_some_and(|run| {
                                         run.run.state == JobState::CompletedWithErrors
                                     }),
                                     |notice| {
@@ -679,7 +748,7 @@ impl Shell {
                                     },
                                 )
                                 .text_color(rgb(
-                                    if self.evidence.latest.as_ref().is_some_and(|run| {
+                                    if !self.capture_is_saved_baseline() && self.evidence.latest.as_ref().is_some_and(|run| {
                                         run.run.state == JobState::CompletedWithErrors
                                     }) {
                                         WARNING
@@ -788,7 +857,16 @@ impl Shell {
                 .zip(self.evidence.baseline.as_ref())
                 .is_some_and(|(r, b)| r.run.inventory.id == b.inventory)
             {
-                "Saved baseline page list · Checks revisit included pages. Find pages to prepare a replacement.".into()
+                if self
+                    .evidence
+                    .baseline
+                    .as_ref()
+                    .is_some_and(|b| b.explicitly_partial)
+                {
+                    "Saved baseline page list · Checks use only saved screenshots; missing page/size pairs are skipped. Find pages to prepare a replacement.".into()
+                } else {
+                    "Saved baseline page list · Checks revisit included pages. Find pages to prepare a replacement.".into()
+                }
             } else {
                 "Latest capture page list · Find pages to prepare a new list; saved baseline unchanged.".into()
             };
@@ -1039,8 +1117,8 @@ impl Shell {
             .child("Capture times may differ; this is not one simultaneous site snapshot.")
             .child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Inspecting {role} · screenshot {} of {rows}", self.approval_reference_index + 1)))
             .child(format!("{} · {} · {environment} · {}", index.target_labels.get(&inspected.key).map(|url| controls::page_path(url)).unwrap_or_else(|| inspected.key.page.to_string()), index.profile_labels.get(&inspected.key.profile).cloned().unwrap_or_else(|| inspected.key.profile.to_string()), capture_time(inspected.captured_at)))
-            .child(self.guided_button(52, if self.approval_exact_open { "Hide screenshot source details" } else { "Show screenshot source details" }, cx))
-            .when(self.approval_exact_open, |body| body.child(div().id("approval-exact-provenance").debug_selector(|| "approval-exact-provenance".into()).text_size(px(14.)).line_height(px(20.)).child(exact)));
+            .child(self.inline_disclosure(Control::Guided(52), "Screenshot source details", "", self.approval_exact_open,
+                div().id("approval-exact-provenance").debug_selector(|| "approval-exact-provenance".into()).text_size(px(14.)).line_height(px(20.)).child(exact), cx));
         // Bound mounted rows, without dropping any unchanged reference. Previous/
         // Next visits every reference and switches the visible 32-row page.
         let start = self.approval_reference_index / 32 * 32;
@@ -1110,40 +1188,19 @@ impl Shell {
                     })),
             );
         }
-        div()
+        regressee_app::ui::dialog::overlay()
             .id("approval-modal-backdrop")
-            .occlude()
-            .absolute()
-            .inset_0()
-            .bg(rgba(0x183f6588))
-            .flex()
-            .items_center()
-            .justify_center()
             .child(
-                div()
+                regressee_app::ui::dialog::surface(if self.narrow_workspace { 740. } else { 760. })
                     .debug_selector(|| "approval-decision".into())
-                    .w(px(if self.narrow_workspace { 740. } else { 760. }))
-                    .max_w_full()
                     .h(px(520.))
-                    .max_h_full()
-                    .p_4()
-                    .bg(rgb(SURFACE))
-                    .border_1()
-                    .border_color(rgb(LINE))
-                    .rounded(px(4.))
-                    .flex()
-                    .flex_col()
-                    .gap_2()
-                    .child(
-                        div()
-                            .text_size(px(22.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child(format!(
-                                "Update the baseline for {} screenshot{}?",
-                                preview.selected.len(),
-                                if preview.selected.len() == 1 { "" } else { "s" }
-                            )),
-                    )
+                    .p_6()
+                    .gap_4()
+                    .child(regressee_app::ui::dialog::heading().child(format!(
+                        "Update the baseline for {} screenshot{}?",
+                        preview.selected.len(),
+                        if preview.selected.len() == 1 { "" } else { "s" }
+                    )))
                     .child(
                         div()
                             .id("approval-reference-list")
@@ -1159,7 +1216,7 @@ impl Shell {
                         "Scroll to see more screenshots. Source details are available above.",
                     ))
                     .child(
-                        div()
+                        regressee_app::ui::dialog::footer()
                             .flex()
                             .flex_wrap()
                             .justify_between()
@@ -1840,6 +1897,20 @@ impl Shell {
             .when_some(scope, |summary, scope| {
                 summary.child(div().text_color(rgb(WARNING)).child(scope))
             })
+            .when_some(
+                self.evidence
+                    .baseline
+                    .as_ref()
+                    .filter(|b| b.explicitly_partial && !self.capture_is_saved_baseline()),
+                |summary, baseline| {
+                    summary.child(div().text_color(rgb(WARNING)).child(format!(
+                        "Baseline: {} / {} screenshots · {} skipped",
+                        baseline.references.len(),
+                        baseline.intended_count,
+                        baseline.intended_count as usize - baseline.references.len()
+                    )))
+                },
+            )
             .into_any_element()
     }
 }
@@ -2227,25 +2298,26 @@ mod tests {
                 cx,
             );
             s.focus.screen = Screen::Results;
-            assert!(!s.focus.candidate && !s.focus.baseline);
-            assert_eq!(s.review_title(), "Inspect capture");
+            assert!(s.focus.candidate && !s.focus.baseline);
+            assert_eq!(s.review_title(), "Inspect baseline");
             assert_eq!(
                 s.baseline_rail_status(),
-                "Incomplete capture\nNo baseline saved"
+                "Ready to save baseline\nSome screenshots will be skipped"
             );
             assert!(
                 s.capture_next_step()
                     .unwrap()
-                    .contains("Filter by Missing or not compared")
+                    .contains("skip 1 missing screenshot")
             );
             assert!(s.comparison_context().contains("no comparison performed"));
             assert_eq!(
                 s.captured_target_label(&key),
                 "Captured · not yet a baseline"
             );
-            assert!(!s.control_enabled(Control::SaveBaseline, cx));
+            assert!(s.control_enabled(Control::SaveBaseline, cx));
+            assert!(s.control_enabled(Control::ReviewCaptureFailures, cx));
             assert!(!s.control_enabled(Control::CheckChanges, cx));
-            assert!(s.control_enabled(Control::CaptureBaseline, cx));
+            assert!(!s.control_enabled(Control::CaptureBaseline, cx));
             let coverage =
                 Coverage::from_run(s.evidence.latest.as_ref().unwrap(), &s.review_index());
             assert_eq!(

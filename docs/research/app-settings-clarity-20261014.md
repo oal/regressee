@@ -1,5 +1,10 @@
 # App settings clarity — 2026-10-14
 
+**Superseded detail, 2026-10-15:** the folder-picker preview described below was
+removed at the user's request, including its focus/activation wiring. Storage
+locations now disclose only actual paths. Other findings below remain historical
+evidence. See [no-op controls audit](no-op-controls-20261015.md).
+
 ## Confirmed scope
 
 The user missed the installed-browser integrity check among unstructured settings

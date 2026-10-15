@@ -29,6 +29,7 @@ pub(super) struct Task {
     pub capture: Option<CaptureStatus>,
     pub scroll: gpui::ScrollHandle,
     pub reveal_details: std::rc::Rc<std::cell::Cell<bool>>,
+    pub details_bounds: std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>,
     pub link_bounds: Vec<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
 }
 
@@ -61,6 +62,9 @@ impl Task {
     fn controls(&self) -> Vec<Control> {
         let mut controls = Vec::new();
         for index in 0..regressee_app::task::MAX_TASK_LINKS {
+            if index == 1 && self.has_details() {
+                controls.push(Control::TaskDetails);
+            }
             if self.link_url(index).is_some() {
                 controls.push(Control::TaskLink(index));
             }
@@ -74,9 +78,6 @@ impl Task {
             if self.spec.pausable && self.state == State::Running {
                 controls.push(Control::PauseCapture);
             }
-        }
-        if self.has_details() {
-            controls.push(Control::TaskDetails);
         }
         controls
     }
@@ -219,6 +220,12 @@ impl Task {
                         {
                             outcome.message = format!("{} failed: {}. {}", workflow::count_label(counts.failed, "screenshot attempt", "screenshot attempts"), code.label(), capture_recovery(*code));
                         }
+                    }
+                    if run
+                        .baseline_save_counts()
+                        .is_some_and(|(captured, intended)| captured < intended)
+                    {
+                        outcome.message = "You can save the successful screenshots as your baseline and skip those that could not be captured. Review the results, then choose Save baseline.".into();
                     }
                     outcome.tone = if run.run.state == JobState::Completed {
                         Tone::Neutral
@@ -616,9 +623,6 @@ fn capture_setup(setup: &CaptureStatus) -> Div {
 
 fn task_details(shell: &Shell, cx: &mut Context<Shell>) -> AnyElement {
     let task = shell.task.as_ref().unwrap();
-    let reveal = task.reveal_details.clone();
-    let scroll = task.scroll.clone();
-    let owner = cx.entity().downgrade();
     let mut details = div()
         .id("task-details")
         .debug_selector(|| "task-details".into())
@@ -627,42 +631,11 @@ fn task_details(shell: &Shell, cx: &mut Context<Shell>) -> AnyElement {
         .w(px(560.))
         .max_w_full()
         .min_w_0()
-        .border_t_1()
-        .border_color(rgb(LINE))
-        .pt_4()
         .text_size(px(14.))
         .line_height(px(20.))
         .flex()
         .flex_col()
-        .gap_6()
-        // Reveal after the new subtree has layout, including on headless draws
-        // without OS frame callbacks. The next frame applies the new offset;
-        // ordinary progress updates never reset the user's scroll position.
-        .child(
-            canvas(
-                move |bounds, window, cx| {
-                    if reveal.replace(false) {
-                        let offset = scroll.offset();
-                        scroll.set_offset(gpui::point(
-                            offset.x,
-                            offset.y + scroll.bounds().top() + px(24.) - bounds.top(),
-                        ));
-                        let owner = owner.clone();
-                        window.defer(cx, move |_, cx| {
-                            if let Some(owner) = owner.upgrade() {
-                                owner.update(cx, |_, cx| cx.notify());
-                            }
-                        });
-                    }
-                },
-                |_, _, _, _| {},
-            )
-            .absolute()
-            .top_0()
-            .left_0()
-            .w_full()
-            .h(px(0.)),
-        );
+        .gap_6();
     if let Some(result) = &task.result {
         if let Some(capture) = &result.capture {
             if capture.gap_count > 0 {
@@ -851,19 +824,21 @@ impl Shell {
             .size_full(),
         )
         .when(enabled, |el| {
-            el.on_click(cx.listener(move |this, _, window, cx| {
-                this.activate_control(control, window, cx);
+            el.on_click(cx.listener(move |this, event, window, cx| {
+                this.click_control(control, event, window, cx);
             }))
         })
         .into_any_element()
     }
 
     pub(super) fn reveal_task_control(&self, control: Control) {
-        let Control::TaskLink(index) = control else {
-            return;
-        };
         let Some(task) = &self.task else { return };
-        let Some(bounds) = task.link_bounds.get(index).and_then(|bounds| bounds.get()) else {
+        let bounds = match control {
+            Control::TaskDetails => task.details_bounds.get(),
+            Control::TaskLink(index) => task.link_bounds.get(index).and_then(|bounds| bounds.get()),
+            _ => None,
+        };
+        let Some(bounds) = bounds else {
             return;
         };
         let viewport = task.scroll.bounds();
@@ -942,6 +917,7 @@ impl Shell {
             progress: self.progress.clone(),
             capture: None,
             reveal_details: std::rc::Rc::new(std::cell::Cell::new(false)),
+            details_bounds: Default::default(),
             link_bounds: (0..regressee_app::task::MAX_TASK_LINKS)
                 .map(|_| Default::default())
                 .collect(),
@@ -1100,6 +1076,9 @@ impl Shell {
                     .debug_selector(|| "task-title".into())
                     .text_size(px(28.))
                     .line_height(px(34.))
+                    .when(task.spec.surface == Surface::Dialog, |heading| {
+                        heading.text_size(px(21.)).line_height(px(28.))
+                    })
                     .font_weight(FontWeight::SEMIBOLD)
                     .when_some(task.result.as_ref(), |el, result| {
                         el.child(div().flex_shrink_0().pt(px(5.)).child(status_icon(
@@ -1249,8 +1228,60 @@ impl Shell {
                 body.child(activity)
                     .child(controls::note(title, explanation, Tone::Information));
         }
-        if task.details && task.has_details() {
-            body = body.child(task_details(self, cx));
+        if task.has_details() {
+            let bounds = task.details_bounds.clone();
+            let reveal = task.reveal_details.clone();
+            let scroll = task.scroll.clone();
+            let owner = cx.entity().downgrade();
+            let trigger = self
+                .disclosure_control(Control::TaskDetails, "Details", task.details, cx)
+                .relative()
+                .child(
+                    canvas(
+                        |_, _, _| (),
+                        move |painted, _, _, _| {
+                            bounds.set(Some(form_recovery::bordered_control_bounds(painted)))
+                        },
+                    )
+                    .absolute()
+                    .inset_0()
+                    .size_full(),
+                );
+            body = body.child(
+                controls::disclosure_group(
+                    "TaskDetails",
+                    trigger.into_any_element(),
+                    "",
+                    task.details.then(|| task_details(self, cx)),
+                )
+                .relative()
+                .child(
+                    canvas(
+                        move |bounds, window, cx| {
+                            // Reveal the owner heading, not just its newly mounted body.
+                            if reveal.replace(false) {
+                                let offset = scroll.offset();
+                                scroll.set_offset(gpui::point(
+                                    offset.x,
+                                    offset.y + scroll.bounds().top() + px(24.) - bounds.top(),
+                                ));
+                                let owner = owner.clone();
+                                window.defer(cx, move |_, cx| {
+                                    if let Some(owner) = owner.upgrade() {
+                                        owner.update(cx, |_, cx| cx.notify());
+                                    }
+                                });
+                            }
+                        },
+                        |_, _, _, _| {},
+                    )
+                    .absolute()
+                    .top_0()
+                    .left_0()
+                    .w_full()
+                    .h(px(0.)),
+                ),
+            );
         }
         let mut actions = div()
             .debug_selector(|| "task-actions".into())
@@ -1283,18 +1314,6 @@ impl Shell {
                     cx,
                 ));
             }
-        }
-        if task.has_details() {
-            actions = actions.child(self.button(
-                Control::TaskDetails,
-                if task.details {
-                    "Hide details"
-                } else {
-                    "Show details"
-                },
-                ActionStyle::Secondary,
-                cx,
-            ));
         }
         div()
             .debug_selector(|| "task-panel".into())
@@ -1344,12 +1363,7 @@ impl Shell {
                     .flex()
                     .flex_col()
                     .gap_6()
-                    .child(
-                        div()
-                            .text_size(px(22.))
-                            .font_weight(FontWeight::SEMIBOLD)
-                            .child("Regressee"),
-                    )
+                    .child(brand::navigation_lockup())
                     .child(
                         div()
                             .font_weight(FontWeight::MEDIUM)
@@ -1383,27 +1397,12 @@ impl Shell {
     }
 
     pub(super) fn task_dialog(&self, cx: &mut Context<Self>) -> AnyElement {
-        div()
+        regressee_app::ui::dialog::overlay()
             .debug_selector(|| "task-dialog-overlay".into())
-            .occlude()
-            .absolute()
-            .inset_0()
-            .p_4()
-            .flex()
-            .items_center()
-            .justify_center()
-            .bg(rgba((INK << 8) | 0x66))
             .child(
-                div()
+                regressee_app::ui::dialog::surface(600.)
                     .debug_selector(|| "task-dialog".into())
-                    .w(px(600.))
                     .h(px(480.))
-                    .max_w_full()
-                    .max_h_full()
-                    .min_h_0()
-                    .border_1()
-                    .border_color(rgb(CONTROL_LINE))
-                    .rounded(px(4.))
                     .overflow_hidden()
                     .child(self.task_panel(cx)),
             )
@@ -1421,6 +1420,62 @@ impl Shell {
 mod tests {
     use super::*;
     use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn every_task_workspace_keeps_the_shared_navigation_brand(cx: &mut TestAppContext) {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let record = store.load_project(project).unwrap();
+        drop(store);
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            for work in [
+                Work::Discover(project),
+                Work::CaptureInventory {
+                    project,
+                    preview: None,
+                    check: false,
+                    resume: None,
+                },
+                Work::CaptureInventory {
+                    project,
+                    preview: None,
+                    check: true,
+                    resume: None,
+                },
+                Work::SetupRuntime,
+            ] {
+                let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+                let owned = jobs.clone();
+                let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+                cx.simulate_resize(size(px(width), px(height)));
+                shell.update(cx, |s, cx| {
+                    drain_initial_read(s, cx);
+                    s.project = Some(record.clone());
+                    s.next_request += 1;
+                    s.pending = Some(s.next_request);
+                    s.focus.busy = true;
+                    s.begin_task(Spec::for_work(&work).unwrap());
+                    assert!(s.task_owns_workspace());
+                    cx.notify();
+                });
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                let mark = cx.debug_bounds("brand-nav-logo").unwrap();
+                let name = cx.debug_bounds("brand-nav-name").unwrap();
+                assert!((f32::from(mark.size.width) - 96.).abs() < 0.1);
+                assert!((f32::from(mark.size.height) - 96. * 180. / 294.).abs() < 1.);
+                assert!((f32::from(mark.center().x) - 96.).abs() < 0.1);
+                assert!((f32::from(name.center().x) - 96.).abs() < 0.1);
+                assert!((f32::from(name.top() - mark.bottom()) - 8.).abs() < 0.1);
+                assert!(mark.top() >= px(24.) && name.bottom() < px(height));
+                assert!(name.left() >= px(24.) && name.right() <= px(168.));
+                let stop = cx.debug_bounds("action-CancelCapture").unwrap();
+                assert!(stop.left() >= px(192.) && stop.bottom() <= px(height));
+                owned.join_after_ui();
+            }
+        }
+    }
 
     #[gpui::test]
     fn browser_download_keeps_readable_amount_bar_and_elapsed_time(cx: &mut TestAppContext) {
@@ -1875,6 +1930,8 @@ mod tests {
             shell.update(cx, |s, cx| {
                 window.focus(&s.handle(Control::TaskLink(0), cx));
                 s.move_focus(false, window, cx);
+                assert!(s.handle(Control::TaskDetails, cx).is_focused(window));
+                s.move_focus(false, window, cx);
                 assert!(s.handle(Control::TaskLink(1), cx).is_focused(window));
                 s.activate(&Activate, window, cx);
             })
@@ -2247,6 +2304,7 @@ mod tests {
                 Spec::for_work(&Work::Activate {
                     run: regressee_core::domain::RunId::new(),
                     revision: 1,
+                    confirm_partial: false,
                 })
                 .unwrap(),
             );

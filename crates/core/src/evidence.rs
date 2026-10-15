@@ -63,6 +63,23 @@ pub struct RunRecord {
     pub queue: Option<QueueSettings>,
 }
 impl RunRecord {
+    /// Finished baseline captures may be saved with explicit consent to omit
+    /// unsuccessful targets. Active, interrupted and preview runs never qualify.
+    pub fn baseline_save_counts(&self) -> Option<(usize, usize)> {
+        if self.run.intent != RunIntent::NewBaseline
+            || !matches!(
+                self.run.state,
+                JobState::Completed | JobState::CompletedWithErrors
+            )
+            || self.run.finished_at.is_none()
+        {
+            return None;
+        }
+        let captured = self.all_captures().count();
+        (captured > 0 && captured <= self.run.targets.len())
+            .then_some((captured, self.run.targets.len()))
+    }
+
     pub fn evidence(&self, key: &TargetKey) -> Option<&CaptureEvidence> {
         self.captures
             .iter()

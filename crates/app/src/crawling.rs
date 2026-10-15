@@ -27,6 +27,32 @@ fn scoped(installed: &Installed, url: &url::Url) -> Result<()> {
     );
     Ok(())
 }
+
+fn capture_targets(
+    inventory: &InventoryRevision,
+    profiles: &[CaptureProfile],
+    reference_keys: Option<&BTreeSet<TargetKey>>,
+) -> Vec<CaptureTarget> {
+    inventory
+        .pages
+        .iter()
+        .filter(|p| p.included)
+        .flat_map(|page| {
+            profiles.iter().map(move |profile| CaptureTarget {
+                key: TargetKey {
+                    page: page.id,
+                    profile: profile.id,
+                },
+                requested: page.canonical.clone(),
+                final_url: None,
+                attempts: 0,
+                outcome: TargetOutcome::Pending,
+                warnings: vec![],
+            })
+        })
+        .filter(|target| reference_keys.is_none_or(|keys| keys.contains(&target.key)))
+        .collect()
+}
 fn request(
     worker: &mut Worker,
     job: RunId,
@@ -629,13 +655,9 @@ impl Product {
                     saved
                         .project
                         .active_baseline
-                        .context("Save a complete baseline before checking")?,
+                        .context("Save a baseline before checking")?,
                 )?;
                 let before = store.load_run(baseline.references[0].run)?;
-                ensure!(
-                    !baseline.explicitly_partial,
-                    "Reduced coverage requires a fresh complete baseline in this preview"
-                );
                 (
                     before.run.inventory.clone(),
                     before.run.profiles.clone(),
@@ -695,24 +717,19 @@ impl Product {
             if check {
                 self.require_probe(store, project, &environment)?;
             }
-            let targets = inventory
-                .pages
-                .iter()
-                .filter(|p| p.included)
-                .flat_map(|page| {
-                    profiles.iter().map(move |profile| CaptureTarget {
-                        key: TargetKey {
-                            page: page.id,
-                            profile: profile.id,
-                        },
-                        requested: page.canonical.clone(),
-                        final_url: None,
-                        attempts: 0,
-                        outcome: TargetOutcome::Pending,
-                        warnings: vec![],
-                    })
-                })
-                .collect();
+            let reference_keys = if let RunIntent::Check { baseline } = intent {
+                Some(
+                    store
+                        .load_baseline(baseline)?
+                        .references
+                        .into_iter()
+                        .map(|r| r.key)
+                        .collect::<BTreeSet<_>>(),
+                )
+            } else {
+                None
+            };
+            let targets = capture_targets(&inventory, &profiles, reference_keys.as_ref());
             let frozen_discovery = if let RunIntent::Check { baseline } = &intent {
                 let b = store.load_baseline(*baseline)?;
                 store
@@ -1337,6 +1354,49 @@ fn capture_one(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn partial_baseline_check_schedules_only_saved_page_and_size_pairs() {
+        let mut project =
+            Project::draft("Partial baseline".into(), "https://example.test/").unwrap();
+        let mut mobile = project.profiles[0].clone();
+        mobile.id = ProfileId::new();
+        mobile.name = "Mobile".into();
+        project.profiles.push(mobile);
+        let inventory = InventoryRevision {
+            id: InventoryId::new(),
+            project: project.id,
+            identity_version: 2,
+            pages: ["/", "/second"]
+                .into_iter()
+                .map(|path| InventoryPage {
+                    id: PageId::new(),
+                    canonical: project.sources[0].join(path).unwrap(),
+                    included: true,
+                    reason: None,
+                })
+                .collect(),
+            coverage: DiscoveryCoverage::Complete,
+        };
+        let all = capture_targets(&inventory, &project.profiles, None);
+        assert_eq!(all.len(), 4);
+        let saved: BTreeSet<_> = all[..3].iter().map(|t| t.key.clone()).collect();
+        let check = capture_targets(&inventory, &project.profiles, Some(&saved));
+        assert_eq!(check.len(), 3);
+        assert_eq!(
+            check.iter().map(|t| t.key.clone()).collect::<BTreeSet<_>>(),
+            saved
+        );
+        assert!(
+            check
+                .iter()
+                .all(|t| t.outcome == TargetOutcome::Pending && t.attempts == 0)
+        );
+        assert_eq!(
+            inventory.pages.len(),
+            2,
+            "original discovery remains intact"
+        );
+    }
     #[test]
     fn discovery_reports_preparation_before_runtime_failure_without_visits() -> Result<()> {
         let dir = tempfile::tempdir()?;

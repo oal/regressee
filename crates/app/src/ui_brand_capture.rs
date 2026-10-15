@@ -28,6 +28,10 @@ fn renderer_capture_branding(cx: &mut TestAppContext) {
             "about",
             "review",
             "review-read-only",
+            "task-discovery",
+            "task-capture",
+            "task-check",
+            "task-browser-setup",
         ] {
             let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
             let owned = jobs.clone();
@@ -60,6 +64,22 @@ fn renderer_capture_branding(cx: &mut TestAppContext) {
                         "review-read-only" => {
                             s.history_inspection =
                                 Some((project, s.evidence.latest.as_ref().unwrap().run.id));
+                        }
+                        "task-discovery" | "task-capture" | "task-check" | "task-browser-setup" => {
+                            let work = match scene {
+                                "task-discovery" => Work::Discover(project),
+                                "task-browser-setup" => Work::SetupRuntime,
+                                _ => Work::CaptureInventory {
+                                    project,
+                                    preview: None,
+                                    check: scene == "task-check",
+                                    resume: None,
+                                },
+                            };
+                            s.next_request += 1;
+                            s.pending = Some(s.next_request);
+                            s.focus.busy = true;
+                            s.begin_task(regressee_app::task::Spec::for_work(&work).unwrap());
                         }
                         _ => (),
                     }
@@ -103,6 +123,13 @@ fn renderer_capture_branding(cx: &mut TestAppContext) {
             }
             let label = format!("brand-{width:.0}x{height:.0}-{scene}");
             capture(cx, &root, &label).unwrap();
+            manifest.push(label.clone());
+            if scene.starts_with("task-") {
+                assert!(cx.debug_bounds("task-workspace").is_some());
+                assert!(cx.debug_bounds("action-CancelCapture").is_some());
+                owned.join_after_ui();
+                continue;
+            }
             let mut previous_bottom = px(0.);
             for selector in [
                 "action-Navigate(Projects)",
@@ -123,7 +150,6 @@ fn renderer_capture_branding(cx: &mut TestAppContext) {
                 }
                 previous_bottom = bounds.bottom();
             }
-            manifest.push(label);
             owned.join_after_ui();
         }
     }

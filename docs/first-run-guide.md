@@ -35,12 +35,15 @@ for the separate platform/clean-machine qualification limits.
    **Save baseline**.
     A baseline is the approved reference screenshots. Failed or missing targets
     cannot be called unchanged or silently approved.
-    Saved capture screenshots are not automatically a baseline. If the capture
-    has gaps, **Inspect capture** shows the screenshots on their own and explains
-    why **Save baseline** is unavailable. Use **Filter** → **Gaps** to inspect
-    failures, then **Find pages** to fix or exclude pages in a new preview and
-    capture again. The earlier screenshots remain in History. Once the capture
-    is complete, choose **Save baseline** to establish the comparison reference.
+    Saved capture screenshots are not automatically a baseline. If a finished
+    capture has some failures, choose **Save baseline** to save the successful
+    screenshots. A confirmation names how many screenshots will be saved and
+    skipped. Skipped page/screen-size pairs are not included in future checks;
+    their failure records remain in History. **Review failures** filters the
+    results without changing the screenshot being inspected. To include missing
+    screenshots later, use **Pages & baseline** → **Use recorded pages** (or
+    **Find pages** for a new list), capture again, and save a replacement baseline.
+    No-success, unfinished and preview-only captures cannot be saved as baselines.
 6. **Review changes** → **Run check** revisits only the fixed baseline
    inventory. Use the coverage summary and searchable queue beside the comparison
    viewer to inspect changed screenshots and failed/non-comparable targets. Differences are evidence

@@ -12,6 +12,7 @@ pub enum StatusIcon {
     Pending,
     Paused,
     Pages,
+    MissingImage,
     Clock,
 }
 
@@ -55,6 +56,14 @@ fn icon_paths(icon: StatusIcon, bounds: Bounds<Pixels>) -> Vec<Path<Pixels>> {
             line(&[(0.6, 0.12), (0.6, 0.34), (0.82, 0.34)]);
             line(&[(0.37, 0.52), (0.68, 0.52)]);
             line(&[(0.37, 0.68), (0.68, 0.68)]);
+        }
+        StatusIcon::MissingImage => {
+            // An image frame interrupted by a diagonal, not a generic alert.
+            line(&[(0.32, 0.18), (0.86, 0.18), (0.86, 0.72)]);
+            line(&[(0.14, 0.28), (0.14, 0.82), (0.68, 0.82)]);
+            line(&[(0.14, 0.68), (0.35, 0.47), (0.58, 0.7)]);
+            line(&[(0.67, 0.38), (0.72, 0.38)]);
+            line(&[(0.1, 0.1), (0.9, 0.9)]);
         }
         StatusIcon::Information | StatusIcon::Error | StatusIcon::Clock | StatusIcon::Pending => {
             // Native circular curves, not font glyphs or emoji.
@@ -114,6 +123,7 @@ mod tests {
             StatusIcon::Pending,
             StatusIcon::Paused,
             StatusIcon::Pages,
+            StatusIcon::MissingImage,
             StatusIcon::Clock,
         ] {
             assert!(!icon_paths(icon, bounds).is_empty(), "{icon:?}");

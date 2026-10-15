@@ -6,8 +6,10 @@ contained opt-in Linux renderer-readback patch. Registry package checksum:
 
 The original `LICENSE-APACHE`, build script, resources, examples, shader sources
 and attribution are preserved. Only the registry's `.cargo-ok` marker was omitted.
-`gpui-provenance.json` records all 183 original file hashes, the nine modified
-files (eight Rust files and Cargo.toml), and patched hashes; 174 files are unchanged.
+`gpui-provenance.json` records all 183 original file hashes, the twelve modified
+files (nine Rust files, Cargo.toml and the later Blade/Windows shader corrections),
+and patched hashes; 171 files are unchanged. The Rust files include the existing
+explicit-float lint correction in `src/taffy.rs`.
 
 The root Cargo patch selects this same version by path. Cargo.lock removes only
 GPUI's registry source/checksum; every other package/version/dependency is retained.
@@ -17,6 +19,11 @@ The directory is excluded from the workspace to avoid formatting all upstream co
 explicitly enabled on a fresh TestAppContext. Default tests still use placeholder
 fonts/atlas, and ordinary native windows still use their existing surface renderer.
 No graphics backend, shader or Blade dependency was replaced.
+
+The Blade and Windows shadow shaders now handle zero blur explicitly, matching Metal's
+signed-distance hard-edge path. A zero-width Gaussian previously produced NaNs,
+leaving only a 1px border instead of the app's keyboard focus outline.
+Nonzero-blur shadows, clipping and color handling are unchanged.
 
 The additional window-local unwrapped text-layout retention API is default-off;
 Regressee explicitly enables its bounded 2,048-entry / 8 MiB accounted-payload

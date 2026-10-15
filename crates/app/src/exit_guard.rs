@@ -288,7 +288,7 @@ impl Shell {
                 PromptLevel::Warning,
                 "Discard discovered pages and quit?",
                 Some("The discovered page list and its include/exclude choices are unsaved and will be discarded when you quit. Saved settings, screenshots and baselines are kept. Keep the page list to continue reviewing."),
-                &["Keep page list", "Discard pages and quit"],
+                &[PromptButton::cancel("Keep page list"), PromptButton::new("Discard pages and quit")],
                 cx,
             )
         } else {
@@ -300,7 +300,7 @@ impl Shell {
             } else {
                 "Project and website settings, ignored areas, review notes and this computer's network edits will be checked and saved locally. This does not visit websites, approve results or save a baseline. Discard only drops unsaved edits; previously saved work stays saved."
             }),
-            &["Cancel", "Save and quit", "Discard and quit"],
+            &[PromptButton::cancel("Cancel"), PromptButton::ok("Save and quit"), PromptButton::new("Discard and quit")],
             cx,
             )
         };

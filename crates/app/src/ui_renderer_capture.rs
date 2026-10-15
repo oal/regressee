@@ -14,8 +14,12 @@ use std::{
 mod ui_app_settings_capture;
 #[path = "ui_brand_capture.rs"]
 mod ui_brand_capture;
+#[path = "ui_dialog_capture.rs"]
+mod ui_dialog_capture;
 #[path = "ui_image_controls_capture.rs"]
 mod ui_image_controls_capture;
+#[path = "ui_keyboard_capture.rs"]
+mod ui_keyboard_capture;
 #[path = "ui_loading_feedback_capture.rs"]
 mod ui_loading_feedback_capture;
 #[path = "ui_phase1_capture.rs"]
@@ -36,6 +40,14 @@ mod ui_review_matrix;
 mod ui_row_hints_capture;
 #[path = "ui_sidebar_capture.rs"]
 mod ui_sidebar_capture;
+
+#[gpui::test]
+#[ignore = "explicit two-size native inline-disclosure inspection"]
+fn renderer_capture_disclosures(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    cx.enable_offscreen_renderer().unwrap();
+    crate::disclosure_tests::matrix(cx, |label, cx| capture(cx, &root, label).unwrap());
+}
 
 #[test]
 fn offscreen_extent_limits_without_gpu() {
@@ -157,6 +169,13 @@ fn write_frame(
               ,"phase3_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase3_capture.rs")))
         });
         for (key, source) in [
+            ("keyboard_test_source_sha256", include_bytes!("keyboard_navigation_tests.rs").as_slice()),
+            ("keyboard_harness_source_sha256", include_bytes!("ui_keyboard_capture.rs").as_slice()),
+            ("blade_shader_source_sha256", include_bytes!("../../../vendor/gpui/src/platform/blade/shaders.wgsl").as_slice()),
+            ("disclosure_test_source_sha256", include_bytes!("disclosure_tests.rs").as_slice()),
+            ("dialog_source_sha256", include_bytes!("ui/dialog.rs").as_slice()),
+            ("dialog_harness_source_sha256", include_bytes!("ui_dialog_capture.rs").as_slice()),
+            ("capture_diagnostics_source_sha256", include_bytes!("capture_diagnostics.rs").as_slice()),
             ("project_settings_source_sha256", include_bytes!("project_settings_ux.rs").as_slice()),
             ("project_settings_test_source_sha256", include_bytes!("project_settings_tests.rs").as_slice()),
             ("project_settings_harness_source_sha256", include_bytes!("ui_project_settings_capture.rs").as_slice()),
@@ -174,6 +193,7 @@ fn write_frame(
             ("loading_feedback_source_sha256", include_bytes!("loading_ux.rs").as_slice()),
             ("loading_feedback_tests_source_sha256", include_bytes!("loading_feedback_tests.rs").as_slice()),
             ("loading_feedback_harness_source_sha256", include_bytes!("ui_loading_feedback_capture.rs").as_slice()),
+            ("screenshot_placeholder_tests_source_sha256", include_bytes!("screenshot_placeholder_tests.rs").as_slice()),
             ("image_controls_test_source_sha256", include_bytes!("image_controls_tests.rs").as_slice()),
             ("image_controls_harness_source_sha256", include_bytes!("ui_image_controls_capture.rs").as_slice()),
             ("recovery_policy_source_sha256", include_bytes!("recovery.rs").as_slice()),
@@ -890,7 +910,7 @@ fn renderer_capture_tasks(cx: &mut TestAppContext) {
                     "capture-progress" | "capture-pausing" | "capture-paused" | "capture-setup-details" | "capture-attention" | "capture-gap-details" | "capture-complete" => Work::CaptureInventory { project, preview: None, check: true, resume: None },
                     "zip-import" => Work::Import { preview: Box::new(import.clone()), path: archive.clone() },
                     "zip-export-stopping" | "export-late-success" => Work::Export { preview: Box::new(export.clone()), path: dir.path().join("not-written.zip") },
-                    "baseline-finishing" => Work::Activate { run, revision: s.project.as_ref().unwrap().revision },
+                    "baseline-finishing" => Work::Activate { run, revision: s.project.as_ref().unwrap().revision, confirm_partial: false },
                     _ => Work::Discover(project),
                 };
                 let spec = Spec::for_work(&work).unwrap();
@@ -2743,6 +2763,65 @@ fn renderer_capture_baseline_states(cx: &mut TestAppContext) {
         before,
         serde_json::to_value(store.project_evidence(project).unwrap()).unwrap()
     );
+}
+
+#[gpui::test]
+#[ignore = "bounded partial-baseline recovery capture; isolated synthetic evidence, no website visits"]
+fn renderer_capture_partial_baseline_recovery(cx: &mut TestAppContext) {
+    let root = output_root().unwrap();
+    cx.enable_offscreen_renderer().unwrap();
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        let dir = tempfile::Builder::new()
+            .prefix("synthetic-partial-")
+            .tempdir_in(&root)
+            .unwrap();
+        let (store, project, run) = crate::approval_fixture::partial_fixture(dir.path());
+        let revision = store.load_project(project).unwrap().revision;
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        shell.update(cx, |s, cx| {
+            crate::workflow_refinement_tests::load_review(s, project, cx)
+        });
+        cx.simulate_resize(size(px(width), px(height)));
+        capture(cx, &root, &format!("partial-{width:.0}x{height:.0}-ready")).unwrap();
+        assert!(cx.debug_bounds("action-SaveBaseline").is_some());
+        assert!(cx.debug_bounds("action-ReviewCaptureFailures").is_some());
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                s.activate_control(Control::ReviewCaptureFailures, window, cx);
+            })
+        });
+        capture(
+            cx,
+            &root,
+            &format!("partial-{width:.0}x{height:.0}-failures"),
+        )
+        .unwrap();
+        shell.update(cx, |s, cx| {
+            s.queue(
+                Work::Activate {
+                    run,
+                    revision,
+                    confirm_partial: true,
+                },
+                cx,
+            );
+            finish_jobs(s, cx);
+            s.queue(Work::Evidence(project), cx);
+            finish_jobs(s, cx);
+            s.result_filter = 0;
+            assert!(s.capture_is_saved_baseline());
+            cx.notify();
+        });
+        capture(cx, &root, &format!("partial-{width:.0}x{height:.0}-saved")).unwrap();
+        shell.read_with(cx, |s, _| {
+            assert!(!s.control_mounted(Control::SaveBaseline))
+        });
+        assert!(cx.debug_bounds("action-CheckChanges").is_some());
+        owned.join_after_ui();
+    }
 }
 
 #[gpui::test]

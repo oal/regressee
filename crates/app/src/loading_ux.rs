@@ -112,6 +112,18 @@ impl Shell {
     }
 
     pub(super) fn screenshot_placeholder(&self) -> AnyElement {
+        let queue_width = if self.initial_evidence_loading() || self.initial_evidence_unavailable()
+        {
+            0.
+        } else {
+            self.review_queue_width()
+        };
+        let stage_width = self.working_width
+            - if queue_width > 0. {
+                queue_width + 12.
+            } else {
+                0.
+            };
         if self.selected_capture_failed()
             || matches!(
                 self.screenshot_state(),
@@ -141,14 +153,19 @@ impl Shell {
                         "The recorded screenshot is missing or could not be read.".into()
                     }),
                 };
-                return div().debug_selector(|| "unavailable-target-recovery".into()).flex().flex_col().gap_2()
-                    .child(div().text_size(px(21.)).child(if self.selected_capture_failed() {
+                return controls::image_placeholder(
+                    if self.selected_capture_failed() {
                         "This page could not be captured"
                     } else {
                         "Screenshot unavailable"
-                    }))
-                    .child(reason)
-                    .child("Find pages creates a new page list for another capture. Refresh only rereads saved results; it does not take screenshots. Your saved baseline is unchanged.")
+                    },
+                    reason,
+                    "Find pages creates a new page list for another capture. Refresh only rereads saved results; it does not take screenshots. Your saved baseline is unchanged.",
+                    Tone::Error,
+                    &self.screenshot_scroll,
+                    stage_width,
+                )
+                    .debug_selector(|| "unavailable-target-recovery".into())
                     .into_any_element();
             }
         }
@@ -156,9 +173,9 @@ impl Shell {
             ScreenshotState::LoadingImage => controls::loading("Loading screenshot…", "Reading the selected screenshot from disk. The page list stays available."),
             ScreenshotState::LoadingEvidence => controls::loading("Loading saved screenshots…", "Reading this project’s page list, captures and comparison results from disk."),
             ScreenshotState::Capturing => controls::loading("Preparing screenshots…", "Completed captures will appear here when they are ready to inspect."),
-            ScreenshotState::Unavailable => controls::empty("Screenshots could not load", "Use Refresh to try reading saved screenshots again. Saved screenshots and the baseline have not been changed."),
+            ScreenshotState::Unavailable => controls::image_placeholder("Screenshots could not load", "Use Refresh to try reading saved screenshots again.", "Saved screenshots and the baseline have not been changed.", Tone::Error, &self.screenshot_scroll, stage_width),
             ScreenshotState::Empty => controls::empty("No screenshots yet", "Find pages, then capture them to inspect this website. No baseline is saved automatically."),
-            ScreenshotState::MissingTarget => controls::empty("No screenshot for this page and screen size", "Select a page and screen size to view its screenshot. A failed or missing capture does not mean the page is unchanged."),
+            ScreenshotState::MissingTarget => controls::image_placeholder("No screenshot for this page and screen size", "Select a page and screen size to view its screenshot.", "A failed or missing capture does not mean the page is unchanged.", Tone::Neutral, &self.screenshot_scroll, stage_width),
         }.into_any_element()
     }
 }

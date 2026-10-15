@@ -68,7 +68,9 @@ impl Shell {
                 enabled,
             )
             .when(enabled, |el| {
-                el.on_click(cx.listener(move |s, _, w, cx| s.activate_control(control, w, cx)))
+                el.on_click(
+                    cx.listener(move |s, event, w, cx| s.click_control(control, event, w, cx)),
+                )
             });
             progress = progress.child(step);
         }
@@ -102,6 +104,8 @@ impl Shell {
         }
         self.reveal_form_control(Control::EnvironmentOptions, false, w, cx);
         w.focus(&self.handle(Control::EnvironmentOptions, cx));
+        self.disclosure_reveal
+            .set(Some(Control::EnvironmentOptions));
         cx.notify();
     }
     pub(super) fn setup_composing(&self, cx: &App) -> bool {

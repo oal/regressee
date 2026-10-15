@@ -107,3 +107,21 @@ confirmation captures and scoped finish verdict recorded above concern the old
 horizontal version only. They remain historical evidence, not new visual
 evidence. No full-app navigation-fit, full visual PASS, native-approval or release
 claim is made for this follow-up; all older qualification history is preserved.
+
+## Task workspace carry-through — 2026-10-15
+
+The separate task rail still rendered a text-only title. It now reuses
+`brand::navigation_lockup()` for discovery, screenshot capture, checks and browser
+setup; rail width, task content, actions and behavior are unchanged.
+
+Verification passed: 11 task UI tests, 2 shared-brand tests and the native app
+build. The expanded branding capture test passed 20 synthetic Linux GPUI/Blade
+offscreen scenes at 1280×800 and 820×600, including all four task kinds and normal
+and read-only navigation. Inspection of capture at both sizes, narrow browser
+setup and narrow read-only review found the logo/name visible and controls clear.
+Scoped disposition: **ship**. These captures also resolve the previously deferred
+stacked-logo layout check, not native input/accessibility or release qualification.
+No asset, palette or unrelated settings changes were needed.
+
+Private evidence:
+`/var/home/olav/Data/opencode/tmp/opencode/regressee-task-brand-20261015-iicz8n8g/inspection/`.

@@ -3,9 +3,9 @@ use analysis_ux::analysis_help;
 use gpui::{
     AnyElement, App, Application, Bounds, Context, Div, Entity, FocusHandle, FontWeight,
     KeyBinding, Menu, MenuItem, MouseButton, MouseDownEvent, MouseMoveEvent, MouseUpEvent,
-    PathPromptOptions, Pixels, PromptLevel, SharedString, TitlebarOptions, Window, WindowBounds,
-    WindowOptions, actions, canvas, div, img, prelude::*, px, relative, rgb, rgba, size,
-    uniform_list,
+    PathPromptOptions, Pixels, PromptButton, PromptLevel, SharedString, TitlebarOptions, Window,
+    WindowBounds, WindowOptions, actions, canvas, div, img, prelude::*, px, relative, rgb, rgba,
+    size, uniform_list,
 };
 use regressee_app::{
     formatting::human_bytes,
@@ -41,6 +41,7 @@ use std::{
 
 mod analysis_ux;
 mod app_settings_ux;
+mod capture_diagnostics;
 mod evidence_workspace;
 mod exit_guard;
 mod form_recovery;
@@ -244,6 +245,7 @@ struct Shell {
     capture_details_open: bool,
     image_controls_open: bool,
     capture_diagnostics_open: bool,
+    copied_capture_diagnostics: Option<String>,
     review_note_open: bool,
     mask_selected: Option<usize>,
     mask_draw: bool,
@@ -268,6 +270,7 @@ struct Shell {
     run_history_index: usize,
     diagnostic_preview: Option<regressee_app::diagnostics::Report>,
     details: std::collections::BTreeSet<Detail>,
+    disclosure_reveal: std::rc::Rc<std::cell::Cell<Option<Control>>>,
     navigation_started: Option<(Screen, std::time::Instant)>,
     screen_scroll: gpui::ScrollHandle,
     settings_scrollbar: ScrollbarState,
@@ -281,6 +284,7 @@ struct Shell {
     history_baseline_scroll: gpui::ScrollHandle,
     history_run_scroll: gpui::ScrollHandle,
     review_details_scroll: gpui::ScrollHandle,
+    screenshot_scroll: gpui::ScrollHandle,
     options_scroll: gpui::ScrollHandle,
     options_anchors: Vec<gpui::ScrollAnchor>,
     options_bounds: Vec<std::rc::Rc<std::cell::Cell<Option<Bounds<Pixels>>>>>,
@@ -309,7 +313,7 @@ impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
             root_focus: cx.focus_handle(),
-            handles: (0..(643 + regressee_app::task::MAX_TASK_LINKS))
+            handles: (0..(646 + regressee_app::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -429,6 +433,7 @@ impl Shell {
             capture_details_open: false,
             image_controls_open: false,
             capture_diagnostics_open: false,
+            copied_capture_diagnostics: None,
             review_note_open: false,
             mask_selected: None,
             mask_draw: false,
@@ -453,6 +458,7 @@ impl Shell {
             run_history_index: 0,
             diagnostic_preview: None,
             details: Default::default(),
+            disclosure_reveal: Default::default(),
             navigation_started: None,
             screen_scroll: gpui::ScrollHandle::new(),
             settings_scrollbar: ScrollbarState::default(),
@@ -466,6 +472,7 @@ impl Shell {
             history_baseline_scroll: gpui::ScrollHandle::new(),
             history_run_scroll: gpui::ScrollHandle::new(),
             review_details_scroll: gpui::ScrollHandle::new(),
+            screenshot_scroll: gpui::ScrollHandle::new(),
             options_scroll: gpui::ScrollHandle::new(),
             options_anchors: Vec::new(),
             options_bounds: (0..12).map(|_| Default::default()).collect(),
@@ -881,7 +888,14 @@ impl Shell {
                     )
                 });
                 self.notice = (!selecting_project).then(|| {
-                    if saved_baseline { "Baseline saved. Future checks will compare against these screenshots using the same page list. Earlier versions are available in History.".into() } else { "Settings saved on this computer.".into() }
+                    if saved_baseline {
+                        if let Some((captured, intended)) = self.evidence.latest.as_ref().and_then(|r| r.baseline_save_counts())
+                            && captured < intended {
+                            format!("Baseline saved with {}. {} skipped and will not be checked. Captures and earlier versions are kept in History.", workflow::count_label(captured, "screenshot", "screenshots"), workflow::count_label(intended - captured, "missing screenshot was", "missing screenshots were"))
+                        } else {
+                            "Baseline saved. Future checks will compare against these screenshots using the same page list. Earlier versions are available in History.".into()
+                        }
+                    } else { "Settings saved on this computer.".into() }
                 });
                 if saved_baseline {
                     self.focus.review_surface = ReviewSurface::Changes;
@@ -1272,9 +1286,7 @@ impl Shell {
                     self.pan_x = 0.;
                 }
                 self.focus.candidate = self.evidence.latest.as_ref().is_some_and(|r| {
-                    r.run.state == JobState::Completed
-                        && r.run.intent == RunIntent::NewBaseline
-                        && !self.capture_is_saved_baseline()
+                    r.baseline_save_counts().is_some() && !self.capture_is_saved_baseline()
                 });
                 self.focus.baseline = self.evidence.baseline.is_some();
                 if self.focus.candidate && !compatible && self.preview.is_none() {
@@ -1555,7 +1567,7 @@ impl Shell {
         self.approval_exact_open = false;
         self.approval_provenance_scroll
             .set_offset(gpui::point(px(0.), px(0.)));
-        self.presentation_focus = Some(Control::Phase5(25));
+        self.presentation_focus = Some(Control::Guided(47));
     }
     fn approval_matches(&self, preview: &regressee_storage::ApprovalPreview) -> bool {
         let c = &preview.context;
@@ -1711,6 +1723,8 @@ impl Shell {
         }
     }
     fn reload_viewer(&mut self, cx: &mut Context<Self>) {
+        self.screenshot_scroll
+            .set_offset(gpui::point(px(0.), px(0.)));
         let Some(identity) = self.viewer_identity() else {
             return;
         };
@@ -2276,7 +2290,9 @@ impl Shell {
         cx.notify();
     }
     fn diagnostic_panel(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut panel=controls::section("Support report", "Preview app and browser information before saving a report for troubleshooting. Screenshots, website addresses, project names and login details are excluded. Nothing is uploaded.")
+        let mut panel=div().w_full().min_w_0().flex().flex_col().gap_2()
+            .child(div().font_weight(FontWeight::MEDIUM).child("Support report"))
+            .child(analysis_help("Preview app and browser information before saving a report for troubleshooting. Screenshots, website addresses, project names and login details are excluded. Nothing is uploaded."))
             .child(self.button(Control::Phase7(0),"Preview support report",ActionStyle::Secondary,cx));
         if let Some(report) = &self.diagnostic_preview {
             panel =
@@ -2563,19 +2579,10 @@ impl Shell {
             || self.deletion_preview.is_some()
             || self.repair_preview.is_some()
         {
-            body = body.child(self.button(
-                Control::Details(Detail::Portability),
-                if self.details.contains(&Detail::Portability) {
-                    "Hide exact details"
-                } else {
-                    "Show exact details"
-                },
-                ActionStyle::Secondary,
-                cx,
-            ));
+            let mut exact = div().w_full().min_w_0().flex().flex_col().gap_3();
             if self.details.contains(&Detail::Portability) {
                 if let Some(p) = &self.deletion_preview {
-                    body = body.child(
+                    exact = exact.child(
                         div()
                             .debug_selector(|| "portability-exact-delete".into())
                             .child(format!(
@@ -2585,23 +2592,31 @@ impl Shell {
                     );
                 }
                 if let Some(p) = &self.export_preview {
-                    body = body.child(
+                    exact = exact.child(
                         div()
                             .debug_selector(|| "portability-exact-export".into())
                             .child(format!("Export size: {} exact bytes", p.bytes)),
                     );
                 }
                 if let Some(p) = &self.import_preview {
-                    body = body.child(
+                    exact = exact.child(
                         div()
                             .debug_selector(|| "portability-exact-import".into())
                             .child(format!("Import size: {} exact bytes", p.bytes)),
                     );
                 }
                 if let Some(p) = &self.repair_preview {
-                    body = body.child(format!("Temporary bytes: {} · temporaries {:?} · interrupted imports {:?} · complete recovery objects {:?} · missing/corrupt {:?}", p.temporary_bytes, p.temporaries, p.interrupted_imports, p.valid_unreferenced, p.missing_or_corrupt));
+                    exact = exact.child(format!("Temporary bytes: {} · temporaries {:?} · interrupted imports {:?} · complete recovery objects {:?} · missing/corrupt {:?}", p.temporary_bytes, p.temporaries, p.interrupted_imports, p.valid_unreferenced, p.missing_or_corrupt));
                 }
             }
+            body = body.child(self.inline_disclosure(
+                Control::Details(Detail::Portability),
+                "Exact details",
+                "",
+                self.details.contains(&Detail::Portability),
+                exact,
+                cx,
+            ));
             body = body.child(self.button(
                 Control::Phase6(7),
                 "Cancel preview",
@@ -2650,8 +2665,8 @@ impl Shell {
             Control::Name => return self.name.read(cx).focus.clone(),
             Control::Address => return self.address.read(cx).focus.clone(),
             Control::Save => 6,
-            Control::ChooseFolder => 7,
             Control::About => 8,
+            Control::AboutRepository => 645 + regressee_app::task::MAX_TASK_LINKS,
             Control::CloseDialog => 9,
             Control::PreviousPage => 10,
             Control::NextPage => 11,
@@ -2661,6 +2676,7 @@ impl Shell {
             Control::CancelProjectChoice => 241,
             Control::CaptureBaseline => 76,
             Control::SaveBaseline => 77,
+            Control::ReviewCaptureFailures => 644 + regressee_app::task::MAX_TASK_LINKS,
             Control::CheckChanges => 78,
             Control::CancelCapture => 79,
             Control::SetupRuntime => 80,
@@ -2708,6 +2724,7 @@ impl Shell {
             Control::CloseMappingPreview => 620,
             Control::DiscardPageList => 634 + regressee_app::task::MAX_TASK_LINKS,
             Control::ImageControls => 635 + regressee_app::task::MAX_TASK_LINKS,
+            Control::CopyCaptureDiagnostics => 643 + regressee_app::task::MAX_TASK_LINKS,
             Control::TaskLink(index) => 626 + index,
         };
         self.handles[index].clone()
@@ -4034,9 +4051,9 @@ impl Shell {
             },
         )
         .when(enabled, |el| {
-            el.on_click(
-                cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
-            )
+            el.on_click(cx.listener(move |this, event, window, cx| {
+                this.click_control(control, event, window, cx)
+            }))
         })
         .into_any_element()
     }
@@ -4077,9 +4094,9 @@ impl Shell {
             },
         )
         .when(enabled, |el| {
-            el.on_click(
-                cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
-            )
+            el.on_click(cx.listener(move |this, event, window, cx| {
+                this.click_control(control, event, window, cx)
+            }))
         })
         .into_any_element()
     }
@@ -4118,8 +4135,7 @@ impl Shell {
             } else {
                 0.
             })
-        .max(1.)
-        .min(680.);
+        .clamp(1., 680.);
         let mut body=div().w(px(form_width)).flex_shrink_0().flex().flex_col().gap_4()
             .when(!self.form_errors(cx).is_empty(), |body| body.child(self.form_error_summary(cx)))
             .when(website, |body| body.child(controls::section("Website", "Saving settings does not visit your website.")
@@ -4187,10 +4203,10 @@ impl Shell {
             .child(page_boundaries)
             .child(controls::section("Images", "Choose before capturing a baseline. Later checks keep the baseline's image mode.")
                 .child(self.choice_button(Control::Choice(Choice::OriginalImages), "Keep original images", "Compare the website as it appears.", original_images, cx))
-                   .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace photos", "Use neutral placeholders so changing photos cause fewer differences. Some logos and other images may also be replaced.", !original_images, cx)))
-            .child(self.guided_button(6,if self.focus.advanced{"Hide scope, speed & custom sizes"}else{"Scope, speed & custom sizes (optional)"},cx));
+                    .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace photos", "Use neutral placeholders so changing photos cause fewer differences. Some logos and other images may also be replaced.", !original_images, cx)));
+            let mut scope = div().w_full().flex().flex_col().gap_4();
             if self.focus.advanced {
-                capture=capture.child(div().max_w(px(680.)).flex().flex_col().gap_4()
+                scope=scope.child(div().max_w(px(680.)).flex().flex_col().gap_4()
                 .child(self.crawl_field(1,"Website section (optional)","Use a path such as /docs to stay within that section. Leave blank for the whole listed website."))
                 .child(self.crawl_field(2,"Skip addresses containing (optional)","Separate text exclusions with commas. The preview explains excluded addresses."))
                 .child(controls::section("Capture speed", "Use a read-only account: even visiting pages can change website data.")
@@ -4211,19 +4227,10 @@ impl Shell {
             .child(self.guided_button(12,"Add / replace Custom screen size",cx)).child(self.guided_button(25,"Remove Custom screen size",cx))
               .child(div().debug_selector(|| "setup-image-limitations".into()).text_size(px(13.)).text_color(rgb(MUTED)).child("Photo replacement works with ordinary image files and some simple background images. Vector icons stay unchanged. Videos, embedded pages, drawn graphics and more complex or script-controlled images may not be replaced. Review any loading or layout warnings. Replaced photos are not saved separately. Future checks use the baseline's screen sizes, device simulation, pixel scale and browser version.")));
             }
-            capture = capture.child(self.button(
-                Control::Details(Detail::Capture),
-                if self.details.contains(&Detail::Capture) {
-                    "Hide capture details and limitations"
-                } else {
-                    "Capture details and limitations"
-                },
-                ActionStyle::Secondary,
-                cx,
-            ));
-            if self.details.contains(&Detail::Capture) {
-                capture = capture.child(div().debug_selector(|| "setup-capture-limitations".into()).text_size(px(14.)).text_color(rgb(MUTED)).child("Regressee reduces motion, stops animations, hides the text cursor and moves the pointer away before capture. It waits a limited time for fonts, images and the page to finish loading. Pages that exceed capture limits fail rather than being silently cropped. Full-page capture allows up to 32,768 pixels in height, 64 million pixels and 64 scroll steps, or a lower limit set for the screen size. It does not expand lists that load as you scroll or separately scrolling panels. Approved login websites are not added to the capture list. Some password prompts, device-specific or frequently changing logins, VPNs and company networks are not fully tested."));
-            }
+            capture = capture
+                .child(self.inline_disclosure(Control::Guided(6), "Scope, speed & custom sizes (optional)", "", self.focus.advanced, scope, cx))
+                .child(self.inline_disclosure(Control::Details(Detail::Capture), "Capture details and limitations", "", self.details.contains(&Detail::Capture),
+                    div().debug_selector(|| "setup-capture-limitations".into()).text_size(px(14.)).text_color(rgb(MUTED)).child("Regressee reduces motion, stops animations, hides the text cursor and moves the pointer away before capture. It waits a limited time for fonts, images and the page to finish loading. Pages that exceed capture limits fail rather than being silently cropped. Full-page capture allows up to 32,768 pixels in height, 64 million pixels and 64 scroll steps, or a lower limit set for the screen size. It does not expand lists that load as you scroll or separately scrolling panels. Approved login websites are not added to the capture list. Some password prompts, device-specific or frequently changing logins, VPNs and company networks are not fully tested."), cx));
             body = body.child(capture.when(stage == SetupStage::Settings, |capture| {
                 self.measured_settings_section(SettingsSection::Capture, capture)
             }));
@@ -4271,9 +4278,9 @@ impl Shell {
              .child(self.crawl_field(12,"Approved login websites (optional)","For a separate sign-in service, enter its website address, such as https://login.example.com/, ending in /. Separate addresses with spaces. Only approve services you trust; their pages will not be captured."))
             .child(self.choice_button(Control::Choice(Choice::SaveLogin), "Remember login securely", "Use encrypted storage and your operating system's secure store.", !self.login_ephemeral, cx))
             .child(self.choice_button(Control::Choice(Choice::EphemeralLogin), "Only for this app session", "Forget the login when Regressee closes.", self.login_ephemeral, cx))
-            .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("If secure storage is locked or unavailable, unlock it or choose Only for this app session. There is no plaintext fallback. Screenshots may still contain private website content.")))
-            .when(self.focus.setup_stage == SetupStage::Access, |body| body.child(self.button(Control::EnvironmentOptions, if advanced { "Hide environments & capture configuration" } else { "Environments & capture configuration (optional)" }, ActionStyle::Secondary, cx)))
-            .when(advanced, |body| body
+             .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("If secure storage is locked or unavailable, unlock it or choose Only for this app session. There is no plaintext fallback. Screenshots may still contain private website content.")));
+        let mut configuration = div().w_full().min_w_0().flex().flex_col().gap_3()
+             .when(advanced, |body| body
                 .child(div().font_weight(FontWeight::SEMIBOLD).mt_3().child("Environments"))
                 .children(self.draft_settings.environments.iter().enumerate().map(|(index, environment)| self.choice_button(Control::Environment(index), environment.name.clone(), "Separate saved login and page mapping", Some(environment.id) == self.environment_draft, cx)))
                 .child(self.guided_button(27,"Add staging environment",cx))
@@ -4283,17 +4290,31 @@ impl Shell {
              .child(self.crawl_field(14,"Matching website or section","For example https://staging.example/preview. The rest of each page address stays unchanged, including anything after ? or #."))
             .child(div().flex().flex_wrap().gap_2().child(self.guided_button(37,"Approve / replace this base mapping",cx)).child(self.guided_button(38,"Use same website for every mapping",cx))));
         if let Some(env) = draft.filter(|_| advanced) {
-            body = body.children(env.mappings.iter().take(16).map(|m| {
+            configuration = configuration.children(env.mappings.iter().take(16).map(|m| {
                 div()
                     .text_size(px(13.))
                     .child(format!("{} → {}", m.source, m.destination))
             }));
         }
-        body=body.when(advanced, |body| body.child(self.crawl_field(15,"Website language","Use a language code such as en-US for US English or nb-NO for Norwegian Bokmål. Changing this requires a new baseline."))
+        configuration=configuration.when(advanced, |body| body.child(self.crawl_field(15,"Website language","Use a language code such as en-US for US English or nb-NO for Norwegian Bokmål. Changing this requires a new baseline."))
              .child(self.measured_form_field(Control::CrawlField(16),controls::field("Capture timezone", "Choose a timezone or search by region or city. Changes apply to future baseline captures.", self.timezone.clone().into_any_element())))
             .child(self.choice_button(Control::Choice(Choice::LightTheme), "Light website theme", "Capture the website's light color scheme.", self.draft_settings.profiles.first().is_none_or(|profile| !profile.dark), cx))
-            .child(self.choice_button(Control::Choice(Choice::DarkTheme), "Dark website theme", "Capture the website's dark color scheme.", self.draft_settings.profiles.first().is_some_and(|profile| profile.dark), cx)))
-            .when(advanced || login_required, |body| body.child(self.environment_actions(cx)));
+             .child(self.choice_button(Control::Choice(Choice::DarkTheme), "Dark website theme", "Capture the website's dark color scheme.", self.draft_settings.profiles.first().is_some_and(|profile| profile.dark), cx)));
+        body = if self.focus.setup_stage == SetupStage::Access {
+            body.child(self.inline_disclosure(
+                Control::EnvironmentOptions,
+                "Environments & capture configuration (optional)",
+                "",
+                advanced,
+                configuration,
+                cx,
+            ))
+        } else {
+            body.child(configuration)
+        };
+        body = body.when(advanced || login_required, |body| {
+            body.child(self.environment_actions(cx))
+        });
         body.into_any_element()
     }
     fn environment_actions(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -4939,6 +4960,21 @@ impl Shell {
         }
         body.into_any_element()
     }
+    fn click_control(
+        &mut self,
+        control: Control,
+        event: &gpui::ClickEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        // Shell key bindings already dispatch guarded activation on KeyDown.
+        // GPUI also synthesizes on_click on KeyUp, potentially after focus has
+        // moved to a different control (e.g. a dialog's Close). Never dispatch
+        // that release a second time; leave text input and selector keys alone.
+        if matches!(event, gpui::ClickEvent::Mouse(_)) {
+            self.activate_control(control, window, cx);
+        }
+    }
     fn activate_control(&mut self, control: Control, window: &mut Window, cx: &mut Context<Self>) {
         if !self.control_enabled(control, cx) {
             return;
@@ -4989,12 +5025,7 @@ impl Shell {
             Control::TaskDetails => {
                 if let Some(task) = &mut self.task {
                     task.details = !task.details;
-                    if task.details {
-                        task.reveal_details.set(true);
-                    } else {
-                        task.reveal_details.set(false);
-                        task.scroll.set_offset(gpui::point(px(0.), px(0.)));
-                    }
+                    task.reveal_details.set(true);
                 }
                 window.focus(&self.handle(control, cx));
                 cx.notify();
@@ -5070,23 +5101,16 @@ impl Shell {
                 },
                 cx,
             ),
-            Control::ChooseFolder => {
-                let prompt = cx.prompt_for_paths(PathPromptOptions {
-                    files: false,
-                    directories: true,
-                    multiple: false,
-                    prompt: Some("Preview a folder path (no files are inspected or moved)".into()),
-                });
-                cx.spawn(async move |this, cx| {
-                    if let Ok(Ok(Some(paths))) = prompt.await && let Some(path) = paths.first() { let text = format!("Folder path preview: {}. No files were inspected or moved. Changing the project data location is not available yet.", path.display()); let _ = this.update(cx, |this, cx| { this.notice = Some(text); cx.notify(); }); }
-                }).detach();
-            }
             Control::About => {
                 self.restore_focus = Some(control);
                 self.help_dialog = false;
                 self.focus.dialog = true;
                 window.focus(&self.handle(Control::CloseDialog, cx));
                 cx.notify();
+            }
+            Control::AboutRepository => {
+                cx.open_url(form_recovery::REPOSITORY_URL);
+                window.focus(&self.handle(control, cx));
             }
             Control::CloseDialog => self.dismiss(&Dismiss, window, cx),
             Control::Shortcuts => self.show_keyboard_help(window, cx),
@@ -5095,7 +5119,13 @@ impl Shell {
             | Control::Address
             | Control::CrawlField(_)
             | Control::AnalysisField(_) => (),
-            Control::Phase5(index) => self.phase5_action(index, cx),
+            Control::Phase5(index) => {
+                self.phase5_action(index, cx);
+                if index == 38 {
+                    window.focus(&self.handle(control, cx));
+                    self.reveal_review_control(control, window, cx);
+                }
+            }
             Control::Phase6(index) => self.phase6_action(index, window, cx),
             Control::Phase7(index) => self.phase7_action(index, window, cx),
             Control::HistorySearch => window.focus(&self.handle(control, cx)),
@@ -5146,6 +5176,13 @@ impl Shell {
                 } else {
                     self.open_image_controls(cx);
                 }
+            }
+            Control::CopyCaptureDiagnostics => {
+                let text = self.capture_diagnostics().text();
+                cx.write_to_clipboard(gpui::ClipboardItem::new_string(text.clone()));
+                self.copied_capture_diagnostics = Some(text);
+                window.focus(&self.handle(control, cx));
+                cx.notify();
             }
             Control::DiscardPageList => (), // Handled by the confirmation gate.
             Control::Guided(index) => {
@@ -5245,18 +5282,48 @@ impl Shell {
                     }
                 }
             }
+            Control::ReviewCaptureFailures => {
+                self.focus.review_surface = ReviewSurface::Inspect;
+                self.review_queue_collapsed = false;
+                self.result_filter = 2;
+                self.crawl_fields[9].update(cx, |field, cx| field.set_value("", cx));
+                self.presentation_focus = Some(Control::CrawlField(9));
+                cx.notify();
+            }
             Control::SaveBaseline => {
                 if let (Some(p), Some(r)) = (&self.project, &self.evidence.latest) {
+                    let Some((captured, intended)) = r.baseline_save_counts() else {
+                        return;
+                    };
                     let run = r.run.id;
                     let revision = p.revision;
+                    let confirm_partial = captured < intended;
+                    let (title, message, action) =
+                        self.baseline_save_confirmation(captured, intended);
                     self.native_prompt = true;
-                    let answer=window.prompt(PromptLevel::Warning,"Save these screenshots as the baseline?",Some("Future checks will compare against these screenshots using the same page list. Earlier baseline versions and captures are kept in History."),&["Keep reviewing","Save baseline"],cx);
+                    let answer = window.prompt(
+                        PromptLevel::Warning,
+                        &title,
+                        Some(&message),
+                        &[
+                            PromptButton::cancel("Keep reviewing"),
+                            PromptButton::ok(action),
+                        ],
+                        cx,
+                    );
                     cx.spawn_in(window, async move |this, cx| {
                         let confirm = answer.await == Ok(1);
                         let _ = this.update_in(cx, |this, _, cx| {
                             this.native_prompt = false;
                             if confirm {
-                                this.queue(Work::Activate { run, revision }, cx);
+                                this.queue(
+                                    Work::Activate {
+                                        run,
+                                        revision,
+                                        confirm_partial,
+                                    },
+                                    cx,
+                                );
                             }
                             cx.notify();
                         });
@@ -5322,6 +5389,21 @@ impl Shell {
                 }
                 cx.notify();
             }
+        }
+        if matches!(
+            control,
+            Control::Details(_)
+                | Control::Guided(6 | 52)
+                | Control::Phase5(3 | 38)
+                | Control::DiscoveryDetails
+        ) {
+            // Pointer collapse may remove the field currently holding focus.
+            // Keep the owner heading in the same reading/keyboard context.
+            self.presentation_focus = None;
+            self.reveal_form_control(control, false, window, cx);
+            self.reveal_review_control(control, window, cx);
+            window.focus(&self.handle(control, cx));
+            self.disclosure_reveal.set(Some(control));
         }
     }
     fn activate(&mut self, _: &Activate, window: &mut Window, cx: &mut Context<Self>) {
@@ -5420,7 +5502,7 @@ impl Shell {
     ) -> gpui::Stateful<Div> {
         let enabled = self.control_enabled(control, cx);
         let handle = self.handle(control, cx);
-        controls::action(
+        let element = controls::action(
             SharedString::from(format!("{control:?}")),
             label,
             &handle,
@@ -5430,33 +5512,132 @@ impl Shell {
         .when(
             self.narrow_workspace && self.focus.screen == Screen::Results,
             |el| el.px(px(8.)),
+        );
+        self.wire_action_control(control, element, cx)
+    }
+    fn disclosure_control(
+        &self,
+        control: Control,
+        title: impl Into<SharedString>,
+        open: bool,
+        cx: &mut Context<Self>,
+    ) -> gpui::Stateful<Div> {
+        let section = matches!(
+            control,
+            Control::Details(Detail::ManagedNetwork | Detail::SupportTools)
+        );
+        let element = controls::disclosure_toggle(
+            SharedString::from(format!("{control:?}")),
+            title,
+            &self.handle(control, cx),
+            open,
+            self.control_enabled(control, cx),
+            section,
+        );
+        self.wire_action_control(control, element, cx)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn inline_disclosure(
+        &self,
+        control: Control,
+        title: impl Into<SharedString>,
+        help: impl Into<SharedString>,
+        open: bool,
+        body: impl IntoElement,
+        cx: &mut Context<Self>,
+    ) -> Div {
+        let reveal = self.disclosure_reveal.clone();
+        let scroll = if self.focus.approval_dialog {
+            self.approval_provenance_scroll.clone()
+        } else if self.focus.screen == Screen::Results && self.options_panel_open() {
+            self.options_scroll.clone()
+        } else if self.focus.screen == Screen::Results
+            && (self.review_tools || self.capture_details_open)
+        {
+            self.review_details_scroll.clone()
+        } else {
+            self.screen_scroll.clone()
+        };
+        let owner = cx.entity().downgrade();
+        controls::disclosure_group(
+            SharedString::from(format!("{control:?}")),
+            self.disclosure_control(control, title, open, cx)
+                .into_any_element(),
+            help,
+            open.then(|| body.into_any_element()),
         )
-        .anchor_scroll(self.review_anchor(control))
-        .when_some(
-            self.options_control_bounds(control)
-                .or_else(|| self.setup_control_bounds(control))
-                .or_else(|| self.history_action_bounds(control))
-                .or_else(|| self.review_action_bounds(control)),
-            |el, bounds| {
-                el.relative().child(
-                    canvas(
-                        |_, _, _| (),
-                        move |painted, _, _, _| {
-                            bounds.set(Some(form_recovery::bordered_control_bounds(painted)))
-                        },
-                    )
-                    .absolute()
-                    .top_0()
-                    .left_0()
-                    .size_full(),
-                )
-            },
-        )
-        .when(enabled, |el| {
-            el.on_click(
-                cx.listener(move |this, _, window, cx| this.activate_control(control, window, cx)),
+        .relative()
+        .child(
+            canvas(
+                move |bounds, window, cx| {
+                    if reveal.get() != Some(control) {
+                        return;
+                    }
+                    reveal.set(None);
+                    let viewport = scroll.bounds();
+                    // Keep the heading AND the beginning of its body together. Do not
+                    // jump to a child below the fold or introduce another scroll owner.
+                    let height = bounds
+                        .size
+                        .height
+                        .min(px(360.))
+                        .min((viewport.size.height - px(16.)).max(px(0.)));
+                    let delta = if bounds.top() < viewport.top() + px(8.) {
+                        viewport.top() + px(8.) - bounds.top()
+                    } else if bounds.top() + height > viewport.bottom() - px(8.) {
+                        viewport.bottom() - px(8.) - bounds.top() - height
+                    } else {
+                        px(0.)
+                    };
+                    let offset = scroll.offset();
+                    scroll.set_offset(gpui::point(offset.x, offset.y + delta));
+                    let owner = owner.clone();
+                    window.defer(cx, move |_, cx| {
+                        if let Some(owner) = owner.upgrade() {
+                            owner.update(cx, |_, cx| cx.notify());
+                        }
+                    });
+                },
+                |_, _, _, _| {},
             )
-        })
+            .absolute()
+            .inset_0()
+            .size_full(),
+        )
+    }
+    fn wire_action_control(
+        &self,
+        control: Control,
+        element: gpui::Stateful<Div>,
+        cx: &mut Context<Self>,
+    ) -> gpui::Stateful<Div> {
+        element
+            .anchor_scroll(self.review_anchor(control))
+            .when_some(
+                self.options_control_bounds(control)
+                    .or_else(|| self.setup_control_bounds(control))
+                    .or_else(|| self.history_action_bounds(control))
+                    .or_else(|| self.review_action_bounds(control)),
+                |el, bounds| {
+                    el.relative().child(
+                        canvas(
+                            |_, _, _| (),
+                            move |painted, _, _, _| {
+                                bounds.set(Some(form_recovery::bordered_control_bounds(painted)))
+                            },
+                        )
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full(),
+                    )
+                },
+            )
+            .when(self.control_enabled(control, cx), |el| {
+                el.on_click(cx.listener(move |this, event, window, cx| {
+                    this.click_control(control, event, window, cx)
+                }))
+            })
     }
     /// The same prerequisites govern pointer actions, keyboard dispatch, and
     /// Tab stops. Backend validation remains authoritative for every mutation.
@@ -5930,6 +6111,7 @@ impl Shell {
                     && self.focus.setup_stage == regressee_core::shell::SetupStage::Access
             }
             PagesBaseline => project,
+            AboutRepository => self.focus.dialog && !self.help_dialog,
             CloseDialog => self.focus.dialog,
             DismissFeedback => self.error.is_some() || self.notice.is_some(),
             NewProject => screen == Screen::Projects,
@@ -5939,7 +6121,6 @@ impl Shell {
             ChooseProject => screen != Screen::Projects && project,
             PreviousPage => screen == Screen::Projects && self.projects.page > 0,
             NextPage => screen == Screen::Projects && self.projects.more,
-            ChooseFolder => settings && self.details.contains(&Detail::LocalStorage),
             About | SetupRuntime => settings,
             CaptureBaseline => {
                 results
@@ -5949,6 +6130,9 @@ impl Shell {
             }
             RefreshEvidence => results,
             SaveBaseline => results && self.focus.candidate,
+            ReviewCaptureFailures => {
+                results && !self.page_list_workspace() && self.partial_baseline_capture()
+            }
             CheckChanges => {
                 results
                     && self.focus.baseline
@@ -6078,6 +6262,13 @@ impl Shell {
                     && !self.mask_draw
             }
             Phase5(38) => results && self.evidence.latest.is_some() && self.capture_details_open,
+            CopyCaptureDiagnostics => {
+                results
+                    && self.capture_details_open
+                    && self.capture_diagnostics_open
+                    && self.evidence.latest.is_some()
+                    && self.selected_key.is_some()
+            }
             Phase5(39) => results && self.viewer_inspector_open(),
             Phase5(37) => analysis,
             Phase5(23) => analysis,
@@ -6460,7 +6651,19 @@ impl Shell {
                     Tone::Warning,
                 ),
                 JobState::CompletedWithErrors => {
-                    ("Could not capture — not an unchanged result", Tone::Warning)
+                    if self.capture_is_saved_baseline() {
+                        (
+                            "Baseline saved — missing screenshots skipped",
+                            Tone::Warning,
+                        )
+                    } else if self.focus.candidate {
+                        (
+                            "Captured screenshots can be saved as a baseline",
+                            Tone::Warning,
+                        )
+                    } else {
+                        ("Could not capture — not an unchanged result", Tone::Warning)
+                    }
                 }
                 _ => ("Capture not complete", Tone::Warning),
             };
@@ -6480,6 +6683,14 @@ impl Shell {
                     JobState::Paused => ("Paused — completed screenshots kept", Tone::Warning),
                     JobState::Interrupted => (
                         "Interrupted — validate and resume, or start fresh",
+                        Tone::Warning,
+                    ),
+                    JobState::CompletedWithErrors if self.capture_is_saved_baseline() => (
+                        "Baseline saved — missing screenshots skipped",
+                        Tone::Warning,
+                    ),
+                    JobState::CompletedWithErrors if self.focus.candidate => (
+                        "Captured screenshots can be saved as a baseline",
                         Tone::Warning,
                     ),
                     JobState::CompletedWithErrors => (
@@ -6590,10 +6801,10 @@ impl Shell {
         else {
             return div()
                 .id("unavailable-target-body")
-                .track_scroll(&self.review_details_scroll)
-                .overflow_y_scroll()
+                .debug_selector(|| "unavailable-target-body".into())
                 .flex_1()
                 .min_h_0()
+                .min_w_0()
                 .flex()
                 .flex_col()
                 .gap_2()
@@ -6619,12 +6830,47 @@ impl Shell {
                             let (path, context) = self.inspection_identity();
                             div()
                                 .debug_selector(|| "unavailable-target-context".into())
+                                .w_full()
+                                .min_w_0()
+                                .flex_shrink_0()
                                 .flex()
                                 .flex_col()
                                 .gap_1()
                                 .text_size(px(14.))
-                                .child(path)
-                                .child(context)
+                                .child(
+                                    div()
+                                        .id("unavailable-target-path")
+                                        .text_ellipsis()
+                                        .tooltip({
+                                            let full = path.clone();
+                                            move |_, cx| {
+                                                cx.new(|_| {
+                                                    evidence_workspace::InspectionHint(
+                                                        full.clone().into(),
+                                                    )
+                                                })
+                                                .into()
+                                            }
+                                        })
+                                        .child(path),
+                                )
+                                .child(
+                                    div()
+                                        .id("unavailable-target-profile")
+                                        .text_ellipsis()
+                                        .tooltip({
+                                            let full = context.clone();
+                                            move |_, cx| {
+                                                cx.new(|_| {
+                                                    evidence_workspace::InspectionHint(
+                                                        full.clone().into(),
+                                                    )
+                                                })
+                                                .into()
+                                            }
+                                        })
+                                        .child(context),
+                                )
                         })
                     },
                 )
@@ -6745,18 +6991,8 @@ impl Shell {
             if self.analysis_pending.is_some() || self.analysis_due.is_some() {
                 panel=panel.child(controls::status("Updating comparison. The previous result stays visible until it is ready. Choose Close to view the screenshots; review decisions are unavailable while the comparison updates.",Tone::Neutral));
             }
-            panel = panel
-                .child(self.ignored_areas_disclosure(cx))
-                .child(self.button(
-                    Control::Phase5(3),
-                    if self.analysis_advanced {
-                        "Hide advanced parameters"
-                    } else {
-                        "Advanced parameters"
-                    },
-                    ActionStyle::Secondary,
-                    cx,
-                ));
+            panel = panel.child(self.ignored_areas_disclosure(cx));
+            let mut parameters = div().w_full().min_w_0().flex().flex_col().gap_3();
             if self.analysis_advanced {
                 for (i, label, help) in [
                     (
@@ -6805,7 +7041,7 @@ impl Shell {
                         "Warn when ignored areas cover this much of the screenshots. Ignored content is not checked.",
                     ),
                 ] {
-                    panel = panel.child(
+                    parameters = parameters.child(
                         controls::field(
                             label,
                             help,
@@ -6818,22 +7054,21 @@ impl Shell {
                         .anchor_scroll(self.review_anchor(Control::AnalysisField(i))),
                     );
                 }
-                panel=panel.child(self.check_button(Control::Phase5(27), "Review page-height changes", self.analysis_policy.height_change_triggers, cx))
+                parameters=parameters.child(self.check_button(Control::Phase5(27), "Review page-height changes", self.analysis_policy.height_change_triggers, cx))
                 .child(self.check_button(Control::Phase5(28), "Ignore small color-blending differences", self.analysis_policy.antialias!=regressee_app::analysis_engine::AntiAliasPolicy::Off, cx))
                 .child(div().text_size(px(13.)).text_color(rgb(MUTED)).child("Ignores some color differences along unchanged horizontal edges. This may hide a real color edit and is not guaranteed to remove text-rendering noise. Results update shortly after you stop editing."));
             }
-            panel = panel.child(self.button(
-                Control::Details(Detail::Analysis),
-                if self.details.contains(&Detail::Analysis) {
-                    "Hide metrics & revision details"
-                } else {
-                    "Metrics & revision details"
-                },
-                ActionStyle::Secondary,
+            panel = panel.child(self.inline_disclosure(
+                Control::Phase5(3),
+                "Advanced parameters",
+                "",
+                self.analysis_advanced,
+                parameters,
                 cx,
             ));
+            let mut metrics = div().w_full().min_w_0().flex().flex_col().gap_3();
             if self.details.contains(&Detail::Analysis) {
-                panel = panel.child(analysis_help(format!(
+                metrics = metrics.child(analysis_help(format!(
                     "Analysis {} · {}",
                     a.revision.id,
                     a.perceptual
@@ -6850,7 +7085,7 @@ impl Shell {
                     .iter()
                     .find(|(k, _)| Some(k) == self.selected_key.as_ref())
                 {
-                    panel = panel.child(
+                    metrics = metrics.child(
                         div()
                             .debug_selector(|| "analysis-metrics-summary".into())
                             .font_weight(FontWeight::MEDIUM)
@@ -6866,8 +7101,8 @@ impl Shell {
                             }),
                     );
                     if !r.triggers.is_empty() || !r.gates.is_empty() || !r.warnings.is_empty() {
-                        panel =
-                            panel.child(div().text_size(px(14.)).text_color(rgb(WARNING)).child(
+                        metrics =
+                            metrics.child(div().text_size(px(14.)).text_color(rgb(WARNING)).child(
                                 format!(
                                     "Review reasons: {}. Comparison limits: {}. Warnings: {}.",
                                     if r.triggers.is_empty() {
@@ -6901,11 +7136,11 @@ impl Shell {
                             ));
                     }
                     if self.details.contains(&Detail::Analysis) {
-                        panel = panel.child(div().text_size(px(13.)).child(format!("{} significant / {} eligible pixels · {} raw changes · {} suppressed. Ignored {} / {} pixels.", r.changed_pixels, r.eligible_pixels, r.raw_changed_pixels, r.antialias_suppressed_pixels, r.ignored_pixels, r.coordinate_union_pixels)))
+                        metrics = metrics.child(div().text_size(px(13.)).child(format!("{} significant / {} eligible pixels · {} raw changes · {} suppressed. Ignored {} / {} pixels.", r.changed_pixels, r.eligible_pixels, r.raw_changed_pixels, r.antialias_suppressed_pixels, r.ignored_pixels, r.coordinate_union_pixels)))
                         .child(div().debug_selector(|| "analysis-metrics-dimensions".into()).text_size(px(13.)).child(format!("{} qualifying local windows / {}. Before {}×{}, after {}×{}; width {:+}, height {:+}. {} structural pixels ({} eligible).", r.local.qualifying, r.local.windows, r.dimensions.before.width,r.dimensions.before.height,r.dimensions.after.width,r.dimensions.after.height,r.dimensions.width_delta,r.dimensions.height_delta,r.structural_pixels,r.unmasked_structural_pixels)));
                     }
                     if r.eligible_pixels == 0 {
-                        panel = panel.child(controls::status(
+                        metrics = metrics.child(controls::status(
                             "No eligible pixels — all content ignored. This is NOT a clean result.",
                             Tone::Warning,
                         ));
@@ -6913,7 +7148,7 @@ impl Shell {
                     if let Some(window) = &r.local.strongest
                         && self.details.contains(&Detail::Analysis)
                     {
-                        panel = panel.child(div().text_size(px(13.)).child(format!(
+                        metrics = metrics.child(div().text_size(px(13.)).child(format!(
                             "Strongest local window: {} / {} changed at x {}, y {} ({}×{}).",
                             window.changed,
                             window.eligible,
@@ -6923,16 +7158,42 @@ impl Shell {
                             window.bounds.height
                         )));
                     }
-                    panel=panel.child(div().flex().flex_wrap().gap_2().child(self.button(Control::Phase5(12),"Previous change region",ActionStyle::Secondary,cx)).child(self.button(Control::Phase5(13),"Next change region",ActionStyle::Secondary,cx))).child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(format!("Navigation retains the largest {} regions; {} further regions are counted but not retained.",r.regions.retained.len(),r.regions.omitted)));
+                    metrics=metrics.child(div().flex().flex_wrap().gap_2().child(self.button(Control::Phase5(12),"Previous change region",ActionStyle::Secondary,cx)).child(self.button(Control::Phase5(13),"Next change region",ActionStyle::Secondary,cx))).child(div().text_size(px(13.)).text_color(rgb(MUTED)).child(format!("Navigation retains the largest {} regions; {} further regions are counted but not retained.",r.regions.retained.len(),r.regions.omitted)));
                 }
                 if let Some((_, reason)) = p
                     .failures
                     .iter()
                     .find(|(k, _)| Some(k) == self.selected_key.as_ref())
                 {
-                    panel = panel.child(controls::error(reason.clone()));
+                    metrics = metrics.child(controls::error(reason.clone()));
                 }
             }
+            for d in self
+                .evidence
+                .reviews
+                .iter()
+                .filter(|d| {
+                    Some(&d.key) == self.selected_key.as_ref() && d.analysis != a.revision.id
+                })
+                .take(if self.details.contains(&Detail::Analysis) {
+                    8
+                } else {
+                    0
+                })
+            {
+                metrics = metrics.child(div().text_size(px(13.)).child(format!(
+                    "Historical review {:?} · analysis {} · {} · {}",
+                    d.state, d.analysis, d.reviewed_at, d.note
+                )));
+            }
+            panel = panel.child(self.inline_disclosure(
+                Control::Details(Detail::Analysis),
+                "Metrics & revision details",
+                "",
+                self.details.contains(&Detail::Analysis),
+                metrics,
+                cx,
+            ));
             let slider_bounds = std::rc::Rc::new(std::cell::Cell::new(None::<Bounds<Pixels>>));
             let b = slider_bounds.clone();
             let b2 = slider_bounds.clone();
@@ -6989,30 +7250,6 @@ impl Shell {
                     )))
                     .child(slider)
             });
-        }
-        for d in self
-            .evidence
-            .reviews
-            .iter()
-            .filter(|d| Some(&d.key) == self.selected_key.as_ref())
-            .filter(|d| {
-                self.evidence
-                    .comparison
-                    .as_ref()
-                    .is_none_or(|a| d.analysis != a.revision.id)
-            })
-            .take(
-                if self.review_tools && self.details.contains(&Detail::Analysis) {
-                    8
-                } else {
-                    0
-                },
-            )
-        {
-            panel = panel.child(div().text_size(px(13.)).child(format!(
-                "Historical review {:?} · analysis {} · {} · {}",
-                d.state, d.analysis, d.reviewed_at, d.note
-            )));
         }
         panel.into_any_element()
     }
@@ -7567,7 +7804,7 @@ impl Shell {
             PromptLevel::Warning,
             "Discard unsaved project edits?",
             Some("This discards unsaved settings, review edits, and any discovered page list and inclusion choices for the current project. Saved settings, screenshots and baselines are unchanged. Keep editing to retain your work."),
-            &["Keep editing", "Discard edits"],
+            &[PromptButton::cancel("Keep editing"), PromptButton::new("Discard edits")],
             cx,
         );
         cx.spawn_in(window, async move |this, cx| {
@@ -8135,6 +8372,7 @@ fn main() -> anyhow::Result<()> {
     let (jobs, events) = Jobs::start(paths);
     let after_ui = jobs.clone();
     application.run(move |cx: &mut App| {
+        regressee_app::ui::dialog::install(cx);
         cx.set_global(controls::ReducedMotion(
             std::env::var_os("REGRESSEE_REDUCED_MOTION").is_some_and(|value| value == "1"),
         ));
@@ -8261,9 +8499,15 @@ mod phase7_qualification_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod app_settings_tests;
 #[cfg(all(test, feature = "ui-tests"))]
+mod dialog_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod disclosure_tests;
+#[cfg(all(test, feature = "ui-tests"))]
 mod discovery_handoff_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod image_controls_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod keyboard_navigation_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod loading_feedback_tests;
 #[cfg(all(test, feature = "ui-tests"))]
@@ -8292,6 +8536,8 @@ mod project_settings_tests;
 mod recovery_ux_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod safety_ux_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod screenshot_placeholder_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod sidebar_ux_tests;
 #[cfg(all(test, feature = "ui-tests"))]
@@ -11365,6 +11611,12 @@ mod tests {
                 shell.focus.screen = Screen::Settings;
                 shell.activate_control(Control::About, window, cx);
                 assert!(shell.handle(Control::CloseDialog, cx).is_focused(window));
+                shell.move_focus(false, window, cx);
+                assert!(
+                    shell
+                        .handle(Control::AboutRepository, cx)
+                        .is_focused(window)
+                );
                 shell.move_focus(false, window, cx);
                 assert!(shell.handle(Control::CloseDialog, cx).is_focused(window));
                 shell.navigate(Screen::Results, window, cx);

@@ -952,6 +952,12 @@ fn fs_shadow(input: ShadowVarying) -> @location(0) vec4<f32> {
     }
 
     let shadow = b_shadows[input.shadow_id];
+    // A hard outline has no Gaussian kernel. Match Metal's zero-blur path:
+    // sampling with sigma=0 produces NaNs and hides keyboard focus rings.
+    if (shadow.blur_radius == 0.0) {
+        let distance = quad_sdf(input.position.xy, shadow.bounds, shadow.corner_radii);
+        return blend_color(input.color, clamp(0.5 - distance, 0.0, 1.0));
+    }
     let half_size = shadow.bounds.size / 2.0;
     let center = shadow.bounds.origin + half_size;
     let center_to_point = input.position.xy - center;

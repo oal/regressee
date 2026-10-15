@@ -311,7 +311,7 @@ impl Shell {
             .child(help(
                 "Estimates only. Page height and website speed can increase them.",
             ));
-        let mut body = div()
+        let body = div()
             .flex_shrink_0()
             .flex()
             .flex_col()
@@ -325,29 +325,31 @@ impl Shell {
                 }))
             })
             .child(matches_group)
-            .child(estimate)
-            .child(self.button(
-                Control::DiscoveryDetails,
-                "Page search details",
-                ActionStyle::Choice {
-                    selected: self.discovery_details_open,
-                },
-                cx,
-            ));
-        if self.discovery_details_open {
-            body = body.child(
-                group("How complete is this page list?")
-                    .debug_selector(|| "discovery-coverage-details".into())
-                    .child(help(format!(
-                        "{} · {} listed addresses",
-                        workflow::count_label(p.visited as usize, "page visit", "page visits"),
-                        p.inventory.pages.len()
-                    )))
-                    .child(help(p.inventory.coverage.label()))
-                    .children(p.notes.iter().map(|note| help(note.clone()))),
-            );
-        }
-        body.into_any_element()
+            .child(estimate);
+        let details = if self.discovery_details_open {
+            group("How complete is this page list?")
+                .border_t_0()
+                .pt_0()
+                .debug_selector(|| "discovery-coverage-details".into())
+                .child(help(format!(
+                    "{} · {} listed addresses",
+                    workflow::count_label(p.visited as usize, "page visit", "page visits"),
+                    p.inventory.pages.len()
+                )))
+                .child(help(p.inventory.coverage.label()))
+                .children(p.notes.iter().map(|note| help(note.clone())))
+        } else {
+            div()
+        };
+        body.child(self.inline_disclosure(
+            Control::DiscoveryDetails,
+            "Page search details",
+            "",
+            self.discovery_details_open,
+            details,
+            cx,
+        ))
+        .into_any_element()
     }
 
     pub(super) fn mapping_preview(&self, cx: &mut Context<Self>) -> AnyElement {

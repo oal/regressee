@@ -6,6 +6,127 @@ use super::*;
 use gpui::TestAppContext;
 use regressee_core::domain::{ProjectId, ReviewDecision, ReviewState};
 
+#[gpui::test]
+fn partial_baseline_save_is_discoverable_cancel_safe_and_explicit(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let (store, project, run) = approval_fixture::partial_fixture(dir.path());
+    let previous = store.load_project(project).unwrap().project.active_baseline;
+    let source = serde_json::to_value(store.load_run(run).unwrap()).unwrap();
+    drop(store);
+    let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    shell.update(cx, |s, cx| {
+        load_review(s, project, cx);
+        assert!(s.focus.candidate);
+        assert!(s.control_enabled(Control::SaveBaseline, cx));
+        assert!(s.control_enabled(Control::ReviewCaptureFailures, cx));
+        let actions: Vec<_> = tab_controls(s, cx)
+            .into_iter()
+            .filter(|c| {
+                matches!(
+                    c,
+                    Control::SaveBaseline
+                        | Control::ReviewCaptureFailures
+                        | Control::CheckChanges
+                        | Control::RefreshEvidence
+                )
+            })
+            .collect();
+        assert_eq!(
+            actions,
+            [
+                Control::SaveBaseline,
+                Control::ReviewCaptureFailures,
+                Control::CheckChanges,
+                Control::RefreshEvidence
+            ]
+        );
+        let (title, message, action) = s.baseline_save_confirmation(3, 4);
+        assert_eq!(title, "Save baseline and skip 1 screenshot?");
+        assert_eq!(action, "Save & skip missing");
+        for text in [
+            "3 of 4",
+            "will not be checked",
+            "replaces your current baseline",
+            "History",
+        ] {
+            assert!(message.contains(text), "{message}");
+        }
+        assert!(
+            s.baseline_save_confirmation(2, 4)
+                .0
+                .contains("2 screenshots")
+        );
+        assert_eq!(
+            s.baseline_save_confirmation(149, 150).0,
+            "Save baseline and skip 1 screenshot?"
+        );
+        assert_eq!(s.baseline_save_confirmation(4, 4).2, "Save baseline");
+    });
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        cx.simulate_resize(size(px(width), px(height)));
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+        for selector in ["action-SaveBaseline", "action-ReviewCaptureFailures"] {
+            let bounds = cx.debug_bounds(selector).unwrap();
+            assert!(bounds.size.height >= px(40.));
+            assert!(bounds.left() >= px(0.) && bounds.right() <= px(width));
+        }
+        assert!(cx.debug_bounds("review-viewer").unwrap().size.height >= px(200.));
+    }
+    cx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            let key = s.selected_key.clone();
+            s.activate_control(Control::ReviewCaptureFailures, window, cx);
+            assert_eq!(s.result_indices(), vec![3]);
+            assert_eq!(s.selected_key, key, "filtering must preserve inspection");
+            assert!(s.control_enabled(Control::SaveBaseline, cx));
+            s.activate_control(Control::SaveBaseline, window, cx);
+            assert!(s.native_prompt);
+            assert!(!s.control_enabled(Control::SaveBaseline, cx));
+        })
+    });
+    assert_eq!(
+        cx.pending_prompt().unwrap().0,
+        "Save baseline and skip 1 screenshot?"
+    );
+    cx.simulate_prompt_answer("Keep reviewing");
+    cx.run_until_parked();
+    cx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            assert!(!s.native_prompt);
+            assert_eq!(
+                s.project.as_ref().unwrap().project.active_baseline,
+                previous
+            );
+            assert!(s.focus.candidate);
+            s.activate_control(Control::SaveBaseline, window, cx);
+        })
+    });
+    cx.simulate_prompt_answer("Save & skip missing");
+    cx.run_until_parked();
+    shell.update(cx, |s, cx| {
+        finish_jobs(s, cx);
+        assert!(s.error.is_none(), "{:?}", s.error);
+        // Evidence is read explicitly after the mutation, as in the render loop.
+        s.queue(Work::Evidence(project), cx);
+        finish_jobs(s, cx);
+        assert!(s.capture_is_saved_baseline());
+        assert!(!s.focus.candidate);
+        assert!(s.control_enabled(Control::CheckChanges, cx));
+        assert!(!s.control_mounted(Control::SaveBaseline));
+        assert!(s.evidence.baseline.as_ref().unwrap().explicitly_partial);
+    });
+    owned.join_after_ui();
+    let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.load_run(run).unwrap()).unwrap(),
+        source
+    );
+}
+
 pub(super) fn screenshot_switch_fixture(path: &std::path::Path, comparison: bool) -> ProjectId {
     use regressee_core::domain::{InventoryId, PageId, RunId};
     let (mut store, project, _, _, _) = approval_fixture::fixture(path);
@@ -1564,7 +1685,10 @@ fn validation_correction_reveals_the_right_stage_without_submission_and_help_res
             let baseline = s.project.as_ref().unwrap().project.active_baseline;
             s.show_keyboard_help(window, cx);
             assert!(s.help_dialog && s.focus.dialog);
-            assert_eq!(s.focus.controls(), vec![Control::CloseDialog]);
+            assert_eq!(
+                s.focus.controls(),
+                [Control::AboutRepository, Control::CloseDialog]
+            );
             assert_eq!(tab_controls(s, cx), vec![Control::CloseDialog]);
             assert_eq!(s.focused(window, cx), Some(Control::CloseDialog));
             s.activate_control(Control::SaveBaseline, window, cx);

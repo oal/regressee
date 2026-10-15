@@ -150,31 +150,31 @@ impl Shell {
 
     pub(super) fn ignored_areas_disclosure(&self, cx: &mut Context<Self>) -> AnyElement {
         let open = self.details.contains(&Detail::IgnoredAreas);
+        let title = format!(
+            "Ignored areas · {}{}",
+            self.mask_rectangles.len(),
+            if self.mask_dirty || self.mask_geometry_dirty(cx) {
+                " · draft"
+            } else {
+                ""
+            }
+        );
         let mut group = div()
             .debug_selector(|| "analysis-ignored-areas".into())
             .flex()
             .flex_col()
-            .gap_2()
-            .child(self.button(
-                Control::Details(Detail::IgnoredAreas),
-                if open {
-                    "Hide ignored areas".to_owned()
-                } else {
-                    format!(
-                        "Ignored areas · {}{}",
-                        self.mask_rectangles.len(),
-                        if self.mask_dirty || self.mask_geometry_dirty(cx) {
-                            " · draft"
-                        } else {
-                            ""
-                        }
-                    )
-                },
-                ActionStyle::Secondary,
-                cx,
-            ));
+            .gap_2();
         if !open {
-            return group.into_any_element();
+            return self
+                .inline_disclosure(
+                    Control::Details(Detail::IgnoredAreas),
+                    title,
+                    "",
+                    open,
+                    group,
+                    cx,
+                )
+                .into_any_element();
         }
         group = group.child(self.keyboard_mask_editor(cx))
             .child(analysis_help("Areas stay at fixed pixel positions in these before-and-after screenshots; they do not follow moving content. Apply updates your draft. Save keeps the areas and recalculates the comparison. Ignored content remains visible in the original images."));
@@ -210,6 +210,14 @@ impl Shell {
         {
             group = group.child(controls::status("Saved areas came from different screenshots or image sizes. Review their positions, then choose Check areas fit these screenshots. Areas are never stretched automatically.", Tone::Warning));
         }
-        group.into_any_element()
+        self.inline_disclosure(
+            Control::Details(Detail::IgnoredAreas),
+            title,
+            "",
+            open,
+            group,
+            cx,
+        )
+        .into_any_element()
     }
 }
