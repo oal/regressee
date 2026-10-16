@@ -352,7 +352,7 @@ impl Shell {
             // A first capture has only an original, not a before/after pair.
             return &[1];
         }
-        match self.viewer_mode {
+        match self.effective_viewer_mode() {
             0 => &[0, 1],
             1 | 3 => &[2],
             4 if self.full_width_after => &[1],
@@ -502,6 +502,8 @@ impl Shell {
             | Control::Phase5(0..=19 | 26..=28 | 34..=39)
             | Control::AnalysisField(0..=8 | 10..=13)
             | Control::Viewer
+            | Control::SplitView
+            | Control::SplitDivider
             | Control::Guided(44 | 46)
             | Control::Details(Detail::Analysis)
                 if results && self.options_panel_open() =>
@@ -529,6 +531,8 @@ impl Shell {
             | Control::PanUp
             | Control::PanDown
             | Control::Viewer
+            | Control::SplitView
+            | Control::SplitDivider
             | Control::Guided(44 | 46 | 52)
             | Control::Details(Detail::Analysis)
                 if results && self.page_list_workspace() && !self.discovery_image_mounted() =>

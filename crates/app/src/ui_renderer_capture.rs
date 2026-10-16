@@ -40,6 +40,8 @@ mod ui_review_matrix;
 mod ui_row_hints_capture;
 #[path = "ui_sidebar_capture.rs"]
 mod ui_sidebar_capture;
+#[path = "ui_split_view_capture.rs"]
+mod ui_split_view_capture;
 
 #[gpui::test]
 #[ignore = "explicit two-size native inline-disclosure inspection"]
@@ -196,6 +198,9 @@ fn write_frame(
             ("screenshot_placeholder_tests_source_sha256", include_bytes!("screenshot_placeholder_tests.rs").as_slice()),
             ("image_controls_test_source_sha256", include_bytes!("image_controls_tests.rs").as_slice()),
             ("image_controls_harness_source_sha256", include_bytes!("ui_image_controls_capture.rs").as_slice()),
+            ("split_view_source_sha256", include_bytes!("split_view.rs").as_slice()),
+            ("split_view_test_source_sha256", include_bytes!("split_view_tests.rs").as_slice()),
+            ("split_view_harness_source_sha256", include_bytes!("ui_split_view_capture.rs").as_slice()),
             ("recovery_policy_source_sha256", include_bytes!("recovery.rs").as_slice()),
             ("recovery_journey_source_sha256", include_bytes!("recovery_ux_tests.rs").as_slice()),
             ("renderer_harness_source_sha256", include_bytes!("ui_renderer_capture.rs").as_slice()),

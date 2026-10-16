@@ -63,15 +63,15 @@ fn zoom_occlusion_and_image_keyboard_preserve_source_pan_across_views(cx: &mut T
         assert!(s.pan_x > 0. && s.pan_y > 0);
         (s.zoom, s.pan_x, s.pan_y)
     });
-    for mode in 0..5 {
+    for mode in [0, 1, 2, 3, 5, 4] {
         cx.update(|w, cx| {
             shell.update(cx, |s, cx| {
                 s.activate_control(Control::Guided(54), w, cx);
                 s.activate_control(
-                    if mode == 4 {
-                        Control::Guided(55)
-                    } else {
-                        Control::Phase5(mode + 6)
+                    match mode {
+                        4 => Control::Guided(55),
+                        5 => Control::SplitView,
+                        mode => Control::Phase5(mode + 6),
                     },
                     w,
                     cx,

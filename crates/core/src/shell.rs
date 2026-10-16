@@ -200,6 +200,8 @@ pub enum Control {
     PanUp,
     PanDown,
     Viewer,
+    SplitView,
+    SplitDivider,
     Guided(usize),
     CrawlField(usize),
     PauseCapture,
@@ -506,6 +508,7 @@ impl FocusState {
                     controls.push(Control::Guided(45));
                     controls.extend([Control::CloseOptions, Control::DiscoveryDetails]);
                     controls.extend([50, 51, 53, 54, 55, 56, 57].map(Control::Guided));
+                    controls.push(Control::SplitView);
                     controls.push(Control::Phase5(39));
                     controls.push(Control::ImageControls);
                     controls.extend([0, 1, 2, 4, 5, 26].map(Control::Phase5));
@@ -531,6 +534,7 @@ impl FocusState {
                 if self.viewer {
                     controls.push(Control::Guided(46));
                     controls.push(Control::Viewer);
+                    controls.push(Control::SplitDivider);
                 }
             }
             Screen::History if self.project_saved => {
@@ -583,12 +587,13 @@ impl FocusState {
                     | Control::DiscoveryDetails => 2,
                     Control::DiscardPageList => 2,
                     Control::Guided(54) => 3,
-                    Control::Phase5(6..=9) | Control::Guided(55..=57) => 4,
+                    Control::Phase5(6..=9) | Control::Guided(55..=57) | Control::SplitView => 4,
                     Control::Guided(46)
                     | Control::ImageControls
                     | Control::Phase5(36)
                     | Control::Guided(44)
                     | Control::Viewer => 5,
+                    Control::SplitDivider => 6,
                     Control::Phase5(20..=22) => 7,
                     Control::Phase5(37 | 33) => 8,
                     Control::Phase5(23..=25) => 9,

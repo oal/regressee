@@ -3,12 +3,13 @@
 use super::*;
 use regressee_app::ui::{selector, timezone_select::chevron_sized};
 
-const MODES: [(Control, &str); 5] = [
+const MODES: [(Control, &str); 6] = [
     (Control::Phase5(6), "Compare"),
     (Control::Phase5(7), "Difference"),
     (Control::Phase5(8), "Overlay"),
     (Control::Phase5(9), "Heatmap"),
     (Control::Guided(55), "Before/After (full width)"),
+    (Control::SplitView, "Split slider"),
 ];
 
 pub(super) struct InspectionHint(pub(super) SharedString);
@@ -152,10 +153,11 @@ impl Shell {
             );
         }
         if self.control_mounted(Control::Guided(54)) {
-            let label = match self.viewer_mode {
+            let label = match self.effective_viewer_mode() {
                 1 => "Difference",
                 2 => "Overlay",
                 3 => "Heatmap",
+                5 => "Split slider",
                 4 => {
                     if self.full_width_after {
                         "After"
@@ -363,11 +365,28 @@ impl Shell {
                     "end" => MODES.len() - 1,
                     _ => return,
                 };
-                window.focus(&s.handle(MODES[next].0, cx));
+                let reverse = matches!(event.keystroke.key.as_str(), "up" | "left" | "end");
+                let next = (0..MODES.len())
+                    .map(|offset| {
+                        if reverse {
+                            (next + MODES.len() - offset) % MODES.len()
+                        } else {
+                            (next + offset) % MODES.len()
+                        }
+                    })
+                    .find(|&i| s.control_enabled(MODES[i].0, cx));
+                if let Some(next) = next {
+                    window.focus(&s.handle(MODES[next].0, cx));
+                }
                 cx.stop_propagation();
             }));
         for (i, (control, label)) in MODES.into_iter().enumerate() {
-            let selected = self.viewer_mode == i;
+            let selected = self.effective_viewer_mode() == i;
+            let label = if control == Control::SplitView && !self.split_view_available() {
+                "Split slider (needs both images)"
+            } else {
+                label
+            };
             menu = menu.child(
                 self.action_control(control, label, ActionStyle::Choice { selected }, cx)
                     .w_full()
@@ -412,7 +431,7 @@ pub(super) fn image_navigation_hint() -> AnyElement {
         .into_any_element()
 }
 
-pub(super) fn image_controls_help() -> AnyElement {
+pub(super) fn image_controls_help(split: bool) -> AnyElement {
     let rows = |items: Vec<(&'static str, &'static str)>| {
         div()
             .w_full()
@@ -448,6 +467,10 @@ pub(super) fn image_controls_help() -> AnyElement {
             ("Move horizontally", "Shift + scroll"),
             ("Zoom at pointer", image_zoom_gesture()),
         ]))
+        .when(split, |help| help.child(rows(vec![
+            ("Compare versions", "Drag the divider left or right"),
+            ("Divider keyboard", "Tab to the divider; Left / Right adjust, Shift moves faster, Home / End show one version"),
+        ])))
         .child(
             div()
                 .flex()

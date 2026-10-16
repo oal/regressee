@@ -274,7 +274,14 @@ visible. Working geometry uses the actual mounted rail width, not a permanent
 Compare remains the default at both sizes. **Before/After (full width)** is an
 explicit, untinted one-original alternative with a named current side and shared
 source pan/zoom; switching sides preserves manual scale and target. A separate
-View chooser exposes Compare, Difference, Overlay, Heatmap and this alternative.
+View chooser exposes Compare, Difference, Overlay, Heatmap, this alternative and
+the optional **Split slider**. Split slider clips untinted Before-left and
+After-right originals in one full-width stage with shared source pan/zoom; dragging
+the vertical divider changes only the reveal. Tab from Viewer reaches the divider:
+Left/Right moves it by 1%, Shift+Left/Right by 10%; Home shows all After and End
+all Before. Missing pairs disable Split slider and fall back to Compare without
+clearing the preferred mode. A shorter page retains an opaque blank tail and image
+navigation. These view changes never save or discard drafts or update a baseline.
 Queue and image panes are independently bounded. Details and comparison
 adjustments use a bounded, scrollable flyout over the viewer; neither replaces
 the queue nor consumes image height below the evidence. Review does not

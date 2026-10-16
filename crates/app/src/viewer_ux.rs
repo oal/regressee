@@ -62,9 +62,12 @@ impl Shell {
 
     pub(super) fn viewer_has_pixels(&self) -> bool {
         self.viewer.as_ref().is_some_and(|v| {
-            self.viewer_pane_indices()
-                .iter()
-                .any(|&i| !v.panes[i].is_empty())
+            let sources: &[usize] = if self.effective_viewer_mode() == 5 {
+                &[0, 1]
+            } else {
+                self.viewer_pane_indices()
+            };
+            sources.iter().any(|&i| !v.panes[i].is_empty())
         })
     }
 
@@ -75,7 +78,7 @@ impl Shell {
             || (self.review_tools && !self.mask_draw)
     }
 
-    fn viewer_input_allowed(&self) -> bool {
+    pub(super) fn viewer_input_allowed(&self) -> bool {
         self.focus.screen == Screen::Results
             && !self.focus.busy
             && !self.focus.dialog
@@ -234,7 +237,9 @@ impl Shell {
             .flex_col()
             .gap_4();
         if self.image_controls_open {
-            body = body.child(evidence_workspace::image_controls_help());
+            body = body.child(evidence_workspace::image_controls_help(
+                self.effective_viewer_mode() == 5,
+            ));
         } else if self.review_note_open {
             body = body.child(
                 div()

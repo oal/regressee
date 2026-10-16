@@ -54,6 +54,19 @@ for the separate platform/clean-machine qualification limits.
    until deliberate manual deletion. **History** distinguishes baseline versions
    from the capture/check runs that supplied their evidence.
 
+## Comparing screenshots with the split slider
+
+In the screenshot viewer, choose **View → Split slider**. Before is on the left
+and After is on the right; drag the vertical divider to reveal either original
+at the same zoom and position. Drag elsewhere on the image, or scroll, to pan;
+Ctrl/Command + scroll zooms at the pointer. **Compare** remains the default view,
+and all existing viewing modes remain available.
+
+For keyboard control, Tab from the image to the divider. Left/Right moves it by
+1%; Shift + Left/Right moves it by 10%. Home shows all After; End shows all Before.
+The slider needs both screenshots. If one is unavailable, the viewer uses
+separate panes instead. Changing the view never saves or updates a baseline.
+
 ## Choosing and switching projects
 
 Use **View results** in Projects to select a website and enter its workspace

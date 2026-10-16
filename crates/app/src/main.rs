@@ -53,6 +53,7 @@ mod review_ux;
 mod runtime_ux;
 mod safety_ux;
 mod setup_ux;
+mod split_view;
 mod task_ux;
 #[cfg(all(feature = "ui-inspection", target_os = "linux"))]
 mod ui_inspection;
@@ -239,6 +240,8 @@ struct Shell {
     analysis_advanced: bool,
     viewer_mode: usize,
     overlay_fraction: f32,
+    split_fraction: f32,
+    split_drag: Option<f32>,
     region_index: usize,
     mask_rectangles: Vec<regressee_app::analysis_engine::Rectangle>,
     review_drafts: review_ux::ReviewDrafts,
@@ -313,7 +316,7 @@ impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
             root_focus: cx.focus_handle(),
-            handles: (0..(646 + regressee_app::task::MAX_TASK_LINKS))
+            handles: (0..(648 + regressee_app::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -427,6 +430,8 @@ impl Shell {
             analysis_advanced: false,
             viewer_mode: 0,
             overlay_fraction: 0.5,
+            split_fraction: 0.5,
+            split_drag: None,
             region_index: 0,
             mask_rectangles: vec![],
             review_drafts: Default::default(),
@@ -2688,6 +2693,8 @@ impl Shell {
             Control::PanUp => 86,
             Control::PanDown => 87,
             Control::Viewer => 615,
+            Control::SplitView => 646 + regressee_app::task::MAX_TASK_LINKS,
+            Control::SplitDivider => 647 + regressee_app::task::MAX_TASK_LINKS,
             Control::Guided(46) => return self.zoom_select.read(cx).focus_handle(),
             Control::PauseCapture => 88,
             Control::Guided(index @ 50..=52) => 612 + index - 50,
@@ -3394,10 +3401,10 @@ impl Shell {
                 54 => {
                     self.viewer_mode_open = !self.viewer_mode_open;
                     self.presentation_focus = Some(if self.viewer_mode_open {
-                        if self.viewer_mode == 4 {
-                            Control::Guided(55)
-                        } else {
-                            Control::Phase5(self.viewer_mode + 6)
+                        match self.effective_viewer_mode() {
+                            4 => Control::Guided(55),
+                            5 => Control::SplitView,
+                            mode => Control::Phase5(mode + 6),
                         }
                     } else {
                         Control::Guided(54)
@@ -5336,7 +5343,15 @@ impl Shell {
                     self.queue(Work::Evidence(p.project.id), cx);
                 }
             }
-            Control::Viewer => (),
+            Control::Viewer | Control::SplitDivider => (),
+            Control::SplitView => {
+                self.viewer_mode = 5;
+                self.viewer_mode_open = false;
+                self.presentation_focus = Some(Control::Guided(54));
+                if self.viewer_fit {
+                    self.zoom = self.fitted_viewer_zoom();
+                }
+            }
             Control::ZoomIn
             | Control::ZoomOut
             | Control::PanLeft
@@ -5671,6 +5686,8 @@ impl Shell {
             return false;
         }
         match control {
+            Control::SplitView => self.split_view_available(),
+            Control::SplitDivider => self.split_input_allowed(),
             Control::ValidationNext => !self.form_errors(cx).is_empty(),
             Control::DiscardPageList => self.preview.is_some(),
             Control::CaptureBaseline => self.preview.is_none() || self.discovery_plan_current(),
@@ -6143,6 +6160,8 @@ impl Shell {
             PauseCapture => self.focus.busy && self.focus.capturing && self.focus.pausable,
             ZoomIn | ZoomOut | PanLeft | PanRight | PanUp | PanDown => false,
             Viewer => viewer && self.viewer_has_pixels(),
+            SplitView => viewer && analysis && self.viewer_mode_open,
+            SplitDivider => viewer && self.effective_viewer_mode() == 5 && !self.mask_draw,
             ImageControls => {
                 viewer && self.viewer_has_pixels() && !self.narrow_workspace && !self.mask_draw
             }
@@ -7269,7 +7288,7 @@ impl Shell {
     ) -> AnyElement {
         let indices = self.viewer_pane_indices();
         let mode = if self.evidence.comparison.is_some() {
-            self.viewer_mode
+            self.effective_viewer_mode()
         } else {
             0
         };
@@ -7348,14 +7367,33 @@ impl Shell {
                         },
                     ))
                 })
-                .child(tile_layer(if mode == 1 { 1 } else { index }, 1.));
+                .child(tile_layer(
+                    if mode == 1 || mode == 5 { 1 } else { index },
+                    1.,
+                ));
+            if mode == 5 {
+                // Clip the reveal, not the image: both originals retain the same
+                // source transform and tile dimensions as the divider moves.
+                viewport = viewport.child(
+                    div()
+                        .debug_selector(|| "split-before-reveal".into())
+                        .absolute()
+                        .left_0()
+                        .top_0()
+                        .h_full()
+                        .w(relative(self.split_fraction))
+                        .overflow_hidden()
+                        .bg(rgb(SURFACE))
+                        .child(tile_layer(0, 1.)),
+                );
+            }
             if mode == 1 {
                 viewport = viewport.child(tile_layer(2, 0.55));
             }
             if mode == 2 {
                 viewport = viewport.child(tile_layer(1, self.overlay_fraction));
             }
-            if view.panes[index].is_empty() {
+            if mode != 5 && view.panes[index].is_empty() {
                 let message = if index == 1 {
                     self.evidence
                         .latest
@@ -7519,6 +7557,9 @@ impl Shell {
                         }),
                     )
                 });
+            if mode == 5 {
+                viewport = viewport.child(self.split_divider(cx));
+            }
             panes = panes.child(
                 div()
                     .flex_1()
@@ -7540,7 +7581,9 @@ impl Shell {
                             .overflow_hidden()
                             .text_size(px(13.))
                             .line_height(px(18.))
-                            .child(if mode == 3 {
+                            .child(if mode == 5 {
+                                self.split_caption()
+                            } else if mode == 3 {
                                 evidence_workspace::heatmap_legend()
                             } else {
                                 div()
@@ -7573,7 +7616,9 @@ impl Shell {
                         div()
                             .text_size(px(13.))
                             .font_weight(FontWeight::SEMIBOLD)
-                            .child(match index {
+                            .child(if mode == 5 {
+                                "Before · drag divider · After"
+                            } else { match index {
                                 0 => {
                                     if self.viewer_mode == 2 {
                                         "Overlay · saved before + after"
@@ -7589,7 +7634,7 @@ impl Shell {
                                         "Difference · after with significant changes highlighted"
                                     }
                                 }
-                            })
+                            } })
                             .into_any_element()
                     })
                     .child(viewport),
@@ -7941,6 +7986,9 @@ impl Render for Shell {
         let render_started = std::time::Instant::now();
         self.configure_review_geometry(f32::from(window.viewport_size().width));
         self.viewport_height = f32::from(window.viewport_size().height);
+        if !self.split_input_allowed() {
+            self.split_drag = None;
+        }
         let bounded_review =
             self.focus.screen == Screen::Results && !self.focus.shows_project_picker();
         if self.focus.approval_dialog
@@ -8009,6 +8057,7 @@ impl Render for Shell {
             && ![
                 Control::Guided(54),
                 Control::Guided(55),
+                Control::SplitView,
                 Control::Phase5(6),
                 Control::Phase5(7),
                 Control::Phase5(8),
@@ -8540,6 +8589,8 @@ mod safety_ux_tests;
 mod screenshot_placeholder_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod sidebar_ux_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod split_view_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod workflow_refinement_tests;
 

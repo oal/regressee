@@ -455,12 +455,13 @@ fn view_menu_is_trigger_attached_full_row_and_native_keyboard_dismissable(cx: &m
             "action-Phase5(8)",
             "action-Phase5(9)",
             "action-Guided(55)",
+            "action-SplitView",
         ] {
             let row = cx.debug_bounds(name).unwrap();
             assert_eq!(row.size.width, menu.size.width - px(2.));
             inside(row, menu);
         }
-        cx.simulate_keystrokes("end enter");
+        cx.simulate_keystrokes("end up enter");
         shell.read_with(cx, |s, _| assert_eq!(s.viewer_mode, 4));
         cx.simulate_keystrokes("enter home down down enter");
         shell.read_with(cx, |s, _| assert_eq!(s.viewer_mode, 2));
