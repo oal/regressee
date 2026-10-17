@@ -250,6 +250,9 @@ impl TextInput {
         true
     }
     fn vertical(&mut self, rows: isize, select: bool, cx: &mut Context<Self>) {
+        if !self.input_allowed() {
+            return;
+        }
         let Some(mode) = self.multiline.as_ref() else {
             return;
         };
@@ -347,6 +350,9 @@ impl TextInput {
         _: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if !self.input_allowed() {
+            return;
+        }
         let Some(b) = self.bounds else {
             return;
         };

@@ -110,7 +110,7 @@ impl Shell {
             self.crawl_fields[18].read(cx).content.to_string(),
         )
     }
-    fn exit_network_dirty(&self, cx: &App) -> bool {
+    pub(super) fn exit_network_dirty(&self, cx: &App) -> bool {
         let text = self.exit_network_text(cx);
         self.exit_network_saved.as_ref().map_or_else(
             || !text.0.is_empty() || !text.1.is_empty(),
@@ -123,7 +123,7 @@ impl Shell {
     }
     // In-progress "Add screen size" and origin-mapping forms are not yet project
     // settings. Do not silently apply them (or silently drop them) on exit.
-    fn exit_builder_dirty(&self, cx: &App) -> bool {
+    pub(super) fn exit_builder_dirty(&self, cx: &App) -> bool {
         let width = self.crawl_fields[7].read(cx).content.trim();
         let height = self.crawl_fields[8].read(cx).content.trim();
         let custom_size = (width != "1440" || height != "900")
@@ -148,7 +148,7 @@ impl Shell {
                 });
         custom_size || mapping
     }
-    fn exit_project_dirty(&self, cx: &App) -> bool {
+    pub(super) fn exit_project_dirty(&self, cx: &App) -> bool {
         self.environment_unsaved(cx)
             || self.project.as_ref().map_or_else(
                 || {
@@ -264,7 +264,7 @@ impl Shell {
         let dirty = draft_dirty || self.preview.is_some();
         // A submitted mutation cannot be rolled back with Cancel or Discard.
         // Do not destroy its reply receiver before we know its committed result.
-        if self.pending.is_some() && !self.focus.capturing {
+        if self.pending.is_some() && !self.focus.capturing && (dirty || !self.jobs.is_remote()) {
             self.notice = Some("Wait for the current operation to finish before quitting. Cancelling would not undo settings or screenshots already saved.".into());
             cx.notify();
             return;
@@ -272,9 +272,9 @@ impl Shell {
         if !self.exit_guard.request(dirty, false) {
             return;
         }
-        // Runtime/discovery/capture work keeps its established stop-and-join
-        // behavior after a clean or explicitly discarded exit. Saving edits
-        // still requires waiting for that operation to finish first.
+        // Production exits detach from the shared engine; admitted work and its
+        // durable result survive. Explicit test actors retain stop-and-join.
+        // Saving unsent edits still waits for their current operation first.
         if !dirty {
             self.finish_exit(cx);
             return;
@@ -908,6 +908,38 @@ mod controller_tests {
             );
         });
         owner.stop();
+        owner.join_after_ui();
+    }
+
+    #[gpui::test]
+    fn agent_follow_never_traps_quit_and_cancel_keeps_the_draft(cx: &mut TestAppContext) {
+        let root = tempfile::tempdir().unwrap();
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(root.path()));
+        let owner = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        cx.update(|w, cx| {
+            shell.update(cx, |s, cx| {
+                crate::workflow_refinement_tests::finish_jobs(s, cx);
+                s.agent =
+                    crate::agent_control_tests::state(regressee_app::control::Status::Active, true);
+                s.name.update(cx, |i, cx| i.set_value("Retained edit", cx));
+                assert!(s.agent_locked());
+                s.request_exit(w, cx);
+                assert_eq!(s.exit_guard.phase, Phase::Prompt);
+                assert!(s.native_prompt);
+            })
+        });
+        cx.simulate_prompt_answer("Cancel");
+        cx.run_until_parked();
+        shell.read_with(cx, |s, cx| {
+            assert_eq!(s.exit_guard.phase, Phase::Idle);
+            assert_eq!(s.name.read(cx).content.as_ref(), "Retained edit");
+            assert!(!s.native_prompt);
+        });
+        cx.update(|w, cx| shell.update(cx, |s, cx| s.request_exit(w, cx)));
+        cx.simulate_prompt_answer("Discard and quit");
+        cx.run_until_parked();
+        shell.read_with(cx, |s, _| assert_eq!(s.exit_guard.phase, Phase::Confirmed));
         owner.join_after_ui();
     }
 

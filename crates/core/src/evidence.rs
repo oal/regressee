@@ -261,6 +261,10 @@ pub struct ProjectEvidence {
     pub analyses: Vec<AnalysisId>,
     #[serde(default)]
     pub reviews: Vec<ReviewDecision>,
+    /// Recent run-wide annotation history is not authoritative current state.
+    /// Terminal current decisions and paginated history use focused store reads.
+    #[serde(default)]
+    pub review_history_truncated: bool,
     #[serde(default)]
     pub baselines: Vec<BaselineVersion>,
 }

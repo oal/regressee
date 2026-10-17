@@ -5,13 +5,15 @@ pub mod activity;
 #[cfg(feature = "ui")]
 pub mod jobs;
 pub mod launch;
+#[cfg(all(feature = "ui", any(test, feature = "test-support")))]
+mod local_jobs;
 #[cfg(feature = "ui")]
 pub mod recovery;
 #[cfg(feature = "ui")]
 pub mod task;
 #[cfg(feature = "ui")]
 pub mod ui;
-#[cfg(feature = "ui")]
+#[cfg(all(feature = "ui", any(test, feature = "test-support")))]
 mod viewer_cache;
 #[cfg(feature = "ui")]
 pub mod viewer_images;

@@ -488,6 +488,9 @@ impl Shell {
             .flex_col()
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_mouse_down_out(cx.listener(|s, event: &MouseDownEvent, _, cx| {
+                if s.agent_locked() {
+                    return;
+                }
                 if !s
                     .viewer_mode_trigger
                     .get()
@@ -498,6 +501,9 @@ impl Shell {
                 }
             }))
             .on_key_down(cx.listener(|s, event: &gpui::KeyDownEvent, window, cx| {
+                if s.agent_locked() {
+                    return;
+                }
                 let current = MODES
                     .iter()
                     .position(|(c, _)| s.handle(*c, cx).is_focused(window))

@@ -4,8 +4,13 @@ Regressee is a local-first desktop app for spotting visual changes on websites.
 Capture reference screenshots, check the same pages again, and review differences
 before deciding which changes to accept.
 
-**Regressee is currently a private preview, not a production-ready public release.**
+**Regressee is a public beta, available on [GitHub](https://github.com/oal/regressee).**
 See [platform availability](#platform-availability) before getting started.
+
+![Regressee comparison workspace showing before and after screenshots of a loopback demo website](assets/screenshots/regressee-comparison.png)
+
+*Demo data: real managed-browser captures of an owned loopback website, shown by
+the native GPUI offscreen renderer. [Screenshot provenance](assets/screenshots/README.md).*
 
 ## What you can do
 
@@ -43,19 +48,22 @@ Browser installation and repair are also available in **App settings**.
 
 For a walkthrough and troubleshooting, see the [first-run guide](docs/first-run-guide.md).
 
-### Download a test build
+### Download a beta build
 
-Linux and Windows x86_64 preview builds are published to
+Linux and Windows x86_64 beta builds are published to
 [GitHub Releases](https://github.com/oal/regressee/releases) when the
 **Downloadable Linux and Windows previews** workflow is run or a `v*` tag is pushed.
-On Windows, download **`regressee-desktop-windows-x86_64.exe`** and run it; no developer
-tools are required. The Windows ZIP includes help and license notices. Linux
-downloads are `.tar.gz` archives for Ubuntu 24.04-compatible systems, not AppImages.
+Choose a **desktop** ZIP (Windows) or `.tar.gz` (Linux) and keep its separate
+`regressee` and `regressee-desktop` executables together. Launch the latter for the
+GUI. **CLI-only** archives are named `regressee-cli-PLATFORM`; they contain no GPUI
+or desktop executable. Both include help, portable agent skill, license inventories,
+source/build metadata and checksums. Linux archives target Ubuntu 24.04-compatible
+systems, not AppImages. No developer tools are needed to run a qualified build.
 
 These builds are unsigned and experimental; Windows may show a publisher warning.
 First-run browser setup needs internet access. See the
 [download and release instructions](docs/release-building.md#downloadable-test-previews)
-for requirements, checksums, and how to publish a preview.
+for requirements, checksums, and how to publish a beta build.
 
 ### Running from source
 
@@ -73,9 +81,20 @@ for platform-specific details.
 
 The native GUI now lives in `crates/gui`; GUI-independent services remain in
 `crates/app`. `cargo build --locked -p regressee-cli --bin regressee` builds only
-the new CLI skeleton, without GPUI. It supports help/version/build metadata only;
-product commands and the shared engine are not available yet. Existing data and
-desktop workflows are unchanged. See [implementation status](docs/agent-cli-status.md).
+the CLI without GPUI. Both entrypoints now use one private local application
+engine. The CLI exposes project/configuration, discovery, capture/check, durable
+jobs, evidence/review/baselines, local HTML reports/crops, ZIP sharing and runtime
+maintenance. Run `regressee --help` or read the [terminal guide](docs/cli.md).
+Headless login/session import is unsupported; servers initially use public sites.
+Optional exclusive GUI following uses named, renewable agent sessions and explicit
+GUI opt-in, with immediate Take control and temporary human handoff. See
+[agent control usage](docs/cli.md#agent-control-and-optional-gui-following).
+See the [engine contract](docs/local-engine.md) and
+[implementation status](docs/agent-cli-status.md) for limits and verification.
+For tool-neutral agents, manually install [the portable skill](docs/agent-skill.md)
+or supply `skills/regressee/SKILL.md` and its references. No host-specific integration
+is implied. A safe [consumer exercise](docs/cli-consumer-exercise.md) uses only the
+packaged CLI and an owned loopback website.
 
 Unknown-duration progress bars animate independently of page-count updates.
 Task screens separate activity, icon-labelled screenshot outcomes and baseline

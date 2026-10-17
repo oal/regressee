@@ -56,7 +56,7 @@ pub struct ScrollMetrics {
 #[derive(Default)]
 struct ElementState {
     handle: ScrollHandle,
-    drag: Rc<Cell<Option<(Axis, f32)>>>,
+    drag: Rc<Cell<Option<(Axis, f32, u64)>>>,
     hovered: Rc<Cell<bool>>,
 }
 
@@ -67,7 +67,7 @@ pub struct Scrollbars {
     metrics: Option<MetricsFn>,
     change: Option<ChangeFn>,
     horizontal: bool,
-    drag: Option<Rc<Cell<Option<(Axis, f32)>>>>,
+    drag: Option<Rc<Cell<Option<(Axis, f32, u64)>>>>,
 }
 
 fn scrollable_element(
@@ -115,7 +115,7 @@ pub struct BarLayout {
 
 pub struct ScrollbarLayoutState {
     child: AnyElement,
-    drag: Rc<Cell<Option<(Axis, f32)>>>,
+    drag: Rc<Cell<Option<(Axis, f32, u64)>>>,
     hovered: Rc<Cell<bool>>,
 }
 
@@ -229,7 +229,7 @@ impl Element for Scrollbars {
         }
         if drag
             .get()
-            .is_some_and(|(axis, _)| !bars.iter().any(|b| b.0 == axis))
+            .is_some_and(|(axis, _, _)| !bars.iter().any(|b| b.0 == axis))
         {
             drag.set(None);
         }
@@ -278,6 +278,13 @@ impl Element for Scrollbars {
         let metrics = layout.metrics;
         let bars = layout.bars.clone();
         window.on_mouse_event(move |e: &MouseDownEvent, phase, window, cx| {
+            if !super::interaction::allowed(window, cx) {
+                drag_down.set(None);
+                if phase == DispatchPhase::Capture && metrics.viewport.contains(&e.position) {
+                    cx.stop_propagation();
+                }
+                return;
+            }
             if phase != DispatchPhase::Bubble || e.button != MouseButton::Left {
                 return;
             }
@@ -287,7 +294,11 @@ impl Element for Scrollbars {
                 }
                 let position = axis.coordinate(e.position);
                 if position >= geometry.thumb.top() && position <= geometry.thumb.bottom() {
-                    drag_down.set(Some((*axis, f32::from(position - geometry.thumb.top()))));
+                    drag_down.set(Some((
+                        *axis,
+                        f32::from(position - geometry.thumb.top()),
+                        super::interaction::epoch(window, cx),
+                    )));
                 } else {
                     let direction = if position < geometry.thumb.top() {
                         1.
@@ -318,14 +329,20 @@ impl Element for Scrollbars {
             if phase != DispatchPhase::Capture {
                 return;
             }
+            if !super::interaction::allowed(window, cx) {
+                drag_move.set(None);
+                return;
+            }
             let over = bars.iter().any(|b| b.3.is_hovered(window));
             if hovered.replace(over) != over {
                 window.refresh();
             }
-            let Some((axis, grab)) = drag_move.get() else {
+            let Some((axis, grab, epoch)) = drag_move.get() else {
                 return;
             };
-            if e.pressed_button != Some(MouseButton::Left) {
+            if epoch != super::interaction::epoch(window, cx)
+                || e.pressed_button != Some(MouseButton::Left)
+            {
                 drag_move.set(None);
             } else if let Some((_, geometry, _, _)) = bars.iter().find(|b| b.0 == axis) {
                 let value = geometry.drag_offset(axis.coordinate(e.position), grab);
@@ -352,6 +369,14 @@ impl Element for Scrollbars {
         let change = self.change.as_ref().unwrap().clone();
         let bars = layout.bars.clone();
         window.on_mouse_event(move |e: &ScrollWheelEvent, phase, window, cx| {
+            if !super::interaction::allowed(window, cx) {
+                // Guard GPUI's child scroll owner too, not just our thumb's
+                // offset callback. This listener predates a possible lock.
+                if phase == DispatchPhase::Capture && metrics.viewport.contains(&e.position) {
+                    cx.stop_propagation();
+                }
+                return;
+            }
             if phase != DispatchPhase::Bubble || !bars.iter().any(|b| b.3.is_hovered(window)) {
                 return;
             }
@@ -422,7 +447,7 @@ impl ScrollbarGeometry {
 
 #[derive(Clone, Default)]
 pub struct ScrollbarState {
-    drag: Rc<Cell<Option<(Axis, f32)>>>,
+    drag: Rc<Cell<Option<(Axis, f32, u64)>>>,
 }
 impl ScrollbarState {
     pub fn cancel_drag(&self) {

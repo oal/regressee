@@ -3,7 +3,7 @@
 use crate::product::RuntimeState;
 use regressee_runtime::protocol::FailureCode;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Problem {
     Browser(RuntimeState),
     Worker(FailureCode),

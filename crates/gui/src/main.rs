@@ -44,6 +44,9 @@ use std::{
 };
 
 mod action_icons;
+mod agent_refresh;
+mod agent_ux;
+use regressee_app::protocol::Outcome;
 mod analysis_ux;
 mod app_settings_ux;
 mod appearance_ux;
@@ -147,7 +150,10 @@ actions!(
         HistoryScreen,
         SettingsScreen,
         FindLocal,
-        KeyboardHelp
+        KeyboardHelp,
+        TakeControl,
+        FollowAgent,
+        ReturnToAgent
     ]
 );
 type SetupPaintBounds = (
@@ -156,6 +162,22 @@ type SetupPaintBounds = (
 );
 
 struct Shell {
+    input_gate: regressee_gui::ui::interaction::InputGate,
+    agent: regressee_gui::jobs::AgentState,
+    agent_handles: [FocusHandle; 3],
+    agent_last_session: Option<(uuid::Uuid, regressee_app::control::Session)>,
+    agent_status_dismissed: Option<(uuid::Uuid, uuid::Uuid, regressee_app::control::Status)>,
+    agent_details_scroll: gpui::ScrollHandle,
+    agent_transition: bool,
+    agent_message: Option<String>,
+    agent_location: Option<(uuid::Uuid, u64, uuid::Uuid, u64, u64)>,
+    agent_exact: Option<regressee_app::protocol::ViewerSelection>,
+    agent_waiting: bool,
+    external_evidence_refresh: bool,
+    passive_evidence_pending: Option<(u64, regressee_app::control::Selection, u64)>,
+    passive_history_pending: Option<(u64, regressee_core::domain::ProjectId, usize, u64)>,
+    history_dirty: bool,
+    data_refresh_generation: u64,
     appearance: regressee_app::appearance::Snapshot,
     desktop_dark: bool,
     appearance_observer: Option<gpui::Subscription>,
@@ -362,6 +384,22 @@ impl RenderOnce for ProjectName {
 impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
+            input_gate: Default::default(),
+            agent: Default::default(),
+            agent_handles: std::array::from_fn(|_| cx.focus_handle().tab_stop(true)),
+            agent_last_session: None,
+            agent_status_dismissed: None,
+            agent_details_scroll: gpui::ScrollHandle::new(),
+            agent_transition: false,
+            agent_message: None,
+            agent_location: None,
+            agent_exact: None,
+            agent_waiting: false,
+            external_evidence_refresh: false,
+            passive_evidence_pending: None,
+            passive_history_pending: None,
+            history_dirty: false,
+            data_refresh_generation: 0,
             appearance: jobs.appearance.snapshot(),
             desktop_dark: desktop_is_dark(cx.window_appearance()),
             appearance_observer: None,
@@ -652,6 +690,28 @@ impl Shell {
         shell
     }
     fn poll_storage(&mut self, cx: &mut Context<Self>) {
+        self.poll_agent(cx);
+        if self.pending.is_none()
+            && self.task.is_none()
+            && let Some(current) = &self.project
+            && let Some(record) = self
+                .jobs
+                .saved_project(current.project.id, current.revision)
+        {
+            self.refresh_saved_project(record, cx);
+        }
+        if self.jobs.take_data_changed() {
+            self.external_evidence_refresh = true;
+            self.data_refresh_generation += 1;
+            self.projects_dirty = true;
+            self.evidence_dirty = true;
+            self.history_dirty = true;
+            self.summary = None;
+            self.invalidate_approval();
+            // No navigation or draft hydration: a changed saved revision must not
+            // discard human edits. Existing refresh guards protect masks/notes.
+            self.refresh_visible(cx);
+        }
         self.sync_appearance(cx);
         self.sync_review_note(cx);
         // Bounded batch: at most the update channel capacity per tick.
@@ -673,6 +733,15 @@ impl Shell {
             self.apply_update(update, cx);
         }
         self.poll_analysis(cx);
+        if (self.external_evidence_refresh
+            && self.evidence_dirty
+            && self.passive_evidence_pending.is_none())
+            || (self.focus.screen == Screen::History
+                && self.history_dirty
+                && self.passive_history_pending.is_none())
+        {
+            self.refresh_visible(cx);
+        }
         if let Some(task) = &mut self.task
             && task.state != regressee_gui::task::State::Finished
         {
@@ -684,6 +753,12 @@ impl Shell {
         }
     }
     fn apply_update(&mut self, update: Update, cx: &mut Context<Self>) {
+        if self.apply_passive_evidence(&update, cx) {
+            return;
+        }
+        if self.apply_passive_history(&update, cx) {
+            return;
+        }
         if self.apply_runtime_observation(&update, cx) {
             return;
         }
@@ -1047,40 +1122,7 @@ impl Shell {
                 self.notice=Some("Baseline ZIP saved. Screenshots may show private information, including ignored areas. Share only with someone allowed to see it.".into());
             }
             Reply::History { history } => {
-                let baseline = self
-                    .evidence
-                    .baselines
-                    .get(self.history_index)
-                    .map(|b| b.id);
-                let run = self
-                    .history
-                    .as_ref()
-                    .and_then(|h| h.runs.get(self.run_history_index))
-                    .map(|r| r.run.id);
-                self.evidence.baselines = history.baselines.clone();
-                self.history_index = baseline
-                    .and_then(|id| history.baselines.iter().position(|b| b.id == id))
-                    .unwrap_or(0);
-                self.run_history_index = run
-                    .and_then(|id| history.runs.iter().position(|r| r.run.id == id))
-                    .unwrap_or(0);
-                self.focus.history_baselines = history.baselines.len();
-                self.focus.history_runs = history.runs.len();
-                self.history = Some(*history);
-                *self.history_filter_cache.borrow_mut() = Default::default();
-                let next_baseline = self
-                    .evidence
-                    .baselines
-                    .get(self.history_index)
-                    .map(|b| b.id);
-                let next_run = self
-                    .history
-                    .as_ref()
-                    .and_then(|h| h.runs.get(self.run_history_index))
-                    .map(|r| r.run.id);
-                if baseline != next_baseline || run != next_run {
-                    self.clear_portability_previews();
-                }
+                self.receive_history(*history, false);
                 if self.project_storage.is_none() {
                     self.queue_project_storage(cx);
                 }
@@ -1260,6 +1302,23 @@ impl Shell {
                 if hydrate {
                     self.login_hydration_origin = Some(self.environment_draft_signature(cx));
                 }
+            }
+            Reply::Captured(evidence) => {
+                // Task completion consumes this exact run above. The workspace
+                // is a separate read; never substitute its newest run into that
+                // authoritative task result (notably after resuming older work).
+                if self.preview.as_ref().is_some_and(|preview| {
+                    evidence.latest.as_ref().is_some_and(|r| {
+                        r.run.intent != RunIntent::RepresentativePreview
+                            && r.run.inventory.id == preview.inventory.id
+                    })
+                }) {
+                    self.preview = None;
+                    self.focus.preview = false;
+                }
+                self.evidence_dirty = true;
+                self.history = None;
+                self.invalidate_approval();
             }
             Reply::Evidence(e) => {
                 self.evidence_read_failed = false;
@@ -1480,7 +1539,63 @@ impl Shell {
         self.refresh_visible(cx);
         cx.notify();
     }
+    fn refresh_saved_project(&mut self, record: ProjectRecord, cx: &mut Context<Self>) {
+        if self
+            .project
+            .as_ref()
+            .is_none_or(|p| p.project.id != record.project.id || p.revision >= record.revision)
+        {
+            return;
+        }
+        if self.project_input_composing(cx)
+            || self.exit_project_dirty(cx)
+            || self.exit_builder_dirty(cx)
+        {
+            // Keep the original expected revision with the draft: advancing it
+            // would let a later Save silently overwrite another client's edits.
+            if self.notice.is_none() {
+                self.notice=Some("Saved project settings changed in another client. Your draft is kept; reload the project before replacing those saved settings.".into());
+                cx.notify();
+            }
+            return;
+        }
+        self.name.update(cx, |input, cx| {
+            input.set_value_if_changed(&record.project.name, cx)
+        });
+        self.address.update(cx, |input, cx| {
+            input.set_value_if_changed(
+                &record
+                    .project
+                    .sources
+                    .iter()
+                    .map(|u| u.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                cx,
+            )
+        });
+        self.draft_settings = record.project.clone();
+        self.project = Some(record);
+        self.hydrate_crawl_fields(true, cx);
+        self.refresh_setup_origins(cx);
+        self.environment = None;
+        self.evidence_dirty = true;
+        self.evidence_read_failed = false;
+        self.history_dirty = true;
+        self.data_refresh_generation += 1;
+        self.project_storage = None;
+        self.summary = None;
+        self.clear_portability_previews();
+        self.invalidate_approval();
+        self.external_evidence_refresh = true;
+        // No screen/selection/focus movement: data refresh is not following.
+        self.refresh_visible(cx);
+        cx.notify();
+    }
     fn refresh_visible(&mut self, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         if self.pending.is_some() || self.error.is_some() || self.task.is_some() {
             return;
         }
@@ -1520,24 +1635,29 @@ impl Shell {
         if self.focus.screen == Screen::Settings && self.summary.is_none() {
             self.queue(Work::InspectStorage, cx);
         }
+        if self.focus.screen == Screen::History {
+            if self.history.is_none()
+                && let Some(p) = &self.project
+            {
+                self.queue(
+                    Work::History {
+                        project: p.project.id,
+                        page: 0,
+                    },
+                    cx,
+                );
+                return;
+            }
+            self.refresh_selected_history();
+        }
         if matches!(self.focus.screen, Screen::Results | Screen::History)
             && self.evidence_dirty
-            && let Some(p) = &self.project
+            && let Some(project) = self.project.as_ref().map(|p| p.project.id)
         {
-            self.queue(Work::Evidence(p.project.id), cx);
-        }
-        if self.pending.is_none()
-            && self.focus.screen == Screen::History
-            && self.history.is_none()
-            && let Some(p) = &self.project
-        {
-            self.queue(
-                Work::History {
-                    project: p.project.id,
-                    page: 0,
-                },
-                cx,
-            );
+            if self.refresh_selected_evidence(cx) {
+                return;
+            }
+            self.queue(Work::Evidence(project), cx);
         }
     }
     fn clear_viewer(&mut self) {
@@ -1676,6 +1796,9 @@ impl Shell {
             && preview.selected == c.selected
     }
     fn poll_analysis(&mut self, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         if self.history_inspection.is_some() {
             return;
         }
@@ -1828,7 +1951,22 @@ impl Shell {
         }
         self.next_request += 1;
         let id = self.next_request;
-        let work = if let Some((project, run)) = self.history_inspection {
+        let work = if self.jobs.is_remote() {
+            Work::Extension(ViewerWork::ExactViewer(
+                regressee_app::protocol::ViewerSelection {
+                    project: identity.project,
+                    run: Some(identity.run),
+                    analysis: identity.analysis,
+                    key: Some(identity.key.clone()),
+                    tile,
+                },
+            ))
+        } else if self.agent_following()
+            && let Some(mut selection) = self.agent_exact.clone()
+        {
+            selection.tile = tile;
+            Work::Extension(ViewerWork::ExactViewer(selection))
+        } else if let Some((project, run)) = self.history_inspection {
             Work::Extension(ViewerWork::HistoricalViewer {
                 project,
                 run,
@@ -2829,6 +2967,61 @@ impl Shell {
             .find(|c| self.control_enabled(*c, cx) && self.handle(*c, cx).is_focused(window))
     }
     fn move_focus(&mut self, reverse: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            window.focus(
+                &self.agent_handles[if self.agent_handles[0].is_focused(window) {
+                    2
+                } else {
+                    0
+                }],
+            );
+            return;
+        }
+        if self.controlling_agent().is_some() || self.agent_status_text().is_some() {
+            let second = self.controlling_agent().is_some()
+                && (!self.agent_following()
+                    || self
+                        .controlling_agent()
+                        .is_some_and(|s| s.status == regressee_app::control::Status::Human));
+            if let Some(index) = self.agent_handles.iter().position(|h| h.is_focused(window)) {
+                let next = match (index, reverse) {
+                    (0, false) => Some(if second { 1 } else { 2 }),
+                    (1, false) => Some(2),
+                    (1, true) => Some(0),
+                    (2, true) => Some(if second { 1 } else { 0 }),
+                    _ => None,
+                };
+                if let Some(next) = next {
+                    window.focus(&self.agent_handles[next]);
+                    return;
+                }
+            }
+            let controls = self
+                .visible_controls()
+                .into_iter()
+                .filter(|c| self.control_enabled(*c, cx))
+                .collect::<Vec<_>>();
+            if self.agent_handles.iter().any(|h| h.is_focused(window)) {
+                if let Some(c) = if reverse {
+                    controls.last()
+                } else {
+                    controls.first()
+                } {
+                    window.focus(&self.handle(*c, cx));
+                }
+                return;
+            }
+            if self.focused(window, cx)
+                == if reverse {
+                    controls.first().copied()
+                } else {
+                    controls.last().copied()
+                }
+            {
+                window.focus(&self.agent_handles[if reverse { 2 } else { 0 }]);
+                return;
+            }
+        }
         // A selector is one shell stop: Tab dismisses and continues from View,
         // rather than traversing the popup's arrow-key choices.
         if self.viewer_mode_open {
@@ -2943,6 +3136,9 @@ impl Shell {
         }
     }
     fn find_local(&mut self, _: &FindLocal, window: &mut Window, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         if self.task.is_some()
             || self.focus.dialog
             || self.focus.approval_dialog
@@ -2988,6 +3184,15 @@ impl Shell {
         if self.pending.is_some() {
             return;
         }
+        if matches!(&work, Work::History { .. }) {
+            self.passive_history_pending = None;
+            self.history_dirty = false;
+        }
+        if matches!(&work, Work::Evidence(_) | Work::Load(_)) {
+            self.external_evidence_refresh = false;
+            self.passive_evidence_pending = None;
+            self.data_refresh_generation += 1;
+        }
         if matches!(&work, Work::NetworkStatus | Work::SaveNetwork(_)) {
             self.network_load_started = true;
             self.network_read_signature = Some((
@@ -3003,6 +3208,7 @@ impl Shell {
             Work::Save { .. }
                 | Work::SaveReplacement { .. }
                 | Work::SaveEnvironment { .. }
+                | Work::SaveReplacementEnvironment { .. }
                 | Work::Import { .. }
                 | Work::CaptureInventory { .. }
                 | Work::Capture { .. }
@@ -3028,6 +3234,7 @@ impl Shell {
                 | Work::Restore { .. }
                 | Work::Mask { .. }
                 | Work::SaveEnvironment { .. }
+                | Work::SaveReplacementEnvironment { .. }
         ) {
             self.viewer_pending = None;
             self.focus.view_loading = false;
@@ -3055,6 +3262,7 @@ impl Shell {
             Work::Load(_)
                 | Work::Save { .. }
                 | Work::SaveReplacement { .. }
+                | Work::SaveReplacementEnvironment { .. }
                 | Work::CaptureInventory { .. }
                 | Work::Capture { .. }
                 | Work::Activate { .. }
@@ -3130,6 +3338,9 @@ impl Shell {
         cx.notify();
     }
     fn navigate(&mut self, screen: Screen, window: &mut Window, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         if self.task.is_some()
             || self.focus.dialog
             || self.focus.approval_dialog
@@ -3163,6 +3374,9 @@ impl Shell {
         cx.notify();
     }
     fn create(&mut self, _: &CreateProject, window: &mut Window, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         if self.task.is_some()
             || self.focus.busy
             || self.focus.dialog
@@ -3212,6 +3426,9 @@ impl Shell {
         cx.notify();
     }
     fn save(&mut self, _: &SaveProject, _: &mut Window, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         self.last_action = Some(Control::Save);
         self.guided_save(false, cx);
     }
@@ -3394,12 +3611,23 @@ impl Shell {
                     (expected_revision, self.environment_draft)
                 {
                     match self.local_login_settings(cx) {
-                        Ok(settings) => Work::SaveEnvironment {
-                            project: Box::new(project),
-                            revision,
-                            environment,
-                            settings,
-                        },
+                        Ok(settings) => {
+                            if project.active_baseline.is_some() {
+                                Work::SaveReplacementEnvironment {
+                                    project: Box::new(project),
+                                    revision,
+                                    environment,
+                                    settings,
+                                }
+                            } else {
+                                Work::SaveEnvironment {
+                                    project: Box::new(project),
+                                    revision,
+                                    environment,
+                                    settings,
+                                }
+                            }
+                        }
                         Err(error) => {
                             self.error = Some(format!("Check your login settings: {error}"));
                             cx.notify();
@@ -3422,12 +3650,14 @@ impl Shell {
                 let submitted_project = match &work {
                     Work::Save { project, .. }
                     | Work::SaveReplacement { project, .. }
-                    | Work::SaveEnvironment { project, .. } => project.id,
+                    | Work::SaveEnvironment { project, .. }
+                    | Work::SaveReplacementEnvironment { project, .. } => project.id,
                     _ => unreachable!(),
                 };
                 let environment = self.environment_draft;
                 let login = match &work {
-                    Work::SaveEnvironment { settings, .. } => Some(settings.clone()),
+                    Work::SaveEnvironment { settings, .. }
+                    | Work::SaveReplacementEnvironment { settings, .. } => Some(settings.clone()),
                     _ => None,
                 };
                 self.queue(work, cx);
@@ -3447,6 +3677,9 @@ impl Shell {
         }
     }
     fn set_crawl_fields(&mut self, cx: &mut Context<Self>) {
+        self.hydrate_crawl_fields(false, cx);
+    }
+    fn hydrate_crawl_fields(&mut self, preserve_editor_state: bool, cx: &mut Context<Self>) {
         let d = &self.draft_settings.discovery;
         let values = [
             d.page_limit.to_string(),
@@ -3464,15 +3697,30 @@ impl Shell {
             d.advanced.retries.to_string(),
         ];
         for (i, v) in values.iter().enumerate() {
-            self.crawl_fields[i].update(cx, |input, cx| input.set_value(v, cx));
+            self.crawl_fields[i].update(cx, |input, cx| {
+                if preserve_editor_state {
+                    input.set_value_if_changed(v, cx);
+                } else {
+                    input.set_value(v, cx);
+                }
+            });
         }
         if let Some(p) = self.draft_settings.profiles.first() {
-            self.crawl_fields[15].update(cx, |input, cx| input.set_value(&p.locale, cx));
+            self.crawl_fields[15].update(cx, |input, cx| {
+                if preserve_editor_state {
+                    input.set_value_if_changed(&p.locale, cx);
+                } else {
+                    input.set_value(&p.locale, cx);
+                }
+            });
             self.timezone
                 .update(cx, |select, cx| select.set_value(&p.timezone, cx));
         }
     }
     fn guided(&mut self, index: usize, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         if matches!(index, 53..=57) {
             match index {
                 53 => {
@@ -4541,11 +4789,17 @@ impl Shell {
             .collect()
     }
     fn select_preview_page(&mut self, id: regressee_core::domain::PageId) {
+        if self.agent_locked() {
+            return;
+        }
         if self.preview.is_some() {
             self.select_page_list_page(id);
         }
     }
     fn select_page_list_page(&mut self, id: regressee_core::domain::PageId) {
+        if self.agent_locked() {
+            return;
+        }
         if let Some(index) = self
             .page_list_page_ids()
             .iter()
@@ -5146,8 +5400,8 @@ impl Shell {
                                     this.selected_key.as_ref() == Some(&key),
                                     this.pending.is_none(),
                                 )
-                                    .on_click(cx.listener(move |this, _, _, cx| {
-                                        if this.pending.is_none() {
+                                     .on_click(cx.listener(move |this, _, _, cx| {
+                                        if !this.agent_locked() && this.pending.is_none() {
                                              if this.mask_dirty || this.mask_geometry_dirty(cx) {
                                                 this.error = Some("Save ignored areas before choosing another screenshot. They will not be moved to another page or screen size.".into());
                                                 cx.notify();
@@ -5657,11 +5911,30 @@ impl Shell {
         }
     }
     fn activate(&mut self, _: &Activate, window: &mut Window, cx: &mut Context<Self>) {
+        if self.agent_handles[0].is_focused(window) {
+            if self.controlling_agent().is_some() {
+                self.take_agent_control(&TakeControl, window, cx);
+            } else {
+                self.dismiss_agent_status(cx);
+            }
+            return;
+        }
+        if self.agent_handles[1].is_focused(window) {
+            if self.agent_following() {
+                self.return_agent(&ReturnToAgent, window, cx);
+            } else {
+                self.follow_agent(&FollowAgent, window, cx);
+            }
+            return;
+        }
         if let Some(control) = self.focused(window, cx) {
             self.activate_control(control, window, cx);
         }
     }
     fn dismiss(&mut self, _: &Dismiss, window: &mut Window, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         if let Some(task) = &self.task {
             if task.state == regressee_gui::task::State::Finished {
                 self.continue_task(window, cx);
@@ -5915,6 +6188,9 @@ impl Shell {
     /// The same prerequisites govern pointer actions, keyboard dispatch, and
     /// Tab stops. Backend validation remains authoritative for every mutation.
     fn control_enabled(&self, control: Control, cx: &App) -> bool {
+        if self.agent_locked() {
+            return false;
+        }
         if self.zoom_select.read(cx).is_open()
             && matches!(
                 control,
@@ -6725,6 +7001,9 @@ impl Shell {
         }
     }
     fn field_enabled(&self, index: usize) -> bool {
+        if self.agent_locked() {
+            return false;
+        }
         if self.focus.dialog
             || self.native_prompt
             || !self.control_mounted(Control::CrawlField(index))
@@ -7551,6 +7830,9 @@ impl Shell {
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, event: &MouseDownEvent, _, cx| {
+                        if this.agent_locked() {
+                            return;
+                        }
                         if let Some(b) = b2.get() {
                             this.overlay_fraction =
                                 ((event.position.x - b.origin.x) / b.size.width).clamp(0., 1.);
@@ -7559,6 +7841,9 @@ impl Shell {
                     }),
                 )
                 .on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
+                    if this.agent_locked() {
+                        return;
+                    }
                     if event.pressed_button == Some(MouseButton::Left)
                         && let Some(b) = b3.get()
                     {
@@ -7813,6 +8098,9 @@ impl Shell {
                 .on_mouse_down(
                     MouseButton::Left,
                     cx.listener(move |this, event: &MouseDownEvent, window, cx| {
+                        if this.agent_locked() {
+                            return;
+                        }
                         if bounded && this.control_enabled(Control::Viewer, cx) {
                             window.focus(&this.handle(Control::Viewer, cx));
                         }
@@ -7826,6 +8114,9 @@ impl Shell {
                     }),
                 )
                 .on_mouse_move(cx.listener(move |this, event: &MouseMoveEvent, _, cx| {
+                    if this.agent_locked() {
+                        return;
+                    }
                     if event.pressed_button == Some(MouseButton::Left)
                         && this.viewer_drag_pane == Some(index)
                     {
@@ -7965,7 +8256,8 @@ impl Shell {
         origin: (f32, f32),
         cx: &mut Context<Self>,
     ) {
-        if self.focus.busy
+        if self.agent_locked()
+            || self.focus.busy
             || self.focus.dialog
             || self.focus.approval_dialog
             || self.native_prompt
@@ -8297,6 +8589,9 @@ impl Drop for Shell {
 }
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.remember_agent_session();
+        self.input_gate.set_allowed(!self.agent_locked());
+        self.input_gate.bind(window, cx);
         self.observe_appearance(window, cx);
         self.tool_hint_input
             .get_or_insert_with(|| toolbar::HintInput::new(window, cx));
@@ -8328,7 +8623,8 @@ impl Render for Shell {
                 let _ = window.drop_image(image);
             }
         }
-        let enabled = !self.focus.busy && !self.focus.dialog && !self.native_prompt;
+        let enabled =
+            !self.agent_locked() && !self.focus.busy && !self.focus.dialog && !self.native_prompt;
         self.name.update(cx, |input, _| {
             input.set_enabled(enabled && self.control_mounted(Control::Name))
         });
@@ -8388,6 +8684,7 @@ impl Render for Shell {
             self.viewer_mode_open = false;
         }
         let inline_activity = self.activity_is_inline();
+        let shared_agent_feedback = self.agent_shared_feedback();
         let mut feedback = div()
             .id("feedback")
             .when(bounded_review, |feedback| {
@@ -8431,7 +8728,7 @@ impl Render for Shell {
             }
             feedback = feedback.child(progress);
         }
-        if self.error.is_some() || self.notice.is_some() {
+        if !shared_agent_feedback && (self.error.is_some() || self.notice.is_some()) {
             feedback = feedback.child(controls::feedback(
                 self.error.clone().map(Into::into),
                 self.notice.clone().map(Into::into),
@@ -8494,7 +8791,7 @@ impl Render for Shell {
                                     .map(|project| {
                                         format!("Selected project: {}", project.project.name)
                                     })
-                                    .unwrap_or_else(|| "No project selected".into()),
+                                    .unwrap_or_else(|| if self.agent_waiting {"Waiting for agent selection".into()} else {"No project selected".into()}),
                             ),
                     )
                     .when(
@@ -8530,8 +8827,7 @@ impl Render for Shell {
             .when(
                 self.task.is_none()
                     && ((self.focus.busy && !inline_activity)
-                        || self.error.is_some()
-                        || self.notice.is_some()),
+                        || (!shared_agent_feedback && (self.error.is_some() || self.notice.is_some()))),
                 |el| el.child(scrollbar::scrollable("feedback-scrollbar", feedback)),
             )
             .when(
@@ -8572,7 +8868,9 @@ impl Render for Shell {
                             })
                             .px_6()
                             .py(px(if bounded_review { 8. } else { 16. }))
-                            .child(self.content(cx)),
+                            .child(if self.agent_waiting {
+                                if self.agent.selection_unavailable {div().child("Agent selection is no longer available. Take control to choose another saved result.").into_any_element()} else {controls::activity_notice("Waiting for the agent's saved selection…").into_any_element()}
+                            } else {self.content(cx)}),
                     )
                     .when(!bounded_review, |body| {
                         body.pr(px(scrollbar::GUTTER)).child(
@@ -8605,6 +8903,7 @@ impl Render for Shell {
             .relative()
             .size_full()
             .flex()
+            .flex_col()
             .bg(rgb(palette().ground))
             .text_color(rgb(palette().ink))
             .text_size(px(BODY_TEXT_SIZE))
@@ -8616,6 +8915,9 @@ impl Render for Shell {
                 cx.listener(|this, _: &TabPrev, window, cx| this.move_focus(true, window, cx)),
             )
             .on_action(cx.listener(Self::activate))
+            .on_action(cx.listener(Self::take_agent_control))
+            .on_action(cx.listener(Self::follow_agent))
+            .on_action(cx.listener(Self::return_agent))
             .on_action(cx.listener(Self::create))
             .on_action(cx.listener(Self::save))
             .on_action(cx.listener(Self::dismiss))
@@ -8640,25 +8942,53 @@ impl Render for Shell {
                     this.navigate(Screen::Settings, w, cx)
                 }),
             )
-            .when(self.task_owns_workspace(), |shell| {
-                shell.child(self.task_workspace(cx))
+            .when(self.agent_banner_visible(), |shell| {
+                shell.child(self.agent_banner(f32::from(window.viewport_size().width), cx))
             })
-            .when(!self.task_owns_workspace(), |shell| {
-                shell
-                    .when(!self.navigation_collapsed, |shell| {
-                        shell.child(self.project_rail(cx))
+            .child(
+                div()
+                    .relative()
+                    .flex()
+                    .flex_1()
+                    .min_h_0()
+                    .w_full()
+                    .when(self.task_owns_workspace(), |shell| {
+                        shell.child(self.task_workspace(cx))
                     })
-                    .child(content)
-            })
-            .when(self.task.is_none() && self.focus.approval_dialog, |shell| {
-                shell.child(self.approval_decision(cx))
-            })
-            .when(self.task.is_none() && self.focus.dialog, |el| {
-                el.child(self.information_dialog(cx))
-            })
-            .when(
-                self.task.is_some() && !self.task_owns_workspace(),
-                |shell| shell.child(self.task_dialog(cx)),
+                    .when(!self.task_owns_workspace(), |shell| {
+                        shell
+                            .when(!self.navigation_collapsed, |shell| {
+                                shell.child(self.project_rail(cx))
+                            })
+                            .child(content)
+                    })
+                    .when(self.task.is_none() && self.focus.approval_dialog, |shell| {
+                        shell.child(self.approval_decision(cx))
+                    })
+                    .when(self.task.is_none() && self.focus.dialog, |el| {
+                        el.child(self.information_dialog(cx))
+                    })
+                    .when(
+                        self.task.is_some() && !self.task_owns_workspace(),
+                        |shell| shell.child(self.task_dialog(cx)),
+                    )
+                    .when(self.agent_locked(), |body| {
+                        body.child(
+                            div()
+                                .id("agent-input-shield")
+                                .debug_selector(|| "agent-input-shield".into())
+                                .absolute()
+                                .inset_0()
+                                .occlude()
+                                .on_any_mouse_down(cx.listener(|_, _, _, cx| cx.stop_propagation()))
+                                .on_mouse_up(
+                                    MouseButton::Left,
+                                    cx.listener(|_, _, _, cx| cx.stop_propagation()),
+                                )
+                                .on_mouse_move(cx.listener(|_, _, _, cx| cx.stop_propagation()))
+                                .on_scroll_wheel(cx.listener(|_, _, _, cx| cx.stop_propagation())),
+                        )
+                    }),
             );
         shell.when_some(navigation, |shell, (screen, navigation)| {
             let timing = regressee_gui::ui::performance::FrameTiming {
@@ -8696,6 +9026,22 @@ fn job_label(state: JobState) -> &'static str {
 }
 fn main() -> anyhow::Result<()> {
     if std::env::args_os()
+        .nth(1)
+        .is_some_and(|arg| arg == "engine")
+    {
+        let args = std::env::args_os()
+            .skip(1)
+            .map(|arg| {
+                arg.into_string()
+                    .map_err(|_| anyhow::anyhow!("Engine arguments must be UTF-8"))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        if let Some(output) = regressee_app::engine::lifecycle(&args)? {
+            println!("{output}");
+            return Ok(());
+        }
+    }
+    if std::env::args_os()
         .skip(1)
         .any(|argument| argument == "--build-info")
     {
@@ -8732,8 +9078,9 @@ fn main() -> anyhow::Result<()> {
     }
     // Path discovery is pure OS/environment resolution; all preparation, SQLite,
     // artifact and image I/O belongs to the background owner.
-    let paths = regressee_gui::launch::app_paths()?;
-    let (jobs, events) = Jobs::start(paths);
+    let paths =
+        regressee_gui::launch::desktop_paths(&std::env::args_os().skip(1).collect::<Vec<_>>())?;
+    let (jobs, events) = Jobs::start(paths)?;
     // Resolve the tiny local preference before showing a window, so a remembered
     // override does not flash the desktop theme. The owner performs all I/O;
     // this startup-only wait happens before entering the native event loop.
@@ -8762,6 +9109,8 @@ fn main() -> anyhow::Result<()> {
             KeyBinding::new("f1", KeyboardHelp, Some("Shell")),
             KeyBinding::new("ctrl-q", Quit, None),
             KeyBinding::new("cmd-q", Quit, None),
+            KeyBinding::new("ctrl-shift-t", TakeControl, None),
+            KeyBinding::new("cmd-shift-t", TakeControl, None),
             KeyBinding::new("ctrl-1", ProjectsScreen, Some("Shell")),
             KeyBinding::new("ctrl-2", SetupScreen, Some("Shell")),
             KeyBinding::new("ctrl-3", ResultsScreen, Some("Shell")),
@@ -8839,6 +9188,11 @@ fn main() -> anyhow::Result<()> {
                 shell.request_exit(window, cx);
             });
         });
+        cx.on_action(move |_: &TakeControl, cx| {
+            let _ = main_window.update(cx, |shell, window, cx| {
+                shell.take_agent_control(&TakeControl, window, cx)
+            });
+        });
         // GPUI's on_app_quit cannot veto termination: never prompt here.
         // This retains cleanup for platform termination outside our Quit action.
         let stop = termination_stop;
@@ -8865,6 +9219,12 @@ mod phase6_history_tests;
 mod phase7_qualification_tests;
 
 #[cfg(all(test, feature = "ui-tests"))]
+mod agent_control_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod agent_feedback_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod agent_repair_tests;
+#[cfg(all(test, feature = "ui-tests"))]
 mod app_settings_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod appearance_tests;
@@ -8878,6 +9238,8 @@ mod dialog_tests;
 mod disclosure_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod discovery_handoff_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod engine_refresh_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod image_controls_tests;
 #[cfg(all(test, feature = "ui-tests"))]

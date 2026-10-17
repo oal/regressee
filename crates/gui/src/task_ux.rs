@@ -45,7 +45,7 @@ pub(super) struct Outcome {
     tone: Tone,
     icon: StatusIcon,
     counts: Option<Counts>,
-    capture: Option<CaptureDetails>,
+    pub(super) capture: Option<CaptureDetails>,
     notes: Vec<String>,
     note: Option<(&'static str, String)>,
 }
@@ -179,7 +179,7 @@ impl Task {
                 outcome.action = "Review found pages";
                 outcome.destination = Some((Screen::Results, ReviewSurface::Pages));
             }
-            Reply::Evidence(evidence) => {
+            Reply::Evidence(evidence) | Reply::Captured(evidence) => {
                 if let Some(run) = &evidence.latest
                     && self.project_id == Some(run.run.project)
                     && matches!(
@@ -1025,6 +1025,10 @@ impl Shell {
             return;
         }
         let task = self.task.take().unwrap();
+        // Continue is an explicit human navigation intent, unlike an external
+        // saved-data refresh of the currently inspected run.
+        self.external_evidence_refresh = false;
+        self.passive_evidence_pending = None;
         let mut restore = task.restore;
         let recovery = task.result.as_ref().and_then(|outcome| outcome.recovery);
         if let Some(destination) =

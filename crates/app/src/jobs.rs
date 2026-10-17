@@ -98,6 +98,12 @@ pub enum Command<W> {
         project: Box<Project>,
         expected_revision: u64,
     },
+    SaveReplacementEnvironment {
+        project: Box<Project>,
+        revision: u64,
+        environment: regressee_core::domain::EnvironmentId,
+        settings: regressee_storage::LocalLoginSettings,
+    },
     Activate {
         run: RunId,
         revision: u64,
@@ -172,6 +178,8 @@ pub enum JobReply<R> {
         message: String,
     },
     Evidence(Box<ProjectEvidence>),
+    /// Result of one executed capture, never a newest-workspace read.
+    Captured(Box<ProjectEvidence>),
     InspectedRun {
         project: ProjectId,
         run: RunId,
@@ -193,7 +201,7 @@ pub enum JobReply<R> {
     Extension(R),
 }
 pub type Reply = JobReply<std::convert::Infallible>;
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum StorageFailure {
     Unavailable,
     InvalidProject,
@@ -362,8 +370,13 @@ impl<E: Extension> BackgroundJobs<E> {
         let extension = Arc::new(E::Shared::default());
         let shared = extension.clone();
         let thread = thread::spawn(move || {
+            // Legacy/test actor cannot migrate or recover a store owned by the
+            // shared engine (or another developer actor).
+            let ownership = crate::engine::ownership::Ownership::acquire(&paths).ok();
             let product = configure(&paths);
-            let mut store = Store::open(paths).ok();
+            let mut store = ownership
+                .as_ref()
+                .and_then(|owner| Store::open(owner.paths.clone()).ok());
             if let Some(s) = store.as_mut() {
                 let _ = s.recover_runs();
                 let _ = s.complete_confirmed_gc();
@@ -415,15 +428,7 @@ impl<E: Extension> BackgroundJobs<E> {
                                     .unwrap_or_else(|error| storage_failure(error, StorageFailure::ConflictOrWrite))
                             }
                         }
-                        Work::SaveEnvironment { project, revision, environment, settings } => {
-                            if project.validate().is_err() || settings.validate().is_err() {
-                                Reply::Failure(StorageFailure::InvalidProject)
-                            } else {
-                                store.save_project_and_environment(&project, revision, environment, &settings)
-                                    .map(|record| Reply::Project(Box::new(record)))
-                                    .unwrap_or_else(|error| storage_failure(error, StorageFailure::ConflictOrWrite))
-                            }
-                        }
+                        work @ (Work::SaveEnvironment {..} | Work::SaveReplacementEnvironment {..}) => environment_work(store,work),
                         Work::DiagnosticPreview => crate::diagnostics::collect(store,product.as_ref().ok(),&cancel)
                             .map(|report|Reply::DiagnosticPreview(Box::new(report)))
                             .unwrap_or_else(|error| if cancellation_error(&error) { Reply::Cancelled } else { Reply::ProductFailure("Support report preview unavailable. No private information was exported; try again.".into()) }),
@@ -558,7 +563,7 @@ impl<E: Extension> BackgroundJobs<E> {
         }
     }
 }
-fn product_work<W, R>(
+pub(crate) fn product_work<W, R>(
     product: &Product,
     store: &mut Store,
     work: Command<W>,
@@ -571,6 +576,14 @@ fn product_work<W, R>(
     // The submit boundary creates one operation slot; cancellation requested
     // while a command is queued is preserved through its actual start.
     let result = (|| -> anyhow::Result<JobReply<R>> {
+        #[cfg(target_os = "linux")]
+        if matches!(&work, Work::OpenLogin(_)) {
+            anyhow::ensure!(
+                std::env::var_os("DISPLAY").is_some()
+                    || std::env::var_os("WAYLAND_DISPLAY").is_some(),
+                "display_required: managed login requires a desktop display. Headless servers initially support public sites only; session import/scripted login is unsupported"
+            );
+        }
         let discovering = matches!(&work, Work::Discover(_));
         let mut verified_runtime = None;
         if let Some(project) = first_use_project(&work) {
@@ -634,7 +647,7 @@ fn product_work<W, R>(
                 store.restore_baseline(baseline, revision)?,
             ))),
             Work::PreviewImages { project, preview } => {
-                product.preview_images_with_progress(
+                let record = product.preview_images_with_progress(
                     store,
                     project,
                     *preview,
@@ -650,7 +663,7 @@ fn product_work<W, R>(
                         });
                     },
                 )?;
-                Ok(Reply::Evidence(Box::new(store.project_evidence(project)?)))
+                capture_reply(store, project, record)
             }
             Work::NetworkStatus => {
                 let settings = product.network()?;
@@ -664,14 +677,9 @@ fn product_work<W, R>(
             Work::EnvironmentStatus(project) => Ok(Reply::Environment(Box::new(
                 product.environment_status(store, project)?,
             ))),
-            Work::SaveEnvironment {
-                project,
-                revision,
-                environment,
-                settings,
-            } => Ok(Reply::Project(Box::new(
-                store.save_project_and_environment(&project, revision, environment, &settings)?,
-            ))),
+            work @ (Work::SaveEnvironment { .. } | Work::SaveReplacementEnvironment { .. }) => {
+                Ok(environment_work(store, work))
+            }
             Work::OpenLogin(project) => Ok(Reply::Environment(Box::new(product.open_login(
                 store,
                 project,
@@ -731,7 +739,7 @@ fn product_work<W, R>(
                 check,
                 resume,
             } => {
-                product.capture_inventory_with_status(
+                let record = product.capture_inventory_with_status(
                     store,
                     verified_runtime,
                     project,
@@ -757,10 +765,10 @@ fn product_work<W, R>(
                         });
                     },
                 )?;
-                Ok(Reply::Evidence(Box::new(store.project_evidence(project)?)))
+                capture_reply(store, project, record)
             }
             Work::Capture { project, check } => {
-                product.capture_with_runtime(
+                let record = product.capture_with_runtime(
                     store,
                     verified_runtime,
                     project,
@@ -777,7 +785,7 @@ fn product_work<W, R>(
                         });
                     },
                 )?;
-                Ok(Reply::Evidence(Box::new(store.project_evidence(project)?)))
+                capture_reply(store, project, record)
             }
             Work::Activate {
                 run,
@@ -794,6 +802,52 @@ fn product_work<W, R>(
         }
     })();
     operation_reply(result)
+}
+/// Keep the service's exact run identity. The separate Evidence command remains
+/// a newest-workspace refresh and must never be a capture's terminal receipt.
+pub(crate) fn capture_reply<R>(
+    store: &Store,
+    project: ProjectId,
+    record: regressee_core::evidence::RunRecord,
+) -> anyhow::Result<JobReply<R>> {
+    anyhow::ensure!(
+        record.run.project == project,
+        "Capture returned a foreign project"
+    );
+    let evidence = store.project_evidence_for_run(project, record.run.id)?;
+    anyhow::ensure!(
+        serde_json::to_vec(&evidence.latest)? == serde_json::to_vec(&record)?,
+        "Capture result changed before publication"
+    );
+    Ok(JobReply::Captured(Box::new(evidence)))
+}
+pub(crate) fn environment_work<W, R>(store: &mut Store, work: Command<W>) -> JobReply<R> {
+    let (project, revision, environment, settings, replacement) = match work {
+        Command::SaveEnvironment {
+            project,
+            revision,
+            environment,
+            settings,
+        } => (project, revision, environment, settings, false),
+        Command::SaveReplacementEnvironment {
+            project,
+            revision,
+            environment,
+            settings,
+        } => (project, revision, environment, settings, true),
+        _ => unreachable!("environment save handler only"),
+    };
+    if project.validate().is_err() || settings.validate().is_err() {
+        return JobReply::Failure(StorageFailure::InvalidProject);
+    }
+    let result = if replacement {
+        store.save_replacement_project_and_environment(&project, revision, environment, &settings)
+    } else {
+        store.save_project_and_environment(&project, revision, environment, &settings)
+    };
+    result
+        .map(|p| JobReply::Project(Box::new(p)))
+        .unwrap_or_else(|e| storage_failure(e, StorageFailure::ConflictOrWrite))
 }
 fn discovery_update<R>(
     updates: &SyncSender<JobUpdate<R>>,
@@ -916,7 +970,11 @@ fn setup_progress(
         InstallProgress::Ready => ("Private browser setup finished.".into(), 0, None),
     }
 }
-fn storage_work<W, R>(store: &mut Store, work: Command<W>, cancel: &AtomicBool) -> JobReply<R> {
+pub(crate) fn storage_work<W, R>(
+    store: &mut Store,
+    work: Command<W>,
+    cancel: &AtomicBool,
+) -> JobReply<R> {
     use {Command as Work, JobReply as Reply};
     let result = (|| -> anyhow::Result<JobReply<R>> {
         match work {
@@ -978,7 +1036,7 @@ fn cancellation_error(error: &anyhow::Error) -> bool {
         )
     })
 }
-fn operation_reply<R>(result: anyhow::Result<JobReply<R>>) -> JobReply<R> {
+pub(crate) fn operation_reply<R>(result: anyhow::Result<JobReply<R>>) -> JobReply<R> {
     use JobReply as Reply;
     result.unwrap_or_else(|error| {
         if cancellation_error(&error) {
@@ -1016,14 +1074,66 @@ fn io_recovery(error: &anyhow::Error) -> Option<crate::recovery::Problem> {
     )
 }
 
-fn storage_failure<R>(error: anyhow::Error, fallback: StorageFailure) -> JobReply<R> {
+pub(crate) fn storage_failure<R>(error: anyhow::Error, fallback: StorageFailure) -> JobReply<R> {
     use JobReply as Reply;
     io_recovery(&error).map_or(Reply::Failure(fallback), Reply::ActionRequired)
 }
 
 #[cfg(test)]
+#[path = "../tests/support/approval_fixture.rs"]
+mod capture_fixture;
+
+#[cfg(test)]
 mod task_reply_tests {
     use super::*;
+
+    #[test]
+    fn capture_reply_uses_the_returned_record_not_a_newer_workspace_run() -> anyhow::Result<()> {
+        use regressee_core::domain::{CaptureError, JobState as Capture, RunIntent, TargetOutcome};
+        let root = tempfile::tempdir()?;
+        let (mut store, project, _, _, _) = capture_fixture::fixture(root.path());
+        let executed = store.project_evidence(project)?.latest.unwrap();
+        let mut newer = executed.clone();
+        newer.run.id = RunId::new();
+        newer.run.intent = RunIntent::NewBaseline;
+        newer.run.state = Capture::Running;
+        newer.run.finished_at = None;
+        newer.captures.clear();
+        newer.capture = None;
+        for target in &mut newer.run.targets {
+            target.outcome = TargetOutcome::Pending;
+            target.final_url = None;
+        }
+        store.begin_run(&newer)?;
+        newer.run.state = Capture::CompletedWithErrors;
+        newer.run.finished_at = Some(300);
+        for target in &mut newer.run.targets {
+            target.outcome = TargetOutcome::Failed {
+                code: CaptureError::Timeout,
+            };
+        }
+        store.finish_run(&newer)?;
+        let reply: Reply = capture_reply(&store, project, executed.clone())?;
+        let Reply::Captured(result) = reply else {
+            panic!("Capture must not be a workspace read")
+        };
+        assert_eq!(result.latest.as_ref().unwrap().run.id, executed.run.id);
+        assert_eq!(
+            result.latest.as_ref().unwrap().run.state,
+            Capture::Completed
+        );
+        assert_eq!(
+            store.project_evidence(project)?.latest.unwrap().run.id,
+            newer.run.id
+        );
+        let mut inconsistent = executed.clone();
+        inconsistent.run.state = Capture::Cancelled;
+        assert!(capture_reply::<std::convert::Infallible>(&store, project, inconsistent).is_err());
+        assert!(
+            capture_reply::<std::convert::Infallible>(&store, ProjectId::new(), executed).is_err()
+        );
+        Ok(())
+    }
 
     #[test]
     fn acknowledged_cancellation_is_distinct_from_failures_and_committed_success() {
@@ -1165,11 +1275,21 @@ mod task_reply_tests {
             Work::Discover(project.id),
             Work::OpenLogin(project.id),
         ] {
+            #[cfg(target_os = "linux")]
+            let headless_login = matches!(&work, Work::OpenLogin(_))
+                && std::env::var_os("DISPLAY").is_none()
+                && std::env::var_os("WAYLAND_DISPLAY").is_none();
             let Reply::ProductFailure(message) =
                 product_work(&product, &mut store, work, &cancel, &cancel, &updates, 1)
             else {
                 panic!("expected setup failure")
             };
+            #[cfg(target_os = "linux")]
+            if headless_login {
+                assert!(message.starts_with("display_required:"));
+                assert!(!product.runtime_cache.exists());
+                continue;
+            }
             assert!(
                 message.starts_with("Browser setup failed during preparation."),
                 "{message}"

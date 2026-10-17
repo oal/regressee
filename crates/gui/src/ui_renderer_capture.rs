@@ -10,6 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "ui_agent_capture.rs"]
+mod ui_agent_capture;
 #[path = "ui_app_settings_capture.rs"]
 mod ui_app_settings_capture;
 #[path = "ui_appearance_capture.rs"]
@@ -40,6 +42,8 @@ mod ui_phase4_capture;
 mod ui_phase5_capture;
 #[path = "ui_project_settings_capture.rs"]
 mod ui_project_settings_capture;
+#[path = "ui_readme_capture.rs"]
+mod ui_readme_capture;
 #[path = "ui_review_footer_capture.rs"]
 mod ui_review_footer_capture;
 #[path = "ui_review_matrix.rs"]

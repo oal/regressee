@@ -15,6 +15,7 @@ fn main() -> Result<()> {
     );
     std::fs::create_dir_all(&root)?;
     let paths = AppPaths::isolated(&root);
+    let _ownership = regressee_app::engine::ownership::Ownership::acquire(&paths)?;
     let mut store = Store::open(paths.clone())?;
     let project = Project::draft(
         "Foundation verification website".into(),

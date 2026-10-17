@@ -92,6 +92,12 @@ impl ZoomSelect {
     pub fn is_open(&self) -> bool {
         self.open
     }
+    pub fn suspend_input(&mut self, cx: &mut Context<Self>) {
+        self.enabled = false;
+        self.open = false;
+        self.focus = self.focus.clone().tab_stop(false);
+        cx.notify();
+    }
 
     pub fn set_image_controls_available(&mut self, available: bool, cx: &mut Context<Self>) {
         if self.image_controls_available != available {
@@ -128,7 +134,7 @@ impl ZoomSelect {
     }
 
     pub fn toggle(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.enabled {
+        if !self.enabled || !super::interaction::allowed(window, cx) {
             return;
         }
         if self.open {
@@ -155,7 +161,7 @@ impl ZoomSelect {
     }
 
     fn navigate(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.enabled {
+        if !self.enabled || !super::interaction::allowed(window, cx) {
             return;
         }
         if !self.open {
@@ -169,7 +175,7 @@ impl ZoomSelect {
     }
 
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.enabled || !self.open {
+        if !self.enabled || !self.open || !super::interaction::allowed(window, cx) {
             return;
         }
         if let Some(choice) = OPTIONS.get(index) {

@@ -191,6 +191,22 @@ impl TimezoneSelect {
         self.enabled
     }
 
+    /// Control handoff must suspend the nested IME handler immediately, before
+    /// a later render removes the popup or clears its old native focus.
+    pub fn suspend_input(&mut self, cx: &mut Context<Self>) {
+        self.set_enabled(false);
+        self.search.update(cx, |input, _| input.set_enabled(false));
+        cx.notify();
+    }
+
+    pub fn is_composing(&self, cx: &App) -> bool {
+        self.search.read(cx).composing()
+    }
+    #[cfg(feature = "ui-tests")]
+    pub fn test_search_input(&self) -> Entity<TextInput> {
+        self.search.clone()
+    }
+
     pub fn focus_handle(&self, cx: &App) -> FocusHandle {
         if self.open && self.enabled {
             self.search.read(cx).focus.clone()
@@ -247,7 +263,7 @@ impl TimezoneSelect {
     }
 
     fn show(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.enabled || self.open {
+        if !self.enabled || self.open || !super::interaction::allowed(window, cx) {
             return;
         }
         self.open = true;
@@ -280,7 +296,7 @@ impl TimezoneSelect {
     }
 
     fn select_index(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.enabled || !self.open {
+        if !self.enabled || !self.open || !super::interaction::allowed(window, cx) {
             return;
         }
         if let Some(zone) = self.filtered.get(index).map(|index| timezones()[*index]) {
@@ -291,6 +307,9 @@ impl TimezoneSelect {
     }
 
     fn toggle(&mut self, _: &Toggle, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.enabled || !super::interaction::allowed(window, cx) {
+            return;
+        }
         if self.open {
             self.dismiss(true, window, cx);
         } else {
@@ -299,6 +318,9 @@ impl TimezoneSelect {
     }
 
     fn next(&mut self, _: &Next, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.enabled || !super::interaction::allowed(window, cx) {
+            return;
+        }
         if !self.open {
             self.show(window, cx);
             return;
@@ -311,6 +333,9 @@ impl TimezoneSelect {
     }
 
     fn previous(&mut self, _: &Previous, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.enabled || !super::interaction::allowed(window, cx) {
+            return;
+        }
         if !self.open {
             self.show(window, cx);
             return;
@@ -323,6 +348,9 @@ impl TimezoneSelect {
     }
 
     fn first(&mut self, _: &First, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.enabled || !super::interaction::allowed(window, cx) {
+            return;
+        }
         self.show(window, cx);
         if self.enabled && !self.filtered.is_empty() {
             self.highlighted = Some(0);
@@ -332,6 +360,9 @@ impl TimezoneSelect {
     }
 
     fn last(&mut self, _: &Last, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.enabled || !super::interaction::allowed(window, cx) {
+            return;
+        }
         self.show(window, cx);
         if self.enabled {
             self.highlighted = self.filtered.len().checked_sub(1);
@@ -341,6 +372,9 @@ impl TimezoneSelect {
     }
 
     fn choose(&mut self, _: &Choose, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.enabled || !super::interaction::allowed(window, cx) {
+            return;
+        }
         if !self.open {
             self.show(window, cx);
         } else if let Some(index) = self.highlighted {
@@ -783,6 +817,32 @@ mod tests {
             arrow.right() >= trigger.right() - px(16.),
             "trigger={trigger:?}, value={value:?}, arrow={arrow:?}"
         );
+    }
+
+    #[gpui::test]
+    fn agent_suspension_blocks_nested_search_ime_before_next_render(cx: &mut TestAppContext) {
+        use gpui::EntityInputHandler;
+        let (host, cx) = setup(cx, "UTC");
+        let select = host.read_with(cx, |host, _| host.select.clone());
+        cx.update(|window, cx| {
+            select.update(cx, |select, cx| {
+                select.show(window, cx);
+                select.search.update(cx, |input, cx| {
+                    input.replace_and_mark_text_in_range(None, "日本", None, window, cx);
+                });
+                assert!(select.is_composing(cx));
+                let retained = select.search.read(cx).content.clone();
+                select.suspend_input(cx);
+                select.search.update(cx, |input, cx| {
+                    input.replace_text_in_range(None, "blocked", window, cx);
+                    input.replace_and_mark_text_in_range(None, "blocked", None, window, cx);
+                });
+                assert_eq!(select.search.read(cx).content, retained);
+                assert_eq!(select.selected.as_ref(), "UTC");
+                assert!(!select.open);
+                assert!(!select.is_enabled());
+            });
+        });
     }
 
     #[core::prelude::v1::test]

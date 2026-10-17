@@ -23,6 +23,12 @@ pub struct AuthOwner {
     login: Option<Login>,
     pub(crate) probe: Option<String>,
 }
+impl AuthOwner {
+    /// Engine lifetime guard; reading it never opens the OS credential store.
+    pub(crate) fn has_open_login(&self) -> bool {
+        self.login.is_some()
+    }
+}
 struct EphemeralSession {
     // Trusted owner metadata supplies the identity binding that persistent state
     // gets from AEAD AAD. A copied local reference must not transplant memory.
@@ -60,7 +66,7 @@ impl AuthState {
         )
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EnvironmentStatus {
     pub environment: EnvironmentId,
     pub name: String,

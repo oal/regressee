@@ -6,6 +6,11 @@ Regressee is the user-confirmed app name (2026-10-14). This document records the
 original planning decisions and the product-context confirmation on 2026-10-11;
 `PLAN.md` contains the implementation strategy and proposed defaults.
 
+As of **2026-10-17**, Regressee is a **public beta** on
+[GitHub](https://github.com/oal/regressee), as confirmed by the user. Beta status
+does not imply stable-release or complete platform qualification; documented
+compatibility and safety limits remain in effect.
+
 ## Platform
 
 adaptive

@@ -109,6 +109,7 @@ impl Store {
             before: None,
             analyses: comparison.iter().map(|a| a.revision.id).collect(),
             reviews: self.review_history(run)?,
+            review_history_truncated: self.review_history_truncated(run)?,
             comparison,
             baselines: vec![],
         })

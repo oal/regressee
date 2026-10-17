@@ -130,6 +130,37 @@ fn encode(path: &Path, w: u32, h: u32, pixels: &[u8], purpose: &str) -> Result<(
 /// Decode a bounded, verified tile derivative without native graphics types.
 pub fn decode_tile(store: &Store, id: &ArtifactId) -> Result<(u32, u32, Vec<u8>)> {
     let (artifact, bytes) = store.read_verified_artifact(id, 16 * 1024 * 1024)?;
+    decode_verified_tile(&artifact, bytes)
+}
+/// Decode an engine-provided immutable file without opening the live database.
+pub fn decode_tile_file(file: &crate::protocol::ArtifactFile) -> Result<(u32, u32, Vec<u8>)> {
+    use sha2::{Digest, Sha256};
+    let m = fs::symlink_metadata(&file.path)?;
+    ensure!(
+        m.is_file()
+            && regressee_core::platform::ordinary(&m)
+            && m.len() == file.artifact.bytes
+            && m.len() <= 16 * 1024 * 1024,
+        "Unsafe viewer artifact"
+    );
+    ensure!(
+        file.path
+            .file_name()
+            .is_some_and(|n| n == file.artifact.id.as_str()),
+        "Viewer artifact path/identity mismatch"
+    );
+    let mut bytes = Vec::new();
+    File::open(&file.path)?
+        .take(16 * 1024 * 1024 + 1)
+        .read_to_end(&mut bytes)?;
+    ensure!(
+        bytes.len() as u64 == file.artifact.bytes
+            && hex::encode(Sha256::digest(&bytes)) == file.artifact.id.as_str(),
+        "Viewer artifact integrity failure"
+    );
+    decode_verified_tile(&file.artifact, bytes)
+}
+fn decode_verified_tile(artifact: &Artifact, bytes: Vec<u8>) -> Result<(u32, u32, Vec<u8>)> {
     ensure!(
         artifact.kind == ArtifactKind::Tile,
         "viewer only accepts tile derivatives"

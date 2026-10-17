@@ -67,6 +67,70 @@ fn geometry(handle: &ScrollHandle) -> ScrollbarGeometry {
 }
 
 #[gpui::test]
+fn agent_gate_revokes_retained_shared_scrollbar_drag_even_after_unlock(cx: &mut TestAppContext) {
+    let (view, cx) = cx.add_window_view(|_, cx| ReadingView {
+        scroll: ScrollHandle::new(),
+        list: UniformListScrollHandle::new(),
+        focus: cx.focus_handle(),
+        rows: 80,
+        virtualized: false,
+        clicks: 0,
+    });
+    cx.simulate_resize(size(px(320.), px(240.)));
+    let gate = crate::ui::interaction::InputGate::default();
+    cx.update(|w, cx| gate.bind(w, cx));
+    draw(cx);
+    let handle = view.read_with(cx, |v, _| v.scroll.clone());
+    let g = geometry(&handle);
+    cx.simulate_mouse_down(g.thumb.center(), MouseButton::Left, Modifiers::none());
+    gate.set_allowed(false);
+    let before = handle.offset();
+    cx.simulate_mouse_move(
+        point(g.track.center().x, g.track.bottom()),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    cx.simulate_event(ScrollWheelEvent {
+        position: g.track.center(),
+        delta: ScrollDelta::Pixels(point(px(0.), px(-200.))),
+        ..Default::default()
+    });
+    assert_eq!(handle.offset(), before);
+    gate.set_allowed(true);
+    cx.simulate_mouse_move(
+        point(g.track.center().x, g.track.bottom()),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    assert_eq!(
+        handle.offset(),
+        before,
+        "unlock must not revive an old held gesture"
+    );
+    cx.simulate_mouse_up(g.thumb.center(), MouseButton::Left, Modifiers::none());
+    cx.simulate_mouse_down(g.thumb.center(), MouseButton::Left, Modifiers::none());
+    gate.set_allowed(false);
+    gate.set_allowed(true);
+    cx.simulate_mouse_move(
+        point(g.track.center().x, g.track.bottom()),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+    assert_eq!(
+        handle.offset(),
+        before,
+        "even without an event during the lock, the gesture epoch revokes retained ownership"
+    );
+    cx.simulate_mouse_up(g.thumb.center(), MouseButton::Left, Modifiers::none());
+    // A new human gesture is still available; the gate is not a permanent trap.
+    cx.simulate_click(
+        point(g.track.center().x, g.track.bottom() - px(1.)),
+        Modifiers::none(),
+    );
+    assert!(handle.offset().y < before.y);
+}
+
+#[gpui::test]
 fn scrollbars_page_drag_release_wheel_and_preserve_focus(cx: &mut TestAppContext) {
     for virtualized in [false, true] {
         let (view, cx) = cx.add_window_view(|w, cx| {

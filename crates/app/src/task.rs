@@ -3,7 +3,7 @@
 use regressee_core::{crawl::TargetCounts, domain::*};
 
 /// No screenshots, session material, inferred progress or activity log.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CaptureStatus {
     pub run: RunId,
     pub project: ProjectId,

@@ -69,6 +69,7 @@ pub struct TextInput {
     pub search_placeholder: Option<&'static str>,
     blur_observer: Option<gpui::Subscription>,
     multiline: Option<MultilineState>,
+    input_gate: Option<super::interaction::InputGate>,
 }
 impl TextInput {
     pub fn new(cx: &mut Context<Self>) -> Self {
@@ -94,6 +95,7 @@ impl TextInput {
             search_placeholder: None,
             blur_observer: None,
             multiline: None,
+            input_gate: None,
         }
     }
     pub fn search(placeholder: &'static str, tab_index: isize, cx: &mut Context<Self>) -> Self {
@@ -121,6 +123,14 @@ impl TextInput {
             *mode = MultilineState::default();
         }
         cx.notify();
+    }
+    pub fn set_value_if_changed(&mut self, value: &str, cx: &mut Context<Self>) {
+        if self.content.as_ref() != value {
+            self.set_value(value, cx);
+        }
+    }
+    fn input_allowed(&self) -> bool {
+        self.enabled && self.input_gate.as_ref().is_none_or(|g| g.allows())
     }
     pub fn validation_error(&self) -> Option<&'static str> {
         if self.marked.is_some() {
@@ -185,12 +195,18 @@ impl TextInput {
         }
     }
     fn move_to(&mut self, n: usize, cx: &mut Context<Self>) {
+        if !self.input_allowed() {
+            return;
+        }
         self.reveal_multiline_caret();
         self.selection = n..n;
         self.selection_reversed = false;
         cx.notify();
     }
     fn select_to(&mut self, n: usize, cx: &mut Context<Self>) {
+        if !self.input_allowed() {
+            return;
+        }
         self.reveal_multiline_caret();
         let anchor = if self.selection_reversed {
             self.selection.end
@@ -211,6 +227,9 @@ impl TextInput {
         self.select_to(self.line_edge(false), cx);
     }
     fn select_end(&mut self, _: &SelectEnd, _: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() {
+            return;
+        }
         self.select_to(self.line_edge(true), cx);
         self.line_end_affinity();
     }
@@ -265,7 +284,7 @@ impl TextInput {
         start..end
     }
     fn on_mouse_down(&mut self, e: &MouseDownEvent, w: &mut Window, cx: &mut Context<Self>) {
-        if !self.enabled {
+        if !self.input_allowed() || !super::interaction::allowed(w, cx) {
             return;
         }
         w.focus(&self.focus);
@@ -284,7 +303,11 @@ impl TextInput {
     }
     fn on_mouse_move(&mut self, e: &MouseMoveEvent, w: &mut Window, cx: &mut Context<Self>) {
         if self.is_selecting {
-            if self.enabled && self.focus.is_focused(w) && e.dragging() {
+            if self.input_allowed()
+                && super::interaction::allowed(w, cx)
+                && self.focus.is_focused(w)
+                && e.dragging()
+            {
                 self.select_to(self.index_for_position(e.position), cx);
                 self.pointer_affinity(e.position);
             } else {
@@ -324,12 +347,18 @@ impl TextInput {
         }
     }
     fn backspace(&mut self, _: &Backspace, w: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() || !super::interaction::allowed(w, cx) {
+            return;
+        }
         if self.selection.is_empty() {
             self.selection = self.prior()..self.selection.end;
         }
         self.replace_text_in_range(None, "", w, cx);
     }
     fn delete(&mut self, _: &Delete, w: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() || !super::interaction::allowed(w, cx) {
+            return;
+        }
         if self.selection.is_empty() {
             self.selection = self.selection.start..self.next();
         }
@@ -355,21 +384,33 @@ impl TextInput {
         self.move_to(self.line_edge(false), cx);
     }
     fn end(&mut self, _: &End, _: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() {
+            return;
+        }
         let n = self.line_edge(true);
         self.move_to(n, cx);
         self.line_end_affinity();
     }
     fn cut(&mut self, _: &Cut, w: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() || !super::interaction::allowed(w, cx) {
+            return;
+        }
         self.copy(&Copy, w, cx);
         self.replace_text_in_range(None, "", w, cx);
     }
     fn all(&mut self, _: &SelectAll, _: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() {
+            return;
+        }
         self.reveal_multiline_caret();
         self.selection = 0..self.content.len();
         self.selection_reversed = false;
         cx.notify();
     }
     fn paste(&mut self, _: &Paste, w: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() || !super::interaction::allowed(w, cx) {
+            return;
+        }
         if let Some(t) = cx.read_from_clipboard().and_then(|v| v.text()) {
             if self.multiline.is_some() {
                 self.replace_text_in_range(None, &t, w, cx);
@@ -379,6 +420,9 @@ impl TextInput {
         }
     }
     fn copy(&mut self, _: &Copy, _: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() {
+            return;
+        }
         cx.write_to_clipboard(ClipboardItem::new_string(
             self.content[self.selection.clone()].into(),
         ));
@@ -416,6 +460,9 @@ impl EntityInputHandler for TextInput {
             .map(|r| self.to_utf16(r.start)..self.to_utf16(r.end))
     }
     fn unmark_text(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        if !self.input_allowed() {
+            return;
+        }
         self.marked = None;
         cx.notify();
     }
@@ -423,10 +470,10 @@ impl EntityInputHandler for TextInput {
         &mut self,
         r: Option<Range<usize>>,
         text: &str,
-        _: &mut Window,
+        window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.enabled {
+        if !self.input_allowed() || !super::interaction::allowed(window, cx) {
             return;
         }
         let r = r
@@ -460,7 +507,7 @@ impl EntityInputHandler for TextInput {
         w: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if !self.enabled {
+        if !self.input_allowed() || !super::interaction::allowed(w, cx) {
             return;
         }
         let range = r
@@ -668,8 +715,12 @@ impl Element for EntryElement {
 }
 impl Render for TextInput {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.input_gate = super::interaction::gate(window, cx);
         if self.blur_observer.is_none() {
             self.blur_observer = Some(cx.on_blur(&self.focus, window, |this, _, cx| {
+                if !this.input_allowed() {
+                    return;
+                }
                 this.touched = true;
                 cx.notify();
             }));
@@ -879,6 +930,72 @@ mod tests {
                 bounds.top() + px(12.),
             )
         })
+    }
+
+    #[gpui::test]
+    fn agent_live_gate_blocks_retained_key_selection_scroll_clipboard_and_ime_callbacks(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(bind);
+        let (input, cx) = cx.add_window_view(|w, cx| {
+            let input = TextInput::review_note("Retained note\nsecond line", 0, cx);
+            w.focus(&input.focus);
+            input
+        });
+        let gate = super::super::interaction::InputGate::default();
+        cx.update(|w, cx| gate.bind(w, cx));
+        draw_input(&input, cx, 240.);
+        cx.update(|w, cx| {
+            input.update(cx, |i, cx| {
+                i.replace_and_mark_text_in_range(Some(0..0), "", None, w, cx);
+                let before = (
+                    i.content.clone(),
+                    i.selection.clone(),
+                    i.marked.clone(),
+                    i.multiline_scroll_offset(),
+                );
+                let backspace = TextInput::backspace;
+                let left = TextInput::left;
+                let scroll = TextInput::scroll_note;
+                gate.set_allowed(false);
+                assert!(
+                    i.enabled,
+                    "the old entity deliberately still reports enabled"
+                );
+                backspace(i, &Backspace, w, cx);
+                left(i, &Left, w, cx);
+                i.all(&SelectAll, w, cx);
+                i.delete(&Delete, w, cx);
+                i.select_end(&SelectEnd, w, cx);
+                i.cut(&Cut, w, cx);
+                i.paste(&Paste, w, cx);
+                i.copy(&Copy, w, cx);
+                i.unmark_text(w, cx);
+                i.replace_text_in_range(None, "blocked", w, cx);
+                i.replace_and_mark_text_in_range(None, "日本", None, w, cx);
+                scroll(
+                    i,
+                    &gpui::ScrollWheelEvent {
+                        delta: gpui::ScrollDelta::Pixels(point(px(0.), px(-100.))),
+                        ..Default::default()
+                    },
+                    w,
+                    cx,
+                );
+                assert_eq!(
+                    before,
+                    (
+                        i.content.clone(),
+                        i.selection.clone(),
+                        i.marked.clone(),
+                        i.multiline_scroll_offset()
+                    )
+                );
+                gate.set_allowed(true);
+                i.unmark_text(w, cx);
+                assert!(!i.composing());
+            })
+        });
     }
 
     #[gpui::test]

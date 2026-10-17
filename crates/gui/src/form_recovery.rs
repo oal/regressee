@@ -337,6 +337,9 @@ impl Shell {
     }
 
     pub(super) fn show_keyboard_help(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         if self.task.is_some()
             || self.native_prompt
             || self.focus.dialog

@@ -1,6 +1,6 @@
 # First run and safe review
 
-This is a private preview, not a public release. The default private browser uses
+Regressee is a public beta. The default app-managed browser uses
 app-pinned official downloads; internet is needed once for setup, with no Node/npm
 or terminal configuration. Historical development distributions remain restricted
 to authorized literal-loopback fixtures. See [support matrix](support-matrix.md)

@@ -25,7 +25,7 @@ pub struct Product {
     pub runtime_cache: PathBuf,
     pub auth: std::sync::Mutex<crate::auth::AuthOwner>,
 }
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum RuntimeState {
     UnavailableDistribution,
     UnsupportedPlatform,
@@ -71,7 +71,7 @@ fn supported_runtime_platform(os: &str, arch: &str) -> bool {
     // expand the unqualified architecture matrix just because Rust compiles.
     matches!(os, "linux" | "windows") && arch == "x86_64"
 }
-fn unsupported_runtime_message() -> &'static str {
+pub(crate) fn unsupported_runtime_message() -> &'static str {
     if cfg!(target_os = "macos") {
         "Browser setup is unavailable on macOS in this build: owned browser process-tree supervision is incomplete. No browser will be downloaded; platform qualification remains open."
     } else {

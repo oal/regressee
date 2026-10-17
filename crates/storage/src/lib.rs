@@ -32,6 +32,7 @@ pub fn portability_warning() -> &'static str {
     portability::COMPATIBILITY
 }
 pub use review::{ApprovalContext, ApprovalPreview};
+pub use review::{ReviewHistoryEntry, ReviewHistoryPage};
 
 pub const DB_VERSION: i64 = 9;
 pub const MAX_ARTIFACT_BYTES: u64 = 128 * 1024 * 1024;
@@ -506,6 +507,27 @@ impl Store {
         environment: EnvironmentId,
         settings: &LocalLoginSettings,
     ) -> Result<ProjectRecord> {
+        self.save_environment_inner(project, expected_revision, environment, settings, false)
+    }
+    /// Explicit replacement intent, with project and private login settings in
+    /// the same revision-bound transaction. Application IPC must confirm it.
+    pub fn save_replacement_project_and_environment(
+        &mut self,
+        project: &Project,
+        expected_revision: u64,
+        environment: EnvironmentId,
+        settings: &LocalLoginSettings,
+    ) -> Result<ProjectRecord> {
+        self.save_environment_inner(project, expected_revision, environment, settings, true)
+    }
+    fn save_environment_inner(
+        &mut self,
+        project: &Project,
+        expected_revision: u64,
+        environment: EnvironmentId,
+        settings: &LocalLoginSettings,
+        replacement: bool,
+    ) -> Result<ProjectRecord> {
         settings.validate()?;
         ensure!(
             project
@@ -517,7 +539,7 @@ impl Store {
         self.save_project_inner(
             project,
             Some(expected_revision),
-            true,
+            replacement,
             Some((environment, settings)),
         )
     }
@@ -921,78 +943,78 @@ mod tests {
     }
     #[test]
     fn coordinated_ui_save_is_atomic_private_and_revision_bound() {
-        let (_root, paths) = isolated();
-        let mut store = Store::open(paths.clone()).unwrap();
-        let mut project =
-            Project::draft("UI save fixture".into(), "https://example.test/docs").unwrap();
-        store.save_project(&project, None).unwrap();
-        let old_settings = LocalLoginSettings::default();
-        store
-            .select_environment(project.id, project.environments[0].id, &old_settings)
-            .unwrap();
-        let new_settings = LocalLoginSettings {
-            login_address: Some(url::Url::parse("https://example.test/login").unwrap()),
-            ephemeral: true,
-            ..Default::default()
-        };
-        project.name = "Edited website and login".into();
-        let environment = project.environments[0].id;
-        assert!(
+        type SaveEnvironment = fn(
+            &mut Store,
+            &Project,
+            u64,
+            EnvironmentId,
+            &LocalLoginSettings,
+        ) -> Result<ProjectRecord>;
+        let saves: [SaveEnvironment; 2] = [
+            Store::save_project_and_environment,
+            Store::save_replacement_project_and_environment,
+        ];
+        for save in saves {
+            let (_root, paths) = isolated();
+            let mut store = Store::open(paths.clone()).unwrap();
+            let mut project =
+                Project::draft("UI save fixture".into(), "https://example.test/docs").unwrap();
+            store.save_project(&project, None).unwrap();
+            let old_settings = LocalLoginSettings::default();
             store
-                .save_project_and_environment(&project, 0, environment, &new_settings)
-                .is_err()
-        );
-        assert!(
+                .select_environment(project.id, project.environments[0].id, &old_settings)
+                .unwrap();
+            let new_settings = LocalLoginSettings {
+                login_address: Some(url::Url::parse("https://example.test/login").unwrap()),
+                ephemeral: true,
+                ..Default::default()
+            };
+            project.name = "Edited website and login".into();
+            let environment = project.environments[0].id;
+            assert!(save(&mut store, &project, 0, environment, &new_settings).is_err());
+            assert!(save(&mut store, &project, 1, EnvironmentId::new(), &new_settings).is_err());
+            assert_eq!(store.load_project(project.id).unwrap().revision, 1);
+            assert_eq!(
+                store.local_login_settings(project.id).unwrap(),
+                old_settings
+            );
+            store.connection.execute_batch("CREATE TRIGGER fail_ui_local_save BEFORE INSERT ON local_environment_settings BEGIN SELECT RAISE(ABORT, 'owned atomic-save negative probe'); END;").unwrap();
+            assert!(save(&mut store, &project, 1, environment, &new_settings).is_err());
+            assert_eq!(
+                store.load_project(project.id).unwrap().project.name,
+                "UI save fixture"
+            );
+            assert_eq!(store.load_project(project.id).unwrap().revision, 1);
+            assert_eq!(
+                store.local_login_settings(project.id).unwrap(),
+                old_settings
+            );
             store
-                .save_project_and_environment(&project, 1, EnvironmentId::new(), &new_settings)
-                .is_err()
-        );
-        assert_eq!(store.load_project(project.id).unwrap().revision, 1);
-        assert_eq!(
-            store.local_login_settings(project.id).unwrap(),
-            old_settings
-        );
-        store.connection.execute_batch("CREATE TRIGGER fail_ui_local_save BEFORE INSERT ON local_environment_settings BEGIN SELECT RAISE(ABORT, 'owned atomic-save negative probe'); END;").unwrap();
-        assert!(
-            store
-                .save_project_and_environment(&project, 1, environment, &new_settings)
-                .is_err()
-        );
-        assert_eq!(
-            store.load_project(project.id).unwrap().project.name,
-            "UI save fixture"
-        );
-        assert_eq!(store.load_project(project.id).unwrap().revision, 1);
-        assert_eq!(
-            store.local_login_settings(project.id).unwrap(),
-            old_settings
-        );
-        store
-            .connection
-            .execute_batch("DROP TRIGGER fail_ui_local_save;")
-            .unwrap();
-        assert_eq!(
-            store
-                .save_project_and_environment(&project, 1, environment, &new_settings)
-                .unwrap()
-                .revision,
-            2
-        );
-        assert!(
-            !serde_json::to_string(&store.load_project(project.id).unwrap().project)
-                .unwrap()
-                .contains("/login")
-        );
-        drop(store);
-        let store = Store::open(paths).unwrap();
-        assert_eq!(
-            store.load_project(project.id).unwrap().project.name,
-            project.name
-        );
-        assert_eq!(
-            store.local_login_settings(project.id).unwrap(),
-            new_settings
-        );
+                .connection
+                .execute_batch("DROP TRIGGER fail_ui_local_save;")
+                .unwrap();
+            assert_eq!(
+                save(&mut store, &project, 1, environment, &new_settings)
+                    .unwrap()
+                    .revision,
+                2
+            );
+            assert!(
+                !serde_json::to_string(&store.load_project(project.id).unwrap().project)
+                    .unwrap()
+                    .contains("/login")
+            );
+            drop(store);
+            let store = Store::open(paths).unwrap();
+            assert_eq!(
+                store.load_project(project.id).unwrap().project.name,
+                project.name
+            );
+            assert_eq!(
+                store.local_login_settings(project.id).unwrap(),
+                new_settings
+            );
+        }
     }
     #[test]
     fn saves_reopens_and_checks_revision_conflicts() {

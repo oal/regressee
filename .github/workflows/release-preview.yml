@@ -60,43 +60,63 @@ jobs:
         run: |
           python -B scripts/test_ci_run.py
           python -B scripts/test_package_preview.py
+          python -B scripts/test_release_preview.py
+          python -B scripts/test_cli_consumer_fixture.py
+          python -B scripts/test_skill_frontmatter.py
           python -B scripts/test_environment_boundaries.py
+      - name: Test private-source omission and completeness policy
+        if: runner.os == 'Linux'
+        run: python -B scripts/test_source_release.py
       - name: Run application contract tests
         # Retain the full bulk suite with the same cold-host budget as CI.
         timeout-minutes: 45
         run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support --target ${{ matrix.target }}
-      - name: Build the desktop application
-        run: cargo build --release --locked -p regressee-gui --features ui --bin regressee-desktop --target ${{ matrix.target }}
+      - name: Build production CLI and desktop (never all-features)
+        run: python -B scripts/release-preview.py --target ${{ matrix.target }} --product all --output artifacts/preview
+      - name: Inspect the CLI-only dependency closure
+        shell: bash
+        run: |
+          cargo tree --locked --offline -p regressee-cli --target ${{ matrix.target }} --edges normal,build --prefix none --format '{p}' > cli-dependencies.txt
+          python - <<'PY'
+          from pathlib import Path
+          names = {line.split(' v')[0] for line in Path('cli-dependencies.txt').read_text().splitlines()}
+          if names & {'gpui', 'regressee-gui'}:
+              raise SystemExit('CLI dependency closure contains the GUI')
+          PY
+          rm cli-dependencies.txt
       - name: Check Linux ABI and dynamic dependencies
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          binary=target/x86_64-unknown-linux-gnu/release/regressee-desktop
-          readelf -d "$binary"
           python - <<'PY'
           import re, subprocess
-          output = subprocess.check_output(['readelf', '--version-info', 'target/x86_64-unknown-linux-gnu/release/regressee-desktop'], text=True)
-          versions = {tuple(map(int, v.split('.'))) for v in re.findall(r'GLIBC_(\d+\.\d+)', output)}
-          if not versions or max(versions) > (2, 39):
-              raise SystemExit('Linux preview must meet the Ubuntu 24.04 GLIBC <= 2.39 floor')
-          print('Highest required GLIBC:', '.'.join(map(str, max(versions))))
+          for name in ('regressee', 'regressee-desktop'):
+              binary = 'target/x86_64-unknown-linux-gnu/release/' + name
+              needed = subprocess.check_output(['readelf', '-d', binary], text=True)
+              print(name, needed)
+              if name == 'regressee' and re.search(r'lib(?:X11|xcb|wayland|vulkan|GL|EGL|xkbcommon|stdc\+\+)', needed):
+                  raise SystemExit('CLI unexpectedly links GUI libraries')
+              output = subprocess.check_output(['readelf', '--version-info', binary], text=True)
+              versions = {tuple(map(int, v.split('.'))) for v in re.findall(r'GLIBC_(\d+\.\d+)', output)}
+              if not versions or max(versions) > (2, 39):
+                  raise SystemExit('Linux previews must meet GLIBC <= 2.39')
+              print(name, 'highest required GLIBC:', '.'.join(map(str, max(versions))))
           PY
       - name: Check Windows DLL dependencies
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $dependencies = & $env:REGRESSEE_DUMPBIN /dependents target/x86_64-pc-windows-msvc/release/regressee-desktop.exe
-          if ($LASTEXITCODE -ne 0) { throw 'DLL dependency inspection failed' }
-          $dependencies
-          if (($dependencies -join "`n") -match '(?i)(?:VCRUNTIME|MSVCP|MSVCR)\d+[^\s]*\.dll') {
-            throw 'The portable preview unexpectedly requires the MSVC redistributable'
+          foreach ($name in @('regressee.exe', 'regressee-desktop.exe')) {
+            $dependencies = & $env:REGRESSEE_DUMPBIN /dependents "target/x86_64-pc-windows-msvc/release/$name"
+            if ($LASTEXITCODE -ne 0) { throw 'DLL dependency inspection failed' }
+            $dependencies
+            if (($dependencies -join "`n") -match '(?i)(?:VCRUNTIME|MSVCP|MSVCR)\d+[^\s]*\.dll') {
+              throw 'The portable preview unexpectedly requires the MSVC redistributable'
+            }
+            if ($name -eq 'regressee.exe' -and ($dependencies -join "`n") -match '(?i)(?:vulkan|d3d\d*|opengl32)\.dll') {
+              throw 'CLI unexpectedly requires graphics libraries'
+            }
           }
-      - name: Package the preview and dependency notices
-        env:
-          PREVIEW_TARGET: ${{ matrix.target }}
-          PREVIEW_REVISION: ${{ github.sha }}
-        run: python -B scripts/package-preview.py --target "$PREVIEW_TARGET" --revision "$PREVIEW_REVISION" --output artifacts/preview
-        shell: bash
       - name: Upload build downloads
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
@@ -120,16 +140,29 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: regressee-*
-          path: artifacts/preview
-          merge-multiple: true
+          path: artifacts/platforms
       - name: Include the exact application source and checksums
         shell: bash
         run: |
-          git archive --format=tar.gz --prefix=regressee-source/ --output=artifacts/preview/regressee-source.tar.gz "$GITHUB_SHA"
+          mkdir -p artifacts/preview
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          output = Path('artifacts/preview')
+          for platform in sorted(Path('artifacts/platforms').iterdir()):
+              for file in sorted(platform.iterdir()):
+                  destination = output / file.name
+                  if destination.exists():
+                      if destination.read_bytes() != file.read_bytes():
+                          raise SystemExit('Cross-platform source/archive identity mismatch: ' + file.name)
+                  else:
+                      shutil.copyfile(file, destination)
+          PY
           cd artifacts/preview
-          test -s regressee-desktop-windows-x86_64.exe
           test -s regressee-desktop-windows-x86_64.zip
           test -s regressee-desktop-linux-x86_64.tar.gz
+          test -s regressee-cli-windows-x86_64.zip
+          test -s regressee-cli-linux-x86_64.tar.gz
           sha256sum regressee-* > SHA256SUMS
       - name: Publish only after both builds succeed
         env:
@@ -145,13 +178,13 @@ jobs:
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
           ## Downloads for testing
 
-          - **Windows 11 x64:** download `regressee-desktop-windows-x86_64.exe` and run it. No Rust, Node.js, npm, or Playwright installation is needed. The `.zip` also includes help and third-party notices.
-          - **Linux x64:** extract `regressee-desktop-linux-x86_64.tar.gz` and run `./regressee-desktop-linux-x86_64/regressee-desktop` on Ubuntu 24.04 or a compatible system with GPUI's shared libraries and a working graphics backend. This is not an AppImage.
-          - `SHA256SUMS` verifies download integrity; `regressee-source.tar.gz` contains the exact application sources, including the patched GPUI.
+          - **Desktop:** extract `regressee-desktop-windows-x86_64.zip` or `regressee-desktop-linux-x86_64.tar.gz`. Keep both separate executables together; launch `regressee-desktop`. Linux needs GPUI libraries and a working graphics backend. These are portable directories, not installers/AppImages.
+          - **CLI-only:** extract `regressee-cli-windows-x86_64.zip` or `regressee-cli-linux-x86_64.tar.gz`, then run `regressee --help`. No GPUI/display is required. Headless capture is public-only and still requires browser OS libraries/fonts and its default sandbox.
+          - All packages include help, portable skill, notices, per-executable metadata/source inventory and checksums. `regressee-source.tar.gz` contains the selected application sources, including patched GPUI and public docs/skill, excluding private data and internal review/evidence documents. `regressee-source.json` records exact selected hashes.
 
           These are **unsigned, experimental test builds**, not supported production releases or installers. Windows may show a publisher/reputation warning. Browser setup needs internet access on first use; the application downloads its pinned private runtime. Native desktop, clean-install, accessibility, and complete license qualification remain pending. macOS is not included. Do not disable OS/browser security protections to make a test pass.
 
-          Dependency license texts and a target-specific inventory are included in each platform archive. Download the Windows ZIP as well if you use the standalone EXE. See the repository's release-building and support-matrix documents for requirements and known limitations.
+          Dependency license texts and product/target-specific inventories are included. Checksums detect corruption, not publisher authenticity. See release-building and support-matrix documents for requirements and known limitations.
           NOTES
           printf '\n' >> "$RUNNER_TEMP/release-notes.md"
           cat docs/preview-release-notes.md >> "$RUNNER_TEMP/release-notes.md"

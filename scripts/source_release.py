@@ -19,6 +19,7 @@ import sys
 import tarfile
 import tomllib
 from pathlib import PurePosixPath
+from skill_frontmatter import validate_skill
 
 
 class Refusal(Exception):
@@ -31,18 +32,22 @@ FIXTURE_ARCHIVES = {
     "tests/fixtures/phase6-corrections/unknown-coverage-field.zip": "1c14a76b93b5a7e8a41575a68018f33bf00c9310ba898a490654972f334de03e",
 }
 ROOT_FILES = frozenset({"Cargo.toml", "Cargo.lock", "rust-toolchain.toml",
-                        "LICENSE", "THIRD_PARTY_NOTICES.md", "README.md", ".gitignore"})
-REQUIRED = ROOT_FILES - {".gitignore"}
+                        "LICENSE", "THIRD_PARTY_NOTICES.md", "README.md", ".gitignore", ".gitattributes"})
+REQUIRED = ROOT_FILES - {".gitignore", ".gitattributes"}
 TREES = frozenset({"crates", "worker", "scripts", "tests", "third-party"})
 USER_DOCS = frozenset({"auth-and-capture.md", "portable-baseline-archive.md",
                        "runtime-distribution.md", "first-run-guide.md", "support-matrix.md",
                         "release-building.md", "updates-and-recovery.md",
-                        "preview-release-notes.md"})
+                          "preview-release-notes.md", "local-engine.md", "cli.md", "agent-skill.md", "cli-consumer-exercise.md"})
+SKILL_FILES = frozenset({"skills/regressee/SKILL.md", "skills/regressee/references/commands.md",
+                         "skills/regressee/references/workflows.md", "skills/regressee/references/safety-and-evidence.md"})
 INTERNAL_DOCS = frozenset({"ACTIVE_WORK.md", "IMPLEMENTATION_STATUS.md",
-                            "agent-cli-plan.md", "agent-cli-status.md",
+                              "agent-cli-plan.md", "agent-cli-status.md", "agent-cli-phase1-review.md", "agent-cli-phase2-review.md", "agent-cli-phase3-review.md", "agent-cli-phase4-review.md", "agent-cli-phase5-review.md", "agent-cli-skill-exercise.md",
                            "phase0-design.md", "spike-surface.md", "foundation-surface.md",
                            "crawling-surface.md", "auth-and-capture-surface.md",
-                           "analysis-and-review-surface.md", "portability-and-storage-surface.md"})
+                            "analysis-and-review-surface.md", "portability-and-storage-surface.md",
+                            "ci.md", "local-first-ux.md", "ux-improvement-plan.md", "ux-writing.md",
+                            "whole-app-ui-plan.md", "workflow-revamp.md"})
 INTERNAL_ROOT = frozenset({"DESIGN.md", "PLAN.md", "PRODUCT.md", "AGENTS.md", ".impeccable"})
 PRIVATE_DIRS = frozenset({".runtime", "target", "artifacts", "node_modules", "__pycache__",
                           ".git", ".npm", ".cache", "cache", "caches", "logs",
@@ -127,6 +132,11 @@ def classify(path, is_dir):
     name = parts[-1]
     if path in FIXTURE_ARCHIVES and not is_dir:
         return "file"  # Reviewed exact synthetic include_bytes inputs, not arbitrary ZIPs.
+    if not is_dir and path in {
+            "crates/runtime/assets/official/bundled-worker.zip",
+            *("crates/runtime/assets/official/LICENSES/" + name for name in
+              ("Node-LICENSE", "playwright-LICENSE", "playwright-NOTICE", "playwright-core-LICENSE", "playwright-core-NOTICE"))}:
+        return "file"  # Reviewed embedded official worker payload + upstream notices.
     if path == "tests/fixtures/analysis-proposal/validation.json" or (path.startswith("tests/fixtures/analysis-proposal/") and name.startswith("independent-validation") and name.endswith(".json")):
         return "omit"  # Decoder reports are not the test corpus's preferred source.
     if name.lower() in PRIVATE_DIRS or private_name(name):
@@ -139,6 +149,28 @@ def classify(path, is_dir):
         return "omit"
     if parts[0] in INTERNAL_ROOT:
         return "omit"
+    if parts[0] == "skills":
+        if is_dir and any(p.startswith(path + "/") for p in SKILL_FILES):
+            return "walk"
+        if not is_dir and path in SKILL_FILES:
+            return "file"
+        raise Refusal("unclassified-skill-entry")
+    if parts[0] == "assets":
+        if is_dir:
+            return "walk"
+        if PurePosixPath(name).suffix in {".png", ".json", ".md"}:
+            return "file"
+        raise Refusal("unclassified-asset-entry")
+    if parts[0] == "vendor":
+        if path == "vendor" or (path.startswith("vendor/gpui/") or path == "vendor/gpui"):
+            if is_dir:
+                return "walk"
+            if (PurePosixPath(name).suffix in EXTENSIONS | {".orig", ".hlsl", ".metal", ".xml", ".rc", ".gif"}
+                    or name == "LICENSE-APACHE"):
+                return "file"
+        if not is_dir and path in {"vendor/README.md", "vendor/gpui-provenance.json"}:
+            return "file"
+        raise Refusal("unclassified-vendored-entry")
     if parts[0] == "docs":
         if len(parts) == 1:
             return "walk"
@@ -148,9 +180,11 @@ def classify(path, is_dir):
             return "file"
         raise Refusal("unclassified-documentation-entry")
     if parts[0] == ".github":
-        if len(parts) == 1 or (len(parts) == 2 and name == "workflows" and is_dir):
+        if len(parts) == 1 or (is_dir and path in {".github/workflows", ".github/actions", ".github/actions/setup"}):
             return "walk"
         if len(parts) == 3 and parts[1] == "workflows" and PurePosixPath(name).suffix in {".yml", ".yaml"}:
+            return "file"
+        if path == ".github/actions/setup/action.yml" and not is_dir:
             return "file"
         raise Refusal("unclassified-ci-entry")
     if len(parts) == 1 and path in ROOT_FILES and not is_dir:
@@ -277,8 +311,13 @@ def validate_sources(files):
     essential = {"worker/package.json", "worker/package-lock.json", "worker/product/package.json",
                  "worker/product/package-lock.json", "third-party/GPUI-LICENSE-APACHE"}
     essential.update("docs/" + name for name in USER_DOCS)
+    essential.update(SKILL_FILES)
     if not essential <= files.keys():
         raise Refusal("required-worker-notice-or-user-documentation-missing")
+    try:
+        validate_skill(files["skills/regressee/SKILL.md"][0])
+    except (ValueError, UnicodeError):
+        raise Refusal("invalid-portable-skill-frontmatter") from None
     for tree in {"worker/src", "worker/test", "worker/product/src", "worker/product/test"}:
         if not any(p.startswith(tree + "/") and p.endswith((".mjs", ".js", ".ts")) for p in files):
             raise Refusal("required-worker-source-or-test-tree-empty")
@@ -288,8 +327,10 @@ def validate_sources(files):
         raise Refusal("workspace-members-required")
     for member in members:
         local_reference("", member, files, directory=True)
-    if workspace.get("exclude"):
+    if workspace.get("exclude") not in (None, [], ["vendor/gpui"]):
         raise Refusal("workspace-exclusions-require-policy-review")
+    if workspace.get("exclude") == ["vendor/gpui"]:
+        local_reference("", "vendor/gpui", files, directory=True)
 
     def dependencies(value, base):
         if isinstance(value, dict):
@@ -308,6 +349,17 @@ def validate_sources(files):
                 local_reference(base, value["path"], files, directory=True)
             for child in value.values():
                 inspect_dependencies(child, base)
+
+    crate_roots = set()
+    for manifest, (data, _) in files.items():
+        if manifest.endswith("Cargo.toml"):
+            document = parse_toml(data)
+            base = str(PurePosixPath(manifest).parent)
+            for kind in {"lib", "bin", "test", "bench", "example"}:
+                entries = document.get(kind, [])
+                for entry in ([entries] if isinstance(entries, dict) else entries):
+                    if "path" in entry:
+                        crate_roots.add(local_reference(base, entry["path"], files))
 
     for path, (data, _) in files.items():
         base = str(PurePosixPath(path).parent)
@@ -351,7 +403,7 @@ def validate_sources(files):
                     local_reference(base, override.group(1), files)
                 else:
                     stem = PurePosixPath(path).stem
-                    module_base = base if stem in {"lib", "main", "mod"} else base + "/" + stem
+                    module_base = base if stem in {"lib", "main", "mod"} or path in crate_roots else base + "/" + stem
                     options = {module_base + "/" + name + ".rs", module_base + "/" + name + "/mod.rs"}
                     if len(options & files.keys()) != 1:
                         raise Refusal("implicit-rust-module-missing-or-ambiguous")

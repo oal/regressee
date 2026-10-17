@@ -10,9 +10,16 @@ the exact build; the application crate version remains `0.1.0`.
 ## What changed
 
 - Source builds now use `regressee-desktop` for the existing native application.
-  The separate `regressee` CLI is a help/version/metadata skeleton only; product
-  commands and shared-engine operation are still being implemented. Desktop
-  preview archives are named `regressee-desktop-<platform>`.
+  The separate `regressee` CLI includes public project/discovery/capture/check,
+  evidence/crops/reviews/baselines/history/local-report/sharing/runtime commands,
+  durable jobs and named renewable agent sessions. GUI following is a human opt-in
+  with exclusive control, immediate takeover and temporary handoff. Both clients
+  use one shared local engine, not independent store owners (protocol 6/schema 1).
+  `regressee-cli-<platform>` archives contain only the CLI;
+  `regressee-desktop-<platform>` archives contain **both** separate executables.
+  Portable skill, public help, product-specific license inventories, source/build
+  metadata and checksums are included. There is no standalone Windows GUI EXE
+  download in this package layout. See [build/install instructions](release-building.md).
 
 - Optional sections now use leading disclosure arrows and explicit **Show / Hide**
   labels throughout settings, setup, analysis, History and confirmation previews.
@@ -42,8 +49,9 @@ the exact build; the application crate version remains `0.1.0`.
   click its track, or scroll normally; the Save footer stays available.
 - Settings Tab order follows the displayed groups, and section jumps focus the
   first enabled destination without saving, opening a browser or changing the
-  baseline. Local tests and two-size native offscreen inspection cover the change;
-  see `docs/research/project-settings-wayfinding-20261014.md` for its bounded scope.
+  baseline. Local tests and two-size native offscreen inspection cover the change,
+  not native OS input or accessibility. Current qualification limits are in the
+  included [support matrix](support-matrix.md).
 - Review gives evidence more space, keeps page/profile/environment context visible,
   and places the queue's collapse/restore controls beside the queue.
 - Review decisions, notes and baseline selection have clearer task ownership;
@@ -72,6 +80,7 @@ are comparison policy, **not pixel redaction**. Browser installation on first us
 needs internet access; downloads do not include the development `.runtime` tree.
 Do not disable operating-system or browser security protections to run a preview.
 
-See `docs/release-building.md`, `docs/support-matrix.md`, and
-`docs/research/whole-app-ui-review-20261012/phase7-verification.md` in the exact
-source archive for requirements, evidence scope and outstanding gates.
+See the included [build/install requirements](release-building.md) and
+[support matrix](support-matrix.md) for evidence scope and outstanding gates.
+The source archive includes these public guides under `docs/`; internal research,
+independent review reports and private evidence are deliberately not distributed.

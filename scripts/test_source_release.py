@@ -60,9 +60,36 @@ def fixture(root):
     put(root, ".github/workflows/source.yml", 'name: synthetic-build-recipe\n')
     for name in helper.USER_DOCS:
         put(root, "docs/" + name, '# Synthetic user-facing documentation\n')
+    for name in helper.SKILL_FILES:
+        put(root, name, '---\n{"name":"regressee","description":"Synthetic skill fixture"}\n---\n# Synthetic portable skill\n' if name.endswith("SKILL.md") else '# Synthetic portable skill reference\n')
 
 
 class SyntheticSourceTests(unittest.TestCase):
+    def test_readme_comparison_image_and_provenance_resolve_in_source_archive(self):
+        import re
+        actual = BASE.parent
+        readme = (actual / "README.md").read_bytes()
+        images = re.findall(rb"!\[[^\]]*\]\((assets/screenshots/[^)]+)\)", readme)
+        self.assertEqual(images, [b"assets/screenshots/regressee-comparison.png"])
+        image_path = images[0].decode()
+        provenance_path = "assets/screenshots/README.md"
+        self.assertIn(f"]({provenance_path})".encode(), readme)
+        image = (actual / image_path).read_bytes()
+        self.assertTrue(image.startswith(b"\x89PNG\r\n\x1a\n"))
+        self.assertEqual(struct.unpack_from(">II", image, 16), (1440, 900))
+        self.assertIn(b"Origin: Actual Regressee native comparison workspace", image)
+        provenance = (actual / provenance_path).read_bytes()
+        self.assertIn(b"offscreen", provenance)
+        self.assertIn(b"loopback", provenance)
+        self.assertNotIn(b"/var/" + b"home/", provenance)
+        for path, data in [("README.md", readme), (image_path, image), (provenance_path, provenance)]:
+            put(self.root, path, data)
+        self.build()
+        with tarfile.open(self.output / "source.tar.gz") as archive:
+            for path in [image_path, provenance_path]:
+                self.assertEqual(archive.extractfile("regressee-source/" + path).read(),
+                                 (actual / path).read_bytes())
+
     def test_phase7_reviewed_binary_fixture_inputs_are_exact_and_required(self):
         actual = Path(__file__).resolve().parent.parent
         for name in helper.FIXTURE_ARCHIVES:
@@ -164,6 +191,17 @@ class SyntheticSourceTests(unittest.TestCase):
                     "third-party/GPUI-LICENSE-APACHE", "docs/portable-baseline-archive.md", ".github/workflows/source.yml"}
         self.assertTrue(expected <= paths)
         self.assertTrue({"docs/"+name for name in helper.USER_DOCS} <= paths)
+        self.assertTrue(helper.SKILL_FILES <= paths)
+
+    def test_portable_skill_is_allowlisted_but_internal_reviews_are_not(self):
+        for name in helper.INTERNAL_DOCS:
+            put(self.root, "docs/" + name, SENTINEL)
+        self.build()
+        paths = {row["path"] for row in self.manifest()["source_files"]}
+        self.assertTrue(helper.SKILL_FILES <= paths)
+        self.assertFalse(paths & {"docs/" + name for name in helper.INTERNAL_DOCS})
+        put(self.root, "skills/unreviewed/SKILL.md", "unreviewed")
+        self.refused("unclassified-skill-entry", self.parent / "unreviewed-skill")
 
     def test_structural_private_internal_and_report_omission(self):
         omitted = [".runtime/installed/source.mjs", "target/debug/generated.rs", "artifacts/private.png",

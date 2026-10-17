@@ -344,6 +344,7 @@ impl Spec {
             Work::Save { .. }
             | Work::SaveReplacement { .. }
             | Work::SaveEnvironment { .. }
+            | Work::SaveReplacementEnvironment { .. }
             | Work::SaveNetwork(_)
             | Work::Mask { .. }
             | Work::Review(_)

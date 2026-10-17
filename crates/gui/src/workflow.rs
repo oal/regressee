@@ -433,6 +433,9 @@ impl Shell {
 
     /// Parent routes Guided(50/51) here and refreshes mounted focus afterwards.
     pub(super) fn toggle_workspace_presentation(&mut self, control: Control) -> bool {
+        if self.agent_locked() {
+            return false;
+        }
         match control {
             Control::Guided(50) if !self.page_list_workspace() => {
                 self.review_queue_collapsed = !self.review_queue_collapsed;
@@ -1212,6 +1215,9 @@ impl Shell {
                             )),
                     )
                     .on_click(cx.listener(move |this, _, _, cx| {
+                        if this.agent_locked() {
+                            return;
+                        }
                         this.approval_reference_index = i;
                         cx.notify();
                     })),

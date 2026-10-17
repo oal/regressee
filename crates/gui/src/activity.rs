@@ -37,7 +37,9 @@ impl ActivityLabel for Work {
             Self::Discover(_) => "Preparing to find pages…",
             Self::ExistingInventory(_) => "Loading saved page list…",
             Self::EnvironmentStatus(_) => "Loading login and environment settings…",
-            Self::SaveEnvironment { .. } => "Saving login and environment settings…",
+            Self::SaveEnvironment { .. } | Self::SaveReplacementEnvironment { .. } => {
+                "Saving login and environment settings…"
+            }
             Self::OpenLogin(_) => "Opening login browser…",
             Self::ConfirmLogin(_) => "Checking and saving login…",
             Self::CloseLogin(_) => "Closing login browser…",

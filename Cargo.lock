@@ -4709,8 +4709,10 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "tempfile",
+ "tokio",
  "url",
  "uuid",
+ "windows-sys 0.61.2",
  "zeroize",
  "zip",
 ]
@@ -4719,8 +4721,22 @@ dependencies = [
 name = "regressee-cli"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "ed25519-dalek",
+ "hex",
+ "libc",
+ "png 0.17.16",
  "regressee-app",
+ "regressee-core",
+ "regressee-runtime",
+ "regressee-storage",
+ "serde",
  "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tokio",
+ "uuid",
+ "zip",
 ]
 
 [[package]]
@@ -6079,6 +6095,7 @@ dependencies = [
  "libc",
  "mio",
  "pin-project-lite",
+ "signal-hook-registry",
  "socket2",
  "tokio-macros",
  "windows-sys 0.61.2",

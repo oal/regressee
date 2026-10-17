@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Independent preference owner: small local writes never wait behind a capture.
-//! The UI only exchanges snapshots; filesystem access and shutdown waits stay off it.
+//! Preferences off the UI thread. Production uses the engine client provider;
+//! the local provider remains for explicit in-process tests/developer actors.
 use regressee_core::appearance::AppAppearance;
 use regressee_storage::{AppPaths, AppPreferences};
 use std::{
@@ -29,6 +29,34 @@ pub struct AppearanceSettings {
 
 impl AppearanceSettings {
     pub fn start(paths: AppPaths) -> Self {
+        let read = paths.clone();
+        Self::with_provider(
+            move || Ok(AppPreferences::load(&read)?.appearance),
+            move |appearance| AppPreferences { appearance }.save(&paths),
+            false,
+        )
+    }
+    pub fn start_client(client: crate::engine::Client) -> Self {
+        let read = client.clone();
+        Self::with_provider(
+            move || match read.request(crate::protocol::Request::Preferences)? {
+                crate::protocol::Response::Preferences(p) => Ok(p),
+                _ => anyhow::bail!("Engine preferences unavailable"),
+            },
+            move |appearance| match client
+                .request(crate::protocol::Request::SetAppearance(appearance))?
+            {
+                crate::protocol::Response::Preferences(_) => Ok(()),
+                _ => anyhow::bail!("Engine preference save unavailable"),
+            },
+            true,
+        )
+    }
+    fn with_provider(
+        load: impl Fn() -> anyhow::Result<AppAppearance> + Send + 'static,
+        save: impl Fn(AppAppearance) -> anyhow::Result<()> + Send + 'static,
+        poll: bool,
+    ) -> Self {
         let state = Arc::new((
             Mutex::new(State {
                 snapshot: Snapshot {
@@ -44,11 +72,11 @@ impl AppearanceSettings {
         ));
         let owner = state.clone();
         let thread = thread::spawn(move || {
-            let loaded = AppPreferences::load(&paths);
+            let loaded = load();
             let (lock, changed) = &*owner;
             let mut state = lock.lock().unwrap();
             match loaded {
-                Ok(preferences) => state.snapshot.preference = preferences.appearance,
+                Ok(preference) => state.snapshot.preference = preference,
                 Err(_) => {
                     state.snapshot.error = Some(
                         "Could not read your appearance preference. Following System for now; choose an appearance to save it again.",
@@ -59,16 +87,34 @@ impl AppearanceSettings {
             changed.notify_all();
             loop {
                 while state.pending.is_none() && !state.stopped {
-                    state = changed.wait(state).unwrap();
+                    if !poll {
+                        state = changed.wait(state).unwrap();
+                        continue;
+                    }
+                    let (next, timeout) = changed
+                        .wait_timeout(state, std::time::Duration::from_millis(500))
+                        .unwrap();
+                    state = next;
+                    if timeout.timed_out() && !state.stopped && state.pending.is_none() {
+                        drop(state);
+                        let latest = load();
+                        state = lock.lock().unwrap();
+                        // A failed local save stays visible until retried. Never
+                        // replace a newer optimistic choice with an older poll.
+                        if state.pending.is_none()
+                            && !state.snapshot.saving
+                            && state.snapshot.error.is_none()
+                            && let Ok(preference) = latest
+                        {
+                            state.snapshot.preference = preference;
+                        }
+                    }
                 }
                 let Some(preference) = state.pending.take() else {
                     break;
                 };
                 drop(state);
-                let result = AppPreferences {
-                    appearance: preference,
-                }
-                .save(&paths);
+                let result = save(preference);
                 state = lock.lock().unwrap();
                 // A newer choice is already visible; an older completion must not
                 // change it, announce it as saved, or hide its pending state.

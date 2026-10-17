@@ -12,6 +12,9 @@ impl Shell {
     }
 
     pub(super) fn open_image_controls(&mut self, cx: &mut Context<Self>) {
+        if self.agent_locked() {
+            return;
+        }
         self.image_controls_open = true;
         self.capture_details_open = false;
         self.review_note_open = false;
@@ -31,6 +34,9 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if self.agent_locked() {
+            return;
+        }
         self.image_controls_open = false;
         self.presentation_focus = None;
         if restore {
@@ -79,7 +85,8 @@ impl Shell {
     }
 
     pub(super) fn viewer_input_allowed(&self) -> bool {
-        self.focus.screen == Screen::Results
+        !self.agent_locked()
+            && self.focus.screen == Screen::Results
             && !self.focus.busy
             && !self.focus.dialog
             && !self.focus.approval_dialog

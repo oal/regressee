@@ -1,9 +1,9 @@
-# Private build and release preparation
+# Beta builds and release preparation
 
 ## Downloadable test previews
 
-`.github/workflows/release-preview.yml` builds the desktop app on Ubuntu 24.04 and
-Windows Server 2025 for Linux/Windows x86_64. It publishes a GitHub **prerelease**
+`.github/workflows/release-preview.yml` builds separate CLI and desktop products on
+Ubuntu 24.04 and Windows Server 2025 for Linux/Windows x86_64. It publishes a GitHub **prerelease**
 only after both platforms pass contract tests, native release compilation, and
 dependency inspection. These owner-requested testing downloads are not production
 release qualification. The existing private-check workflow remains separate.
@@ -25,12 +25,14 @@ remove a failed draft before rerunning its publishing job.
 
 ### Downloads and requirements
 
-- **Windows 11 x64:** download `regressee-desktop-windows-x86_64.exe` and run it as your
-  normal user. No Rust, Visual Studio, Node.js, npm, or Playwright installation is
+- **Windows 11 x64:** extract `regressee-desktop-windows-x86_64.zip` and run
+  `regressee-desktop.exe` as your normal user. Keep `regressee.exe` alongside it.
+  No Rust, Visual Studio, Node.js, npm, or Playwright installation is
   needed. The MSVC runtime is statically linked; GPUI's release shaders are compiled
   into the executable. The unsigned app may produce a Windows publisher/reputation
   warning. No signing or security-policy bypass is performed by this workflow.
-  Download `regressee-desktop-windows-x86_64.zip` as well for help and dependency notices.
+  The former standalone GUI EXE download is no longer produced: the ZIP contains
+  both required executables, help, skill and dependency notices.
 - **Linux x64:** extract `regressee-desktop-linux-x86_64.tar.gz`, then run
   `./regressee-desktop-linux-x86_64/regressee-desktop`. Use Ubuntu 24.04 or a compatible glibc-based
   desktop with a working GPU/graphics backend. Shared libraries remain system
@@ -44,17 +46,32 @@ remove a failed draft before rerunning its publishing job.
 
   Browser shared-library and default AppArmor/sandbox compatibility still need
   native qualification; do not use `--no-sandbox` or disable OS protections.
-- **Both:** first-run browser installation needs internet access. The app embeds
+- **CLI-only (no GPUI/display):** extract `regressee-cli-linux-x86_64.tar.gz` or
+  `regressee-cli-windows-x86_64.zip`. Run `regressee --help` inside the extracted
+  directory, or add that directory to PATH. These archives contain only the CLI
+  executable, not the desktop. Use public `--data-dir` / `--cache-dir` flags for
+  isolated installations. Headless operations initially support public sites;
+  login/session import remains unavailable. Browser OS libraries/fonts/default
+  sandbox remain prerequisites. No clean-server support is implied by extraction.
+- **Both products:** first-run browser installation needs internet access. The app embeds
   its worker and official-runtime catalog and downloads verified Node/Chromium
   components into its private local storage. The development `.runtime` directory
   is never included. App data is stored outside the extracted/download directory.
 
-Each platform archive includes `build-info.json` (source commit, compiler, target,
-and binary hash), help, project notices, and cached license texts with a
-target-specific normal/build Cargo dependency inventory. Missing license texts
+Each product/platform archive includes `build-info.json` (per-executable version,
+features, protocol, hash/bytes, compiler and source identity), `build-receipt.json`
+(selected sources frozen before/after exact production compilation), source
+inventory, `SHA256SUMS`, public help, portable `skills/regressee/`, project notices,
+and cached license texts with a **product/target-specific** normal/build Cargo
+dependency inventory. CLI closure is checked for absence of GPUI/GUI and graphics
+linkage. Missing license texts
 and unreviewed entries remain visible; this is not a completed native/transitive
-license audit. `regressee-source.tar.gz` supplies the exact tracked application
-sources, including vendored GPUI, at the same commit. The
+license audit. `regressee-source.tar.gz` supplies the selected application
+sources, including vendored GPUI, public docs and portable skill, at the same
+commit. `regressee-source.json` records every selected source hash and omissions;
+private runtime/data/build outputs and internal review/research/design documents
+are not published. Linux/Windows source bytes must match before merging downloads.
+The
 [whole-app preview notes](preview-release-notes.md) are included in the platform
 help directories and appended to the GitHub prerelease notes. `SHA256SUMS` covers
 all assets. It detects download corruption, not publisher authenticity:
@@ -63,7 +80,7 @@ all assets. It detects download corruption, not publisher authenticity:
 sha256sum --ignore-missing --check SHA256SUMS
 ```
 
-On Windows, compare `(Get-FileHash .\regressee-desktop-windows-x86_64.exe -Algorithm SHA256).Hash`
+On Windows, compare `(Get-FileHash .\regressee-desktop-windows-x86_64.zip -Algorithm SHA256).Hash`
 with its entry in `SHA256SUMS`.
 
 No macOS build, installer, app signing, or automatic updater is added. Hosted CI
@@ -73,6 +90,38 @@ See [the support matrix](support-matrix.md) for those outstanding gates.
 
 ## Production release preparation (still pending)
 
+### Local build/package without publishing
+
+```sh
+python3 -B scripts/release-preview.py --target x86_64-unknown-linux-gnu --product all --output artifacts/local-preview
+# On a native Windows build host instead:
+python scripts/release-preview.py --target x86_64-pc-windows-msvc --product all --output artifacts/windows-preview
+```
+
+Choose `--product cli` for a GPUI-free build/archive or `--product desktop` for
+both executables. Output must be new. The helper uses exact release package/feature
+arguments, never `--all-features`; it refuses source changes across compilation/
+packaging. Dirty sources are refused unless explicitly `--allow-dirty` for local
+qualification; those archives truthfully record the base commit **plus exact
+working-tree source inventory**, not a claim to be that commit. `--offline` is
+available with pre-cached build dependencies. `scripts/release-candidate.py` now
+delegates to this path; earlier debug candidate receipts/formats remain historical.
+
+`scripts/package-preview.py` can separately package caller-supplied trusted native
+binaries (`--binary-dir`, `--product`, matching full `--revision`), but labels that
+case **no compile attestation**. Its bounded isolated metadata execution is not
+a sandbox for malicious executables. Only run it on trusted builds. The integrated
+build path binds selected sources before/after build to exact executable hashes;
+neither path establishes signed provenance or bit reproducibility on a clean host.
+Package probes reject mismatched versions/protocol/product, nonproduction feature
+leakage, unsafe links/paths, missing/mismatched inventories or notice hashes.
+
+Both binaries can host `engine serve` without display initialization. The desktop
+uses its own installed executable for autostart, so the combined extracted package
+has a compatible engine without PATH lookup and a stale sibling cannot redirect
+it. CLI/desktop build metadata and actual protocol must match. Close old owners
+before upgrading; never delete locks to force attachment.
+
 Run serially in a dedicated checkout/image with pre-provisioned prerequisites:
 
 ```sh
@@ -81,6 +130,7 @@ cargo build --locked --workspace --all-features --all-targets
 cargo test --locked --workspace --all-features -- --test-threads=1
 cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
 cargo build --release --locked -p regressee-gui --features ui --bin regressee-desktop
+cargo build --release --locked -p regressee-cli --bin regressee
 ```
 
 Linux: build in Ubuntu 24.04 userspace, inspect every ELF using `readelf -d` and
@@ -106,6 +156,25 @@ notarization/stapling and approved JIT entitlements are separate required work;
 no automatic signing or vendor submission is authorized.
 
 ## Developer-only tools
+
+### CLI-only source build
+
+```sh
+cargo build --release --locked -p regressee-cli --bin regressee
+./target/release/regressee --help
+./target/release/regressee --json capabilities
+```
+
+This target has no GPUI or native GUI SDK dependencies. Use public
+`--data-dir DIR [--cache-dir DIR]` flags for isolated CLI installations, not
+developer overrides. Read [CLI workflows and contracts](cli.md) before capture
+or exporting private evidence. Browser OS libraries/fonts and the default sandbox
+remain prerequisites; a display-free CLI build is not clean-server/browser
+qualification. CLI-only and combined desktop archives use the local package path
+above; tooling does not imply a newly published artifact. `--build-info` retains data-free JSON metadata;
+`--json` additionally selects the versioned CLI envelope.
+
+### Existing development hooks
 
 Normal builds (`--features ui`), including downloadable previews, ignore
 `REGRESSEE_DEV_DATA` and `REGRESSEE_CAPTURE_TRACE_EVIDENCE`. These hooks require
@@ -145,7 +214,7 @@ The opt-in authorized-site test requires `REGRESSEE_TEST_RETAINED_STORE` when
 `REGRESSEE_TEST_RUNTIME_CACHE` is supplied, so reuse is bound to the caller's
 explicit retained store rather than a historical developer directory.
 
-## CLI-only build (implementation skeleton)
+## CLI-only build and local engine
 
 ```sh
 cargo build --release --locked -p regressee-cli --bin regressee
@@ -153,20 +222,21 @@ cargo tree --locked -p regressee-cli --edges normal,build
 ```
 
 This separate target does not depend on GPUI or require native GUI development
-libraries, graphics initialization, a display or an unlocked keychain. Only
-`--help`, `--version` and data-free `--build-info` exist in Phase 1; there are no
-product operations or engine yet. The current preview scripts package the
-desktop executable only. CLI-only archives and a desktop package containing both
-executables belong to Phase 5, not a completed release claim. Historical previews
+libraries, graphics initialization, a display or an unlocked keychain. The full
+public product workflow uses one private shared engine; see [the terminal guide](cli.md),
+[portable agent skill](agent-skill.md) and [local engine contract](local-engine.md).
+Historical previews
 used the name `regressee` for the GUI; new builds use `regressee-desktop`.
 
 ## Source and artifact binding
 
-`scripts/source_release.py` is the integrated independently checked Linux-only
+`scripts/source_release.py` is the Linux-only
 source helper. It does not execute sources, emits deterministic source archive,
 inventory/hashes and explicitly blocked release/legal gates in a fresh private
 directory **outside** the source tree. New help/build documents are reviewed
-allowlist entries. Unknown/unreviewed dependencies are never auto-approved.
+allowlist entries. Its expanded vendor/assets/skill/CI allowlist is tested by the
+Phase 5 package suite; earlier independent review does not automatically certify
+these additions. Unknown/unreviewed dependencies are never auto-approved.
 
 ```sh
 python3 -B scripts/test_source_release.py --report <new-private-report>

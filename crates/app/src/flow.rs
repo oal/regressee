@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Headless entry to the same product services (not the fixture spike).
 fn main() -> anyhow::Result<()> {
+    if let Some(output) =
+        regressee_app::engine::lifecycle(&std::env::args().skip(1).collect::<Vec<_>>())?
+    {
+        println!("{output}");
+        return Ok(());
+    }
     let args: Vec<_> = std::env::args().collect();
     anyhow::ensure!(
         args.len() >= 3,
         "usage: regressee-flow DATA_ROOT setup|status|new URL|capture PROJECT_ID|check PROJECT_ID|activate RUN_ID REVISION|evidence PROJECT_ID"
     );
     let paths = regressee_storage::AppPaths::isolated(std::path::Path::new(&args[1]));
+    // Historical developer verifier is exclusive, never an engine bypass.
+    let _ownership = regressee_app::engine::ownership::Ownership::acquire(&paths)?;
     let mut store = regressee_storage::Store::open(paths.clone())?;
     store.recover_runs()?;
     let mut product = regressee_app::product::Product::configured(&paths.cache)?;

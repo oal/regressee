@@ -29,7 +29,7 @@ fn title_save_then_discovery_reports_old_install_and_opens_real_update_control(
     );
     std::fs::write(root.join("READY"), &previous).unwrap();
     std::fs::write(cache.join("current"), "runtime-previous").unwrap();
-    let (jobs, events) = Jobs::start(paths.clone());
+    let (jobs, events) = Jobs::start_test_configured(paths.clone());
     let owned = jobs.clone();
     let (shell, vcx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
     vcx.update(|window, cx| {

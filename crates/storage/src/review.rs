@@ -147,6 +147,20 @@ pub struct ApprovalPreview {
     #[serde(default)]
     pub source_environments: Vec<(TargetKey, String)>,
 }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewHistoryEntry {
+    pub id: i64,
+    pub decision: ReviewDecision,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewHistoryPage {
+    pub analysis: AnalysisId,
+    pub run: RunId,
+    pub key: Option<TargetKey>,
+    pub items: Vec<ReviewHistoryEntry>,
+    pub total: usize,
+    pub next_before: Option<i64>,
+}
 impl Store {
     pub fn display_analysis(&mut self, id: AnalysisId) -> Result<()> {
         let a = self.load_analysis(id)?;
@@ -362,6 +376,93 @@ impl Store {
         q.query_map([run.to_string()], |r| r.get::<_, String>(0))?
             .map(|s| Ok(serde_json::from_str(&s?)?))
             .collect()
+    }
+    pub fn review_history_truncated(&self, run: RunId) -> Result<bool> {
+        Ok(self.connection.query_row("SELECT EXISTS(SELECT 1 FROM review_decisions d JOIN analyses a ON a.id=d.analysis_id WHERE a.run_id=?1 LIMIT 1 OFFSET 256)",[run.to_string()],|r|r.get(0))?)
+    }
+    /// Authoritative latest decision per requested analysis/target, independent
+    /// of unrelated run activity. One bounded result and one SQL scan, no blobs.
+    pub fn current_reviews(
+        &self,
+        analysis: AnalysisId,
+        keys: &[TargetKey],
+    ) -> Result<Vec<ReviewDecision>> {
+        ensure!(
+            keys.len() <= 200,
+            "current review selection exceeds 200 targets"
+        );
+        let a = read_analysis_record(&self.connection, analysis)?;
+        ensure!(
+            keys.iter()
+                .all(|k| a.revision.results.iter().any(|r| &r.key == k)),
+            "review target/revision missing"
+        );
+        let mut q=self.connection.prepare("SELECT record FROM review_decisions WHERE id IN (SELECT MAX(id) FROM review_decisions WHERE analysis_id=?1 AND (json_extract(record,'$.key.page'),json_extract(record,'$.key.profile')) IN (SELECT json_extract(value,'$.page'),json_extract(value,'$.profile') FROM json_each(?2)) GROUP BY json_extract(record,'$.key.page'),json_extract(record,'$.key.profile')) ORDER BY id DESC")?;
+        q.query_map(
+            params![analysis.to_string(), serde_json::to_string(keys)?],
+            |r| r.get::<_, String>(0),
+        )?
+        .map(|s| {
+            let d: ReviewDecision = serde_json::from_str(&s?)?;
+            ensure!(
+                d.analysis == analysis && keys.contains(&d.key),
+                "stored review identity mismatch"
+            );
+            validate_review_note(&d.note).map_err(anyhow::Error::msg)?;
+            Ok(d)
+        })
+        .collect()
+    }
+    /// Keyset history pagination preserves stable append-only decision IDs. New
+    /// reviews do not move entries between subsequent older pages.
+    pub fn review_history_page(
+        &self,
+        analysis: AnalysisId,
+        key: Option<TargetKey>,
+        before: Option<i64>,
+        limit: usize,
+    ) -> Result<ReviewHistoryPage> {
+        ensure!(
+            (1..=200).contains(&limit) && before.is_none_or(|v| v > 0),
+            "invalid_request: review history limit 1–200; before must be positive"
+        );
+        let a = read_analysis_record(&self.connection, analysis)?;
+        ensure!(
+            key.as_ref()
+                .is_none_or(|k| a.revision.results.iter().any(|r| &r.key == k)),
+            "invalid_request: review target/revision missing"
+        );
+        let page = key.as_ref().map(|k| k.page.to_string());
+        let profile = key.as_ref().map(|k| k.profile.to_string());
+        let total=self.connection.query_row("SELECT COUNT(*) FROM review_decisions WHERE analysis_id=?1 AND (?2 IS NULL OR (json_extract(record,'$.key.page')=?2 AND json_extract(record,'$.key.profile')=?3))",params![analysis.to_string(),page,profile],|r|r.get::<_,usize>(0))?;
+        let mut q=self.connection.prepare("SELECT id,record FROM review_decisions WHERE analysis_id=?1 AND (?2 IS NULL OR (json_extract(record,'$.key.page')=?2 AND json_extract(record,'$.key.profile')=?3)) AND (?4 IS NULL OR id<?4) ORDER BY id DESC LIMIT ?5")?;
+        let mut items = q
+            .query_map(
+                params![analysis.to_string(), page, profile, before, limit + 1],
+                |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)),
+            )?
+            .map(|r| {
+                let (id, s) = r?;
+                let decision: ReviewDecision = serde_json::from_str(&s)?;
+                ensure!(
+                    decision.analysis == analysis
+                        && key.as_ref().is_none_or(|k| k == &decision.key),
+                    "stored review identity mismatch"
+                );
+                Ok(ReviewHistoryEntry { id, decision })
+            })
+            .collect::<Result<Vec<_>>>()?;
+        let more = items.len() > limit;
+        items.truncate(limit);
+        let next_before = more.then(|| items.last().unwrap().id);
+        Ok(ReviewHistoryPage {
+            analysis,
+            run: a.revision.run,
+            key,
+            items,
+            total,
+            next_before,
+        })
     }
     pub fn baseline_history(&self, project: ProjectId) -> Result<Vec<BaselineVersion>> {
         let mut q = self.connection.prepare(

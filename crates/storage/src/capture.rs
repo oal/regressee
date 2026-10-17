@@ -812,25 +812,72 @@ impl Store {
     }
     pub fn project_evidence(&self, id: ProjectId) -> Result<ProjectEvidence> {
         let project = self.load_project(id)?;
+        let latest = self
+            .latest_run_id(id)?
+            .map(|id| self.load_run(id))
+            .transpose()?;
+        self.evidence_snapshot(project, latest, false)
+    }
+    /// Resolve only the default identity. Evidence clients must then use the
+    /// exact-run reader, not combine workspace baseline state with saved results.
+    pub fn latest_run_id(&self, project: ProjectId) -> Result<Option<RunId>> {
         let latest: Option<String> = self
             .connection
             .query_row(
                 "SELECT id FROM runs WHERE project_id=?1 ORDER BY rowid DESC LIMIT 1",
-                [id.to_string()],
+                [project.to_string()],
                 |r| r.get(0),
             )
             .optional()?;
-        let latest = latest
-            .map(|s| {
-                serde_json::from_value(serde_json::json!(s))
-                    .and_then(|id| self.load_run(id).map_err(serde::de::Error::custom))
+        Ok(latest
+            .map(|s| serde_json::from_value(serde_json::json!(s)))
+            .transpose()?)
+    }
+    /// Exact executed-run receipt, including paused/failed checks that have no
+    /// analysis yet. Unlike project_evidence, never select a run by insertion
+    /// order or borrow the active baseline instead of a check's frozen one.
+    pub fn project_evidence_for_run(
+        &self,
+        project: ProjectId,
+        run: RunId,
+    ) -> Result<ProjectEvidence> {
+        let saved = self.load_project(project)?;
+        let record = self.load_run(run)?;
+        ensure!(
+            record.run.project == project,
+            "Capture run belongs to another project"
+        );
+        self.evidence_snapshot(saved, Some(record), true)
+    }
+    fn evidence_snapshot(
+        &self,
+        project: ProjectRecord,
+        latest: Option<RunRecord>,
+        exact: bool,
+    ) -> Result<ProjectEvidence> {
+        let id = project.project.id;
+        let reference = if exact {
+            latest.as_ref().and_then(|r| {
+                if let RunIntent::Check { baseline } = r.run.intent {
+                    Some(baseline)
+                } else {
+                    None
+                }
             })
-            .transpose()?;
-        let baseline = project
-            .project
-            .active_baseline
-            .map(|id| self.load_baseline(id))
-            .transpose()?;
+        } else {
+            None
+        };
+        let baseline = (if exact {
+            reference
+        } else {
+            project.project.active_baseline
+        })
+        .map(|id| self.load_baseline(id))
+        .transpose()?;
+        ensure!(
+            baseline.as_ref().is_none_or(|b| b.project == id),
+            "Evidence baseline belongs to another project"
+        );
         let before = baseline
             .as_ref()
             .map(|b| {
@@ -852,6 +899,14 @@ impl Store {
                 ensure!(s.len() <= RECORD_LIMIT, "analysis too large");
                 let a: ComparisonEvidence = serde_json::from_str(&s)?;
                 let a = self.load_analysis(a.revision.id)?;
+                ensure!(
+                    a.revision.run == r.run.id
+                        && (!exact
+                            || baseline
+                                .as_ref()
+                                .is_some_and(|b| b.id == a.revision.baseline)),
+                    "Saved analysis does not match capture run/reference"
+                );
                 if let Some(h) = &a.heatmap {
                     for id in h.artifacts() {
                         self.verify_artifact(&id)?;
@@ -883,6 +938,11 @@ impl Store {
                 self.review_history(r.run.id)?
             } else {
                 vec![]
+            },
+            review_history_truncated: if let Some(r) = &latest {
+                self.review_history_truncated(r.run.id)?
+            } else {
+                false
             },
             baselines: self.baseline_history(id)?,
             latest,
@@ -929,9 +989,20 @@ impl Store {
             latest.as_ref().is_none_or(|r| r.run.project == project),
             "viewer analysis belongs to another project"
         );
+        let reference = latest.as_ref().and_then(|r| match r.run.intent {
+            RunIntent::Check { baseline } => Some(baseline),
+            _ => None,
+        });
+        ensure!(
+            comparison
+                .as_ref()
+                .is_none_or(|a| reference == Some(a.revision.baseline)),
+            "viewer analysis does not match the original check baseline"
+        );
         let baseline = comparison
             .as_ref()
             .map(|a| a.revision.baseline)
+            .or(reference)
             .or(saved.project.active_baseline)
             .map(|id| self.load_baseline(id))
             .transpose()?;
@@ -946,6 +1017,7 @@ impl Store {
             comparison,
             analyses: vec![],
             reviews: vec![],
+            review_history_truncated: false,
             baselines: vec![],
         })
     }

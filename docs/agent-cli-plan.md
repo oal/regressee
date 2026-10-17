@@ -1,6 +1,8 @@
 # Agent CLI and portable skill plan
 
-Date: 2026-10-17. Status: implementation underway; see `agent-cli-status.md` for phase gates.
+Date: 2026-10-17. Status: implementation delivered and independently reviewed;
+native/clean-server/release qualification gates remain open. See
+`agent-cli-status.md` for phase dispositions and evidence.
 
 This document records the user interview and a proposed implementation plan.
 Confirmed requirements below are distinct from recommended defaults. Existing

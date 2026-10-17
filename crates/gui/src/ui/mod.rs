@@ -4,6 +4,7 @@ pub mod controls;
 pub mod depth;
 pub mod dialog;
 pub mod gpu_diagnostics;
+pub mod interaction;
 pub mod performance;
 pub mod scrollbar;
 pub mod selector;
