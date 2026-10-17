@@ -73,7 +73,6 @@ class SyntheticSourceTests(unittest.TestCase):
         self.assertEqual(images, [b"assets/screenshots/regressee-comparison.png"])
         image_path = images[0].decode()
         provenance_path = "assets/screenshots/README.md"
-        self.assertIn(f"]({provenance_path})".encode(), readme)
         image = (actual / image_path).read_bytes()
         self.assertTrue(image.startswith(b"\x89PNG\r\n\x1a\n"))
         self.assertEqual(struct.unpack_from(">II", image, 16), (1440, 900))

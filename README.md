@@ -7,10 +7,7 @@ before deciding which changes to accept.
 **Regressee is a public beta, available on [GitHub](https://github.com/oal/regressee).**
 See [platform availability](#platform-availability) before getting started.
 
-![Regressee comparison workspace showing before and after screenshots of a loopback demo website](assets/screenshots/regressee-comparison.png)
-
-*Demo data: real managed-browser captures of an owned loopback website, shown by
-the native GPUI offscreen renderer. [Screenshot provenance](assets/screenshots/README.md).*
+![Regressee comparing baseline and current screenshots of a demo website](assets/screenshots/regressee-comparison.png)
 
 ## What you can do
 
