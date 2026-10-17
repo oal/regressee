@@ -2490,11 +2490,8 @@ fn actual_signed_http_product_flow() -> Result<()> {
     let ti = &t.capture.as_ref().unwrap().image;
     assert_eq!(ti.height, 20000);
     assert_eq!(ti.tiles.len(), 40);
-    #[cfg(feature = "ui")]
-    {
-        let texture = regressee_app::images::viewer_tile(&store, &ti.tiles[39])?;
-        assert!(texture.size(0).height.0 <= 512);
-    }
+    let (_, height, _) = regressee_app::images::decode_tile(&store, &ti.tiles[39])?;
+    assert!(height <= 512);
     let h = fresh_project(&mut store, &site, "/hang")?;
     let trigger = cancel.clone();
     let mut cancel_thread = None;

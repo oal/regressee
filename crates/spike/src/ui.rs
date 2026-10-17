@@ -1,6 +1,6 @@
 use gpui::{actions, prelude::*, *};
 // SPDX-License-Identifier: MPL-2.0
-use regressee_app::ui::text_input;
+use regressee_gui::ui::text_input;
 use regressee_spike::{
     actor::{Controller, Update, Work},
     images::Tiles,

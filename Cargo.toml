@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/spike", "crates/core", "crates/storage", "crates/runtime", "crates/app"]
+members = ["crates/spike", "crates/core", "crates/storage", "crates/runtime", "crates/app", "crates/gui", "crates/cli"]
 exclude = ["vendor/gpui"]
 resolver = "2"
 

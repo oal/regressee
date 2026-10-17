@@ -33,8 +33,8 @@ class PreviewTests(unittest.TestCase):
             binary = self.root / "target" / target / "release" / executable
             binary.parent.mkdir(parents=True)
             binary.write_bytes(b"native binary fixture")
-        (self.root / "crates/app").mkdir(parents=True)
-        (self.root / "crates/app/Cargo.toml").write_text('[package]\nversion = "0.1.0"\n')
+        (self.root / "crates/gui").mkdir(parents=True)
+        (self.root / "crates/gui/Cargo.toml").write_text('[package]\nversion = "0.1.0"\n')
         for name in ("LICENSE", "THIRD_PARTY_NOTICES.md", "README.md"):
             (self.root / name).write_text(name)
         (self.root / "docs").mkdir()
@@ -69,19 +69,19 @@ class PreviewTests(unittest.TestCase):
 
     def test_linux_archive_and_executable_mode(self):
         names = self.build("x86_64-unknown-linux-gnu")
-        self.assertEqual(names, ["regressee-linux-x86_64.tar.gz"])
+        self.assertEqual(names, ["regressee-desktop-linux-x86_64.tar.gz"])
         with tarfile.open(self.output / names[0]) as archive:
             files = {m.name: archive.extractfile(m).read() for m in archive.getmembers()}
-            self.assertEqual(archive.getmember("regressee-linux-x86_64/regressee").mode, 0o755)
-        self.check_files(files, "regressee-linux-x86_64", "regressee")
+            self.assertEqual(archive.getmember("regressee-desktop-linux-x86_64/regressee-desktop").mode, 0o755)
+        self.check_files(files, "regressee-desktop-linux-x86_64", "regressee-desktop")
 
     def test_windows_standalone_matches_zip_binary(self):
         names = self.build("x86_64-pc-windows-msvc")
-        self.assertEqual(names, ["regressee-windows-x86_64.exe", "regressee-windows-x86_64.zip"])
+        self.assertEqual(names, ["regressee-desktop-windows-x86_64.exe", "regressee-desktop-windows-x86_64.zip"])
         with zipfile.ZipFile(self.output / names[1]) as archive:
             files = {name: archive.read(name) for name in archive.namelist()}
-        self.check_files(files, "regressee-windows-x86_64", "regressee.exe")
-        self.assertEqual((self.output / names[0]).read_bytes(), files["regressee-windows-x86_64/regressee.exe"])
+        self.check_files(files, "regressee-desktop-windows-x86_64", "regressee-desktop.exe")
+        self.assertEqual((self.output / names[0]).read_bytes(), files["regressee-desktop-windows-x86_64/regressee-desktop.exe"])
 
     def test_existing_output_is_not_overwritten(self):
         self.output.mkdir()
@@ -98,7 +98,7 @@ class PreviewTests(unittest.TestCase):
         self.assertFalse(self.output.exists())
 
     def test_empty_binary_is_rejected(self):
-        (self.root / "target/x86_64-pc-windows-msvc/release/regressee.exe").write_bytes(b"")
+        (self.root / "target/x86_64-pc-windows-msvc/release/regressee-desktop.exe").write_bytes(b"")
         with self.assertRaises(ValueError):
             self.build("x86_64-pc-windows-msvc")
         self.assertFalse(self.output.exists())
@@ -109,7 +109,8 @@ class PreviewTests(unittest.TestCase):
             with self.subTest(feature=feature), self.assertRaises(ValueError):
                 self.build("x86_64-unknown-linux-gnu", build_info=info)
             self.assertFalse(self.output.exists())
-        for info in ({}, {**BUILD_INFO, "version": "other"}):
+        for info in ({}, {**BUILD_INFO, "version": "other"},
+                     {**BUILD_INFO, "features": {**BUILD_INFO["features"], "ui": False}}):
             with self.subTest(info=info), self.assertRaises(ValueError):
                 self.build("x86_64-unknown-linux-gnu", build_info=info)
         self.assertFalse(self.output.exists())
@@ -156,7 +157,7 @@ checksum = "fixture-checksum"
         (cache / "legal").mkdir()
         (cache / "legal/license.txt").write_text("example license")
         (cache / "NOTICE").write_text("example notice")
-        graph = "regressee-app v0.1.0\ngpui v0.2.2 (/vendor/gpui)\nexample v1.0.0\nexample v1.0.0 (*)"
+        graph = "regressee-gui v0.1.0\ngpui v0.2.2 (/vendor/gpui)\nexample v1.0.0\nexample v1.0.0 (*)"
         with patch.dict(os.environ, {"CARGO_HOME": str(self.root / "cargo")}), \
                 patch.object(preview, "command", return_value=graph) as command:
             inventory, texts = preview.dependency_notices(self.root, "x86_64-pc-windows-msvc")

@@ -31,6 +31,27 @@ its consequence and the next available action, not the implementation.
   A rejected edit says what to change and whether text was added or saved.
 - Optional settings still need clear labels, examples and consequences. Being
   under “Advanced” is not permission to use internal implementation language.
+- A context label must identify something useful. In comparison headings, name
+  the screenshot's role: **Before: saved baseline / After: this check**. Do not
+  repeat the generated environment name “Website” as if it were a distinction.
+  Show meaningful differing environment names and a shared meaningful name once;
+  retain full recorded names and
+  origins in Details, never substitute today's settings for historical sources.
+- Name what is actually saved. Saving project settings does not save a website;
+  captured screenshots do not become a baseline until the user confirms Save baseline.
+- Avoid generic container labels such as “Local task workspace”. A heading or
+  status must add information not already supplied by the selected project/task.
+- Keep source terminology separate from action terminology: address mapping can
+  use any environments, not just Production and Staging, and editing its draft is
+  not approval. Use **Support report** consistently for the privacy-filtered file;
+  **Capture diagnostics** remains the separate full-URL technical report.
+- Loading text must describe ongoing work, not a failed read. Recovery must point
+  to a control or capability that actually exists.
+- Explain baseline updates at the selection step: **Use After as the reference
+  for future checks. Review before saving.** **Select After screenshot** only adds
+  that page and screen size to the selection; **Review update…** previews it and
+  **Save baseline update** commits it. Never imply that selecting or marking a
+  change Intentional updates a baseline.
 
 ## Terminology
 

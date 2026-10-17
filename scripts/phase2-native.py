@@ -16,7 +16,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 def main():
     p=argparse.ArgumentParser();p.add_argument('--output',type=pathlib.Path,required=True);a=p.parse_args()
     output=a.output.resolve();output.mkdir(parents=True,exist_ok=False)
-    require_developer_binary(ROOT/'target/debug/regressee', output/'native-data')
+    require_developer_binary(ROOT/'target/debug/regressee-desktop', output/'native-data')
     spec=importlib.util.spec_from_file_location('owned_x11',ROOT/'scripts/ui-smoke.py');h=importlib.util.module_from_spec(spec);spec.loader.exec_module(h)
     h.bind('XCloseDisplay',C.c_int,[h.Display]);x=h.x
     result={'scope':'One X11/lavapipe developer inspection; not ordinary native qualification','outcome':'FAIL / native evidence open','forced_mapping':False,'input':'NOT RUN','human_visual_approval':'PENDING'}
@@ -35,7 +35,7 @@ def main():
     env=dict(os.environ,REGRESSEE_DEV_DATA=str(output/'native-data'),VK_ICD_FILENAMES='/usr/share/vulkan/icd.d/lvp_icd.json');env.pop('WAYLAND_DISPLAY',None);env.pop('REGRESSEE_DISTRIBUTION',None)
     try:
         with (output/'app.log').open('w') as log:
-            process=subprocess.Popen([str(ROOT/'target/debug/regressee')],cwd=ROOT,env=env,stdout=log,stderr=log)
+            process=subprocess.Popen([str(ROOT/'target/debug/regressee-desktop')],cwd=ROOT,env=env,stdout=log,stderr=log)
             result['pid']=process.pid;display=x.XOpenDisplay(None);assert display,'X11 unavailable'
             window=None
             for _ in range(100):

@@ -39,6 +39,7 @@ USER_DOCS = frozenset({"auth-and-capture.md", "portable-baseline-archive.md",
                         "release-building.md", "updates-and-recovery.md",
                         "preview-release-notes.md"})
 INTERNAL_DOCS = frozenset({"ACTIVE_WORK.md", "IMPLEMENTATION_STATUS.md",
+                            "agent-cli-plan.md", "agent-cli-status.md",
                            "phase0-design.md", "spike-surface.md", "foundation-surface.md",
                            "crawling-surface.md", "auth-and-capture-surface.md",
                            "analysis-and-review-surface.md", "portability-and-storage-surface.md"})

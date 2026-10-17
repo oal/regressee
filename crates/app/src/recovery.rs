@@ -1,26 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
-//! Known causes carry safe explanations and real navigation, never raw site stacks.
+//! Shared failure causes and safe explanations, never native navigation or raw site stacks.
 use crate::product::RuntimeState;
 use regressee_runtime::protocol::FailureCode;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Destination {
-    Workspace,
-    AppSettings,
-    ProjectSettings,
-    History,
-}
-
-impl Destination {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Workspace => "Return to workspace",
-            Self::AppSettings => "Open App settings",
-            Self::ProjectSettings => "Open Project settings",
-            Self::History => "Open History",
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Problem {
@@ -80,7 +61,7 @@ impl Problem {
                 "The private browser could not be verified. Automatic replacement is blocked. Open App settings and choose Repair browser, then return to your project and retry. Repair does not delete saved screenshots or change your baseline."
             }
             Self::Worker(FailureCode::NeedsLogin) => {
-                "The website requires a login, or the saved login has expired. In Project settings, open the login browser, finish logging in, then choose I'm ready before retrying."
+                "The website requires a login, or the saved login has expired. In Project settings, open the login browser, finish logging in, then choose Confirm login before retrying."
             }
             Self::Worker(FailureCode::AccessDenied) => {
                 "The website refused access. Check that your account can open the page and review website access in Project settings before retrying."
@@ -116,29 +97,11 @@ impl Problem {
                 "The browser could not complete this operation; the exact cause was not reported. Check that the page opens normally, then return to the workspace to retry. If it fails again, check the private browser in App settings."
             }
             Self::PermissionDenied => {
-                "Regressee could not access a required local file or folder. Check its folder permissions in App settings, or choose a writable destination when exporting. Your drafts are kept; retry only after fixing access."
+                "Regressee could not access a required local file or folder. Check its permissions in your operating system; App settings shows the data and cache locations. When exporting, choose a writable destination. Your drafts are kept; retry only after fixing access."
             }
             Self::LowSpace => {
                 "There is not enough free disk space to finish. Free space before retrying. Use History to inspect storage before deleting anything; cleanup is never automatic."
             }
-        }
-    }
-
-    pub fn destination(self) -> Destination {
-        match self {
-            Self::Browser(_)
-            | Self::Worker(FailureCode::UnsupportedVersion)
-            | Self::PermissionDenied => Destination::AppSettings,
-            Self::Worker(
-                FailureCode::NeedsLogin
-                | FailureCode::AccessDenied
-                | FailureCode::NotFound
-                | FailureCode::RateLimited
-                | FailureCode::RedirectOutsideScope
-                | FailureCode::ImageLimit,
-            ) => Destination::ProjectSettings,
-            Self::LowSpace => Destination::History,
-            Self::Worker(_) => Destination::Workspace,
         }
     }
 }

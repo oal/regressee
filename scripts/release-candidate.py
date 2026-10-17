@@ -15,7 +15,7 @@ def run(argv,root,env):
     return r.stdout
 
 def notices(root,env):
-    graph=run(['cargo','tree','--locked','--offline','-p','regressee-app','--features','ui','--target','x86_64-unknown-linux-gnu','--edges','normal','--prefix','none','--format','{p}'],root,env).decode()
+    graph=run(['cargo','tree','--locked','--offline','-p','regressee-gui','--features','ui','--target','x86_64-unknown-linux-gnu','--edges','normal','--prefix','none','--format','{p}'],root,env).decode()
     packages=set(re.findall(r'^([A-Za-z0-9_-]+) v([^\s]+)',graph,re.M));rows=[];texts={}
     cache=Path(os.environ.get('CARGO_HOME',str(Path.home()/'.cargo')))/'registry/src'
     lock=tomllib.loads((root/'Cargo.lock').read_text())['package']
@@ -51,8 +51,8 @@ def build(root,output,epoch):
         selected=source.collect(fd);source.validate_sources(selected);rows=source.inventory(selected)
         identity=source.digest(source.json_bytes(rows))
         env=dict(os.environ,LIBRARY_PATH=str(root/'.runtime/link-libs'),CARGO_BUILD_JOBS='4')
-        log=run(['cargo','build','--locked','-p','regressee-app','--features','ui','--bin','regressee'],root,env)
-        binary=root/'target/debug/regressee';data=binary.read_bytes()
+        log=run(['cargo','build','--locked','-p','regressee-gui','--features','ui','--bin','regressee-desktop'],root,env)
+        binary=root/'target/debug/regressee-desktop';data=binary.read_bytes()
         if len(data)>256*1024*1024:raise source.Refusal('app-size-budget')
         inventory,texts=notices(root,env)
         inspect=run(['readelf','--version-info',str(binary)],root,env).decode()
@@ -62,7 +62,7 @@ def build(root,output,epoch):
         if source.inventory(source.collect(fd))!=rows:raise source.Refusal('source-changed-across-build')
         src=source.make_archive(selected,epoch)
         inventory_bytes=source.json_bytes(inventory)
-        shipped={'bin/regressee':(data,0o755),'LICENSE':((root/'LICENSE').read_bytes(),0o644),
+        shipped={'bin/regressee-desktop':(data,0o755),'LICENSE':((root/'LICENSE').read_bytes(),0o644),
             'THIRD_PARTY_NOTICES.md':((root/'THIRD_PARTY_NOTICES.md').read_bytes(),0o644),
             'license-inventory.json':(inventory_bytes,0o644)}
         for name,content in texts.items():shipped['notices/'+name]=(content,0o644)

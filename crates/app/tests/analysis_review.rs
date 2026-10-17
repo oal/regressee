@@ -53,6 +53,29 @@ fn capture_with_renderer(
     mapped: bool,
     rendering: RenderingEnvironment,
 ) -> Result<RunRecord> {
+    capture_with_renderer_and_warnings(
+        store,
+        project,
+        inventory,
+        intent,
+        names,
+        mapped,
+        rendering,
+        &[],
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn capture_with_renderer_and_warnings(
+    store: &mut Store,
+    project: &Project,
+    inventory: &InventoryRevision,
+    intent: RunIntent,
+    names: &[Option<&str>],
+    mapped: bool,
+    rendering: RenderingEnvironment,
+    warnings: &[&str],
+) -> Result<RunRecord> {
     let mut environment = project.environments[0].clone();
     if mapped {
         environment.mappings[0].destination = "http://127.0.0.1:43211/".parse()?;
@@ -113,8 +136,8 @@ fn capture_with_renderer(
                     height: image.height,
                     sha256: image.original.clone(),
                     bytes: store.verify_artifact(&image.original)?.bytes,
-                    warnings: vec![],
-                    stable: true,
+                    warnings: warnings.iter().map(|w| (*w).to_owned()).collect(),
+                    stable: !warnings.contains(&"Unstable"),
                     duration_ms: 1,
                     readiness: Readiness {
                         font_failures: 0,
@@ -152,6 +175,21 @@ fn setup(
     BaselineVersion,
     u64,
 )> {
+    setup_with_warnings(path, n, &[])
+}
+
+fn setup_with_warnings(
+    path: &Path,
+    n: usize,
+    warnings: &[&str],
+) -> Result<(
+    Store,
+    Project,
+    InventoryRevision,
+    RunRecord,
+    BaselineVersion,
+    u64,
+)> {
     let mut s = Store::open(AppPaths::isolated(path))?;
     let mut p = Project::draft(
         "Synthetic Phase 5 history fixture".into(),
@@ -181,13 +219,22 @@ fn setup(
         coverage: DiscoveryCoverage::Complete,
     };
     s.freeze_inventory(&inventory)?;
-    let old = capture(
+    let old = capture_with_renderer_and_warnings(
         &mut s,
         &p,
         &inventory,
         RunIntent::NewBaseline,
         &vec![Some("unchanged-before.png"); n],
         false,
+        RenderingEnvironment {
+            os: "fixture".into(),
+            architecture: "fixture".into(),
+            browser: "fixture".into(),
+            worker_version: "fixture".into(),
+            profile_version: 1,
+            fonts_fingerprint: Some("fixture-fonts".into()),
+        },
+        warnings,
     )?;
     // Public API activation validates source address for legacy single-target mode.
     let mut project = s.load_project(p.id)?;
@@ -203,6 +250,166 @@ fn setup(
         baseline,
         activated.revision,
     ))
+}
+
+#[test]
+fn loading_warnings_allow_real_pixel_review_and_explicit_baseline_update() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let warnings = [
+        "ImagesIncomplete",
+        "ResourceFailed",
+        "EmbeddedContentBlocked",
+    ];
+    let (mut store, project, inventory, before, baseline, revision) =
+        setup_with_warnings(dir.path(), 3, &warnings)?;
+    let check = capture_with_renderer_and_warnings(
+        &mut store,
+        &project,
+        &inventory,
+        RunIntent::Check {
+            baseline: baseline.id,
+        },
+        &[
+            Some("unchanged-before.png"),
+            Some("ignored-rectangles-after.png"),
+            None,
+        ],
+        false,
+        before.run.rendering.clone(),
+        &warnings,
+    )?;
+    let cancel = AtomicBool::new(false);
+    let analysis = review::analyze_run(
+        &mut store,
+        check.run.id,
+        review::preset(e::Preset::Balanced),
+        &cancel,
+    )?;
+    assert_eq!(
+        analysis.revision.results[0].classification,
+        Classification::NoSignificantChange
+    );
+    assert_eq!(analysis.revision.results[0].changed_pixels, 0);
+    assert_eq!(
+        analysis.revision.results[1].classification,
+        Classification::Changed
+    );
+    assert!(analysis.revision.results[1].changed_pixels > 0);
+    assert_eq!(
+        analysis.revision.results[2].classification,
+        Classification::CouldNotCapture
+    );
+
+    // Reopen an actual persisted older summary with the useful pixel reports
+    // still present. No migration/reanalysis/capture is needed to review it.
+    let mut legacy = analysis.clone();
+    legacy.revision.id = AnalysisId::new();
+    legacy.perceptual.as_mut().unwrap().cache_key =
+        identity_hash(&("old-warning-veto", analysis.revision.id))?;
+    for result in legacy.revision.results.iter_mut().take(2) {
+        result.classification = Classification::NotComparable;
+    }
+    store.save_analysis(&legacy)?;
+    store.display_analysis(legacy.revision.id)?;
+    let frozen = serde_json::to_value(store.load_analysis(legacy.revision.id)?)?;
+    let reopened = store.load_analysis(legacy.revision.id)?;
+    let unchanged = &check.run.targets[0].key;
+    let changed = &check.run.targets[1].key;
+    assert_eq!(
+        reopened.review_classification(unchanged),
+        Some(Classification::NoSignificantChange)
+    );
+    assert_eq!(
+        reopened.review_classification(changed),
+        Some(Classification::Changed)
+    );
+    assert_eq!(
+        reopened.review_classifications()[changed],
+        Classification::Changed
+    );
+    store.save_review(&ReviewDecision {
+        analysis: legacy.revision.id,
+        key: unchanged.clone(),
+        state: ReviewState::Intentional,
+        note: "Expected unavailable external content".into(),
+        reviewed_at: 105,
+    })?;
+    assert_eq!(
+        store.review_history(check.run.id)?[0].note,
+        "Expected unavailable external content"
+    );
+    assert_eq!(
+        frozen,
+        serde_json::to_value(store.load_analysis(legacy.revision.id)?)?
+    );
+    assert_eq!(
+        store.load_project(project.id)?.project.active_baseline,
+        Some(baseline.id)
+    );
+    assert!(
+        store
+            .approval_preview(legacy.revision.id, &[check.run.targets[2].key.clone()])
+            .is_err()
+    );
+
+    // A caution is not a missing image, corrupt data, incompatible profile or
+    // unstable/replacement-problem approval. Those protections remain separate.
+    for warning in [
+        "Unstable",
+        "ReplacementGeometryChanged",
+        "UnknownFutureWarning",
+    ] {
+        let cautioned = capture_with_renderer_and_warnings(
+            &mut store,
+            &project,
+            &inventory,
+            RunIntent::Check {
+                baseline: baseline.id,
+            },
+            &[
+                Some("unchanged-before.png"),
+                Some("unchanged-before.png"),
+                Some("unchanged-before.png"),
+            ],
+            false,
+            before.run.rendering.clone(),
+            &[warning],
+        )?;
+        let a = review::analyze_run(
+            &mut store,
+            cautioned.run.id,
+            review::preset(e::Preset::Balanced),
+            &cancel,
+        )?;
+        assert_eq!(
+            a.revision.results[0].classification,
+            Classification::NoSignificantChange
+        );
+        assert!(
+            store
+                .approval_preview(a.revision.id, &[cautioned.run.targets[0].key.clone()])
+                .is_err()
+        );
+    }
+    store.display_analysis(legacy.revision.id)?;
+    let preview = store.approval_preview(legacy.revision.id, std::slice::from_ref(changed))?;
+    assert_eq!(
+        store.load_project(project.id)?.project.active_baseline,
+        Some(baseline.id)
+    );
+    let updated = store.accept_selected(&preview, revision)?;
+    assert_ne!(updated.project.active_baseline, Some(baseline.id));
+    assert!(
+        store
+            .baseline_history(project.id)?
+            .iter()
+            .any(|b| b.id == baseline.id)
+    );
+    assert_eq!(
+        frozen,
+        serde_json::to_value(store.load_analysis(legacy.revision.id)?)?
+    );
+    Ok(())
 }
 #[test]
 fn approval_context_refuses_switch_reanalysis_selection_and_stale_baseline() -> Result<()> {
@@ -1184,5 +1391,106 @@ fn approval_refuses_material_rendering_missing_artifact_and_preview_mixing() -> 
     assert_eq!(s.load_project(p.id)?.project.active_baseline, Some(b.id));
     std::fs::write(&path, bytes)?;
     assert_eq!(s.load_baseline(b.id)?.references, b.references);
+    Ok(())
+}
+
+#[test]
+fn review_saves_skip_media_reads_but_inspection_and_acceptance_verify_it() -> Result<()> {
+    let dir = tempfile::tempdir()?;
+    let paths = AppPaths::isolated(dir.path());
+    let (mut store, project, inventory, _, baseline, revision) = setup(dir.path(), 2)?;
+    let check = capture(
+        &mut store,
+        &project,
+        &inventory,
+        RunIntent::Check {
+            baseline: baseline.id,
+        },
+        &[
+            Some("ignored-rectangles-after.png"),
+            Some("unchanged-after.png"),
+        ],
+        false,
+    )?;
+    let analysis = review::analyze_run(
+        &mut store,
+        check.run.id,
+        review::preset(e::Preset::Balanced),
+        &AtomicBool::new(false),
+    )?;
+    let key = check.run.targets[0].key.clone();
+    let approval = store.approval_preview(analysis.revision.id, std::slice::from_ref(&key))?;
+    let frozen = serde_json::to_value(&store.load_analysis(analysis.revision.id)?)?;
+
+    // Deterministic no-media-I/O regression: originals and derivatives are offline.
+    // This fails even on tiny fixtures if a save or its reply reloads evidence.
+    std::fs::rename(paths.artifacts(), dir.path().join("offline-artifacts"))?;
+    let mut decision = ReviewDecision {
+        analysis: analysis.revision.id,
+        key,
+        state: ReviewState::Intentional,
+        note: " Exact annotation.\n日本語 🦀 café\r\n".into(),
+        reviewed_at: 102,
+    };
+    let mut expected = Vec::new();
+    for state in [
+        ReviewState::Intentional,
+        ReviewState::NeedsFix,
+        ReviewState::Unreviewed,
+    ] {
+        decision.state = state;
+        assert_eq!(store.save_review(&decision)?, check.run.id);
+        expected.insert(0, decision.clone());
+        assert_eq!(store.review_history(check.run.id)?, expected);
+    }
+    assert!(store.load_analysis(analysis.revision.id).is_err());
+    assert!(
+        store
+            .approval_preview(analysis.revision.id, std::slice::from_ref(&decision.key))
+            .is_err()
+    );
+    assert!(store.accept_selected(&approval, revision).is_err());
+    assert_eq!(
+        store.load_project(project.id)?.project.active_baseline,
+        Some(baseline.id)
+    );
+    drop(store);
+
+    // Exercise the production worker too: it must use the save's returned run
+    // identity, not perform a second verified load just to refresh history.
+    let (jobs, events) = regressee_app::jobs::Jobs::start(paths.clone());
+    decision.note.push_str("Worker save.");
+    jobs.submit(regressee_app::jobs::Request {
+        id: 1,
+        work: regressee_app::jobs::Work::Review(decision.clone()),
+    })
+    .map_err(anyhow::Error::msg)?;
+    let update = events.recv_timeout(std::time::Duration::from_secs(5));
+    jobs.join_after_ui();
+    let update = update?;
+    assert_eq!(update.id, 1);
+    expected.insert(0, decision);
+    match update.reply {
+        regressee_app::jobs::Reply::SavedReview(history) => assert_eq!(history, expected),
+        reply => anyhow::bail!("review save unexpectedly reread media or failed: {reply:?}"),
+    }
+
+    // Restoring media makes normal verification succeed; annotations changed
+    // neither the immutable analysis nor baseline acceptance eligibility.
+    std::fs::remove_dir(paths.artifacts())?; // empty directory recreated on worker startup
+    std::fs::rename(dir.path().join("offline-artifacts"), paths.artifacts())?;
+    let mut store = Store::open(paths)?;
+    assert_eq!(
+        serde_json::to_value(store.load_analysis(analysis.revision.id)?)?,
+        frozen
+    );
+    assert_eq!(store.review_history(check.run.id)?, expected);
+    assert_eq!(
+        store
+            .approval_preview(analysis.revision.id, &[check.run.targets[0].key.clone()])?
+            .context,
+        approval.context
+    );
+    store.accept_selected(&approval, revision)?;
     Ok(())
 }

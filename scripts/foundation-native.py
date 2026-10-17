@@ -26,7 +26,7 @@ def main():
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=False)
-    require_developer_binary(ROOT / 'target/debug/regressee', output / 'native-data')
+    require_developer_binary(ROOT / 'target/debug/regressee-desktop', output / 'native-data')
     spec = importlib.util.spec_from_file_location('bench_native_helpers', ROOT / 'scripts/ui-smoke.py')
     helper = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(helper)
@@ -66,7 +66,7 @@ def main():
     display = None; process = None
     try:
         with (output/'app.log').open('w') as log:
-            process = subprocess.Popen([str(ROOT/'target/debug/regressee')], cwd=ROOT, env=env, stdout=log, stderr=log)
+            process = subprocess.Popen([str(ROOT/'target/debug/regressee-desktop')], cwd=ROOT, env=env, stdout=log, stderr=log)
             result['pid'] = process.pid
             display = x.XOpenDisplay(None); assert display, 'X11 display unavailable'
             window = None

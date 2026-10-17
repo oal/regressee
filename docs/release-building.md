@@ -25,14 +25,14 @@ remove a failed draft before rerunning its publishing job.
 
 ### Downloads and requirements
 
-- **Windows 11 x64:** download `regressee-windows-x86_64.exe` and run it as your
+- **Windows 11 x64:** download `regressee-desktop-windows-x86_64.exe` and run it as your
   normal user. No Rust, Visual Studio, Node.js, npm, or Playwright installation is
   needed. The MSVC runtime is statically linked; GPUI's release shaders are compiled
   into the executable. The unsigned app may produce a Windows publisher/reputation
   warning. No signing or security-policy bypass is performed by this workflow.
-  Download `regressee-windows-x86_64.zip` as well for help and dependency notices.
-- **Linux x64:** extract `regressee-linux-x86_64.tar.gz`, then run
-  `./regressee-linux-x86_64/regressee`. Use Ubuntu 24.04 or a compatible glibc-based
+  Download `regressee-desktop-windows-x86_64.zip` as well for help and dependency notices.
+- **Linux x64:** extract `regressee-desktop-linux-x86_64.tar.gz`, then run
+  `./regressee-desktop-linux-x86_64/regressee-desktop`. Use Ubuntu 24.04 or a compatible glibc-based
   desktop with a working GPU/graphics backend. Shared libraries remain system
   prerequisites; this is a portable directory, **not an AppImage or installer**.
   On Ubuntu 24.04, GPUI's basic runtime prerequisites can be installed with:
@@ -63,7 +63,7 @@ all assets. It detects download corruption, not publisher authenticity:
 sha256sum --ignore-missing --check SHA256SUMS
 ```
 
-On Windows, compare `(Get-FileHash .\regressee-windows-x86_64.exe -Algorithm SHA256).Hash`
+On Windows, compare `(Get-FileHash .\regressee-desktop-windows-x86_64.exe -Algorithm SHA256).Hash`
 with its entry in `SHA256SUMS`.
 
 No macOS build, installer, app signing, or automatic updater is added. Hosted CI
@@ -80,7 +80,7 @@ cargo fmt --all -- --check
 cargo build --locked --workspace --all-features --all-targets
 cargo test --locked --workspace --all-features -- --test-threads=1
 cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
-cargo build --release --locked -p regressee-app --features ui --bin regressee
+cargo build --release --locked -p regressee-gui --features ui --bin regressee-desktop
 ```
 
 Linux: build in Ubuntu 24.04 userspace, inspect every ELF using `readelf -d` and
@@ -111,7 +111,7 @@ Normal builds (`--features ui`), including downloadable previews, ignore
 `REGRESSEE_DEV_DATA` and `REGRESSEE_CAPTURE_TRACE_EVIDENCE`. These hooks require
 the explicit `developer-tools` Cargo feature; inspection and renderer-capture
 features enable it as well. Do not package an `--all-features` build as a preview.
-`regressee --build-info` reports compiled features without initializing graphics
+`regressee-desktop --build-info` reports compiled features without initializing graphics
 or storage. Preview packaging checks this metadata and rejects developer/test
 features or a version mismatch.
 
@@ -120,7 +120,7 @@ symlink ancestors, then run:
 
 ```sh
 REGRESSEE_DEV_DATA="/absolute/path/to/private-test-directory" \
-  cargo run --locked -p regressee-app --features ui,developer-tools --bin regressee
+  cargo run --locked -p regressee-gui --features ui,developer-tools --bin regressee-desktop
 ```
 
 Do not point developer overrides at existing user data. Normal runtime download
@@ -144,6 +144,21 @@ Renderer tests require both `REGRESSEE_RENDERER_APPROVED_ROOT` and
 The opt-in authorized-site test requires `REGRESSEE_TEST_RETAINED_STORE` when
 `REGRESSEE_TEST_RUNTIME_CACHE` is supplied, so reuse is bound to the caller's
 explicit retained store rather than a historical developer directory.
+
+## CLI-only build (implementation skeleton)
+
+```sh
+cargo build --release --locked -p regressee-cli --bin regressee
+cargo tree --locked -p regressee-cli --edges normal,build
+```
+
+This separate target does not depend on GPUI or require native GUI development
+libraries, graphics initialization, a display or an unlocked keychain. Only
+`--help`, `--version` and data-free `--build-info` exist in Phase 1; there are no
+product operations or engine yet. The current preview scripts package the
+desktop executable only. CLI-only archives and a desktop package containing both
+executables belong to Phase 5, not a completed release claim. Historical previews
+used the name `regressee` for the GUI; new builds use `regressee-desktop`.
 
 ## Source and artifact binding
 

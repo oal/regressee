@@ -66,16 +66,16 @@ jobs:
         timeout-minutes: 45
         run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support --target ${{ matrix.target }}
       - name: Build the desktop application
-        run: cargo build --release --locked -p regressee-app --features ui --bin regressee --target ${{ matrix.target }}
+        run: cargo build --release --locked -p regressee-gui --features ui --bin regressee-desktop --target ${{ matrix.target }}
       - name: Check Linux ABI and dynamic dependencies
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          binary=target/x86_64-unknown-linux-gnu/release/regressee
+          binary=target/x86_64-unknown-linux-gnu/release/regressee-desktop
           readelf -d "$binary"
           python - <<'PY'
           import re, subprocess
-          output = subprocess.check_output(['readelf', '--version-info', 'target/x86_64-unknown-linux-gnu/release/regressee'], text=True)
+          output = subprocess.check_output(['readelf', '--version-info', 'target/x86_64-unknown-linux-gnu/release/regressee-desktop'], text=True)
           versions = {tuple(map(int, v.split('.'))) for v in re.findall(r'GLIBC_(\d+\.\d+)', output)}
           if not versions or max(versions) > (2, 39):
               raise SystemExit('Linux preview must meet the Ubuntu 24.04 GLIBC <= 2.39 floor')
@@ -85,7 +85,7 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $dependencies = & $env:REGRESSEE_DUMPBIN /dependents target/x86_64-pc-windows-msvc/release/regressee.exe
+          $dependencies = & $env:REGRESSEE_DUMPBIN /dependents target/x86_64-pc-windows-msvc/release/regressee-desktop.exe
           if ($LASTEXITCODE -ne 0) { throw 'DLL dependency inspection failed' }
           $dependencies
           if (($dependencies -join "`n") -match '(?i)(?:VCRUNTIME|MSVCP|MSVCR)\d+[^\s]*\.dll') {
@@ -127,9 +127,9 @@ jobs:
         run: |
           git archive --format=tar.gz --prefix=regressee-source/ --output=artifacts/preview/regressee-source.tar.gz "$GITHUB_SHA"
           cd artifacts/preview
-          test -s regressee-windows-x86_64.exe
-          test -s regressee-windows-x86_64.zip
-          test -s regressee-linux-x86_64.tar.gz
+          test -s regressee-desktop-windows-x86_64.exe
+          test -s regressee-desktop-windows-x86_64.zip
+          test -s regressee-desktop-linux-x86_64.tar.gz
           sha256sum regressee-* > SHA256SUMS
       - name: Publish only after both builds succeed
         env:
@@ -145,8 +145,8 @@ jobs:
           cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
           ## Downloads for testing
 
-          - **Windows 11 x64:** download `regressee-windows-x86_64.exe` and run it. No Rust, Node.js, npm, or Playwright installation is needed. The `.zip` also includes help and third-party notices.
-          - **Linux x64:** extract `regressee-linux-x86_64.tar.gz` and run `./regressee-linux-x86_64/regressee` on Ubuntu 24.04 or a compatible system with GPUI's shared libraries and a working graphics backend. This is not an AppImage.
+          - **Windows 11 x64:** download `regressee-desktop-windows-x86_64.exe` and run it. No Rust, Node.js, npm, or Playwright installation is needed. The `.zip` also includes help and third-party notices.
+          - **Linux x64:** extract `regressee-desktop-linux-x86_64.tar.gz` and run `./regressee-desktop-linux-x86_64/regressee-desktop` on Ubuntu 24.04 or a compatible system with GPUI's shared libraries and a working graphics backend. This is not an AppImage.
           - `SHA256SUMS` verifies download integrity; `regressee-source.tar.gz` contains the exact application sources, including the patched GPUI.
 
           These are **unsigned, experimental test builds**, not supported production releases or installers. Windows may show a publisher/reputation warning. Browser setup needs internet access on first use; the application downloads its pinned private runtime. Native desktop, clean-install, accessibility, and complete license qualification remain pending. macOS is not included. Do not disable OS/browser security protections to make a test pass.

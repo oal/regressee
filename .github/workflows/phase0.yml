@@ -63,4 +63,4 @@ jobs:
           cargo run --locked --bin regressee-spike -- protocol-test
       - name: GPUI compile on Windows/macOS (not opening-window evidence)
         if: runner.os != 'Linux'
-        run: cargo build --locked --features ui --bins
+        run: cargo build --locked --workspace --features regressee-gui/ui,regressee-spike/ui --bins

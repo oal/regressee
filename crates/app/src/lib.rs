@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 pub mod analysis_engine;
+pub mod appearance;
 pub mod auth;
 pub mod crawling;
 pub mod diagnostics;
@@ -12,7 +13,3 @@ pub mod product;
 pub mod recovery;
 pub mod review;
 pub mod task;
-#[cfg(feature = "ui")]
-pub mod ui;
-#[cfg(feature = "ui")]
-mod viewer_cache;

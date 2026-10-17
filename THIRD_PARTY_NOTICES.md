@@ -1,7 +1,7 @@
 # Third-party notices — private candidate and historical fixture bench
 
 Application sources are MPL-2.0 (`LICENSE`), except the explicitly attributed
-Apache-2.0 adaptation in `crates/app/src/ui/text_input.rs` of GPUI's input example
+Apache-2.0 adaptation in `crates/gui/src/ui/text_input.rs` of GPUI's input example
 (shared by the maintained product and separate fixture bench).
 GPUI 0.2.2: Zed contributors, Apache-2.0; retained license in
 `third-party/GPUI-LICENSE-APACHE`. GPUI dependencies have their own licenses;
@@ -96,7 +96,7 @@ No runtime/browser/font or package tool is bundled into the private app tarball.
 
 ## Bundled timezone catalog
 
-`crates/app/assets/timezones.txt` contains 436 Zone identifiers and UTC derived
+`crates/gui/assets/timezones.txt` contains 436 Zone identifiers and UTC derived
 from the locally installed IANA tzdata 2026c compact zic input, whose header
 declares the data public domain. No timezone rules, host configuration or user
 timezone are bundled. Source/derivation/hash are recorded in

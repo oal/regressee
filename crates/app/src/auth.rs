@@ -503,7 +503,7 @@ impl Product {
         let mut login = owner
             .login
             .take()
-            .context("Open the browser before choosing I'm ready")?;
+            .context("Open the browser before choosing Confirm login")?;
         ensure!(
             login.scope.project == project,
             "Login belongs to another project"
@@ -546,7 +546,7 @@ impl Product {
         );
         if let Err(e) = result {
             owner.login = Some(login);
-            return Err(e).context("Your saved login could not open the test page in a separate browser session. Finish login or cookie consent, then choose I'm ready again. Some websites do not allow saved logins to be reused.");
+            return Err(e).context("Your saved login could not open the test page in a separate browser session. Finish login or cookie consent, then choose Confirm login again. Some websites do not allow saved logins to be reused.");
         }
         let material = material.context("Browser did not return confirmed state")?;
         owner.replace_session(store, &scope, material, login.ephemeral)?;

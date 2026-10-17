@@ -115,7 +115,7 @@ malicious same-user filesystem racer, nor Windows/macOS ownership qualification.
 # system Node/npm. Builds UI/headless binaries first, then runs serially.
 bash scripts/build-ui.sh
 REGRESSEE_PHASE2_EVIDENCE=/absolute/path/to/new-private-evidence \
-  cargo test --locked -p regressee-app --features ui-tests --test product_flow \
+  cargo test --locked -p regressee-app --features test-support --test product_flow \
   actual_signed_http_product_flow -- --ignored --nocapture --test-threads=1
 ```
 

@@ -33,8 +33,8 @@ def collect(root):
             assert digest(png) == data["png_sha256"], png
             assert data["real_gpui_blade_offscreen"] and not data["os_input_verified"]
             if name == "confirmation":
-                assert data["main_source_sha256"] == digest(REPO / "crates/app/src/main.rs")
-                assert data["task_source_sha256"] == digest(REPO / "crates/app/src/task_ux.rs")
+                assert data["main_source_sha256"] == digest(REPO / "crates/gui/src/main.rs")
+                assert data["task_source_sha256"] == digest(REPO / "crates/gui/src/task_ux.rs")
             pairs.append({"capture": png.stem, "png": digest(png), "metadata": digest(metadata)})
         assert len(pairs) == 34, (name, len(pairs))
         matrix = json.loads((directory / "whole-app-matrix.json").read_text())

@@ -21,6 +21,8 @@ pub mod images;
 #[cfg(test)]
 mod phase6_corrections_tests;
 mod portability;
+mod preferences;
+pub use preferences::AppPreferences;
 mod retention;
 mod review;
 pub use portability::require_space;

@@ -39,7 +39,7 @@ def verify(root, repo):
     for fixture in fixtures:
         assert fixture['synthetic_offline_website_only']
         assert fixture['sha256'] == sha(root / 'website-fixtures' / fixture['name'])
-    harness = repo / 'crates/app/src/ui_renderer_capture.rs'
+    harness = repo / 'crates/gui/src/ui_renderer_capture.rs'
     bindings = {
         key: (harness.parent / path).resolve()
         for key, path in re.findall(r'"(\w+_source_sha256)"[^"\n]*include_bytes!\("([^"]+)"\)', harness.read_text())

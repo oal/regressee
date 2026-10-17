@@ -45,6 +45,12 @@ cargo test --locked --workspace --all-features
 cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 ```
 
+The native target is now `cargo build --locked -p regressee-gui --features ui
+--bin regressee-desktop`. GUI-only tests use `-p regressee-gui --features ui-tests`;
+application/product tests remain in `regressee-app` with `test-support`.
+The independent CLI skeleton target is `cargo build --locked -p regressee-cli
+--bin regressee`; its normal/build dependency closure must remain free of GPUI.
+
 `test-support` exposes owned-loopback fixture helpers without pulling in GPUI.
 The `product_flow` integration target requires it; `ui-tests` and `--all-features`
 also enable it. Plain `cargo test --locked` still runs ordinary tests, but omits

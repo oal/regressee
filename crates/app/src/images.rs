@@ -127,15 +127,8 @@ fn encode(path: &Path, w: u32, h: u32, pixels: &[u8], purpose: &str) -> Result<(
     e.write_header()?.write_image_data(pixels)?;
     Ok(())
 }
-#[cfg(feature = "ui")]
-pub fn viewer_tile(store: &Store, id: &ArtifactId) -> Result<std::sync::Arc<gpui::RenderImage>> {
-    Ok(viewer_tile_with_size(store, id)?.0)
-}
-#[cfg(feature = "ui")]
-pub(crate) fn viewer_tile_with_size(
-    store: &Store,
-    id: &ArtifactId,
-) -> Result<(std::sync::Arc<gpui::RenderImage>, usize)> {
+/// Decode a bounded, verified tile derivative without native graphics types.
+pub fn decode_tile(store: &Store, id: &ArtifactId) -> Result<(u32, u32, Vec<u8>)> {
     let (artifact, bytes) = store.read_verified_artifact(id, 16 * 1024 * 1024)?;
     ensure!(
         artifact.kind == ArtifactKind::Tile,
@@ -149,20 +142,11 @@ pub(crate) fn viewer_tile_with_size(
     let mut pixels = Vec::with_capacity(rows.w as usize * rows.h as usize * 4);
     let cancel = AtomicBool::new(false);
     for _ in 0..rows.h {
-        let mut row = rows.row(&cancel)?;
-        for p in row.as_chunks_mut::<4>().0 {
-            p.swap(0, 2);
-        }
+        let row = rows.row(&cancel)?;
         pixels.extend_from_slice(&row);
     }
     rows.finish()?;
-    let size = pixels.len();
-    let buffer =
-        image::RgbaImage::from_raw(rows.w, rows.h, pixels).context("invalid viewer tile pixels")?;
-    Ok((
-        std::sync::Arc::new(gpui::RenderImage::new(vec![image::Frame::new(buffer)])),
-        size,
-    ))
+    Ok((rows.w, rows.h, pixels))
 }
 pub fn ingest(
     store: &mut Store,
@@ -249,7 +233,6 @@ pub fn compare(
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[cfg(feature = "ui")]
     #[test]
     fn viewer_tile_exact_bytes_kind_png_and_dimensions_remain_authoritative() -> Result<()> {
         let root = tempfile::tempdir()?;
@@ -259,11 +242,11 @@ mod tests {
         encode(&path, 8, 2, &[255; 8 * 2 * 4], "synthetic viewer tile")?;
         let bytes = fs::read(&path)?;
         let tile = store.put_artifact(bytes.as_slice(), ArtifactKind::Tile)?;
-        let (_, size) = viewer_tile_with_size(&store, &tile.id)?;
-        assert_eq!(size, 8 * 2 * 4);
+        let (_, _, pixels) = decode_tile(&store, &tile.id)?;
+        assert_eq!(pixels.len(), 8 * 2 * 4);
         let joined = [bytes.as_slice(), bytes.as_slice()].concat();
         let trailing = store.put_artifact(joined.as_slice(), ArtifactKind::Tile)?;
-        assert!(viewer_tile(&store, &trailing.id).is_err());
+        assert!(decode_tile(&store, &trailing.id).is_err());
         let large = root.path().join("large.png");
         encode(
             &large,
@@ -273,15 +256,15 @@ mod tests {
             "oversized viewer tile",
         )?;
         let large = store.put_artifact(fs::File::open(large)?, ArtifactKind::Tile)?;
-        assert!(viewer_tile(&store, &large.id).is_err());
+        assert!(decode_tile(&store, &large.id).is_err());
         let invalid = store.put_artifact(&b"not a PNG"[..], ArtifactKind::Tile)?;
-        assert!(viewer_tile(&store, &invalid.id).is_err());
+        assert!(decode_tile(&store, &invalid.id).is_err());
         let wrong = store.put_artifact(&b"not a tile"[..], ArtifactKind::Screenshot)?;
-        assert!(viewer_tile(&store, &wrong.id).is_err());
+        assert!(decode_tile(&store, &wrong.id).is_err());
         let mut damaged = bytes;
         damaged[20] ^= 1;
         fs::write(paths.artifacts().join(tile.id.as_str()), damaged)?;
-        assert!(viewer_tile(&store, &tile.id).is_err());
+        assert!(decode_tile(&store, &tile.id).is_err());
         Ok(())
     }
     #[test]

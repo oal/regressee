@@ -14,6 +14,32 @@ on:
 permissions:
   contents: read
 jobs:
+  cli-only:
+    name: CLI dependency boundary (no GUI setup)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      PKG_CONFIG: /bin/false
+      DISPLAY: ''
+      WAYLAND_DISPLAY: ''
+      DBUS_SESSION_BUS_ADDRESS: ''
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      # Deliberately do not use the native GUI SDK/library setup action.
+      - run: cargo build --locked -p regressee-cli --bin regressee
+      - run: cargo test --locked -p regressee-cli
+      - name: Assert the selected dependency closure excludes GPUI
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          graph = subprocess.check_output(['cargo', 'tree', '--locked', '-p', 'regressee-cli', '--edges', 'normal,build', '--prefix', 'none', '--format', '{p}'], text=True)
+          assert not any(line.startswith(('gpui ', 'regressee-gui ')) for line in graph.splitlines()), graph
+          print(graph)
+          PY
+      - run: target/debug/regressee --help
+      - run: target/debug/regressee --build-info
   contracts:
     # Hosted 4f84363 took up to 54m39s; keep cold-host headroom bounded.
     timeout-minutes: 90
@@ -50,5 +76,5 @@ jobs:
         timeout-minutes: 45
         shell: bash
         run: |
-          cargo build --locked --workspace --features ui --bins
+          cargo build --locked --workspace --features regressee-gui/ui,regressee-spike/ui --bins
           python scripts/ci-run.py cargo test --locked --workspace --all-features

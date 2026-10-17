@@ -18,6 +18,26 @@ HOST_PATHS = (b"/var/home/", b"/home/developer/", b"/path/to/private-tests/")
 
 
 class EnvironmentBoundaryTests(unittest.TestCase):
+    def test_application_services_and_cli_have_no_native_gui_dependencies(self):
+        for crate in ("app", "cli"):
+            manifest = tomllib.loads((ROOT / f"crates/{crate}/Cargo.toml").read_text())
+            self.assertNotIn("gpui", manifest.get("dependencies", {}))
+            for name, dependencies in manifest.get("features", {}).items():
+                self.assertFalse(name.startswith("ui"), (crate, name))
+                self.assertFalse(any("gpui" in value or "regressee-gui" in value
+                                     for value in dependencies), (crate, name))
+        application = (ROOT / "crates/app/src").rglob("*.rs")
+        for path in application:
+            self.assertNotIn("gpui::", path.read_text(), path)
+
+    def test_separate_public_executable_targets_and_native_feature_gates(self):
+        cli = tomllib.loads((ROOT / "crates/cli/Cargo.toml").read_text())
+        gui = tomllib.loads((ROOT / "crates/gui/Cargo.toml").read_text())
+        self.assertEqual(cli["bin"][0]["name"], "regressee")
+        self.assertEqual(gui["bin"][0]["name"], "regressee-desktop")
+        self.assertEqual(gui["bin"][0]["required-features"], ["ui"])
+        self.assertEqual(gui["features"]["default"], [])
+
     def test_active_first_party_code_has_no_harness_or_personal_paths(self):
         files = [*ROOT.joinpath("crates").rglob("*.rs"),
                  *ROOT.joinpath("scripts").glob("*.py"),
@@ -43,7 +63,7 @@ class EnvironmentBoundaryTests(unittest.TestCase):
                         self.assertNotIn(value, data)
 
     def test_normal_ui_feature_does_not_enable_developer_tools(self):
-        app = tomllib.loads((ROOT / "crates/app/Cargo.toml").read_text())["features"]
+        app = tomllib.loads((ROOT / "crates/gui/Cargo.toml").read_text())["features"]
         def enabled(name):
             found = {name}
             for dependency in app.get(name, []):

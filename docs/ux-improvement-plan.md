@@ -1,5 +1,10 @@
 # Regressee UX improvement plan — 2026-10-13
 
+> Source-layout migration (2026-10-17): native files and UI tests now live in
+> `crates/gui`, package `regressee-gui`, binary `regressee-desktop`. Historical
+> commands/results below retain their original identities. Use
+> [current build instructions](release-building.md) for new runs.
+
 ## Goal and approved direction
 
 Make the native desktop app easier to set up, inspect and customize. Replace the

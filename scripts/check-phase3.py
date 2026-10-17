@@ -28,7 +28,7 @@ commands = []
 if not args.runtime_only:
     commands += [('format', ['cargo', 'fmt', '--all', '--', '--check']), ('locked-ui-tests-clippy', ['bash', 'scripts/check-foundation.sh']), ('protocol', [str(root / '.runtime/installed/node/bin/node'), '--test', 'worker/product/test/protocol.test.mjs'])]
 test_name = 'actual_phase3_resource_corrections' if args.resource_corrections_only else 'actual_phase3_policy_corrections' if args.policy_corrections_only else 'actual_phase3_active_cancel_and_custom_viewport' if args.active_cancel_only else 'actual_phase3_crawl_capture_resume_and_scale'
-commands += [('actual-phase3', ['cargo', 'test', '--locked', '-p', 'regressee-app', '--features', 'ui-tests', '--test', 'product_flow', test_name, '--', '--ignored', '--nocapture', '--test-threads=1'])]
+commands += [('actual-phase3', ['cargo', 'test', '--locked', '-p', 'regressee-app', '--features', 'test-support', '--test', 'product_flow', test_name, '--', '--ignored', '--nocapture', '--test-threads=1'])]
 env['REGRESSEE_PHASE3_EVIDENCE'] = str(args.output.resolve() / 'product-flow')
 env['REGRESSEE_PHASE3_SCALE_PAGES'] = str(args.scale_pages)
 if args.retained_flow:

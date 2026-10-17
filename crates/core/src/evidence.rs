@@ -23,6 +23,25 @@ pub struct CaptureMetadata {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub replacement: Option<serde_json::Value>,
 }
+
+/// Website loading cautions describe the capture, not whether two PNGs can be
+/// compared. Unknown/replacement warnings are not silently admitted to a baseline.
+pub fn loading_warning(warning: &str) -> bool {
+    matches!(
+        warning,
+        "ImagesIncomplete"
+            | "FontsIncomplete"
+            | "ResourceFailed"
+            | "EmbeddedContentBlocked"
+            | "ReadinessBudget"
+    )
+}
+
+impl CaptureMetadata {
+    pub fn baseline_ready(&self) -> bool {
+        self.stable && self.warnings.iter().all(|w| loading_warning(w))
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Readiness {
@@ -131,6 +150,96 @@ pub struct ComparisonEvidence {
     pub heatmaps: Vec<(TargetKey, ImageEvidence)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub perceptual: Option<PerceptualEvidence>,
+}
+
+fn pixel_review_classification(
+    result: &AnalysisResult,
+    report: Option<&crate::analysis_engine::AnalysisReport>,
+    failed: bool,
+) -> Classification {
+    use crate::analysis_engine as engine;
+    if result.classification != Classification::NotComparable || failed {
+        return result.classification;
+    }
+    let Some(report) = report else {
+        return result.classification;
+    };
+    if report.eligible_pixels == 0
+        || !report.gates.is_empty()
+        || report
+            .warnings
+            .contains(&engine::Warning::RenderingEnvironmentMismatch)
+        || report.eligible_pixels != result.eligible_pixels
+        || report.changed_pixels != result.changed_pixels
+        || report.request.before.target.page != result.key.page.to_string()
+        || report.request.before.target.profile != result.key.profile.to_string()
+    {
+        return result.classification;
+    }
+    match report.classification {
+        engine::Classification::Changed => Classification::Changed,
+        engine::Classification::NoSignificantChange => Classification::NoSignificantChange,
+        engine::Classification::NotComparable => Classification::NotComparable,
+    }
+}
+
+impl ComparisonEvidence {
+    /// Use the actual saved pixel verdict, even when an earlier app version
+    /// vetoed its summary for capture cautions. This is read-only: original
+    /// summaries/reports, revision IDs, notes and decisions are never rewritten.
+    /// Storage verifies report/source bindings before supplying this evidence.
+    pub fn review_classification(&self, key: &TargetKey) -> Option<Classification> {
+        let result = self.revision.results.iter().find(|r| &r.key == key)?;
+        let perceptual = self.perceptual.as_ref();
+        let report =
+            perceptual.and_then(|p| p.reports.iter().find(|(k, _)| k == key).map(|(_, r)| r));
+        let failed = perceptual.is_some_and(|p| p.failures.iter().any(|(k, _)| k == key));
+        Some(pixel_review_classification(result, report, failed))
+    }
+
+    /// Index once for coverage, queue filters and progress, rather than scanning
+    /// every report again for each target in a large project.
+    pub fn review_classifications(&self) -> std::collections::BTreeMap<TargetKey, Classification> {
+        if !self
+            .revision
+            .results
+            .iter()
+            .any(|r| r.classification == Classification::NotComparable)
+        {
+            return self
+                .revision
+                .results
+                .iter()
+                .map(|r| (r.key.clone(), r.classification))
+                .collect();
+        }
+        let reports: std::collections::BTreeMap<_, _> = self
+            .perceptual
+            .iter()
+            .flat_map(|p| p.reports.iter())
+            .map(|(key, report)| (key, report))
+            .collect();
+        let failed: std::collections::BTreeSet<_> = self
+            .perceptual
+            .iter()
+            .flat_map(|p| p.failures.iter())
+            .map(|(key, _)| key)
+            .collect();
+        self.revision
+            .results
+            .iter()
+            .map(|result| {
+                (
+                    result.key.clone(),
+                    pixel_review_classification(
+                        result,
+                        reports.get(&result.key).copied(),
+                        failed.contains(&result.key),
+                    ),
+                )
+            })
+            .collect()
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

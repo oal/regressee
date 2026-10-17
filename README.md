@@ -25,11 +25,11 @@ See [platform availability](#platform-availability) before getting started.
 ## Getting started
 
 1. Choose **Create project**, enter a name and your website address, then select
-   **Save website & continue**.
+   **Save project & continue**.
 2. Choose whether the site needs a login. If it does, save the settings, open the
-   login browser, finish signing in, and select **I'm ready**.
+   login browser, finish signing in, and select **Confirm login**.
 3. Choose which pages and screen sizes to capture. Save the settings, then use
-   **Find pages & preview** to review the included pages.
+   **Find pages** to review the included pages.
 4. Capture the reviewed pages, inspect screenshots and warnings, and explicitly
    **Save baseline**. A baseline is your approved set of reference screenshots.
 5. Open **Review changes** and choose **Run check**. The check revisits the fixed
@@ -48,7 +48,7 @@ For a walkthrough and troubleshooting, see the [first-run guide](docs/first-run-
 Linux and Windows x86_64 preview builds are published to
 [GitHub Releases](https://github.com/oal/regressee/releases) when the
 **Downloadable Linux and Windows previews** workflow is run or a `v*` tag is pushed.
-On Windows, download **`regressee-windows-x86_64.exe`** and run it; no developer
+On Windows, download **`regressee-desktop-windows-x86_64.exe`** and run it; no developer
 tools are required. The Windows ZIP includes help and license notices. Linux
 downloads are `.tar.gz` archives for Ubuntu 24.04-compatible systems, not AppImages.
 
@@ -63,13 +63,19 @@ Regressee is built with Rust and GPUI. Install Rust through rustup and your
 platform's native build dependencies, then run from the repository root:
 
 ```sh
-cargo run --locked --features ui --bin regressee
+cargo run --locked -p regressee-gui --features ui --bin regressee-desktop
 ```
 
 The repository pins its Rust toolchain in `rust-toolchain.toml`. Linux also needs
 GPUI's native development libraries and a working graphics backend; Cargo does
 not install those prerequisites. See the [build instructions](docs/release-building.md)
 for platform-specific details.
+
+The native GUI now lives in `crates/gui`; GUI-independent services remain in
+`crates/app`. `cargo build --locked -p regressee-cli --bin regressee` builds only
+the new CLI skeleton, without GPUI. It supports help/version/build metadata only;
+product commands and the shared engine are not available yet. Existing data and
+desktop workflows are unchanged. See [implementation status](docs/agent-cli-status.md).
 
 Unknown-duration progress bars animate independently of page-count updates.
 Task screens separate activity, icon-labelled screenshot outcomes and baseline

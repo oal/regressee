@@ -9,6 +9,11 @@ the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
 
+- Source builds now use `regressee-desktop` for the existing native application.
+  The separate `regressee` CLI is a help/version/metadata skeleton only; product
+  commands and shared-engine operation are still being implemented. Desktop
+  preview archives are named `regressee-desktop-<platform>`.
+
 - Optional sections now use leading disclosure arrows and explicit **Show / Hide**
   labels throughout settings, setup, analysis, History and confirmation previews.
   Revealed content is indented directly under its heading, without a divider that

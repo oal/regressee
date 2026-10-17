@@ -61,7 +61,7 @@ def main():
         ['cargo','fmt','--all'],
         ['bash','scripts/check-foundation.sh'],
         [str(ROOT/'.runtime/installed/node/bin/node'),'--test','worker/product/test/protocol.test.mjs'],
-        ['cargo','test','--locked','-p','regressee-app','--features','ui-tests','--test','product_flow','actual_signed_http_product_flow','--','--ignored','--nocapture','--test-threads=1'],
+        ['cargo','test','--locked','-p','regressee-app','--features','test-support','--test','product_flow','actual_signed_http_product_flow','--','--ignored','--nocapture','--test-threads=1'],
         ['cargo','run','--locked','--bin','regressee-foundation','--',str(evidence/'foundation-reopen')],
     ]
     if args.checks_only:commands=commands[:3]

@@ -2,36 +2,64 @@
 name: Regressee — Clear wayfinding
 description: User-approved direction, source-derived native Rust/GPUI system; native and release qualification pending
 colors:
-  ground: "#f5f9fa"
+  ground: "#f4f4f4"
   surface: "#ffffff"
-  rail: "#082b50"
-  rail-ink: "#ffffff"
-  rail-muted: "#d1e4f2"
-  rail-hover: "#123d65"
-  ink: "#1b3044"
-  muted: "#506579"
-  line: "#cddcdf"
-  control-line: "#7b919f"
-  action-surface: "#f4f8fa"
-  action-hover: "#e2f5f0"
+  rail: "#eaeaea"
+  rail-ink: "#242424"
+  rail-muted: "#595959"
+  rail-hover: "#dedede"
+  nav-selected-ink: "#00685f"
+  ink: "#242424"
+  muted: "#595959"
+  line: "#d6d6d6"
+  control-line: "#858585"
+  action-surface: "#f8f8f8"
+  action-hover: "#e8e8e8"
   accent: "#007970"
   accent-hover: "#00685f"
+  on-accent: "#ffffff"
   selected: "#e2f5f0"
   error: "#9c3038"
   error-surface: "#fff2f2"
   warning: "#775311"
   warning-surface: "#fff7df"
+  shadow: "#181818"
+  dark-ground: "#1b1b1b"
+  dark-surface: "#232323"
+  dark-rail: "#202020"
+  dark-rail-ink: "#ededed"
+  dark-rail-muted: "#b8b8b8"
+  dark-rail-hover: "#303030"
+  dark-nav-selected-ink: "#bceee4"
+  dark-ink: "#ededed"
+  dark-muted: "#b8b8b8"
+  dark-line: "#3d3d3d"
+  dark-control-line: "#808080"
+  dark-action-surface: "#2b2b2b"
+  dark-action-hover: "#333333"
+  dark-accent: "#65d9bf"
+  dark-accent-hover: "#85e7d1"
+  dark-on-accent: "#072c29"
+  dark-selected: "#203e38"
+  dark-error: "#ffacb2"
+  dark-error-surface: "#40282f"
+  dark-warning: "#f1ca7d"
+  dark-warning-surface: "#382d1b"
+  dark-shadow: "#080808"
 typography:
   headline:
     fontFamily: "Segoe UI, .AppleSystemUIFont, DejaVu Sans"
     fontSize: "28px"
     fontWeight: 600
+    lineHeight: "36px"
   review-heading:
     fontSize: "24px"
     fontWeight: 600
+    lineHeight: "32px"
   title:
     fontSize: "21px"
     fontWeight: 600
+    lineHeight: "28px"
   brand-wordmark:
     fontSize: "20px"
     fontWeight: 600
@@ -43,6 +71,7 @@ typography:
   body:
     fontSize: "15px"
     fontWeight: 400
+    lineHeight: "22px"
   action:
     fontSize: "14px"
     fontWeight: 500
@@ -63,13 +92,13 @@ spacing:
 components:
   button-primary:
     backgroundColor: "{colors.accent}"
-    textColor: "{colors.surface}"
+    textColor: "{colors.on-accent}"
     typography: "{typography.action}"
     rounded: "{rounded.control}"
     padding: "8px 12px"
   button-primary-hover:
     backgroundColor: "{colors.accent-hover}"
-    textColor: "{colors.surface}"
+    textColor: "{colors.on-accent}"
   button-secondary:
     backgroundColor: "{colors.action-surface}"
     textColor: "{colors.ink}"
@@ -90,7 +119,7 @@ components:
     padding: "8px 12px"
   navigation-selected:
     backgroundColor: "{colors.selected}"
-    textColor: "{colors.rail}"
+    textColor: "{colors.nav-selected-ink}"
     rounded: "{rounded.control}"
   field:
     backgroundColor: "{colors.surface}"
@@ -105,6 +134,22 @@ components:
     typography: "{typography.action}"
     rounded: "{rounded.control}"
     padding: "{spacing.row}"
+  toolbar-icon:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    typography: "{typography.action}"
+    rounded: "{rounded.control}"
+    padding: "0px 8px"
+    height: "40px"
+    width: "40px"
+  toolbar-icon-selected:
+    backgroundColor: "{colors.selected}"
+    textColor: "{colors.accent-hover}"
+    typography: "{typography.action}"
+    rounded: "{rounded.control}"
+    padding: "0px 8px"
+    height: "40px"
+    width: "40px"
 ---
 
 # Design System: Regressee — Clear wayfinding
@@ -113,25 +158,52 @@ components:
 
 **Creative North Star: "Clear wayfinding"**
 
-Make the next safe action obvious. Navy project navigation anchors a bright,
-precisely aligned working surface for non-developers reviewing website releases.
+Make the next safe action obvious. Unified neutral navigation and working
+surfaces form one precisely aligned environment for non-developers reviewing
+website releases, with teal/mint reserved for action and selection.
 The signature is self-labelling task state with baseline consequences attached,
 not a developer dashboard, decorative charts or a mobile-app shell.
 
 The user approved this direction and the full workflow brief on 2026-10-11.
 This document records the built source system, not approval of its usability,
 native accessibility or public release. The chosen HTML sketch remains an
-illustrative composition reference, not authority for the approved 2026-10-14
-palette; production GPUI source supplies the normative tokens above. The
-extensions-only sidecar carries native behavior and geometry, not a browser
-implementation.
+illustrative composition reference, not authority for the subsequent palette
+refinements or appearance extension; production GPUI source supplies the
+normative tokens above. The extensions-only sidecar carries native behavior and
+geometry, not a browser implementation.
 
-**Logo and palette adaptation — 2026-10-14.** The user approved navy navigation,
+**Historical logo and palette adaptation — 2026-10-14.** The user approved navy navigation,
 readable teal actions, pale mint selection and white workspaces, with supplied
 background-appropriate icons alongside the readable Regressee name. This narrow
 extension preserves structure, workflows, system UI fonts, error/warning roles,
-focus and immediate state changes; screenshot originals remain untinted. It does
-not introduce a full dark workspace theme.
+focus and immediate state changes; screenshot originals remain untinted. At that
+date the approval did not introduce a full dark workspace theme.
+
+**Historical desktop appearance extension — 2026-10-16.** The user approved app-wide
+System / Light / Dark, extending Clear wayfinding (seed `6e22d8c4`) rather than
+redesigning it. This superseded the historical white-only scope above. At that
+date, light retained its palette and dark added layered blue-charcoal surfaces,
+soft light ink, mint actions/selection and distinct semantic states. The palette
+is superseded below; the System / Light / Dark behavior remains current.
+Installed system type, geometry, focus, depth recipes and immediate guarded
+behavior are inherited.
+App appearance never changes website capture-theme options or screenshot pixels;
+no dependency, animation, shipping raster or unrelated visual change is added.
+
+**Unified neutral themes — 2026-10-17.** The user rejected the actual native
+app's slate workspace against its blue sidebar and the gradient header, and
+selected Unified neutrals. Dark uses charcoal layers and matching neutral ink;
+light uses off-white/soft-gray equivalents. Navigation and workspace differ by
+lightness, not competing hue families. Teal/mint action and selection, semantic
+warning/error roles and restrained directional depth remain; header and
+inspector/disclosure chrome is solid `surface`, never a gradient. Both rail and
+About select the existing background-appropriate logo. This local Operate-mode
+refinement inherits Clear wayfinding's seed `6e22d8c4`, type, geometry, behavior,
+drafts and consent, with no new identity, dependency, motion or shipping raster.
+It supersedes earlier navy-rail, blue-charcoal and gradient-chrome guidance,
+not its dated verification records or unchanged appearance-preference behavior.
+Both palettes and foreground/shadow aliases are normative in the frontmatter;
+the native sidecar maps each semantic role to its light or `dark-` sibling.
 
 **Key Characteristics:**
 - Persistent project context and a clear next safe action.
@@ -141,8 +213,10 @@ not introduce a full dark workspace theme.
 Authority: `PRODUCT.md`, `docs/workflow-revamp.md`,
 `.impeccable/surfaces/crates-app-src-main-rs.md` and the selected
 `.impeccable/mocks/decision/pick-6e22d8c4.html`. Implementation sources:
-`crates/app/src/ui/{brand,theme,controls,text_input,timezone_select}.rs`,
-`crates/app/src/{main,workflow,form_recovery,workspace_history}.rs` and
+`crates/gui/src/ui/{brand,theme,controls,toolbar,text_input,timezone_select,zoom_select}.rs`,
+`crates/gui/src/{main,appearance_ux,action_icons,evidence_workspace,review_ux,workflow,form_recovery,workspace_history}.rs`,
+`crates/app/src/appearance.rs`,
+`crates/core/src/appearance.rs`, `crates/storage/src/preferences.rs` and
 `crates/core/src/shell.rs`. Asset authority: `assets/README.md` and
 `assets/brand/provenance.json`. Earlier direction remains in `docs/phase0-design.md`.
 
@@ -200,26 +274,91 @@ and reachability with multiline saved-results context at both window sizes.
 Capture verification and that whole-navigation guard remain deferred, not a
 full visual PASS or native approval.
 
+**Appearance finish status — 2026-10-16.** Following the initial **FIX**,
+independent `finish-verdict.md` scores **both findings resolved**, disposition
+**SHIP for those two fixes only**: About identity and design persistence, not
+the whole surface. The complete second native GPUI/Blade capture passed
+`capture-verdict.log`; all 48 frames remain at their original `confirmation/`
+paths, with the actual background-appropriate logos visible in all six About
+captures. Frame hashes/dimensions/opacity and all 180 source hashes were verified;
+current `source-receipt.json` binds this final capture. The only source change
+since the first complete round is the test capture's image-readiness wait/assert,
+not shipping Rust UI or a presumed production-logo repair. First-round images,
+sheets and receipt remain in `review-round-1/`, `boards-round-1/` and
+`source-receipt-round-1.json`. Renewed `untinted-evidence.json` confirms identical
+original-image strips at all three sizes, not every original pixel.
+Current reported tests: core
+56 passed; storage 40 passed/2 ignored; app library 140 passed/2 ignored; shell
+223 passed/**5 failed**/59 ignored. The broader filtering, loading bounds,
+project-action bounds, minimum queue bounds and disclosure-enablement failures
+have no A/B attribution; no whole-suite pass or pre-existing-failure claim is
+made. Production build succeeds. No OS-input/live-desktop-toggle, accessibility,
+cross-platform, usability or release acceptance is established. Detailed evidence:
+`docs/research/dark-mode-20261016.md`.
+
+**Unified-neutral finish record — 2026-10-17; scoped SHIP.** The earlier finish
+scores qualify only their recorded work, not this user-rejected palette or the
+new refinement. `build-final.log` records a successful production build;
+`tests-confirmation.log` records app library **145 passed / 0 failed / 2 ignored**
+and shell **226 passed / 5 failed / 61 ignored**. Neutral-shell, solid-chrome,
+both-palette contrast, appearance live/override/focus and settings keyboard checks
+pass. The five broader failures match the prior categories but lack A/B attribution;
+they are not labelled pre-existing, and the whole suite is not a pass. Intermediate
+compile/startup-timing failures were corrected only in tests, not shipping chrome
+or preference behavior.
+
+The final `capture-final.log` passed: **48 current-source GPUI/Blade frames** in
+`confirmation/`, eight states in both themes at 1440×900, 1280×800 and 820×600,
+using copied synthetic website fixtures with provenance. The first `inspection/`
+round is superseded because shared Rust sources changed during verification.
+`validate_frames.py` passed PNG integrity and all 13 embedded critical-source
+hashes per frame; `source-receipt.json` binds current Rust sources. Header samples
+at Y5/Y45 match in each size/theme, and original-image 100px strips match between
+light/dark at all three sizes: sampled proof, not every pixel.
+
+Fresh `finish-review.md` disposition is **SHIP for the neutral palette/chrome
+refinement only**. The reviewer inspected all 48 final captures and all six current
+boards, confirmed actual background-appropriate logos, and found no material
+palette findings. No source-theme/header/layout change followed this capture.
+This does not clear the five shell failures or establish whole-app, actual OS
+input/accessibility/live OS-switch, Windows/macOS, usability or release approval.
+Current evidence root, exact failures and qualification limits:
+`docs/research/theme-coherence-20261017.md`.
+
 ## Colors
 
 ### Primary
-Navy `rail` is the navigation anchor; readable teal `accent` marks the next task
-action. `accent-hover` deepens action hover/press. Pale mint `selected` identifies the current
+Teal `accent` marks the next task action; the rail itself is neutral.
+`accent-hover` changes action hover/press without changing geometry. `selected`
+is pale mint in light and restrained dark mint in dark; it identifies the current
 navigation, choice or page, never successful evidence by itself. Rail text uses
 `rail-ink` and `rail-muted`; unselected navigation hover uses `rail-hover`.
-The artwork's luminous turquoise is not a white-text action fill; source uses
-the darker teal accent for readability.
+Always use `on-accent` for filled-action text/icons and checkbox ticks, and
+`nav-selected-ink` for selected navigation—not `surface` or `rail` aliases.
+Light actions use darker readable teal than the luminous artwork; dark actions
+use bright mint with deep teal foreground.
 
 ### Neutral
-`ground`, `surface` and `action-surface` separate the workspace, editable fields
-and secondary actions. `ink` carries readable content; `muted` carries supporting
-copy. `line` is a separator, not an interactive boundary. `control-line` outlines
-controls; production darkens it from the sketch to meet the source contrast
-test's (3:1) threshold against field and secondary-action surfaces. This is not
-native accessibility certification. Keep semantic aliases even when values match.
+`ground`, `surface`, `rail` and `action-surface` separate workspace, editable
+fields, navigation and secondary actions by lightness within one achromatic
+family. Shell surfaces, hover, ink, lines and shadow bases have equal RGB
+channels in each theme. `rail-ink` equals `ink`, and `rail-muted` equals `muted`;
+retain the semantic aliases. `action-hover` and `rail-hover` are neutral, not
+selection tints. `line` is a separator, not an interactive boundary;
+`control-line` outlines controls. Source contrast requirements remain (3:1)
+against field and secondary-action surfaces, not native certification.
+
+Unprefixed frontmatter colors are the exact `ui/theme.rs::LIGHT` palette;
+`dark-` siblings are the exact `DARK` palette. Component references name the
+light roles; `.impeccable/design.json` `extensions.nativeAppearance.roleMapping`
+records native palette resolution for both themes. `shadow` is independent of
+content `ink`. Confirmed source tests pass body/semantic text (4.5:1) and
+control/focus-boundary (3:1) requirements in both palettes. These checks are not
+visual approval, do not establish native accessibility and do not override the
+user's feedback.
 
 Error and warning ink/surface pairs always accompany explanatory words.
-Informational feedback stays neutral white, distinct from selected navigation;
+Informational feedback uses neutral `surface`, distinct from selected navigation;
 information status labels may use the mint tint.
 
 **The Evidence Rule.** A change classification is never rendered as a confirmed defect, and missing screenshots are never rendered as an unchanged result.
@@ -240,6 +379,16 @@ The navigation wordmark uses the dedicated `brand-wordmark` role; `section`
 remains unchanged for form groups. About retains the existing `title` role.
 Both lockups use semibold system type; branding adds no font family.
 
+**Explicit leading — 2026-10-17.** Pair font size and line height at every local
+size override; do not inherit GPUI's 1.618 default or an ancestor's absolute
+heading/control leading. The body root is 15/22, help and wrapped rail status
+13/18, compact labels 14/20, titles 21/28, review headings 24/32 (21/28 when
+compact), and task headings 28/36. Field labels own their body metrics and hints
+own regular help metrics. Preserve intentional compact inspection treatments,
+40px action targets and the multiline editor's 14/20 shaping/caret geometry.
+Font families, palette, copy and operations are unchanged. Scoped evidence and
+qualification limits: `docs/research/typography-leading-20261017.md`.
+
 **The Stable State Rule.** Focus, hover, press and selection change paint, never text metrics or control geometry.
 
 Screenshot switches keep the selected path/profile heading and inspection toolbar
@@ -251,10 +400,43 @@ This is a resizable native desktop application. Default window (1280×800 logica
 px), minimum (820×600); fixed project rail (192px), working horizontal inset
 (24px). Setup forms cap at (680px), with an explicit pinned save footer.
 The pinned shared header names **Selected project** and offers **Change project**.
+It has no permanent workspace-type badge: all projects are local. Only actual
+unsaved project settings add a status. Its flexible project-context text has a
+minimum width (180px), avoiding an extra
+narrow-header row with icon-labelled actions while retaining project identity.
 Results and History offer an in-place chooser when no project is selected.
 Changing projects preserves the destination and confirms draft discard; reopening
 the same project must not reload away its draft. Projects separates **View results**
 from **Edit settings** and identifies the selected project with words and paint.
+The row's **Selected** status follows the project name with an 8px gap, separate
+from its trailing action group. Native text measurement keeps short names at their
+natural width; long names ellipsize without shrinking the status. The existing
+mint row selection, URL and actions are unchanged.
+
+**Copy restraint — 2026-10-16:** fixed product facts and restatements of visible
+controls are clutter, not status. App settings omits its section-summary subtitle,
+the healthy browser's repeated readiness explanation and the idle network-loaded/
+save instruction. Storage keeps the History destination, not a local-only claim.
+Baseline selection omits the persistent confirmation disclaimer. Restricted-browser
+warnings, failure/loading states, selected counts, eligibility explanations and
+protected confirmation remain. The focused header regression and eight synthetic
+GPUI/Blade frames passed at 1280×800 and 820×600 (App settings, saved/unsaved Project
+settings and comparison review); headers fit one row. Evidence:
+`/var/home/olav/Data/opencode/tmp/opencode/regressee-quiet-copy-p080b4vh/inspection/`.
+Offscreen layout only, not native input, accessibility or release qualification.
+No new token, asset, backend operation or consent rule.
+Production UI build and 14 focused shell tests passed (one opt-in capture ignored).
+The browser-check test now paints the resized/current state before traversing focus,
+rather than using stale layout bounds for successive Tab actions. The broader shell
+run timed out at 120 seconds with a page-search disclosure failure still unresolved;
+no whole-suite pass is claimed.
+
+**Project-status placement — 2026-10-16:** scoped UI build and four sidebar/project
+tests passed. Six synthetic GPUI/Blade confirmation frames cover short/long names
+and a second unselected project at 1440×900, 1280×800 and 820×600, under
+`/var/home/olav/Data/opencode/tmp/opencode/regressee-project-status-crocnp3u/confirmation/`.
+This is offscreen layout verification, not native-input or release qualification;
+no palette, asset or backend change.
 
 Comparison review remains side by side, including small desktop windows: queue width (200px)
 below viewport width (1100px), otherwise (272px), separated from the flexible
@@ -262,18 +444,24 @@ viewer by (12px). Do not describe a stacking layout that is not implemented.
 The logo/name lockup is always the first item in the project rail, at the same
 top position across sections. Its navigation-only title wrapper has padding
 above and below (12px each) inside the existing rail; the mark and name are
-centered on separate rows. Whole-navigation fit verification for this larger
-stack is deferred as recorded above. The review header owns **Hide sidebar / Show
-sidebar** in one consistent location, with a hint explaining the extra screenshot
-space. This control is absent from project choosers, where navigation stays
-visible. Review also owns local **Hide results / Show results** controls.
+centered on separate rows. The earlier deferred stack verification remains
+recorded above; unified-neutral capture and scoped review are complete, not
+whole-navigation qualification. The review
+header owns one icon-only sidebar
+control in a consistent location, named **Hide sidebar / Show sidebar** on hover
+and keyboard focus. This control is absent from project choosers, where navigation
+stays visible. Review also owns an icon-only **Hide results / Show results** toggle.
 At narrow sizes the project navigation starts collapsed;
 an explicit workspace preference survives resize. Selected project context remains
 visible. Working geometry uses the actual mounted rail width, not a permanent
 192px reservation. Ctrl/Cmd+F restores a hidden queue before focusing its search.
-Compare remains the default at both sizes. **Before/After (full width)** is an
-explicit, untinted one-original alternative with a named current side and shared
-source pan/zoom; switching sides preserves manual scale and target. A separate
+Compare remains the default at both sizes. **Single image (full width)** is an
+explicit, untinted one-original alternative. Its toolbar pairs **Single image**
+(**Single** below 720px working width) with persistent labelled **Before** and
+**After** choices; the selected choice has a mint surface and teal boundary.
+Both destinations remain visible, rather than hiding side switching behind a
+swap icon. Choosing the current side is a no-op; shared source pan/zoom, manual
+scale, target and drafts survive either choice. A separate
 View chooser exposes Compare, Difference, Overlay, Heatmap, this alternative and
 the optional **Split slider**. Split slider clips untinted Before-left and
 After-right originals in one full-width stage with shared source pan/zoom; dragging
@@ -294,6 +482,14 @@ pending targets, not changed/unchanged or analysis awaiting a nonexistent check.
 Keep the save requirement and gap-recovery instructions visible above the queue;
 screenshots are never automatically activated as a baseline.
 
+Ordinary review keeps the three classifications together, with Review note nearby
+and Next unreviewed trailing. Below actual working width (720px), classifications
+and note/next form two complete action rows separated by (8px), rather than losing
+labels or shrinking targets. At the minimum window with navigation expanded this
+deliberately costs (48px) of evidence height; do not claim unchanged evidence height
+for that state. The user's navigation preference remains authoritative. This
+threshold uses available workspace width after the mounted rail, not window width.
+
 Discovery and captured-target lists use virtualized, full-width rows (64px) with
 aligned horizontal insets (16px). Address and details truncate independently;
 selection and hover preserve row height. Lists fill their bounded viewport, not
@@ -303,18 +499,18 @@ desktop websites—not app devices or a mobile product layout.
 Discovery selection opens **Page options** immediately, with the complete wrapped
 address, capture status and explicit Include/Exclude action. **Previous page** and
 **Next page** inspect these details and reveal the selected row in the list; they
-never change inclusion themselves. A row's hover hint explains this action instead
-of repeating its URL. Discovery-blocked pages retain their reason and explain the
+never change inclusion themselves. Rows use selection and pointer feedback, not
+hover help. Discovery-blocked pages retain their reason and explain the
 settings/rediscovery route, without enabling an unsafe inclusion override.
 Inspection result rows are now 84px, with path/query/fragment first and separate
 profile and status lines. Result rows have no redundant address tooltip obscuring
 the screenshots; the full URL remains in the selected screenshot's
-keyboard-accessible Details. Remaining page-list hints fit their content, capped
-at 480px and the window width rather than reserving a fixed width. Discovery and
+keyboard-accessible Details. Discovery and recorded-page lists expose complete
+addresses in Page options / Page details, with no hover overlays. Discovery and
 History keep their previous row geometry. Authoritative empty captures reserve
 no blank queue.
 Automatic capture-only overview fit is capped at 100%; manual enlargement remains
-available. Compact Zoom explicitly distinguishes Fit from Manual.
+available. Compact Zoom keeps **Fit** or the fixed percentage visible.
 
 **Destructive-action consent — 2026-10-14.** Page options offers **Discard
 discovered pages…**, not the ambiguous Dismiss page list. Its warning names the
@@ -342,8 +538,8 @@ accessibility qualification; see `docs/research/page-list-recovery-20261014.md`.
 ### Shared dialogs — 2026-10-15
 
 All in-app confirmations, information dialogs, selective baseline approvals and
-task dialogs share `ui::dialog`'s white surface, control boundary, 4px corners,
-16px window clearance and ink-colored scrim. Content uses 24px insets, 16px
+task dialogs share `ui::dialog`'s palette `surface`, control boundary, 4px corners,
+16px window clearance and a `shadow`-colored scrim (alpha 102/255). Content uses 24px insets, 16px
 section gaps, a 21px/28px semibold heading and 15px/22px body copy. Actions use
 the existing 40px-minimum shared controls, with a ruled, pinned footer. Task
 workspaces retain their larger page headings; their modal variants use dialog
@@ -370,16 +566,52 @@ assets or shipping rasters were introduced.
 
 ## Elevation & Depth
 
-Flat tonal layering and precise boundaries, not decorative shadows. GPUI's
-zero-blur spread paint provides a functional focus outline, not elevation.
-Information and approval dialogs dim the workspace; approval occludes background
-interaction. Folder/discard prompts use platform prompts where supported.
+**App-wide depth refinement — 2026-10-16.** The user requested subtle shadows
+and depth, referenced Xcode, and selected app-wide consistency. This supersedes
+the former flat-only treatment, not Clear wayfinding's layout or workflow.
+The 2026-10-17 unified-neutral refinement supersedes its cool ground and
+gradient chrome, not the historical review or directional shadow geometry.
+Neutral `ground` separates opaque working surfaces from the workspace in both
+themes. Shared native recipes in `ui/depth.rs` establish restrained hierarchy:
+
+| Role | Shadow: x / y / blur / spread / shadow alpha | Use |
+| --- | --- | --- |
+| Control | 0 / 1 / 2 / 0 / 24 | Enabled labelled actions and Zoom; selected navigation |
+| Surface | 0 / 2 / 6 / 0 / 20; 0 / 1 / 2 / 0 / 12 | Screenshot stages and continuous page/result lists |
+| Floating | 0 / 8 / 24 / 0 / 38; 0 / 2 / 6 / 0 / 24 | Menus, hints, inspectors and option panels |
+| Dialog | 0 / 18 / 48 / 0 / 56; 0 / 4 / 12 / 0 / 36 | Shared information, task and protected confirmation surfaces |
+| Header / Footer | 0 / ±2 / 6 / 0 / 16 | Persistent shell header and pinned setup/baseline footer |
+| Rail | 2 / 0 / 6 / 0 / 28 | Navigation-to-workspace boundary |
+
+Distances are logical pixels; alpha is out of 255 and all shadows use `shadow`
+(historically equal to light `ink`, now a separate neutral theme role). The header
+and disclosure/inspector titlebars use solid theme `surface`, not a vertical
+gradient, glass or blurred content. Layer lightness, thin rules and the existing
+edge shadows supply hierarchy. The earlier highlight treatment is historical
+only. Keep editable fields on `surface` and grounded. Individual list rows, form choices and transparent
+toolbar tools do not cast shadows. Disabled actions lose their lift. Geometry,
+40px targets, type, semantic colors, selection and mounted-control rules remain.
+
+GPUI's zero-blur spread paint remains a functional focus outline, not elevation;
+it replaces ordinary control elevation and hover never overwrites the ring.
+The transparent screenshot viewer is an exception: reserve a stable 1px border
+and change only its colour to ink on focus. Never put a filled focus shadow behind
+its captions, pane gaps or original screenshot pixels. Pointer and keyboard use
+the same boundary without changing text colours or layout. Elevate only each
+opaque screenshot frame; do not tint, round, blur or resample the source pixels.
+Shared dialogs retain their scrim, occlusion, focus lifecycle and explicit consent.
+File pickers remain platform-owned. No decorative assets or new motion are added.
+Scoped evidence and qualification limits belong to
+`docs/research/subtle-depth-20261016.md` for the historical depth pass, and
+`docs/research/theme-coherence-20261017.md` for the scoped SHIP neutral/solid-chrome
+refinement.
+
 No invented motion scale: state changes are immediate. Unknown-duration activity
 uses a seamless 1.2-second linear pattern for long tasks and a rotating native
 arc for compact reads, driven by native animation frames only while visible,
 independently of worker updates. This communicates activity, not completion.
 `REGRESSEE_REDUCED_MOTION=1` keeps both indicators static; automatic OS
-motion-preference integration, theme and high-contrast behavior remain
+motion-preference integration and high-contrast behavior remain
 qualification work.
 
 ## Shapes
@@ -413,16 +645,20 @@ while saving, browser visits, baseline changes, exports and deletion stay explic
 
 ### Product identity — background-appropriate icon and readable name
 
-The noninteractive lockup pairs `assets/brand/logo-dark.png` with **Regressee**
-on the navy rail, and `assets/brand/logo-light.png` with **About Regressee** on
-white. The mark supplements, never replaces, the name. Navigation uses
+The noninteractive navigation and **About Regressee** lockups both select the
+active theme's existing asset through `Background::workspace()`:
+`assets/brand/logo-light.png` on the light soft-gray rail or light `surface`,
+and `assets/brand/logo-dark.png` on the dark charcoal rail or dark `surface`.
+This changes background selection, not the artwork or lockup geometry. The mark
+supplements, never replaces, the name. Navigation uses
 `navigation_lockup()`: a larger proportional mark (96px wide, approximately
 58.8px high) with matching height reservation, centered above the name with the
 related gap (8px) and `brand-wordmark` system type in `rail-ink`. About keeps the
 horizontal `lockup()`, logo width (36px), proportional painted height
 (approximately 22px), height reservation (24px), related gap (8px) and existing
-`title` system type in `ink`. Navigation retains the existing rail width and
-About the existing dialog structure. Exclusive task workspaces (finding pages,
+`title` system type in `ink` (light) or `rail-ink` (dark, equal to dark `ink`).
+Navigation retains the existing rail width and About the existing dialog
+structure. Exclusive task workspaces (finding pages,
 capturing screenshots, checking for changes and browser setup) use the same
 `navigation_lockup()` in their 192px rail, not a separate text-only heading.
 Derived PNGs are transparent RGBA
@@ -431,6 +667,28 @@ recoloring or artwork changes.
 Compile-time embedded bytes and cached `Arc<Image>` identities let GPUI decode
 and cache off-thread; no filesystem/network lookup or image decoding occurs in
 the render callback.
+
+### Desktop appearance — immediate, machine-local preference
+
+Browser status remains first in App settings; one labelled **Appearance** group
+immediately follows, with shared native radio choices **System / Light / Dark**
+in painted keyboard order. The choices retain the existing settings scroller,
+complete-control keyboard reveal, focus/selection distinction and modal guards.
+System is the absent-file default and follows GPUI window-appearance notifications
+live, including vibrant variants. Light/Dark ignore desktop changes until System
+is chosen again. Palette changes refresh all windows/cached child entities and
+prompts, not only the shell; state changes are immediate, with no theme animation.
+
+The independent serial `appearance.rs` worker owns machine-local
+`app-preferences.json` in the app-data directory, separate from project artifacts,
+capture profiles and baseline ZIPs. It coalesces rapid choices without stale
+completions replacing newer intent; protected temporary-file write, sync and
+atomic replacement persist the choice. Startup loads before showing the window;
+shutdown flushes after UI exit. File I/O never occurs in a UI callback or waits
+behind capture work. Missing settings default to System; unreadable settings
+explain the System fallback. A failed write keeps the session choice and reports
+that it was not saved, with retry guidance. Choosing appearance queues no project,
+capture, review or baseline operation. See `docs/research/dark-mode-20261016.md`.
 
 ### Guided setup — native connected progression
 
@@ -492,6 +750,30 @@ Scoped SHIP covers the three reviewed corrections, not the whole app; two-size
 synthetic Linux GPUI offscreen evidence and its limits are recorded in
 `docs/research/project-settings-wayfinding-20261014.md`.
 
+**App-wide scroll affordances — 2026-10-16.** Scrollable lists, forms, menus,
+disclosures and reading panels share the overflow-only native scrollbar in
+`ui/scrollbar.rs`. A rounded muted thumb stays visible while content overflows;
+hover/drag strengthens its ink and reveals the quiet track. The stable 16px hit
+area surrounds an 8px thumb with a thin surface keyline. Existing reserved
+settings/dialog gutters remain reserved; elsewhere overlays preserve layout and
+full-row selection. The thumb normally has a 32px minimum, reducing only for
+very short viewports. Track clicks page by 90%; dragging releases outside the
+panel; wheel input and keyboard reveal retain the original scroll owner and focus.
+No overflow means no painted or interactive bar. Virtual lists remain virtual.
+The same treatment covers both outer and nested History scrolling, Results and
+page queues, settings/setup/project workspaces, options/inspectors, task bodies,
+feedback, approval and information dialogs, placeholder explanations and the
+multiline note editor. Note scrolling does not move its caret, edit or save a
+draft; reflow keeps an already-visible caret visible without snapping a manually
+scrolled reading position back to it.
+
+**User-directed exception:** actual screenshot/image panes have **no scrollbars**.
+They retain direct drag-to-pan, wheel/keyboard navigation and synchronized zoom;
+image pixels and existing gestures are unchanged. Text explanations in missing/
+loading screenshot stages still use the shared reading scrollbar when needed.
+No new palette, motion, dependency or shipping raster. Scoped verification and
+qualification limits: `docs/research/scrollbars-20261016.md`.
+
 **Actions and choices.** Shared actions have a minimum target height (40px).
 Buttons fit their labels; navigation fills its column; choice/check rows fill
 their available width with balanced `spacing.row` insets even when help wraps.
@@ -500,14 +782,109 @@ than clip. The analysis noise-suppression label paints on two lines at both
 qualified logical window sizes (270×40px inner text, 326×66px complete control).
 Primary keeps its filled teal identity through focus; danger uses error ink and
 surface, never primary fill. Secondary hover uses `action-hover`. Focus is distinct
-from selection: ordinary actions use ink outlines, rail navigation a white outer
-outline with a dark inner border on its selected light surface. Disabled controls
+from selection: ordinary controls use `accent` outlines, rail navigation a
+`rail-ink` outline separated from its selected surface by a `rail` gap. Disabled controls
 fade, leave the focus model and reject activation. Shared focus rings use a
-3px outline beyond a 2px contrasting gap (5px total extent): ink/white on light
-surfaces, white/navy on the rail. Focus remains visible through hover without
+2px outline beyond a 1px contrasting gap (3px total extent): `accent`/`surface`
+in the workspace and `rail-ink`/`rail` on the rail. Keep the normal control border, rather than
+adding a second dark stroke; editable fields retain their teal focused border.
+This user-requested refinement supersedes the oversized 3px/2px focus treatment
+documented in `docs/research/keyboard-focus-20261015.md` without changing keyboard
+activation or the hard-edge renderer fix. Focus remains visible through hover without
 changing layout, selection, primary/danger identity or inherited GPUI text.
 Keyboard reveal measures complete bordered choice/check/action rows, not their
 padded content alone. Disclosure focus handles are distinct from project rows.
+Current refinement evidence and limits: `docs/research/restrained-focus-20261016.md`.
+
+**Labelled action icons — 2026-10-16.** Ordinary icon-plus-label actions retain
+their Primary, Secondary, Danger, Navigation or Choice styling; they do not become
+quiet toolbar tools. `action_icons.rs` maps semantic `Control` identities to the
+shared `ToolIcon` paths, not translated label substrings. This carries recurring
+review, project, settings and History actions through one language while keeping
+consequential save, capture, baseline, export and delete wording explicit. The
+native path slot (18px) and related gap (8px) supplement the full label; icon ink
+follows the variant's text, including `on-accent` primary and error-colored danger ink.
+The existing minimum target (40px), focus, disabled and selected treatments remain.
+
+Consequential labels must wrap, not disappear behind clipping, ellipsis or forced
+no-wrap. `controls::action_with_icon` reuses `action_frame` and a `RenderOnce`
+`ActionLabel`: a bare flex-column text child can collapse to zero preferred width
+in intrinsic-width GPUI containers. Measure the maximum natural line width with
+the effective `window.text_style()` font, size and weight through
+`window.text_system().shape_line`; expose that preferred width with `max_w_full`,
+`min_w_0` and column wrapping. The parent then subtracts the icon, gap, border and
+padding before wrapping. Do not replace this shared measurement with hardcoded
+per-button widths. Preserve exact `action-{id}` and `action-label-{id}` selectors
+and the existing mounted/enabled, focus, reveal and guarded click/keyboard wiring.
+
+**Compact workspace toolbars — 2026-10-16.** `ui::toolbar` supplies shared native
+stroke tools, not generic outlined text buttons. Icon-only targets use the
+`toolbar-icon` variants above; labelled tools retain the same height and grow to
+their content. Icons are drawn paths (18px, 1.6px stroke), with related icon/label
+spacing (8px). Quiet idle tools have transparent fill and boundary with `ink`;
+selection pairs `selected` mint with an `accent` boundary and `accent-hover` ink.
+Hover uses `action-hover`; the shared teal focus ring remains distinct from
+selection. Shared `controls::action_frame` preserves focus/disabled/activation
+behavior without reserving an empty label child. Disabled tools leave traversal.
+
+The viewer uses one 40px row: Results, an icon/current-name/chevron View chooser,
+the labelled Before/After choices in Single image mode, and Zoom, then trailing
+inspector tools. View menu rows pair matching icons with
+names, full-width mint selection and a drawn check, not a repeated **Current**
+label. Results, Image controls, Details and Analysis are icon-only; each enabled
+icon-only tool discloses its action name on hover and keyboard focus without
+another focus stop. Hints fit their text and stay within the window. Labelled tools
+and menu rows have no redundant tooltip; disabled tools have none. Drawing
+replaces secondary inspector tools with labelled **Done**, not an extra row.
+
+Queue/page arrows, sidebar, refresh, History section/type choices and History/
+project pagination share this tool language. Previous/Next item controls use
+up/down chevrons to match the vertical results and page lists; History/project
+pagination keeps left/right chevrons. History sections/types, Filter and
+page options/details retain short names; pagination retains its page number.
+Capture, save, review classifications, baseline consent, export and deletion stay
+explicit text actions with existing guards. This extends the incumbent palette,
+system type and geometry; no new font, dependency or shipping raster is needed.
+Visible name hints do not resolve the native accessibility integration gap.
+Source-bound three-size development evidence and reported tests are recorded in
+`docs/research/compact-toolbars-20261016.md`; independent final visual review is
+separate, and no OS-input, screen-reader or release approval is implied.
+
+**Grouped inspection context — 2026-10-16.** One compact heading (40px) places
+path/profile in a two-line identity stack beside a Before/After source stack,
+separated by the group gap (16px), not equal-width columns or decorative cards.
+Capture-only evidence names Capture instead of inventing a Before source.
+`InspectionHeading` is a native `RenderOnce` component: shaped text determines
+preferred group widths, capped at (440px) for identity and (320px) for sources,
+with the source cap reduced to (180px) below actual working width (720px). These
+are caps, not fixed widths to reserve for short content. Source context does not
+shrink; original dimensions have a nonshrinking slot and the profile name yields
+first. Long path/name/source text may ellipsize in this compact metadata; complete
+keyboard-accessible metadata lives in existing Details, never a hover overlay.
+Details includes full Before/After environment names and origins, or the Capture
+environment for capture-only inspection, alongside the full page and screen size.
+Identity and environments come from the inspected run/reference, never today's
+project configuration or a filtered-out replacement target. The heading persists
+across modes, hidden Results and matching pending image reads.
+
+**Tooltip restraint — 2026-10-16.** User feedback rejects unsolicited explanation
+over working content. Only enabled icon-only tools retain short identifying names
+on delayed hover and keyboard focus. Mouse clicks retain actual focus, but never
+pin the identifying tooltip after the pointer leaves. Pointer input dismisses
+keyboard hints; keyboard input restores them, independently per window. Visible
+labels, View menu rows, Zoom, page/result rows,
+links and inspection metadata never spawn explanatory bubbles. Zoom keeps its
+mode/scale visible and its choices explicit; gesture/keyboard help stays behind
+Image controls. Long addresses and evidence-derived source context remain in
+Page options, Page details and Capture details. No workflow, action guard, target
+size or evidence-height change is needed. Scoped verification is recorded in
+`docs/research/tooltip-restraint-20261016.md`; earlier tooltip-specific acceptance
+records do not override this user-directed policy.
+
+This source-backed extension adds no palette, font, dependency, motion or shipping
+raster; visible names do not close the GPUI accessibility integration gap. Tests,
+capture confirmation and independent finish status belong to
+`docs/research/action-icons-spacing-20261016.md`; no final outcome is claimed here.
 
 **Keyboard activation repair — 2026-10-15.** Shell Enter/Space key bindings are
 the single keyboard activation owner; click wiring accepts pointer clicks only.
@@ -554,17 +931,14 @@ keyboard focus and Tab/Enter activation. Hover/press changes only the link ink t
 text metrics. Do not rely on color or hover alone, and
 never make ordinary noninteractive text look like a link. External page links
 open the OS default browser only on activation; capture-session credentials are
-not transferred. Link hints say **Open in default browser**, without repeating
-the URL. They fit the text (13px/18px, 8px horizontal and 6px vertical insets),
-appear after the standard 500ms delay, and stay at the resting pointer with a 12px
-clearance. They flip inside window edges, rather than chasing the cursor or
-covering the link. Website settings and page details retain complete addresses.
+not transferred. No hover explanation repeats this familiar link behavior.
+Website settings and page details retain complete addresses.
 Only complete HTTP(S) addresses without embedded credentials are openable;
 unsupported schemes remain plain data. Editable URL fields, literal code and raw
 diagnostics are not automatically linkified. Task context and gap links share
 this treatment and scroll into view when reached by keyboard.
 
-**Fields and timezone.** Native input stays white when focused, with accent focus
+**Fields and timezone.** Native input stays on `surface` when focused, with accent focus
 paint and stable action metrics. Disabled fields reject editing and leave focus
 order; storage work locks affected fields. Clipboard, IME composition, pointer
 selection, Home/End and anchored Shift selection belong to fields. Double-click
@@ -576,6 +950,32 @@ bounded popup chooses available space above/below, virtualizes options and keeps
 current selection distinct from keyboard highlight. Arrows/Home/End navigate,
 Enter chooses, Escape dismisses/restores focus; Tab follows the shell order and
 outside dismissal does not steal its target's focus.
+
+**Search and list filters — 2026-10-17.** The user rejected the queue's separate
+Search label and requested an app-wide search/filter-field refinement. Pages and
+results, loaded History and the timezone picker share the native input's 40px
+height, 4px corners, 12px insets, a 16px drawn magnifier and 8px icon/text gap.
+Use contextual placeholders (**Search pages…**, **Filter this history page…**,
+**Search region or city…**) in the theme's readable muted ink, not a separate
+visual field label. Search text uses ordinary editable ink; the magnifier remains
+visible. Placeholders are paint only, never selected/copied/committed or included
+in IME ranges. Shared queue/History rows place their existing named clear actions
+beside the field; History's loaded-page scope stays persistently visible below.
+In short result queues, search/filter/clear controls precede a bounded scrollable
+no-match explanation; recovery text must not push those controls out of view.
+The changes-only notice names **No matches** when searching yields none.
+Preserve ordinary settings labels, filter choices, keyboard order, draft/evidence
+retention and all explicit capture/save/approval boundaries. No palette, asset,
+dependency or animation change. Native accessibility integration remains the
+existing qualification blocker; a placeholder is not a screen-reader label.
+Scoped verification: `docs/research/search-fields-20261017.md`.
+
+**Queue focus clipping — 2026-10-17.** The queue/viewer overflow boundary must
+include the shared focus ring's full 3px paint outset. Equal padding and negative
+margins expand only the clip boundary, preserving queue alignment, control sizes
+and screenshot geometry. Do not remove evidence/list overflow protection or
+special-case Search: Filter and other edge controls need the same clearance.
+Scoped verification: `docs/research/queue-focus-clipping-20261017.md`.
 
 **Interface wording — 2026-10-14.** Routine messages explain the outcome and next
 action in ordinary language, following `docs/ux-writing.md`. Baseline saving says
@@ -608,6 +1008,30 @@ explicit import/export/baseline/cleanup decision. The existing settings hierarch
 native controls, palette and keyboard reveal remain unchanged; no new tokens or
 shipping rasters. See `docs/research/no-op-controls-20261015.md`.
 
+**Context and action wording — 2026-10-16.** The user rejected **Before Website /
+After Website** and requested an app-wide review of similar wording. Inspection
+headings now name the screenshots' roles: **Before — Saved baseline** and
+**After — This check** (or **Recorded check** in read-only History). Generated
+“Website” names and identical environment names do not repeat as distinctions;
+meaningful differing recorded names remain alongside the roles, and a shared
+meaningful name appears once. Full environment
+names, origins and dates remain in Details, and missing source records stay
+explicitly unknown. Capture-only context distinguishes saved baselines, confirmed
+unsaved candidates and screenshot previews; History uses neutral **Recorded
+capture** when baseline status is not established. This supersedes the earlier compact heading's
+unconditional paired environment names, not its provenance safeguards.
+Setup saves a **project**, not a website. **Find pages**, **Confirm login**,
+**Page address mapping** and **Add / replace address mapping** describe the actual
+operations. Login instructions and recovery use the same control name; the
+privacy-filtered **Support report** has consistent preview/save/progress/recovery
+copy, distinct from capture diagnostics. Skipped/stopped screenshots do not claim
+an attempted capture failed. Network loading text appears only during its actual
+read; recovery points to the OS for folder permissions. Count templates use
+singular/plural correctly. Generic task-workspace labels are omitted. No palette,
+layout-system, saved-record, eligibility or consent-policy change is introduced.
+See `docs/ux-writing.md` and `docs/research/ui-wording-20261016.md` for the scope
+and bounded verification record.
+
 **Feedback and progress.** Dismiss belongs inside the feedback surface, centered
 beside the message. Long diagnostics scroll within a bounded area; errors retain
 their red treatment. Known nonzero totals alone produce a clamped completion
@@ -628,7 +1052,7 @@ keeps already loaded evidence visible.
 
 **Loading feedback refinement — 2026-10-14.** Compact activity uses a 16px native
 stroke spinner beside readable, medium-weight task text, never a filled dot that
-resembles a list bullet. Global operations use a white, thin-bordered status
+resembles a list bullet. Global operations use a palette `surface`, thin-bordered status
 surface with a 40px minimum height; longer labels wrap without moving the icon
 away from their first line. Projects, History, screenshot/evidence placeholders,
 browser verification and storage reads share this treatment. Placeholder help
@@ -643,12 +1067,12 @@ verdict, source-bound captures and unrelated full-suite failure.
 **Task workspaces and dialogs.** One shared panel separates compact project/site/
 environment context, current activity, labelled outcomes and a single safety note.
 Supporting prose and notes cap at 560px; whole count items wrap together rather
-than separating numbers from labels. Small native-drawn stroke icons always sit
+than separating numbers from labels. Small native-drawn task-status icons sit
 beside words. Attention is amber, actual failures are red, saved captures use
 normal ink, and zero counts stay muted. A saved-screenshot checkmark never means
 baseline approval. Screenshot progress accounts for processed page/profile
 targets, including failures, not successful captures or an invented ETA.
-An information note stays white and explains the relevant operation/state;
+An information note stays on `surface` and explains the relevant operation/state;
 finished results do not inherit cancellation advice. The independently scrollable
 body has a visible overflow indicator; Stop/Pause/Continue stay in its fixed footer.
 Details appears only for independent information: a run's frozen capture setup,
@@ -718,11 +1142,17 @@ recorded-environment heading and compact toolbar persist with Results hidden.
 Hiding Results does not reduce evidence height; full-width Before/After preserves
 the inspection identity and source scale. One highest-priority reason explains
 blocked review/Next actions: dirty note/areas, pending analysis, noncomparable
-evidence or no next matching target. Empty baseline selection reads **0 selected**;
-nonempty selection names references ready for update without changing eligibility.
+evidence or no next matching target. The baseline footer appears only for an
+eligible current screenshot or an existing selection. Its heading is **Update
+baseline**, with the attached explanation **Use After as the reference for future
+checks. Review before saving.** **Select After screenshot** and **Deselect After
+screenshot** name the actual original being selected. Nonempty selection names
+selected references ready for update, and mounts **Review update…**; an empty
+selection has no confirmation action. Below 900px working width, explanation and
+actions stack instead of squeezing or overflowing. Eligibility is unchanged.
 The protected approval dialog has a bounded height (520px) and widths (740px)
 at narrow desktop sizes or (760px) otherwise, capped by its available viewport.
-It asks “Update the baseline for 1 screenshot?” with correct plural forms, names
+It asks “Use this After screenshot for future checks?” (or “these After screenshots”), names
 the future-check consequence and retained versions, and distinguishes Replace
 from Keep. One scroll owner contains the inspected path/profile/source environment/
 UTC time, on-demand exact provenance and the reference rows; actions remain pinned.
@@ -731,7 +1161,7 @@ At most 32 reference rows mount on a page. Previous/Next inspects every referenc
 and advances the visible page, keeping all unchanged references accessible.
 Exact page/profile IDs, run/artifact identities and requested/final URLs remain
 available, including the technical tail. Keep reviewing/Escape dismisses without approving;
-Confirm baseline is explicit. Each new or cached consent opening resets the
+**Save baseline update** is explicit. Each new or cached consent opening resets the
 inspected reference, exact-details disclosure and actual reading scroll to the
 top, so consequences cannot disappear behind a previous tail inspection/resize.
 Focus is trapped, background mutations are guarded,
@@ -740,7 +1170,7 @@ be approved; replacing the whole baseline remains a separate workflow.
 
 Ordinary review exposes revision-bound decisions, explicit note saving, progress
 and Next unreviewed without opening Analysis. Classification is not approval:
-**Select for baseline update** names reference selection explicitly. Discovery
+**Select After screenshot** names reference selection explicitly. Discovery
 owns the current inventory and optionally a matching representative screenshot,
 never an earlier comparison. Narrow review compacts chrome, prioritizes original
 dimensions in two-line captions and can collapse the queue. Details and Analysis
@@ -778,33 +1208,103 @@ after a completed rectangle, with drafts still requiring explicit save.
 Image navigation is direct: drag or two-axis scroll to pan, Shift+scroll for
 horizontal movement, Ctrl/Cmd+scroll to zoom at the pointer. Before/after stay
 synchronized. Screenshot hover never opens navigation help. **Image controls**
-beside Zoom opens an explicit, bounded flyout with readable gesture/shortcut rows
-and an attached Close action; Escape restores its trigger, and an outside click
-closes without taking focus from the clicked control. At narrow widths the help
-action lives at the end of the Zoom menu rather than adding a toolbar row. One
+in the trailing toolbar group opens an explicit, bounded flyout with readable
+gesture/shortcut rows and an attached Close action; Escape restores its trigger,
+and an outside click closes without taking focus from the clicked control. At
+narrow widths the help action lives at the end of the Zoom menu rather than
+adding a toolbar row. One
 muted drag/zoom hint shares the existing caption only when there is room; no new
 strip reduces evidence height. macOS names Command, other hosts name Ctrl. Help
 shares the mutually exclusive inspector lifecycle, preserves drafts/scale/target,
 and never triggers a capture or baseline operation.
 A single focus stop provides +/− zoom, arrows/Page Up/Page Down,
-0 for fit width and 1 for actual size. One labelled Zoom menu combines fit width,
-actual size (100%) and percentage presets at both desktop widths. Its desktop
-trigger shows “Zoom: Fit width · 52%” in automatic mode and “Zoom: 75%” after manual zoom;
-a drawn chevron makes the selection affordance explicit. Fit follows resizing;
+0 for fit width and 1 for actual size. One Zoom menu combines fit width,
+actual size (100%) and percentage presets at all supported desktop widths. Its
+trigger pairs a zoom icon with “Fit width · 26%” in automatic mode or “75%” after
+manual zoom; the compact form shortens only the fit name to “Fit · 26%”. These
+percentages illustrate the actual current scale, not fixed fit values. A drawn
+chevron makes the selection affordance explicit. Fit follows resizing;
 fixed percentages do not. Arrows/Home/End navigate the menu, Enter chooses,
 Escape dismisses, and Tab continues the shell order without trapping focus.
-Small windows stack “Zoom” and the scale inside the same compact 40px control;
-the selected mode remains explicit in its menu, without adding toolbar rows.
+Both forms keep the name/scale on one line in a 40px control (188px ordinary,
+132px compact); the selected mode remains explicit in its menu. This supersedes
+the former text-heavy toolbar and two-line narrow zoom treatment, without
+changing their historical verification records or adding toolbar rows.
 Missing images have no useless zoom/pan controls. A hand/crosshair cursor conveys
 the current interaction.
 Compact no-match recovery precedes the search controls, with expanded
 filters scrolling separately.
 
-Phase 4 separates the selected disposition group from Review note and the primary
-Next unreviewed action. Baseline selection/preview remains a separate footer.
-Notes now use the owned temporary editor rather than a permanent evidence-height
-row. Details, notes and filters remove or disable review/baseline decisions while
-evidence is occluded; Close/Escape preserves unsaved note text without saving it.
+**Changes-first result queue — 2026-10-16.** Opening a saved comparison or recorded
+check defaults to Changed, using the effective saved pixel verdict (including
+legacy warning-bearing reports). The queue explains **Only changed results shown.**
+with a quiet **Show all** action. Capture-only evidence remains unfiltered. A
+refresh or another analysis of the same run preserves the explicit filter choice;
+a new run starts with the appropriate default. Show all changes only the status
+filter, retaining search, grouping, inspected evidence, notes and ignored-area
+drafts. Its disappearing keyboard stop returns focus to Filter. A no-change queue
+says **No changed results**, not that every capture passed; the unfiltered coverage
+strip still calls out missing/not-compared results, available through Show all or
+Filter. The compact notice replaces the queue heading; redundant shown counts
+are omitted in changes-only mode. No evidence, review or baseline is changed.
+Verification and limits: `docs/research/changed-results-default-20261016.md`.
+
+**Unchanged results complete automatically — 2026-10-16.** The saved effective
+`NoSignificantChange` verdict displays a check mark and **No significant change**,
+not Unreviewed / Intentional / Needs fix choices. The user rejected the redundant
+“no review needed” suffix and footer count; the comparison strip already counts
+these results. Footer progress names only manual review work and gaps. The verdict means
+below the saved thresholds and outside ignored areas, not necessarily identical
+pixels. Next unreviewed visits only genuinely changed, captured results without a
+current decision, respecting filters, wraparound and draft guards. Progress
+distinguishes manual decisions from changes still to review.
+Optional notes and explicit baseline selection remain available; a successful
+check never creates an Intentional decision or updates a baseline. Existing saved
+decisions/notes remain visible and retained. Loading warnings stay independent
+cautions, without inviting a redundant review. Pending analysis and unreadable,
+missing or noncomparable evidence never use the success footer. Legacy saved
+pixel reports work immediately without a recapture, reanalysis or history rewrite.
+This supersedes the earlier comparable-result disposition/navigation rule below;
+the other approval, provenance and inspector safeguards remain. Plan and scoped
+verification: `docs/research/unchanged-review-20261016.md`. No new tokens or assets.
+
+**State-aware review footer — 2026-10-16.** Comparable results have a compact
+Review/progress line above selected **Unreviewed / Intentional / Needs fix**
+choices, separate from Review note and the primary Next unreviewed action.
+Secondary zero counts and repeated baseline disclaimers are omitted. Loading
+warnings are advisory: one quiet caution beside Review, not a blocking paragraph.
+Pixel comparison, queue status/filtering, progress and review actions use the
+actual saved pixel verdict, including older warning-vetoed summaries with valid
+reports. Matching warning codes alone never establish identical pixels. Saved
+reports, revision IDs, decisions, notes and baseline versions are not rewritten;
+no forced reanalysis or recapture is needed. Details attributes cautions to Before,
+After or both, bound to this analysis's baseline reference, not today's settings.
+Stable captures with ordinary loading warnings remain eligible for deliberate
+baseline selection; confirmation explains that their captured appearance becomes
+the baseline. Failed, missing/corrupt or incompatible evidence, hard comparison
+gates and unstable/replacement-problem baseline updates remain protected.
+Genuine comparison failures replace disabled decisions with the actual saved
+cause and safe next step inline. Absent explanations stay explicitly unknown.
+Details and Analysis share that explanation; numeric difference triggers do not
+masquerade as rejection reasons. Long failure reasons scroll within 108px with an
+overflow thumb while recovery remains visible.
+Optional **Technical details** opens the existing inspector with supporting
+records expanded, focuses Close and restores its trigger on Close/Escape.
+Next unreviewed mounts only when another matching reviewable result exists.
+Baseline selection remains in its
+separate conditional footer; **Review update…** mounts only after
+selection. Stale selections stay removable, with confirmation disabled.
+Explicit consent, draft and revision-binding guards remain. Notes use the owned
+temporary editor rather than a permanent evidence-height row. Details, notes and
+filters remove or disable review/baseline decisions while evidence is occluded;
+Close/Escape preserves unsaved note text without saving it. Scoped verification
+and qualification limits are in `docs/research/review-footer-20261016.md`.
+The user's rejection of its missing-cause/focus states and fresh scoped repair
+evidence are recorded in `docs/research/comparison-recovery-20261016.md`; the earlier
+generic-state verdict does not qualify these reported states. The subsequent
+user-directed advisory-warning correction supersedes the earlier warning-veto
+policy; current verification is in `docs/research/advisory-warnings-20261016.md`.
+No new palette, asset or shipping raster.
 The finite V4 repair gives the inspector scroll body a finite content width;
 the actual note input is 326px wide (300px inner content). The current review-note
 editor is bounded and genuinely multiline, with wrapping, caret/selection and
@@ -872,16 +1372,40 @@ or targeted retry was introduced. Browser recovery links to the existing explici
 installer in App settings, rather than automatically replacing components.
 
 **Missing screenshot treatment — 2026-10-15.** Failed captures and unavailable
-images reserve the remaining screenshot stage, with the same white surface and
+images reserve the remaining screenshot stage, with the same palette `surface` and
 thin boundary as the image panes. A 48px native missing-image mark accompanies
 an 18px heading, the recorded reason and quieter recovery guidance separated by
 a rule. Failure marks retain error ink. The message centers within a 440px maximum
 measure with 24px insets; long explanations start at the top and scroll inside
 the fixed frame with an overflow-only thumb. Finite final-width text measurement
 keeps the full recovery guidance reachable. Path/profile context and Details remain outside the placeholder;
-truncated context discloses its full text on hover. No retry action, screenshot
+truncated context is available in the explicit Details panel. No retry action, screenshot
 pixels, capture operation or approval rule changes. See
 `docs/research/screenshot-placeholder-20261015.md` for scoped verification.
+
+**Screenshot loading treatment — 2026-10-16.** Screenshot reads, initial saved-
+evidence loading and screenshot preparation share the missing-image view's palette `surface`,
+thin-bordered stage, centered 440px message measure and 24px insets. A 32px teal
+native stroke spinner sits above the 18px heading and existing muted explanation;
+it denotes activity, not progress. Compact loading elsewhere stays 16px. The same
+fixed-frame scrolling handles constrained heights, and the existing reduced-motion
+override stops the spinner. The queue and inspection context remain available;
+no fake screenshot, new action, palette, asset or approval behavior is introduced.
+Scoped tests and two-size offscreen inspection passed; see
+`docs/research/screenshot-loading-20261016.md` for evidence and limits.
+
+**Stable result navigation — 2026-10-16.** Changing the selected result keeps the
+View/Compare selector, Single-image sides, Zoom, image/inspection tools and eligible
+review/baseline actions in place while pixels load. Image-dependent actions stay
+disabled until the current read succeeds; loading never shows the previous
+target's pixels. Split slider retains its name during the read, and a duplicate
+queue-owned Results toggle no longer appears. Previous/Next result and Next
+unreviewed reveal the selected row in the actual filtered/grouped queue without
+moving keyboard focus. Already visible rows do not recenter; manual scrolling
+after selection is retained when the read finishes. Draft, failed-read, stale-reply
+and explicit approval guards remain. No palette, token, asset or animation change.
+Scoped tests and three-size offscreen inspection:
+`docs/research/result-navigation-20261016.md`.
 
 **History and keyboard.** Runs, Baselines and Storage are separate sections.
 Baseline versions and capture/check runs are distinct,
@@ -903,6 +1427,19 @@ save awaits exact authoritative replies and preserves invalid or newer drafts.
 F1/App settings exposes keyboard help; correction summaries reveal the affected
 form stage/field without submitting. Real OS input, platform termination behavior
 and native accessibility remain qualification obligations.
+
+**Focus reading order — 2026-10-16.** User keyboard testing found illogical jumps
+between Filter, Compare, Results and the inspectors. Do not sort focus candidates
+by control type. The rail follows its painted destinations; review follows the
+project header and task actions, then the full-width toolbar left to right
+(Results, View, optional Before/After, Zoom, Image controls, Details, Analysis),
+queue search/filter/navigation, evidence, review choices/note/next and the baseline
+footer. Inspectors follow Close, content, pinned save/copy actions. Page previews
+and unavailable captures retain their evidence-column controls after the queue;
+Done follows its drawing-toolbar position. Hidden and disabled controls leave
+traversal. Tab exits View/Zoom from their trigger, with Shift-Tab reversing the
+same order. Preserve appearance, drafts and all operation/consent guards.
+Scoped verification and limits: `docs/research/focus-order-20261016.md`.
 
 The user-requested carry-through confirms the previously incomplete History,
 Tools, empty-message/help and capture-only corrections in fresh source-bound

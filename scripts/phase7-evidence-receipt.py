@@ -27,7 +27,7 @@ def index(directory):
                        "width": width, "height": height, "synthetic": True,
                        "distinct_persisted_pages": 100, "os_input_verified": False,
                        "main_source_sha256": data["main_source_sha256"],
-                       "bulk_harness_sha256": digest(REPO / "crates/app/src/phase7_qualification_tests.rs"),
+                       "bulk_harness_sha256": digest(REPO / "crates/gui/src/phase7_qualification_tests.rs"),
                        "geometry_receipt": f"bulk-{width}x{height}-geometry.json"})
     assert len(matrix) == 28
     matrix_path.write_text(json.dumps(matrix, indent=2) + "\n")
@@ -58,16 +58,16 @@ def collect(root, checks):
             assert float(entry["width"]) == data["width"] and float(entry["height"]) == data["height"]
             assert png.name in (directory / "index.html").read_text()
             if name == "confirmation":
-                assert data["main_source_sha256"] == digest(REPO / "crates/app/src/main.rs")
-                assert data["task_source_sha256"] == digest(REPO / "crates/app/src/task_ux.rs")
-                assert data["task_controls_source_sha256"] == digest(REPO / "crates/app/src/ui/controls.rs")
+                assert data["main_source_sha256"] == digest(REPO / "crates/gui/src/main.rs")
+                assert data["task_source_sha256"] == digest(REPO / "crates/gui/src/task_ux.rs")
+                assert data["task_controls_source_sha256"] == digest(REPO / "crates/gui/src/ui/controls.rs")
             pairs.append({"capture": png.stem, "png": digest(png), "metadata": digest(metadata)})
         assert len(pairs) == 28
         for entry in matrix:
             if "harness_sha256" in entry and name == "confirmation":
-                assert entry["harness_sha256"] == digest(REPO / "crates/app/src/ui_review_matrix.rs")
+                assert entry["harness_sha256"] == digest(REPO / "crates/gui/src/ui_review_matrix.rs")
             if "bulk_harness_sha256" in entry and name == "confirmation":
-                assert entry["bulk_harness_sha256"] == digest(REPO / "crates/app/src/phase7_qualification_tests.rs")
+                assert entry["bulk_harness_sha256"] == digest(REPO / "crates/gui/src/phase7_qualification_tests.rs")
         batches[name] = {"pairs": pairs, "matrix": digest(directory / "whole-app-matrix.json"),
                          "gallery": digest(directory / "gallery-manifest.json"),
                          "html": digest(directory / "index.html"),
@@ -87,11 +87,11 @@ def collect(root, checks):
             assert digest(directory / (pair["capture"] + ".png")) == pair["png"]
             assert digest(directory / (pair["capture"] + ".json")) == pair["metadata"]
     sources = {str(p.relative_to(REPO)): digest(p) for p in sorted((REPO / "crates").glob("*/src/**/*.rs"))}
-    for p in sorted((REPO / "crates/app/tests").rglob("*.rs")):
+    for p in sorted([*(REPO / "crates/app/tests").rglob("*.rs"), *(REPO / "crates/gui/tests").rglob("*.rs")]):
         sources[str(p.relative_to(REPO))] = digest(p)
     for p in sorted((REPO / "worker/product").rglob("*.mjs")):
         sources[str(p.relative_to(REPO))] = digest(p)
-    for p in [REPO / "Cargo.lock", REPO / "crates/app/Cargo.toml", *sorted((REPO / "scripts").glob("phase7-*.py"))]:
+    for p in [REPO / "Cargo.lock", REPO / "crates/app/Cargo.toml", REPO / "crates/gui/Cargo.toml", REPO / "crates/cli/Cargo.toml", *sorted((REPO / "scripts").glob("phase7-*.py"))]:
         sources[str(p.relative_to(REPO))] = digest(p)
     results = json.loads((checks / "results.json").read_text())
     assert len(results["results"]) == 9 and all(r["exit"] == 0 for r in results["results"]), results

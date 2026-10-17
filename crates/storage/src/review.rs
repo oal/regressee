@@ -4,6 +4,10 @@ use crate::capture::{encode, pin};
 use regressee_core::{analysis_engine as engine, evidence::*};
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
+#[cfg(test)]
+#[path = "review_save_tests.rs"]
+mod save_tests;
+
 // Read-local only: callers supply the authoritative reader, never viewer state.
 fn read_source_once<T>(
     sources: &mut BTreeMap<RunId, T>,
@@ -37,6 +41,29 @@ fn capture_descriptors(run: &RunRecord) -> Result<BTreeMap<TargetKey, engine::Ca
         .into_iter()
         .map(|(key, capture)| Ok((key, descriptor(run, capture)?)))
         .collect()
+}
+
+// Database metadata only. This is sufficient to bind an annotation to its
+// immutable analysis, but never grants display or baseline-approval authority.
+fn read_analysis_record(connection: &Connection, id: AnalysisId) -> Result<ComparisonEvidence> {
+    let (record, run, baseline): (String, String, String) = connection.query_row(
+        "SELECT record,run_id,baseline_id FROM analyses WHERE id=?1",
+        [id.to_string()],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    )?;
+    ensure!(record.len() <= 64 * 1024 * 1024, "analysis exceeds budget");
+    let analysis: ComparisonEvidence = serde_json::from_str(&record)?;
+    ensure!(analysis.revision.id == id, "analysis identity mismatch");
+    ensure!(
+        analysis.revision.run.to_string() == run
+            && analysis.revision.baseline.to_string() == baseline,
+        "analysis run/baseline identity mismatch"
+    );
+    analysis.revision.policy.validate()?;
+    for result in &analysis.revision.results {
+        result.validate()?;
+    }
+    Ok(analysis)
 }
 
 #[cfg(test)]
@@ -134,18 +161,7 @@ impl Store {
         Ok(())
     }
     pub fn load_analysis(&self, id: AnalysisId) -> Result<ComparisonEvidence> {
-        let s: String = self.connection.query_row(
-            "SELECT record FROM analyses WHERE id=?1",
-            [id.to_string()],
-            |r| r.get(0),
-        )?;
-        ensure!(s.len() <= 64 * 1024 * 1024, "analysis exceeds budget");
-        let a: ComparisonEvidence = serde_json::from_str(&s)?;
-        ensure!(a.revision.id == id, "analysis identity mismatch");
-        a.revision.policy.validate()?;
-        for result in &a.revision.results {
-            result.validate()?;
-        }
+        let a = read_analysis_record(&self.connection, id)?;
         if let Some(p) = &a.perceptual {
             ensure!(
                 a.revision.algorithm == engine::ALGORITHM_ID,
@@ -320,19 +336,26 @@ impl Store {
         })
         .transpose()
     }
-    pub fn save_review(&mut self, decision: &ReviewDecision) -> Result<()> {
+    /// Append an annotation without rereading screenshot artifacts. Returns the
+    /// authoritative run identity for refreshing history without a verified load.
+    /// Inspection and baseline acceptance still use full evidence verification.
+    pub fn save_review(&mut self, decision: &ReviewDecision) -> Result<RunId> {
         validate_review_note(&decision.note).map_err(|message| anyhow::anyhow!(message))?;
         ensure!(decision.reviewed_at > 0, "invalid review date");
-        let a = self.load_analysis(decision.analysis)?;
+        let tx = self
+            .connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let a = read_analysis_record(&tx, decision.analysis)?;
         ensure!(
             a.revision.results.iter().any(|r| r.key == decision.key),
             "review target/revision missing"
         );
-        self.connection.execute(
+        tx.execute(
             "INSERT INTO review_decisions(analysis_id,record) VALUES(?1,?2)",
             params![decision.analysis.to_string(), encode(decision)?],
         )?;
-        Ok(())
+        tx.commit()?;
+        Ok(a.revision.run)
     }
     pub fn review_history(&self, run: RunId) -> Result<Vec<ReviewDecision>> {
         let mut q = self.connection.prepare("SELECT d.record FROM review_decisions d JOIN analyses a ON a.id=d.analysis_id WHERE a.run_id=?1 ORDER BY d.id DESC LIMIT 256")?;
@@ -388,9 +411,9 @@ impl Store {
         let mut source: Option<regressee_core::evidence::RunRecord> = None;
         for key in selected {
             ensure!(
-                a.revision.results.iter().any(|r| &r.key == key
-                    && matches!(
-                        r.classification,
+                a.review_classification(key)
+                    .is_some_and(|classification| matches!(
+                        classification,
                         Classification::Changed | Classification::NoSignificantChange
                     )),
                 "Failed or noncomparable analysis targets cannot be approved"
@@ -408,13 +431,18 @@ impl Store {
                 .evidence(key)
                 .context("Failed or missing captures cannot be approved")?;
             ensure!(
+                run.run.targets.iter().any(|target| &target.key == key
+                    && matches!(target.outcome, TargetOutcome::Captured { .. })),
+                "Failed or missing captures cannot be approved"
+            );
+            ensure!(
                 before.metadata.profile == after.metadata.profile
                     && old.run.rendering == run.run.rendering,
                 "Incompatible rendering/profile mixing requires a complete replacement baseline"
             );
             ensure!(
-                after.metadata.stable && after.metadata.warnings.is_empty(),
-                "Capture did not settle or has readiness/replacement warnings; capture again before approval"
+                after.metadata.baseline_ready(),
+                "Capture did not settle or has replacement/unsupported warnings; capture again before approval"
             );
             let p = a
                 .perceptual

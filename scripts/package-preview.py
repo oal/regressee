@@ -17,8 +17,8 @@ import zipfile
 
 
 TARGETS = {
-    "x86_64-unknown-linux-gnu": ("linux-x86_64", "regressee"),
-    "x86_64-pc-windows-msvc": ("windows-x86_64", "regressee.exe"),
+    "x86_64-unknown-linux-gnu": ("linux-x86_64", "regressee-desktop"),
+    "x86_64-pc-windows-msvc": ("windows-x86_64", "regressee-desktop.exe"),
 }
 HELP_FILES = (
     "first-run-guide.md", "auth-and-capture.md", "portable-baseline-archive.md",
@@ -44,7 +44,7 @@ def dependency_notices(root, target):
     completeness. In particular it does not redistribute a development runtime.
     """
     graph = command(
-        root, "cargo", "tree", "--locked", "--offline", "-p", "regressee-app",
+        root, "cargo", "tree", "--locked", "--offline", "-p", "regressee-gui",
         "--features", "ui", "--target", target, "--edges", "normal,build",
         "--prefix", "none", "--format", "{p}",
     )
@@ -101,7 +101,7 @@ def package(root, output, target, revision):
     data = binary.read_bytes()
     if not data:
         raise ValueError("The application binary is empty")
-    version = tomllib.loads((root / "crates/app/Cargo.toml").read_text(encoding="utf-8"))["package"]["version"]
+    version = tomllib.loads((root / "crates/gui/Cargo.toml").read_text(encoding="utf-8"))["package"]["version"]
     # Metadata is data-free in current builds. Isolate and bound an accidentally
     # supplied older executable too, before it can be accepted for packaging.
     with tempfile.TemporaryDirectory(prefix="regressee-preview-check-") as isolated:
@@ -129,7 +129,7 @@ def package(root, output, target, revision):
         files[name] = ((root / name).read_bytes(), 0o644)
     for name in HELP_FILES:
         files[f"help/{name}"] = ((root / "docs" / name).read_bytes(), 0o644)
-    prefix = f"regressee-{platform}"
+    prefix = f"regressee-desktop-{platform}"
     # Fresh output only: do not accidentally upload a stale binary or archive.
     output.mkdir(parents=True, exist_ok=False)
     if executable.endswith(".exe"):

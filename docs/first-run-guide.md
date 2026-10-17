@@ -7,13 +7,14 @@ to authorized literal-loopback fixtures. See [support matrix](support-matrix.md)
 for the separate platform/clean-machine qualification limits.
 
 1. **Create project**, enter a recognizable name and your test website
-   address(es), then **Save website & continue**. This saves locally without
+   address(es), then **Save project & continue**. This saves settings locally without
    visiting the site. Approve all listed websites when using multiple websites.
    Visits themselves can have effects: use a read-only test account, never an
    administrative production account.
 2. In **Website access**, choose **No login required** or **Login required**.
    For login, **Save settings** first, then use **Open login browser**, finish
-   login/consent yourself, and choose **I'm ready**. An unavailable secure store
+   login/consent yourself, and choose **Confirm login** to check that it works in a
+   separate session. An unavailable secure store
    permits explicit **Only for this app session** login; it never silently saves
    plaintext. Production/staging sessions remain separate, and ZIP recipients
    establish their own login. Mapping, language and website-theme options remain
@@ -24,7 +25,7 @@ for the separate platform/clean-machine qualification limits.
    Gentle reduces site load; Fast can run four pages at once. Phone/tablet are
    Chromium emulation, not actual Safari/iOS hardware. Advanced controls remain
    available. **Save settings** before finding pages.
-4. Use **Find pages & preview**, then inspect the included/excluded inventory in
+4. Use **Find pages**, then inspect the included/excluded page list in
     **Pages & baseline** before capturing. A page limit is incomplete discovery,
     not proof you found every page. An existing baseline remains unchanged.
     Select a page to open its details and **Include page** / **Exclude page**
@@ -83,7 +84,7 @@ edits require confirmation before switching to a different project.
 
 ### Browser update or repair required
 
-If **Find pages & preview**, login or capture reports **Browser update required**,
+If **Find pages**, login or capture reports **Browser update required**,
 the installed private-browser components do not match this app build. Choose
 **Open App settings** → **Update browser**, then return to your project and retry.
 **Private browser needs repair** instead leads to **Repair browser**. Both actions
@@ -114,7 +115,7 @@ For an affected build, close Regressee and launch the extracted Linux executable
 with an explicit Regressee-owned namespace, then retry browser setup in App settings:
 
 ```sh
-REGRESSEE_WORKER_SCRATCH_PARENT="/tmp/rg2-$(id -u)" ./regressee
+REGRESSEE_WORKER_SCRATCH_PARENT="/tmp/rg2-$(id -u)" ./regressee-desktop
 ```
 
 The app creates the final directory with mode 0700 if missing and validates its
@@ -127,7 +128,7 @@ similar setup failures there need their own error details.
 Start with a plain launch:
 
 ```sh
-./regressee
+./regressee-desktop
 ```
 
 Do not add GPU overrides when the plain launch works.
@@ -140,7 +141,7 @@ graphics driver and meets the [platform requirements](support-matrix.md).
 The current build has a bounded, data-free backend diagnostic:
 
 ```sh
-./regressee --check-renderer
+./regressee-desktop --check-renderer
 ```
 
 It initializes the same GPUI backend as the app, with filtered GPU logs, before
@@ -148,7 +149,7 @@ opening project storage or background jobs. Passing it does **not** verify
 swapchain presentation, visible pixels or input. For logs during a normal launch:
 
 ```sh
-REGRESSEE_GPU_DIAGNOSTICS=1 ./regressee
+REGRESSEE_GPU_DIAGNOSTICS=1 ./regressee-desktop
 ```
 
 GPUI chooses Wayland when `WAYLAND_DISPLAY`
@@ -259,6 +260,11 @@ no separate Search submission. Clear restores the list. If your inspected
 screenshot falls outside the filter, it remains visible with a notice so typing
 does not discard ignored-area edits or replace evidence underneath you.
 
+Comparisons open with changed results only. **Show all** restores the other
+results without changing screenshots or review drafts; search still applies.
+The summary always includes missing/not-compared results. **No changed results**
+does not mean every capture succeeded. Capture-only runs show all results.
+
 History separates Runs, Baselines and Storage, with direct selection and live date/type filtering of
 loaded records. Its search scope is labelled; another history page can contain
 additional matches. Storage totals are measured separately and are never shown
@@ -266,9 +272,24 @@ as zero just because measurement has not completed. Refresh history reloads the
 current page; Refresh storage totals requests a separate census. Saved network settings load
 automatically in App settings; saving edits is still explicit.
 
-Review decisions and Save note are available without opening Analysis. Decisions
-apply only to the displayed analysis; they never approve a baseline. Use Select
-for baseline update → Review approval to preview reference changes separately.
+**App settings → Appearance** controls Regressee's light/dark theme. **System**
+is the default and follows desktop appearance changes automatically. Choose
+**Light** or **Dark** to override it; the change applies immediately and is
+remembered on this computer. Choose **System** again to resume desktop following.
+This never recolors saved screenshots or changes the website-theme setting used
+for captures.
+
+No significant change means the visual check needs no manual review, using the
+saved sensitivity and ignored areas; it does not necessarily mean identical
+pixels. These results have no disposition buttons and Next unreviewed skips them.
+Loading cautions remain separate from the pixel verdict. Notes are optional.
+Review decisions for changed results and Save note are available without opening
+Analysis. Decisions apply only to the displayed analysis; they never approve a baseline.
+To use an After screenshot as the reference for future checks, choose **Select After
+screenshot** in **Update baseline**. Select any other page and screen size you want
+to include, then choose **Review update…**. Nothing changes until you choose
+**Save baseline update** in the confirmation. Other baseline screenshots stay
+unchanged, and earlier versions remain in History.
 Next unreviewed waits for your drafts to be saved. Hide page queue gives the
 screenshots more room. Drag or scroll in an image to move around; Ctrl+scroll
 (also Cmd+scroll on macOS) zooms around the pointer. Shift+scroll moves sideways.

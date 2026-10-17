@@ -1,5 +1,10 @@
 # Whole-app UI review and improvement plan
 
+> Source-layout migration (2026-10-17): native files and UI tests now live in
+> `crates/gui`, package `regressee-gui`, binary `regressee-desktop`. Historical
+> commands/results below retain their original identities. Use
+> [current build instructions](release-building.md) for new runs.
+
 Created: **2026-10-12**. Platform: **native Rust/GPUI desktop**, Windows,
 macOS and Linux. Mode: **Operate**. This is the continuation document for this
 task; it does not replace the existing implementation `PLAN.md`.

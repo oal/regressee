@@ -128,10 +128,40 @@ failures in ordinary language rather than exposing an automation framework.
   of the direction and brief, not native usability or release qualification.
 - On **2026-10-14**, the user supplied light/dark-background logo variants and
   confirmed that the icon must accompany **Regressee**, never replace its name.
-  The approved palette adaptation keeps the existing layout and white workspaces,
+  That palette adaptation kept the existing layout and white workspaces,
   with navy navigation, readable teal primary actions and pale mint selection.
   Originals live in `assets/`; cropped, optimized embedded copies and provenance
-  live in `assets/brand/`. This is not a request for a full dark workspace theme.
+  live in `assets/brand/`. That approval did not request a full dark workspace theme.
+- On **2026-10-16**, the user approved an **app-wide appearance extension** of
+  Clear wayfinding, not a redesign: follow the live desktop preference by default,
+  with an immediately applied, remembered **System / Light / Dark** choice in
+  App settings. This supersedes the earlier white-workspace-only scope while
+  preserving its light palette, system type, geometry and background-appropriate
+  icon/name lockups. Appearance is machine-local, stored independently in
+  `app-preferences.json`, not project settings or baseline ZIPs. Read/write failures
+  must describe the fallback or session-only choice truthfully. Website capture-theme
+  options and screenshot pixels remain unchanged; no new dependency, animation or
+  shipping raster is introduced. Bounded evidence and outstanding qualification:
+  `docs/research/dark-mode-20261016.md`.
+- On **2026-10-17**, the user rejected the actual native app's slate workspace /
+  blue sidebar pairing and gradient header, and selected **Unified neutrals**.
+  The current palette uses a continuous charcoal shell in dark mode and
+  off-white/soft-gray layers in light mode; teal/mint is reserved for action and
+  selection, with warning/error semantics retained. Headers use solid surfaces,
+  not gradients. This supersedes the earlier navy-rail, blue-charcoal and
+  gradient-chrome direction, not its dated approvals or verification records.
+  It is a local Clear wayfinding refinement (inherited seed `6e22d8c4`), not a
+  redesign: preserve layout, system type, control geometry, original screenshots,
+  drafts, consent and the existing logo assets. Both navigation and About choose
+  the supplied logo appropriate to the active light/dark background. System /
+  Light / Dark following and independent atomic preferences remain unchanged;
+  no dependency, motion or shipping raster is added. Production build and focused
+  palette/appearance checks passed; five broader shell failures remain unattributed,
+  so the whole suite is not a pass. Current-source native confirmation passed;
+  fresh review returned **SHIP for the neutral palette/chrome refinement only**,
+  not whole-app or release approval. Earlier scores and source contrast alone
+  do not override this feedback. Scope and qualification limits:
+  `docs/research/theme-coherence-20261017.md`.
 
 ## Product Principles
 
@@ -148,8 +178,11 @@ failures in ordinary language rather than exposing an automation framework.
 
 The project directory was empty at the original planning interview, but that is
 no longer the current state. The maintained native application lives in
-`crates/app`, with its GPUI shell in `crates/app/src/main.rs`, shared controls in
-`crates/app/src/ui`, and navigation/focus rules in `crates/core/src/shell.rs`.
+`crates/gui`, with its GPUI shell in `crates/gui/src/main.rs`, shared controls in
+`crates/gui/src/ui`, GUI-independent application services in `crates/app`, and
+navigation/focus rules in `crates/core/src/shell.rs`. Its executable is
+`regressee-desktop`; `regressee` is currently a separate CLI skeleton, not a
+replacement product workflow.
 
 `README.md` and `docs/first-run-guide.md` describe the implemented workflows:
 guided discovery, authenticated capture, separate environments, fixed-baseline

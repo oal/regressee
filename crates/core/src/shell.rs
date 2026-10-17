@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Testable navigation/focus rules shared by the native shell.
+use crate::appearance::AppAppearance;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Choice {
     AddressesOnly,
@@ -167,6 +168,7 @@ pub enum ReviewSurface {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Control {
+    Appearance(AppAppearance),
     Navigate(Screen),
     SetupStage(SetupStage),
     SettingsSection(SettingsSection),
@@ -189,6 +191,7 @@ pub enum Control {
     CaptureBaseline,
     SaveBaseline,
     ReviewCaptureFailures,
+    ShowAllResults,
     CheckChanges,
     CancelCapture,
     SetupRuntime,
@@ -202,6 +205,7 @@ pub enum Control {
     Viewer,
     SplitView,
     SplitDivider,
+    ReviewDetails,
     Guided(usize),
     CrawlField(usize),
     PauseCapture,
@@ -306,7 +310,15 @@ impl FocusState {
                 Control::Phase5(25),
             ];
         }
-        let mut controls: Vec<_> = Screen::ALL.into_iter().map(Control::Navigate).collect();
+        // Screen::ALL is the shortcut order, not the painted project rail.
+        let mut controls = vec![
+            Control::Navigate(Screen::Projects),
+            Control::Navigate(Screen::Results),
+            Control::PagesBaseline,
+            Control::Navigate(Screen::History),
+            Control::Navigate(Screen::Setup),
+            Control::Navigate(Screen::Settings),
+        ];
         if self.busy && self.screen == Screen::Settings {
             // Read-only app information remains available during background reads,
             // alongside keyboard help and in the same order as the footer.
@@ -315,7 +327,9 @@ impl FocusState {
         if self.screen != Screen::Settings || self.busy {
             controls.push(Control::Shortcuts);
         }
-        controls.push(Control::PagesBaseline);
+        if self.screen == Screen::Results && self.project_saved {
+            controls.push(Control::Guided(53));
+        }
         if !self.busy && self.project_saved && self.screen != Screen::Projects {
             controls.push(if self.choosing_project {
                 Control::CancelProjectChoice
@@ -324,9 +338,6 @@ impl FocusState {
             });
         }
         controls.push(Control::DismissFeedback);
-        if self.busy && self.screen == Screen::Results && self.project_saved {
-            controls.push(Control::Guided(53));
-        }
         if self.busy {
             if self.screen == Screen::History && self.project_saved {
                 controls.extend([Control::HistorySearch, Control::HistoryClear]);
@@ -453,6 +464,9 @@ impl FocusState {
                 controls.extend([
                     Control::SetupRuntime,
                     Control::Details(Detail::Browser),
+                    Control::Appearance(AppAppearance::System),
+                    Control::Appearance(AppAppearance::Light),
+                    Control::Appearance(AppAppearance::Dark),
                     Control::Details(Detail::LocalStorage),
                     Control::Details(Detail::ManagedNetwork),
                     Control::ValidationNext,
@@ -479,38 +493,67 @@ impl FocusState {
             }
             Screen::Results => {
                 if self.project_saved {
-                    controls.push(Control::Phase5(30));
-                    controls.extend([Control::CaptureBaseline, Control::RefreshEvidence]);
+                    // Follow the workspace's reading order, not control-type
+                    // buckets: heading, full-width toolbar, queue, evidence /
+                    // inspector, review strip, then the baseline footer.
+                    if self.candidate {
+                        controls.push(Control::SaveBaseline);
+                    }
+                    controls.push(Control::ReviewCaptureFailures);
+                    if self.baseline {
+                        controls.push(Control::CheckChanges);
+                    }
                     controls.extend([
+                        Control::CaptureBaseline,
                         Control::Guided(16),
+                        Control::Phase5(30),
+                        Control::RefreshEvidence,
+                        Control::Guided(51),
+                    ]);
+                    controls.extend([Control::Guided(50), Control::Guided(54)]);
+                    // View's popup is arrow-key navigated; Tab continues from
+                    // its trigger. Keep its candidates in painted menu order.
+                    controls.extend((6..10).map(Control::Phase5));
+                    controls.extend([
+                        Control::Guided(55),
+                        Control::SplitView,
+                        Control::Guided(57), // Before, then After.
+                        Control::Guided(56),
+                    ]);
+                    if self.viewer {
+                        controls.push(Control::Guided(46));
+                    }
+                    controls.extend([
+                        Control::ImageControls,
+                        Control::Phase5(36),
+                        Control::Guided(44),
+                        Control::ShowAllResults,
+                        Control::CrawlField(9),
                         Control::Guided(17),
-                        Control::Guided(19),
+                        Control::Guided(45),
                         Control::Guided(23),
                         Control::Guided(24),
                     ]);
-                    controls.extend(Choice::RESULTS.into_iter().map(Control::Choice));
-                    if self.preview {
-                        controls.extend([
-                            Control::DiscardPageList,
-                            Control::Guided(20),
-                            Control::Guided(21),
-                            Control::Guided(22),
-                        ]);
-                    }
                     if self.resumable {
                         controls.push(Control::Guided(15));
                     }
-                    controls.push(Control::CrawlField(9));
-                    // Analysis controls can be mounted without image panes;
-                    // the app filters these candidates by the actual sections.
-                    controls.extend((6..12).map(Control::Phase5));
-                    controls.push(Control::Guided(44));
-                    controls.push(Control::Guided(45));
-                    controls.extend([Control::CloseOptions, Control::DiscoveryDetails]);
-                    controls.extend([50, 51, 53, 54, 55, 56, 57].map(Control::Guided));
-                    controls.push(Control::SplitView);
+                    // Options overlay the evidence, with Close at the top.
+                    controls.push(Control::CloseOptions);
+                    controls.extend(Choice::RESULTS.into_iter().map(Control::Choice));
+                    controls.push(Control::Guided(19));
+                    if self.preview {
+                        controls.extend([22, 20, 21].map(Control::Guided));
+                        controls.extend([Control::DiscoveryDetails, Control::DiscardPageList]);
+                    }
+                    if self.viewer {
+                        controls.extend([Control::Viewer, Control::SplitDivider]);
+                    }
+                    controls.extend([10, 11].map(Control::Phase5));
                     controls.push(Control::Phase5(39));
-                    controls.push(Control::ImageControls);
+                    // Mutually exclusive inspectors share Close, then their
+                    // own top-to-bottom contents and pinned footer action.
+                    controls.extend([Control::Phase5(38), Control::CopyCaptureDiagnostics]);
+                    controls.extend([Control::AnalysisField(9), Control::Phase5(32)]);
                     controls.extend([0, 1, 2, 4, 5, 26].map(Control::Phase5));
                     controls.push(Control::Details(Detail::IgnoredAreas));
                     controls.extend([14, 34].map(Control::Phase5));
@@ -520,21 +563,9 @@ impl FocusState {
                     controls.extend([27, 28].map(Control::Phase5));
                     controls.push(Control::Details(Detail::Analysis));
                     controls.extend([12, 13].map(Control::Phase5));
-                    controls.extend((20..26).chain([32, 33, 36, 37, 38]).map(Control::Phase5));
-                    controls.push(Control::CopyCaptureDiagnostics);
-                    controls.push(Control::AnalysisField(9));
-                }
-                if self.candidate {
-                    controls.push(Control::SaveBaseline);
-                }
-                controls.push(Control::ReviewCaptureFailures);
-                if self.baseline {
-                    controls.push(Control::CheckChanges);
-                }
-                if self.viewer {
-                    controls.push(Control::Guided(46));
-                    controls.push(Control::Viewer);
-                    controls.push(Control::SplitDivider);
+                    controls.extend((20..23).map(Control::Phase5));
+                    controls.push(Control::ReviewDetails);
+                    controls.extend([37, 33, 23, 24, 25].map(Control::Phase5));
                 }
             }
             Screen::History if self.project_saved => {
@@ -566,51 +597,6 @@ impl FocusState {
                 ) || self.setup_stage.mounts(*control)
             });
         }
-        if self.screen == Screen::Results {
-            controls.sort_by_key(|control| {
-                let group = match control {
-                    Control::SaveBaseline
-                    | Control::ReviewCaptureFailures
-                    | Control::CheckChanges
-                    | Control::CaptureBaseline
-                    | Control::RefreshEvidence => 1,
-                    Control::Guided(53) => 0,
-                    Control::Navigate(_)
-                    | Control::ChooseProject
-                    | Control::CancelProjectChoice
-                    | Control::PagesBaseline
-                    | Control::DismissFeedback => 1,
-                    Control::Guided(50 | 51 | 45 | 16..=24)
-                    | Control::CrawlField(9)
-                    | Control::Choice(_)
-                    | Control::CloseOptions
-                    | Control::DiscoveryDetails => 2,
-                    Control::DiscardPageList => 2,
-                    Control::Guided(54) => 3,
-                    Control::Phase5(6..=9) | Control::Guided(55..=57) | Control::SplitView => 4,
-                    Control::Guided(46)
-                    | Control::ImageControls
-                    | Control::Phase5(36)
-                    | Control::Guided(44)
-                    | Control::Viewer => 5,
-                    Control::SplitDivider => 6,
-                    Control::Phase5(20..=22) => 7,
-                    Control::Phase5(37 | 33) => 8,
-                    Control::Phase5(23..=25) => 9,
-                    _ => 6,
-                };
-                // The task heading's actions precede the queue, in painted order.
-                let action = match control {
-                    Control::SaveBaseline => 1,
-                    Control::ReviewCaptureFailures => 2,
-                    Control::CheckChanges => 3,
-                    Control::CaptureBaseline => 4,
-                    Control::RefreshEvidence => 5,
-                    _ => 0,
-                };
-                (group, action)
-            });
-        }
         controls
     }
     pub fn next(&self, current: Control, reverse: bool) -> Option<Control> {
@@ -634,6 +620,58 @@ impl FocusState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn review_candidates_follow_rail_toolbar_queue_evidence_and_footer_order() {
+        let state = FocusState {
+            screen: Screen::Results,
+            busy: false,
+            project_saved: true,
+            baseline: true,
+            viewer: true,
+            ..Default::default()
+        };
+        let expected = [
+            Control::Navigate(Screen::Projects),
+            Control::Navigate(Screen::Results),
+            Control::PagesBaseline,
+            Control::Navigate(Screen::History),
+            Control::Navigate(Screen::Setup),
+            Control::Navigate(Screen::Settings),
+            Control::Guided(53),
+            Control::ChooseProject,
+            Control::CheckChanges,
+            Control::RefreshEvidence,
+            Control::Guided(50),
+            Control::Guided(54),
+            Control::Guided(57),
+            Control::Guided(56),
+            Control::Guided(46),
+            Control::ImageControls,
+            Control::Phase5(36),
+            Control::Guided(44),
+            Control::CrawlField(9),
+            Control::Guided(17),
+            Control::Guided(45),
+            Control::Guided(23),
+            Control::Guided(24),
+            Control::Viewer,
+            Control::SplitDivider,
+            Control::Phase5(20),
+            Control::Phase5(21),
+            Control::Phase5(22),
+            Control::Phase5(37),
+            Control::Phase5(33),
+            Control::Phase5(23),
+            Control::Phase5(24),
+        ];
+        let actual: Vec<_> = state
+            .controls()
+            .into_iter()
+            .filter(|c| expected.contains(c))
+            .collect();
+        assert_eq!(actual, expected);
+    }
+
     #[test]
     fn busy_settings_keep_about_and_keyboard_help_without_unlocking_mutations() {
         let mut state = FocusState {

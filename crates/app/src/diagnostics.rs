@@ -63,7 +63,7 @@ pub struct Report {
     pub versions: Option<Versions>,
     pub counts: regressee_storage::DiagnosticCounts,
 }
-pub const PREVIEW: &str = "This report includes app and database versions, your operating system and processor type, browser status and versions, and result counts. Counts cover up to 100 recent captures or checks and 10,000 planned screenshots; saved-record counts stop at 100,001. It excludes screenshots, names, website addresses, logins, passwords, file locations, logs, device identifiers and detailed error messages. Export saves a JSON file on your computer; nothing is sent. Review the contents, then choose Export or Cancel.";
+pub const PREVIEW: &str = "This report includes app and database versions, your operating system and processor type, browser status and versions, and result counts. Counts cover up to 100 recent captures or checks and 10,000 planned screenshots; saved-record counts stop at 100,001. It excludes screenshots, names, website addresses, logins, passwords, file locations, logs, device identifiers and detailed error messages. Saving creates a JSON file on your computer; nothing is sent. Review the contents, then choose Save support report or Cancel.";
 pub fn collect(
     store: &regressee_storage::Store,
     product: Option<&crate::product::Product>,

@@ -23,8 +23,8 @@ for phase in (5, 6):
 commands = [
     ('locked-ui-build-test-clippy-fmt', ['bash', 'scripts/check-foundation.sh']),
     ('signed-auth-crawl-resource-safety', ['python3', 'scripts/check-phase4.py', '--output', str(output / 'signed-safety'), '--runtime-only']),
-    ('signed-phase5-product', ['cargo', 'test', '--locked', '-p', 'regressee-app', '--features', 'ui-tests', '--test', 'product_flow', 'actual_phase5_product_analysis_composite_and_replacement', '--', '--exact', '--ignored', '--nocapture', '--test-threads=1']),
-    ('signed-phase6-recipient', ['cargo', 'test', '--locked', '-p', 'regressee-app', '--features', 'ui-tests', '--test', 'product_flow', 'actual_phase6_composite_zip_fresh_recipient_login_and_fixed_mapped_check', '--', '--exact', '--ignored', '--nocapture', '--test-threads=1']),
+    ('signed-phase5-product', ['cargo', 'test', '--locked', '-p', 'regressee-app', '--features', 'test-support', '--test', 'product_flow', 'actual_phase5_product_analysis_composite_and_replacement', '--', '--exact', '--ignored', '--nocapture', '--test-threads=1']),
+    ('signed-phase6-recipient', ['cargo', 'test', '--locked', '-p', 'regressee-app', '--features', 'test-support', '--test', 'product_flow', 'actual_phase6_composite_zip_fresh_recipient_login_and_fixed_mapped_check', '--', '--exact', '--ignored', '--nocapture', '--test-threads=1']),
     ('readonly-independent-corpus', ['python3', '-B', 'tests/fixtures/analysis-proposal/corpus.py', 'validate']),
     ('final-format', ['cargo', 'fmt', '--all', '--', '--check']),
 ]

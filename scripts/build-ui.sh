@@ -16,4 +16,4 @@ if [[ "$(uname -s)" == Linux && "$(uname -m)" == x86_64 ]]; then
   done
   export LIBRARY_PATH="$PWD/.runtime/link-libs${LIBRARY_PATH:+:$LIBRARY_PATH}"
 fi
-cargo build --locked --workspace --features ui --bins -j 4
+cargo build --locked --workspace --features regressee-gui/ui,regressee-spike/ui --bins -j 4

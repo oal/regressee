@@ -98,7 +98,7 @@ if a.candidate:
     try:
         if source_release.inventory(source_release.collect(fd))!=manifest['source_files']:failures.append('candidate-source-changed')
     finally:os.close(fd)
-    if digest(root/'target/debug/regressee')!=manifest['binary_sha256']:failures.append('candidate-binary-changed')
+    if digest(root/'target/debug/regressee-desktop')!=manifest['binary_sha256']:failures.append('candidate-binary-changed')
     for line in (a.candidate/'SHA256SUMS').read_text().splitlines():
         expected,name=line.split('  ',1)
         if name not in {'source.tar.gz','app.tar.gz','manifest.json','license-inventory.json'} or digest(a.candidate/name)!=expected:failures.append('candidate-hash-mismatch')

@@ -10,7 +10,7 @@ from pathlib import Path
 p=argparse.ArgumentParser();p.add_argument('--output',required=True,type=Path);p.add_argument('--distribution',required=True,type=Path);p.add_argument('--runtime-cache',required=True,type=Path);a=p.parse_args()
 a.output.mkdir(mode=0o700,parents=True,exist_ok=False);out=a.output.resolve();root=Path(__file__).resolve().parent.parent
 env=dict(os.environ,REGRESSEE_PHASE7_EVIDENCE=str(out/'data'),REGRESSEE_PHASE7_DISTRIBUTION=str(a.distribution.resolve()),REGRESSEE_PHASE7_RUNTIME_CACHE=str(a.runtime_cache.resolve()))
-cmd=['python3','scripts/check-phase6-corrections.py','--output',str(out/'command'),'--timeout','1560','--','cargo','test','--locked','-p','regressee-app','--features','ui-tests','--test','product_flow','phase7_actual_1000_page_soak_pause_resume_cancel','--','--exact','--ignored','--nocapture','--test-threads=1']
+cmd=['python3','scripts/check-phase6-corrections.py','--output',str(out/'command'),'--timeout','1560','--','cargo','test','--locked','-p','regressee-app','--features','test-support','--test','product_flow','phase7_actual_1000_page_soak_pause_resume_cancel','--','--exact','--ignored','--nocapture','--test-threads=1']
 known={};peaks={'AppRust':0,'Node':0,'Chromium':0,'HarnessBuild':0};samples=0;start=time.monotonic()
 with (out/'wrapper.log').open('xb') as log:
     child=subprocess.Popen(cmd,cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT)

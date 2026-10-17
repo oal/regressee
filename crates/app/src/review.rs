@@ -71,16 +71,18 @@ pub fn analyze_run(
                     policy: policy.clone(),
                     mask: store.latest_mask(run.run.project, &reference.key)?,
                 },
-                before.metadata.stable
-                    && after.metadata.stable
-                    && before.metadata.warnings.is_empty()
-                    && after.metadata.warnings.is_empty(),
             ));
         }
     }
     // Includes exact source run/artifact IDs, material/rendering identities,
     // complete policy semantics/revision and mask pair/dimensions/revision.
-    let cache_key = identity_hash(&(baseline_id, id, &policy, &requests))?;
+    let cache_key = identity_hash(&(
+        "capture-cautions-advisory-v2",
+        baseline_id,
+        id,
+        &policy,
+        &requests,
+    ))?;
     if let Some(cached) = store.cached_analysis(id, &cache_key)? {
         if cancel.load(Ordering::Acquire) {
             return Err(e::Cancelled.into());
@@ -103,7 +105,7 @@ pub fn analyze_run(
             changed_pixels: 0,
             dimensions_changed: false,
         };
-        if let Some((_, request, ready)) = requests.iter().find(|(key, _, _)| key == &target.key) {
+        if let Some((_, request)) = requests.iter().find(|(key, _)| key == &target.key) {
             let before = baseline
                 .references
                 .iter()
@@ -118,10 +120,9 @@ pub fn analyze_run(
                 cancel,
             ) {
                 Ok((report, heatmap)) => {
-                    result.classification = if !ready
-                        || report
-                            .warnings
-                            .contains(&e::Warning::RenderingEnvironmentMismatch)
+                    result.classification = if report
+                        .warnings
+                        .contains(&e::Warning::RenderingEnvironmentMismatch)
                     {
                         Classification::NotComparable
                     } else {

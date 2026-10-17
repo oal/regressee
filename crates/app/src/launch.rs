@@ -16,11 +16,11 @@ pub fn build_info() -> serde_json::Value {
     serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "features": {
-            "ui": cfg!(feature = "ui"),
+            "ui": false,
             "developer-tools": cfg!(feature = "developer-tools"),
             "test-support": cfg!(feature = "test-support"),
-            "ui-inspection": cfg!(feature = "ui-inspection"),
-            "ui-renderer-capture": cfg!(feature = "ui-renderer-capture"),
+            "ui-inspection": false,
+            "ui-renderer-capture": false,
         }
     })
 }

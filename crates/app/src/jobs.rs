@@ -20,7 +20,7 @@ use std::{
 pub const COMMAND_CAPACITY: usize = 4;
 pub const UPDATE_CAPACITY: usize = 4;
 #[derive(Debug)]
-pub enum Work {
+pub enum Command<W> {
     List {
         page: usize,
     },
@@ -56,13 +56,6 @@ pub enum Work {
     InspectRun {
         project: ProjectId,
         run: RunId,
-    },
-    #[cfg(feature = "ui")]
-    HistoricalViewer {
-        project: ProjectId,
-        run: RunId,
-        tile: usize,
-        key: Option<TargetKey>,
     },
     DeletePreview {
         project: ProjectId,
@@ -137,73 +130,18 @@ pub enum Work {
         project: ProjectId,
         preview: Box<DiscoveryPreview>,
     },
-    #[cfg(feature = "ui")]
-    Viewer {
-        project: ProjectId,
-        tile: usize,
-        key: Option<TargetKey>,
-        analysis: Option<regressee_core::domain::AnalysisId>,
-    },
+    /// Private in-process extension, not a public command/protocol surface.
+    Extension(W),
 }
-impl Work {
-    /// Immediate, honest task feedback before the worker's first progress update.
-    pub fn activity_label(&self) -> &'static str {
-        match self {
-            Self::List { .. } => "Loading projects…",
-            Self::Load(_) => "Opening project…",
-            Self::Save { .. } | Self::SaveReplacement { .. } => "Saving project settings…",
-            Self::InspectStorage | Self::ProjectStorage(_) => "Measuring local storage…",
-            Self::DiagnosticPreview => "Preparing diagnostic preview…",
-            Self::DiagnosticExport { .. } => "Saving diagnostic file…",
-            Self::ExportPreview { .. } => "Preparing baseline ZIP preview…",
-            Self::Export { .. } => "Saving baseline ZIP…",
-            Self::ImportPreview(_) => "Reading baseline ZIP…",
-            Self::Import { .. } => "Importing project and baseline…",
-            Self::History { .. } => "Loading capture and baseline history…",
-            Self::InspectRun { .. } => "Loading saved screenshots and results…",
-            #[cfg(feature = "ui")]
-            Self::Viewer { .. } | Self::HistoricalViewer { .. } => "Loading screenshot…",
-            Self::DeletePreview { .. } => "Preparing deletion preview…",
-            Self::Delete(_) => "Deleting selected history…",
-            Self::RepairPreview => "Checking local storage…",
-            Self::CleanupTemporaries(_) => "Removing confirmed temporary files…",
-            Self::DeleteUnreferenced(_) => "Deleting recovery files…",
-            Self::RuntimeStatus => "Checking installed browser…",
-            Self::NetworkStatus => "Loading network settings…",
-            Self::SaveNetwork(_) => "Saving network settings…",
-            Self::SetupRuntime => "Preparing browser setup…",
-            Self::Evidence(_) => "Loading saved screenshots and results…",
-            Self::Capture { check: true, .. } | Self::CaptureInventory { check: true, .. } => {
-                "Starting website check…"
-            }
-            Self::Capture { .. } | Self::CaptureInventory { .. } => "Starting screenshot capture…",
-            Self::Discover(_) => "Preparing to find pages…",
-            Self::ExistingInventory(_) => "Loading saved page list…",
-            Self::EnvironmentStatus(_) => "Loading login and environment settings…",
-            Self::SaveEnvironment { .. } => "Saving login and environment settings…",
-            Self::OpenLogin(_) => "Opening login browser…",
-            Self::ConfirmLogin(_) => "Saving login session…",
-            Self::CloseLogin(_) => "Closing login browser…",
-            Self::ForgetLogin(_) => "Removing saved login session…",
-            Self::ProbeEnvironment(_) => "Checking website access…",
-            Self::Activate { .. } | Self::Accept { .. } => "Saving baseline…",
-            Self::Restore { .. } => "Restoring selected baseline…",
-            Self::Reanalyze { .. } => "Updating comparison analysis…",
-            Self::Mask { .. } => "Saving ignored areas…",
-            Self::Review(_) => "Saving review decision…",
-            Self::LoadAnalysis(_) => "Loading saved comparison…",
-            Self::Approval { .. } => "Preparing baseline update preview…",
-            Self::PreviewImages { .. } => "Capturing a preview screenshot…",
-        }
-    }
-}
+pub type Work = Command<std::convert::Infallible>;
 #[derive(Debug)]
-pub struct Request {
+pub struct JobRequest<W> {
     pub id: u64,
-    pub work: Work,
+    pub work: Command<W>,
 }
+pub type Request = JobRequest<std::convert::Infallible>;
 #[derive(Debug)]
-pub enum Reply {
+pub enum JobReply<R> {
     Projects(ProjectPage),
     Project(Box<ProjectRecord>),
     Storage(StorageSummary),
@@ -252,66 +190,9 @@ pub enum Reply {
     },
     /// Real screenshot-target counts and frozen setup, separate from phase text.
     CaptureStatus(crate::task::CaptureStatus),
-    #[cfg(feature = "ui")]
-    Viewer(Box<ViewerFrame>),
+    Extension(R),
 }
-#[cfg(feature = "ui")]
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ViewerIdentity {
-    pub project: ProjectId,
-    pub run: RunId,
-    pub key: TargetKey,
-    pub analysis: Option<regressee_core::domain::AnalysisId>,
-}
-#[cfg(feature = "ui")]
-#[derive(Debug, Clone)]
-pub struct ViewerFrame {
-    pub tile: usize,
-    pub panes: Vec<Vec<Arc<gpui::RenderImage>>>,
-    pub width: u32,
-    pub height: u32,
-    pub request: Option<crate::analysis_engine::AnalysisRequest>,
-    pub analysis: Option<regressee_core::domain::AnalysisId>,
-    pub identity: Option<ViewerIdentity>,
-    pub before_environment: Option<String>,
-    /// Exact immutable source metadata for the selected reference, not today's settings.
-    pub before_capture: Option<regressee_core::evidence::CaptureEvidence>,
-}
-#[cfg(feature = "ui")]
-#[derive(Default)]
-struct ViewerMailbox {
-    generation: u64,
-    latest: Option<(u64, Request)>,
-    prefetch: Option<Work>,
-}
-#[cfg(feature = "ui")]
-impl ViewerMailbox {
-    fn submit(&mut self, request: Request) -> Result<(), &'static str> {
-        if !matches!(
-            &request.work,
-            Work::Viewer { .. } | Work::HistoricalViewer { .. }
-        ) {
-            return Err("Viewer navigation only accepts screenshot reads.");
-        }
-        self.generation = self
-            .generation
-            .checked_add(1)
-            .ok_or("Viewer generation exhausted; restart Regressee.")?;
-        self.latest = Some((self.generation, request));
-        // A new intent invalidates speculative work from the old selection.
-        self.prefetch = None;
-        Ok(())
-    }
-    fn take(&mut self) -> Option<(Request, bool, Option<u64>)> {
-        if let Some((generation, request)) = self.latest.take() {
-            Some((request, false, Some(generation)))
-        } else {
-            self.prefetch
-                .take()
-                .map(|work| (Request { id: 0, work }, true, None))
-        }
-    }
-}
+pub type Reply = JobReply<std::convert::Infallible>;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StorageFailure {
     Unavailable,
@@ -338,29 +219,91 @@ impl StorageFailure {
     }
 }
 #[derive(Debug)]
-pub struct Update {
+pub struct JobUpdate<R> {
     pub id: u64,
-    pub reply: Reply,
+    pub reply: JobReply<R>,
 }
-pub struct Jobs {
-    commands: SyncSender<Request>,
+pub type Update = JobUpdate<std::convert::Infallible>;
+
+/// An optional private actor adapter. Application services know nothing about
+/// the extension's data or native widgets. All work still uses one store owner.
+pub trait Extension: Default + Send + 'static {
+    type Work: std::fmt::Debug + Send + 'static;
+    type Reply: std::fmt::Debug + Send + 'static;
+    type Shared: Default + Send + Sync + 'static;
+    fn submit(
+        shared: &Self::Shared,
+        request: JobRequest<Self::Work>,
+        stop: &AtomicBool,
+    ) -> Result<(), &'static str>;
+    fn take(shared: &Self::Shared) -> Option<(JobRequest<Self::Work>, bool, Option<u64>)>;
+    fn before_work(&mut self, shared: &Self::Shared, work: &Command<Self::Work>);
+    fn execute(
+        &mut self,
+        store: &mut Store,
+        work: Self::Work,
+        speculative: bool,
+    ) -> anyhow::Result<Self::Reply>;
+    fn publish(
+        sender: &SyncSender<JobUpdate<Self::Reply>>,
+        update: JobUpdate<Self::Reply>,
+        stop: &AtomicBool,
+        shared: &Self::Shared,
+        generation: u64,
+    ) -> bool;
+    fn stop(shared: &Self::Shared);
+}
+
+#[derive(Default)]
+pub struct NoExtension;
+impl Extension for NoExtension {
+    type Work = std::convert::Infallible;
+    type Reply = std::convert::Infallible;
+    type Shared = ();
+    fn submit(_: &(), request: Request, _: &AtomicBool) -> Result<(), &'static str> {
+        match request.work {
+            Command::Extension(never) => match never {},
+            _ => unreachable!(),
+        }
+    }
+    fn take(_: &()) -> Option<(Request, bool, Option<u64>)> {
+        None
+    }
+    fn before_work(&mut self, _: &(), _: &Work) {}
+    fn execute(&mut self, _: &mut Store, work: Self::Work, _: bool) -> anyhow::Result<Self::Reply> {
+        match work {}
+    }
+    fn publish(
+        sender: &SyncSender<Update>,
+        update: Update,
+        stop: &AtomicBool,
+        _: &(),
+        _: u64,
+    ) -> bool {
+        publish(sender, update, stop)
+    }
+    fn stop(_: &()) {}
+}
+
+pub type Jobs = BackgroundJobs<NoExtension>;
+pub struct BackgroundJobs<E: Extension> {
+    commands: SyncSender<JobRequest<E::Work>>,
     stopped: Arc<AtomicBool>,
     cancelled: Arc<AtomicBool>,
     operation_active: Arc<AtomicBool>,
     paused: Arc<AtomicBool>,
     analysis_cancel: Mutex<Option<Arc<AtomicBool>>>,
     thread: Mutex<Option<JoinHandle<()>>>,
-    #[cfg(feature = "ui")]
-    viewer: Arc<Mutex<ViewerMailbox>>,
+    extension: Arc<E::Shared>,
 }
-impl Jobs {
-    pub fn start(paths: AppPaths) -> (Arc<Self>, Receiver<Update>) {
+impl<E: Extension> BackgroundJobs<E> {
+    pub fn start(paths: AppPaths) -> (Arc<Self>, Receiver<JobUpdate<E::Reply>>) {
         Self::start_inner(paths, |paths| Product::configured(&paths.cache))
     }
     pub fn start_with_distribution(
         paths: AppPaths,
         distribution: regressee_runtime::distribution::Distribution,
-    ) -> (Arc<Self>, Receiver<Update>) {
+    ) -> (Arc<Self>, Receiver<JobUpdate<E::Reply>>) {
         Self::start_inner(paths, move |paths| {
             distribution.validate()?;
             Ok(Product {
@@ -372,8 +315,11 @@ impl Jobs {
         })
     }
     /// Test-only injection; production `start` always uses configured app trust.
-    #[cfg(any(test, feature = "ui-tests"))]
-    pub fn start_with_product(paths: AppPaths, product: Product) -> (Arc<Self>, Receiver<Update>) {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn start_with_product(
+        paths: AppPaths,
+        product: Product,
+    ) -> (Arc<Self>, Receiver<JobUpdate<E::Reply>>) {
         Self::start_inner(paths, move |_| {
             if let Some(d) = &product.distribution {
                 d.validate()?;
@@ -381,8 +327,8 @@ impl Jobs {
             Ok(product)
         })
     }
-    #[cfg(any(test, feature = "ui-tests"))]
-    pub fn start_without_runtime(paths: AppPaths) -> (Arc<Self>, Receiver<Update>) {
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn start_without_runtime(paths: AppPaths) -> (Arc<Self>, Receiver<JobUpdate<E::Reply>>) {
         let product = Product {
             distribution: None,
             official_runtime: false,
@@ -391,10 +337,18 @@ impl Jobs {
         };
         Self::start_with_product(paths, product)
     }
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn start_with_factory(
+        paths: AppPaths,
+        configure: impl FnOnce(&AppPaths) -> anyhow::Result<Product> + Send + 'static,
+    ) -> (Arc<Self>, Receiver<JobUpdate<E::Reply>>) {
+        Self::start_inner(paths, configure)
+    }
     fn start_inner(
         paths: AppPaths,
         configure: impl FnOnce(&AppPaths) -> anyhow::Result<Product> + Send + 'static,
-    ) -> (Arc<Self>, Receiver<Update>) {
+    ) -> (Arc<Self>, Receiver<JobUpdate<E::Reply>>) {
+        use {Command as Work, JobReply as Reply, JobUpdate as Update};
         let (commands, rx) = mpsc::sync_channel(COMMAND_CAPACITY);
         let (updates, results) = mpsc::sync_channel(UPDATE_CAPACITY);
         let stopped = Arc::new(AtomicBool::new(false));
@@ -405,10 +359,8 @@ impl Jobs {
         let active = operation_active.clone();
         let paused = Arc::new(AtomicBool::new(false));
         let pause = paused.clone();
-        #[cfg(feature = "ui")]
-        let viewer = Arc::new(Mutex::new(ViewerMailbox::default()));
-        #[cfg(feature = "ui")]
-        let mailbox = viewer.clone();
+        let extension = Arc::new(E::Shared::default());
+        let shared = extension.clone();
         let thread = thread::spawn(move || {
             let product = configure(&paths);
             let mut store = Store::open(paths).ok();
@@ -416,52 +368,29 @@ impl Jobs {
                 let _ = s.recover_runs();
                 let _ = s.complete_confirmed_gc();
             }
-            #[cfg(feature = "ui")]
-            let mut viewer_cache = crate::viewer_cache::ViewerCache::default();
+            let mut extension = E::default();
             while !stop.load(Ordering::Acquire) {
-                #[cfg(feature = "ui")]
-                let (request, speculative, viewer_generation) =
-                    match next_viewer_work(&rx, &mailbox) {
-                        Some(work) => work,
-                        None => match rx.recv_timeout(Duration::from_millis(20)) {
-                            Ok(request) => (request, false, None),
-                            Err(mpsc::RecvTimeoutError::Timeout) => continue,
-                            Err(_) => break,
-                        },
-                    };
-                #[cfg(not(feature = "ui"))]
-                let request: Request = match rx.recv_timeout(Duration::from_millis(20)) {
-                    Ok(r) => r,
-                    Err(mpsc::RecvTimeoutError::Timeout) => continue,
-                    Err(_) => break,
+                let (request, speculative, generation) = match rx
+                    .try_recv()
+                    .ok()
+                    .map(|request| (request, false, None))
+                    .or_else(|| E::take(&shared))
+                {
+                    Some(work) => work,
+                    None => match rx.recv_timeout(Duration::from_millis(20)) {
+                        Ok(request) => (request, false, None),
+                        Err(mpsc::RecvTimeoutError::Timeout) => continue,
+                        Err(_) => break,
+                    },
                 };
                 let is_operation = is_operation(&request.work);
-                #[cfg(feature = "ui")]
-                if invalidates_viewer(&request.work) {
-                    // Before work: even a partly completed/failed operation may
-                    // have committed a checkpoint. Explicit refresh re-reads CAS.
-                    viewer_cache.invalidate();
-                    mailbox.lock().unwrap().prefetch = None;
-                }
+                extension.before_work(&shared, &request.work);
                 let reply = match store.as_mut() {
-                    None => Reply::Failure(StorageFailure::Unavailable),
+                    None => JobReply::Failure(StorageFailure::Unavailable),
                     Some(store) => match request.work {
-                        #[cfg(feature = "ui")]
-                        Work::Viewer { project, tile, key, analysis } => {
-                            let result = if speculative {
-                                viewer_cache.prefetch(store, project, tile, key, analysis)
-                            } else {
-                                viewer_cache.frame(store, project, tile, key, analysis)
-                            };
-                            result.map(|frame| Reply::Viewer(Box::new(frame)))
-                                .unwrap_or_else(|e| Reply::ProductFailure(e.to_string()))
-                        }
-                        #[cfg(feature = "ui")]
-                        Work::HistoricalViewer { project, run, tile, key } => {
-                            crate::viewer_cache::ViewerCache::default().historical_frame(store, project, run, tile, key)
-                                .map(|frame| Reply::Viewer(Box::new(frame)))
-                                .unwrap_or_else(|e| Reply::ProductFailure(e.to_string()))
-                        }
+                        Command::Extension(work) => extension.execute(store, work, speculative)
+                            .map(JobReply::Extension)
+                            .unwrap_or_else(|e| JobReply::ProductFailure(e.to_string())),
                         Work::InspectRun { project, run } => store.inspect_run(project, run)
                             .map(|evidence| Reply::InspectedRun { project, run, evidence: Box::new(evidence) })
                             .unwrap_or_else(|e| Reply::ProductFailure(e.to_string())),
@@ -497,10 +426,10 @@ impl Jobs {
                         }
                         Work::DiagnosticPreview => crate::diagnostics::collect(store,product.as_ref().ok(),&cancel)
                             .map(|report|Reply::DiagnosticPreview(Box::new(report)))
-                            .unwrap_or_else(|error| if cancellation_error(&error) { Reply::Cancelled } else { Reply::ProductFailure("Diagnostic preview unavailable. No private information was exported; try again.".into()) }),
+                            .unwrap_or_else(|error| if cancellation_error(&error) { Reply::Cancelled } else { Reply::ProductFailure("Support report preview unavailable. No private information was exported; try again.".into()) }),
                         Work::DiagnosticExport { report,path } => crate::diagnostics::export(&report,&path,&cancel)
                             .map(|_|Reply::DiagnosticExported)
-                            .unwrap_or_else(|error| if cancellation_error(&error) { Reply::Cancelled } else { Reply::ProductFailure("Diagnostic file could not be saved. Choose a new filename and check folder permissions. Nothing was sent.".into()) }),
+                            .unwrap_or_else(|error| if cancellation_error(&error) { Reply::Cancelled } else { Reply::ProductFailure("Support report could not be saved. Choose a new filename and check folder permissions. Nothing was sent.".into()) }),
                         Work::InspectStorage => store
                             .summary()
                             .map(Reply::Storage)
@@ -516,26 +445,23 @@ impl Jobs {
                 if is_operation {
                     active.store(false, Ordering::Release);
                 }
-                #[cfg(feature = "ui")]
-                {
-                    if speculative {
-                        continue;
+                if speculative {
+                    continue;
+                }
+                if let Some(generation) = generation {
+                    if !E::publish(
+                        &updates,
+                        Update {
+                            id: request.id,
+                            reply,
+                        },
+                        &stop,
+                        &shared,
+                        generation,
+                    ) {
+                        break;
                     }
-                    if let Some(generation) = viewer_generation {
-                        if !publish_viewer(
-                            &updates,
-                            Update {
-                                id: request.id,
-                                reply,
-                            },
-                            &stop,
-                            &mailbox,
-                            generation,
-                        ) {
-                            break;
-                        }
-                        continue;
-                    }
+                    continue;
                 }
                 if !publish(
                     &updates,
@@ -558,20 +484,19 @@ impl Jobs {
                 paused,
                 analysis_cancel: Mutex::new(None),
                 thread: Mutex::new(Some(thread)),
-                #[cfg(feature = "ui")]
-                viewer,
+                extension,
             }),
             results,
         )
     }
     /// UI-safe: no DB/file/process access, blocking send, or thread join.
-    pub fn submit(&self, request: Request) -> Result<(), &'static str> {
-        #[cfg(feature = "ui")]
-        if matches!(
-            &request.work,
-            Work::Viewer { .. } | Work::HistoricalViewer { .. }
-        ) {
-            return self.submit_viewer(request);
+    pub fn submit(&self, request: JobRequest<E::Work>) -> Result<(), &'static str> {
+        use Command as Work;
+        if matches!(&request.work, Command::Extension(_)) {
+            if self.stopped.load(Ordering::Acquire) {
+                return Err("Background storage has stopped. Restart Regressee.");
+            }
+            return E::submit(&self.extension, request, &self.stopped);
         }
         if self.stopped.load(Ordering::Acquire) {
             return Err("Background storage has stopped. Restart Regressee.");
@@ -601,42 +526,23 @@ impl Jobs {
         }
         Ok(())
     }
-    /// Latest intent replaces the single pending screenshot read. Replies keep
-    /// the caller's Update.id generation; mutations retain the reliable queue.
-    #[cfg(feature = "ui")]
-    pub fn submit_viewer(&self, request: Request) -> Result<(), &'static str> {
-        let mut viewer = self.viewer.lock().unwrap();
-        if self.stopped.load(Ordering::Acquire) {
-            return Err("Background storage has stopped. Restart Regressee.");
-        }
-        viewer.submit(request)
-    }
-    /// One adjacent-target speculation, read by the same owner only when the
-    /// command queue and latest-viewer slot are empty. Never publishes a reply.
-    #[cfg(feature = "ui")]
-    pub fn prefetch_viewer(&self, work: Work) -> Result<(), &'static str> {
-        if !matches!(&work, Work::Viewer { .. }) {
-            return Err("Viewer prefetch only accepts screenshot reads.");
-        }
-        let mut viewer = self.viewer.lock().unwrap();
-        if self.stopped.load(Ordering::Acquire) {
-            return Err("Background storage has stopped. Restart Regressee.");
-        }
-        viewer.prefetch = Some(work);
-        Ok(())
-    }
     pub fn stop(&self) {
         self.stopped.store(true, Ordering::Release);
         self.cancelled.store(true, Ordering::Release);
-        #[cfg(feature = "ui")]
-        {
-            let mut viewer = self.viewer.lock().unwrap();
-            viewer.latest = None;
-            viewer.prefetch = None;
-        }
+        E::stop(&self.extension);
         if let Some(cancel) = self.analysis_cancel.lock().unwrap().as_ref() {
             cancel.store(true, Ordering::Release);
         }
+    }
+    /// Run a non-blocking extension mailbox update under the actor's stop guard.
+    pub fn with_extension(
+        &self,
+        update: impl FnOnce(&E::Shared, &AtomicBool) -> Result<(), &'static str>,
+    ) -> Result<(), &'static str> {
+        if self.stopped.load(Ordering::Acquire) {
+            return Err("Background storage has stopped. Restart Regressee.");
+        }
+        update(&self.extension, &self.stopped)
     }
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
@@ -652,18 +558,19 @@ impl Jobs {
         }
     }
 }
-fn product_work(
+fn product_work<W, R>(
     product: &Product,
     store: &mut Store,
-    work: Work,
+    work: Command<W>,
     cancel: &Arc<AtomicBool>,
     pause: &Arc<AtomicBool>,
-    updates: &SyncSender<Update>,
+    updates: &SyncSender<JobUpdate<R>>,
     id: u64,
-) -> Reply {
+) -> JobReply<R> {
+    use {Command as Work, JobReply as Reply, JobUpdate as Update};
     // The submit boundary creates one operation slot; cancellation requested
     // while a command is queued is preserved through its actual start.
-    let result = (|| -> anyhow::Result<Reply> {
+    let result = (|| -> anyhow::Result<JobReply<R>> {
         let discovering = matches!(&work, Work::Discover(_));
         let mut verified_runtime = None;
         if let Some(project) = first_use_project(&work) {
@@ -710,10 +617,8 @@ fn product_work(
                 Ok(Reply::SavedMask)
             }
             Work::Review(decision) => {
-                store.save_review(&decision)?;
-                Ok(Reply::SavedReview(store.review_history(
-                    store.load_analysis(decision.analysis)?.revision.run,
-                )?))
+                let run = store.save_review(&decision)?;
+                Ok(Reply::SavedReview(store.review_history(run)?))
             }
             Work::LoadAnalysis(id) => {
                 store.display_analysis(id)?;
@@ -885,33 +790,20 @@ fn product_work(
                     confirm_partial,
                 )?,
             ))),
-            #[cfg(feature = "ui")]
-            Work::Viewer {
-                project,
-                tile,
-                key,
-                analysis,
-            } => {
-                // Direct helper callers get a verified one-shot session; the
-                // Jobs owner intercepts Viewer and retains its bounded cache.
-                Ok(Reply::Viewer(Box::new(
-                    crate::viewer_cache::ViewerCache::default()
-                        .frame(store, project, tile, key, analysis)?,
-                )))
-            }
             _ => anyhow::bail!("invalid background product action"),
         }
     })();
     operation_reply(result)
 }
-fn discovery_update(
-    updates: &SyncSender<Update>,
+fn discovery_update<R>(
+    updates: &SyncSender<JobUpdate<R>>,
     id: u64,
     message: &str,
     completed: u32,
     total: Option<u32>,
     cancel: &AtomicBool,
 ) {
+    use {JobReply as Reply, JobUpdate as Update};
     let update = Update {
         id,
         reply: Reply::Progress {
@@ -929,7 +821,8 @@ fn discovery_update(
         let _ = updates.try_send(update);
     }
 }
-fn first_use_project(work: &Work) -> Option<ProjectId> {
+fn first_use_project<W>(work: &Command<W>) -> Option<ProjectId> {
+    use Command as Work;
     match work {
         Work::Discover(project) | Work::OpenLogin(project) | Work::ProbeEnvironment(project) => {
             Some(*project)
@@ -947,17 +840,20 @@ fn first_use_project(work: &Work) -> Option<ProjectId> {
         _ => None,
     }
 }
-fn explicit_setup_reply(
+fn explicit_setup_reply<R>(
     setup: impl FnOnce() -> anyhow::Result<String>,
     readiness: impl FnOnce(&AtomicBool) -> anyhow::Result<crate::product::RuntimeReadiness>,
-) -> anyhow::Result<Reply> {
+) -> anyhow::Result<JobReply<R>> {
     setup()?;
     // Explicit installation already committed. Verify/report its actual state
     // without converting a late Cancel into a false installation failure. This
     // token is only for terminal verification, never for website continuation.
-    Ok(Reply::RuntimeReadiness(readiness(&AtomicBool::new(false))?))
+    Ok(JobReply::RuntimeReadiness(readiness(&AtomicBool::new(
+        false,
+    ))?))
 }
-fn automatic_setup_allowed(work: &Work, has_baseline: bool) -> bool {
+fn automatic_setup_allowed<W>(work: &Command<W>, has_baseline: bool) -> bool {
+    use Command as Work;
     match work {
         // Login/probe can prepare a pinned comparison: never select a new
         // default for an existing baseline, even if its current pointer is gone.
@@ -965,11 +861,12 @@ fn automatic_setup_allowed(work: &Work, has_baseline: bool) -> bool {
         _ => first_use_project(work).is_some(),
     }
 }
-fn setup_update(
-    updates: &SyncSender<Update>,
+fn setup_update<R>(
+    updates: &SyncSender<JobUpdate<R>>,
     id: u64,
     phase: regressee_runtime::distribution::InstallProgress,
 ) {
+    use {JobReply as Reply, JobUpdate as Update};
     let (message, completed, total) = setup_progress(phase);
     let _ = updates.try_send(Update {
         id,
@@ -1019,8 +916,9 @@ fn setup_progress(
         InstallProgress::Ready => ("Private browser setup finished.".into(), 0, None),
     }
 }
-fn storage_work(store: &mut Store, work: Work, cancel: &AtomicBool) -> Reply {
-    let result = (|| -> anyhow::Result<Reply> {
+fn storage_work<W, R>(store: &mut Store, work: Command<W>, cancel: &AtomicBool) -> JobReply<R> {
+    use {Command as Work, JobReply as Reply};
+    let result = (|| -> anyhow::Result<JobReply<R>> {
         match work {
             Work::ExportPreview { project, baseline } => Ok(Reply::ExportPreview(Box::new(
                 store.export_preview(project, baseline)?,
@@ -1080,7 +978,8 @@ fn cancellation_error(error: &anyhow::Error) -> bool {
         )
     })
 }
-fn operation_reply(result: anyhow::Result<Reply>) -> Reply {
+fn operation_reply<R>(result: anyhow::Result<JobReply<R>>) -> JobReply<R> {
+    use JobReply as Reply;
     result.unwrap_or_else(|error| {
         if cancellation_error(&error) {
             Reply::Cancelled
@@ -1117,7 +1016,8 @@ fn io_recovery(error: &anyhow::Error) -> Option<crate::recovery::Problem> {
     )
 }
 
-fn storage_failure(error: anyhow::Error, fallback: StorageFailure) -> Reply {
+fn storage_failure<R>(error: anyhow::Error, fallback: StorageFailure) -> JobReply<R> {
+    use JobReply as Reply;
     io_recovery(&error).map_or(Reply::Failure(fallback), Reply::ActionRequired)
 }
 
@@ -1286,7 +1186,8 @@ mod task_reply_tests {
         Ok(())
     }
 }
-fn is_operation(work: &Work) -> bool {
+fn is_operation<W>(work: &Command<W>) -> bool {
+    use Command as Work;
     matches!(
         work,
         Work::SetupRuntime
@@ -1304,72 +1205,16 @@ fn is_operation(work: &Work) -> bool {
             | Work::PreviewImages { .. }
     )
 }
-#[cfg(feature = "ui")]
-fn invalidates_viewer(work: &Work) -> bool {
-    matches!(
-        work,
-        Work::Evidence(_)
-            | Work::Save { .. }
-            | Work::SaveEnvironment { .. }
-            | Work::SaveReplacement { .. }
-            | Work::Activate { .. }
-            | Work::Reanalyze { .. }
-            | Work::Mask { .. }
-            | Work::Review(_)
-            | Work::LoadAnalysis(_)
-            | Work::Accept { .. }
-            | Work::Restore { .. }
-            | Work::Capture { .. }
-            | Work::CaptureInventory { .. }
-            | Work::PreviewImages { .. }
-            | Work::Import { .. }
-            | Work::Delete(_)
-            | Work::CleanupTemporaries(_)
-            | Work::DeleteUnreferenced(_)
-    )
-}
-#[cfg(feature = "ui")]
-fn next_viewer_work(
-    commands: &Receiver<Request>,
-    mailbox: &Mutex<ViewerMailbox>,
-) -> Option<(Request, bool, Option<u64>)> {
-    // Queued commands (particularly mutations) always precede speculation.
-    match commands.try_recv() {
-        Ok(request) => Some((request, false, None)),
-        Err(_) => mailbox.lock().unwrap().take(),
-    }
-}
-#[cfg(feature = "ui")]
-fn publish_viewer(
-    sender: &SyncSender<Update>,
-    mut update: Update,
-    stop: &AtomicBool,
-    mailbox: &Mutex<ViewerMailbox>,
-    generation: u64,
-) -> bool {
-    while !stop.load(Ordering::Acquire) {
-        // Hold the slot lock through try_send: a newer accepted request cannot
-        // race a stale publication. Already-published replies still carry id.
-        let viewer = mailbox.lock().unwrap();
-        if viewer.generation != generation {
-            return true;
-        }
-        match sender.try_send(update) {
-            Ok(()) => return true,
-            Err(TrySendError::Full(value)) => update = value,
-            Err(TrySendError::Disconnected(_)) => return false,
-        }
-        drop(viewer);
-        thread::sleep(Duration::from_millis(10));
-    }
-    false
-}
-impl Drop for Jobs {
+impl<E: Extension> Drop for BackgroundJobs<E> {
     fn drop(&mut self) {
         self.stop();
     }
 }
-fn publish(sender: &SyncSender<Update>, mut update: Update, stop: &AtomicBool) -> bool {
+fn publish<R>(
+    sender: &SyncSender<JobUpdate<R>>,
+    mut update: JobUpdate<R>,
+    stop: &AtomicBool,
+) -> bool {
     while !stop.load(Ordering::Acquire) {
         match sender.try_send(update) {
             Ok(()) => return true,
@@ -1400,230 +1245,6 @@ mod tests {
         );
         Ok(())
     }
-    #[cfg(feature = "ui")]
-    fn viewer_work(project: ProjectId, tile: usize) -> Work {
-        Work::Viewer {
-            project,
-            tile,
-            key: None,
-            analysis: None,
-        }
-    }
-    #[cfg(feature = "ui")]
-    #[test]
-    fn viewer_mailbox_coalesces_and_prioritizes_commands_then_latest_then_prefetch() {
-        let project = ProjectId::new();
-        let mailbox = Mutex::new(ViewerMailbox::default());
-        let (tx, rx) = mpsc::sync_channel(1);
-        assert!(
-            mailbox
-                .lock()
-                .unwrap()
-                .submit(Request {
-                    id: 0,
-                    work: Work::List { page: 0 }
-                })
-                .is_err()
-        );
-        for id in 1..=100 {
-            mailbox
-                .lock()
-                .unwrap()
-                .submit(Request {
-                    id,
-                    work: viewer_work(project, id as usize),
-                })
-                .unwrap();
-        }
-        mailbox.lock().unwrap().prefetch = Some(viewer_work(project, 101));
-        tx.send(Request {
-            id: 200,
-            work: Work::InspectStorage,
-        })
-        .unwrap();
-        let (request, speculative, generation) = next_viewer_work(&rx, &mailbox).unwrap();
-        assert_eq!(request.id, 200);
-        assert!(!speculative && generation.is_none());
-        let (request, speculative, generation) = next_viewer_work(&rx, &mailbox).unwrap();
-        assert_eq!(
-            (request.id, speculative, generation),
-            (100, false, Some(100))
-        );
-        let (_, speculative, generation) = next_viewer_work(&rx, &mailbox).unwrap();
-        assert!(speculative && generation.is_none());
-        assert!(next_viewer_work(&rx, &mailbox).is_none());
-        mailbox.lock().unwrap().prefetch = Some(viewer_work(project, 102));
-        mailbox
-            .lock()
-            .unwrap()
-            .submit(Request {
-                id: 103,
-                work: viewer_work(project, 103),
-            })
-            .unwrap();
-        assert!(mailbox.lock().unwrap().prefetch.is_none());
-    }
-    #[cfg(feature = "ui")]
-    #[test]
-    fn viewer_invalidation_covers_refresh_display_and_mutations_not_browsing() {
-        let project = ProjectId::new();
-        for work in [
-            Work::Evidence(project),
-            Work::LoadAnalysis(regressee_core::domain::AnalysisId::new()),
-            Work::Activate {
-                run: RunId::new(),
-                revision: 1,
-                confirm_partial: false,
-            },
-            Work::Capture {
-                project,
-                check: true,
-            },
-        ] {
-            assert!(invalidates_viewer(&work));
-        }
-        for work in [
-            Work::History { project, page: 0 },
-            Work::ProjectStorage(project),
-            Work::Load(project),
-            Work::List { page: 0 },
-            viewer_work(project, 0),
-        ] {
-            assert!(!invalidates_viewer(&work));
-        }
-    }
-    #[cfg(feature = "ui")]
-    #[test]
-    fn viewer_publication_drops_superseded_backpressure_and_stops() {
-        let (tx, rx) = mpsc::sync_channel(1);
-        tx.send(Update {
-            id: 0,
-            reply: Reply::Failure(StorageFailure::Unavailable),
-        })
-        .unwrap();
-        let mailbox = Arc::new(Mutex::new(ViewerMailbox::default()));
-        mailbox
-            .lock()
-            .unwrap()
-            .submit(Request {
-                id: 1,
-                work: viewer_work(ProjectId::new(), 0),
-            })
-            .unwrap();
-        let stop = Arc::new(AtomicBool::new(false));
-        let m = mailbox.clone();
-        let s = stop.clone();
-        let t = tx.clone();
-        let worker = thread::spawn(move || {
-            publish_viewer(
-                &t,
-                Update {
-                    id: 1,
-                    reply: Reply::Failure(StorageFailure::Unavailable),
-                },
-                &s,
-                &m,
-                1,
-            )
-        });
-        mailbox
-            .lock()
-            .unwrap()
-            .submit(Request {
-                id: 2,
-                work: viewer_work(ProjectId::new(), 0),
-            })
-            .unwrap();
-        assert!(worker.join().unwrap());
-        assert_eq!(rx.recv().unwrap().id, 0);
-        assert!(rx.try_recv().is_err());
-        assert!(publish_viewer(
-            &tx,
-            Update {
-                id: 2,
-                reply: Reply::Failure(StorageFailure::Unavailable)
-            },
-            &stop,
-            &mailbox,
-            2
-        ));
-        stop.store(true, Ordering::Release);
-        assert!(!publish_viewer(
-            &tx,
-            Update {
-                id: 3,
-                reply: Reply::Failure(StorageFailure::Unavailable)
-            },
-            &stop,
-            &mailbox,
-            2
-        ));
-        assert_eq!(rx.recv().unwrap().id, 2);
-    }
-    #[cfg(feature = "ui")]
-    #[test]
-    fn viewer_jobs_normal_submit_is_latest_wins_prefetch_is_silent_and_shutdown_rejects()
-    -> anyhow::Result<()> {
-        let root = tempfile::tempdir()?;
-        let paths = AppPaths::isolated(root.path());
-        let (ready, wait) = mpsc::channel();
-        let (release, gate) = mpsc::channel();
-        let (jobs, events) = Jobs::start_inner(paths, move |paths| {
-            ready.send(()).unwrap();
-            gate.recv().unwrap();
-            Ok(Product {
-                distribution: None,
-                official_runtime: false,
-                runtime_cache: paths.cache.join("product-runtime"),
-                auth: Default::default(),
-            })
-        });
-        wait.recv_timeout(Duration::from_secs(5))?;
-        let project = Project::draft("Latest navigation".into(), "https://example.test/")?;
-        jobs.submit(Request {
-            id: 10,
-            work: Work::Save {
-                project: Box::new(project.clone()),
-                expected_revision: None,
-            },
-        })
-        .unwrap();
-        for id in 1..=100 {
-            jobs.submit(Request {
-                id,
-                work: viewer_work(project.id, 0),
-            })
-            .unwrap();
-        }
-        assert!(
-            jobs.submit_viewer(Request {
-                id: 0,
-                work: Work::InspectStorage
-            })
-            .is_err()
-        );
-        assert!(jobs.prefetch_viewer(Work::InspectStorage).is_err());
-        jobs.prefetch_viewer(viewer_work(project.id, 0)).unwrap();
-        release.send(())?;
-        assert_eq!(events.recv_timeout(Duration::from_secs(5))?.id, 10);
-        // Save invalidates speculative work, but never the latest read intent.
-        assert_eq!(events.recv_timeout(Duration::from_secs(5))?.id, 100);
-        jobs.prefetch_viewer(viewer_work(project.id, 0)).unwrap();
-        assert!(
-            events.recv_timeout(Duration::from_millis(80)).is_err(),
-            "prefetch publishes neither success nor failure"
-        );
-        jobs.join_after_ui();
-        assert!(
-            jobs.submit_viewer(Request {
-                id: 101,
-                work: viewer_work(project.id, 0)
-            })
-            .is_err()
-        );
-        assert!(jobs.prefetch_viewer(viewer_work(project.id, 0)).is_err());
-        Ok(())
-    }
     #[test]
     fn explicit_setup_reports_committed_state_despite_late_cancel() -> anyhow::Result<()> {
         let cancel = AtomicBool::new(false);
@@ -1648,7 +1269,7 @@ mod tests {
         assert!(matches!(reply, Reply::RuntimeReadiness(state)
             if state.status == crate::product::RuntimeState::Ready));
         assert!(
-            explicit_setup_reply(
+            explicit_setup_reply::<std::convert::Infallible>(
                 || anyhow::bail!("cancelled before commit"),
                 |_| panic!("failed setup must not report committed readiness"),
             )

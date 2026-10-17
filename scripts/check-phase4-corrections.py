@@ -23,7 +23,7 @@ hashes = {str(f.relative_to(root)): hashlib.sha256(f.read_bytes()).hexdigest() f
 (args.output/'protected-entry.json').write_text(json.dumps(hashes, indent=2))
 env = dict(os.environ, LIBRARY_PATH=str(root/'.runtime/link-libs'), RUST_TEST_THREADS='1', CARGO_BUILD_JOBS='4')
 commands = [
-    ('focused-binding', ['cargo', 'test', '--locked', '-p', 'regressee-app', '--features', 'ui-tests', '--lib', 'auth::tests::', '--', '--nocapture', '--test-threads=1']),
+    ('focused-binding', ['cargo', 'test', '--locked', '-p', 'regressee-app', '--features', 'test-support', '--lib', 'auth::tests::', '--', '--nocapture', '--test-threads=1']),
     ('locked-node-browser', ['python3', 'scripts/check-phase4.py', '--output', str(args.output.resolve()/'handoff')]),
 ]
 records = []

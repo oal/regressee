@@ -36,18 +36,18 @@ jobs:
       - run: cargo build --locked --workspace --all-features --all-targets --target ${{ matrix.target }}
       - run: python scripts/ci-run.py cargo test --locked --workspace --all-features --target ${{ matrix.target }} -- --test-threads=1
       - run: cargo clippy --locked --workspace --all-features --all-targets --target ${{ matrix.target }} -- -D warnings
-      - run: cargo build --release --locked -p regressee-app --features ui --bin regressee --target ${{ matrix.target }}
+      - run: cargo build --release --locked -p regressee-gui --features ui --bin regressee-desktop --target ${{ matrix.target }}
       - name: Linux ABI inspection, default-policy sandbox still a separate native gate
         if: runner.os == 'Linux'
         run: |
-          readelf -d target/${{ matrix.target }}/release/regressee
-          readelf --version-info target/${{ matrix.target }}/release/regressee
+          readelf -d target/${{ matrix.target }}/release/regressee-desktop
+          readelf --version-info target/${{ matrix.target }}/release/regressee-desktop
       - name: macOS architecture/deployment/dependency inspection
         if: runner.os == 'macOS'
         run: |
-          lipo -info target/${{ matrix.target }}/release/regressee
-          otool -L target/${{ matrix.target }}/release/regressee
-          otool -l target/${{ matrix.target }}/release/regressee
+          lipo -info target/${{ matrix.target }}/release/regressee-desktop
+          otool -L target/${{ matrix.target }}/release/regressee-desktop
+          otool -l target/${{ matrix.target }}/release/regressee-desktop
       # No artifact upload, signing, secret access, vendor submission or dispatch
       # occurs without explicit owner execution. Windows Server CI is not Win11
       # standard-user desktop; Mac compilation cannot pass blocked supervision.

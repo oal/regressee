@@ -4699,11 +4699,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "ed25519-dalek",
- "gpui",
  "hex",
- "image",
  "libc",
- "log",
  "png 0.17.16",
  "regressee-core",
  "regressee-runtime",
@@ -4716,6 +4713,14 @@ dependencies = [
  "uuid",
  "zeroize",
  "zip",
+]
+
+[[package]]
+name = "regressee-cli"
+version = "0.1.0"
+dependencies = [
+ "regressee-app",
+ "serde_json",
 ]
 
 [[package]]
@@ -4732,6 +4737,31 @@ dependencies = [
  "url",
  "uuid",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "regressee-gui"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "ed25519-dalek",
+ "gpui",
+ "hex",
+ "image",
+ "libc",
+ "log",
+ "png 0.17.16",
+ "regressee-app",
+ "regressee-core",
+ "regressee-runtime",
+ "regressee-storage",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "url",
+ "uuid",
+ "zip",
 ]
 
 [[package]]
@@ -4770,7 +4800,7 @@ dependencies = [
  "hex",
  "libc",
  "png 0.17.16",
- "regressee-app",
+ "regressee-gui",
  "regressee-runtime",
  "serde",
  "serde_json",
