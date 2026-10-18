@@ -14,6 +14,13 @@ TARGET = "x86_64-unknown-linux-gnu"
 
 
 class ReleasePreviewTests(unittest.TestCase):
+    def test_workflow_prepares_only_the_package_parent_before_building(self):
+        workflow = (Path(__file__).resolve().parent.parent / ".github/workflows/release-preview.yml").read_text()
+        build = workflow.split("\n  publish:", 1)[0]
+        self.assertLess(build.index("run: mkdir -p artifacts\n"),
+                        build.index("run: python -B scripts/release-preview.py"))
+        self.assertNotIn("mkdir -p artifacts/preview", build)
+
     def test_source_policy_gate_supplies_its_required_report_argument(self):
         workflow = (Path(__file__).resolve().parent.parent / ".github/workflows/release-preview.yml").read_text()
         commands = [line.strip().removeprefix("run: ") for line in workflow.splitlines()

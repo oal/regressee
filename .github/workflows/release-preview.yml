@@ -71,6 +71,9 @@ jobs:
         # Retain the full bulk suite with the same cold-host budget as CI.
         timeout-minutes: 45
         run: python scripts/ci-run.py cargo test --locked --workspace --features regressee-app/test-support --target ${{ matrix.target }}
+      - name: Prepare fresh package parent
+        shell: bash
+        run: mkdir -p artifacts
       - name: Build production CLI and desktop (never all-features)
         run: python -B scripts/release-preview.py --target ${{ matrix.target }} --product all --output artifacts/preview
       - name: Inspect the CLI-only dependency closure
