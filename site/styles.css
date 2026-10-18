@@ -54,7 +54,9 @@
   --shadow-floating: 0 8px 24px 0 rgba(24, 24, 24, 0.149), 0 2px 6px 0 rgba(24, 24, 24, 0.094);
   --shadow-header: 0 2px 6px 0 rgba(24, 24, 24, 0.063);
   --shadow-seam: -6px 0 18px 0 rgba(24, 24, 24, 0.10);
-  --ground-mute: 0.97;
+  --shadow-card: 0 18px 48px 0 rgba(24, 24, 24, 0.20), 0 4px 12px 0 rgba(24, 24, 24, 0.14);
+  --ground-mute: 0.96;
+  --desk-mute: 1;
 
   --font-ui: "Roboto", "Segoe UI", system-ui, -apple-system, "DejaVu Sans", sans-serif;
 
@@ -114,7 +116,9 @@
     --shadow-floating: 0 8px 24px 0 rgba(8, 8, 8, 0.149), 0 2px 6px 0 rgba(8, 8, 8, 0.094);
     --shadow-header: 0 2px 6px 0 rgba(8, 8, 8, 0.063);
     --shadow-seam: -6px 0 18px 0 rgba(8, 8, 8, 0.35);
-    --ground-mute: 0.7;
+    --shadow-card: 0 24px 64px 0 rgba(0, 0, 0, 0.62), 0 6px 18px 0 rgba(0, 0, 0, 0.5);
+    --ground-mute: 0.45;
+    --desk-mute: 0.82;
   }
 }
 
@@ -148,7 +152,9 @@
   --shadow-floating: 0 8px 24px 0 rgba(8, 8, 8, 0.149), 0 2px 6px 0 rgba(8, 8, 8, 0.094);
   --shadow-header: 0 2px 6px 0 rgba(8, 8, 8, 0.063);
   --shadow-seam: -6px 0 18px 0 rgba(8, 8, 8, 0.35);
-  --ground-mute: 0.7;
+  --shadow-card: 0 24px 64px 0 rgba(0, 0, 0, 0.62), 0 6px 18px 0 rgba(0, 0, 0, 0.5);
+  --ground-mute: 0.45;
+  --desk-mute: 0.82;
 }
 
 /* The two screenshot variants: exactly one is in the layout per theme. */
@@ -365,6 +371,12 @@ a:hover { color: var(--accent); }
   justify-content: flex-end;
   padding: 24px 0 26px 36px;
   background: var(--ground);
+}
+.hero-way::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--ground);
   filter: brightness(var(--ground-mute));
 }
 body.settling .hero { --split: 54%; }
@@ -380,6 +392,7 @@ body.settling .hero { --split: 54%; }
   flex-direction: column;
   align-items: flex-start;
   min-height: 0;
+  filter: brightness(var(--desk-mute));
 }
 
 .artifact {
@@ -485,6 +498,7 @@ body.settling .hero { --split: 54%; }
   margin-top: 24px;
   font-size: var(--fs-help);
   line-height: 1.45;
+  filter: brightness(var(--desk-mute));
 }
 .hero-note .lead { display: block; color: var(--ink); font-weight: 500; }
 
@@ -516,7 +530,7 @@ body.settling .hero { --split: 54%; }
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 4px;
-  box-shadow: var(--shadow-floating);
+  box-shadow: var(--shadow-card);
   padding: 28px;
   text-align: center;
 }
