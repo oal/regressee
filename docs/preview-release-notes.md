@@ -1,4 +1,4 @@
-# DOM comparisons and project management — preview.6
+# DOM comparisons and project management — preview.7
 
 This preview adds independent DOM snapshot comparisons, complete project-removal
 controls, and fixes for new-project access saves and engine upgrade recovery,
@@ -9,6 +9,9 @@ the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
 
+- This retries the unpublished `preview.6` build with the required Linux source
+  policy report argument and a canonical Windows test-fixture destination.
+  Source/privacy checks and application tests remain mandatory on both platforms.
 - Capture **Screenshots only**, **Screenshots + DOM snapshots**, or **DOM snapshots
   only**. Baselines freeze that mode. DOM source is inert, read-only text with
   kind-specific comparison, review and approval; missing or failed checks are not

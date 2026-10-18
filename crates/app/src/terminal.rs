@@ -1352,6 +1352,9 @@ mod tests {
     #[test]
     fn legacy_reports_expose_unknown_queue_without_borrowing_current_settings() -> Result<()> {
         let root = tempfile::tempdir()?;
+        // Windows canonical paths include the verbatim prefix; macOS temporary
+        // paths may also have aliases. Keep production's strict path guard.
+        let destination = fs::canonicalize(root.path())?.join("legacy-report");
         let (mut store, project, run, _, _) = super::legacy_fixture::fixture(root.path());
         let mut saved = store.load_project(project)?;
         saved.project.discovery.skipped_text = vec!["TODAY_ONLY_NOT_RECORDED".into()];
@@ -1368,7 +1371,7 @@ mod tests {
                 },
                 dom_analysis: None,
                 selected: vec![record.run.targets[0].key.clone()],
-                destination: root.path().join("legacy-report"),
+                destination: destination.clone(),
             },
             &AtomicBool::new(false),
         )?
@@ -1376,6 +1379,7 @@ mod tests {
             unreachable!()
         };
         assert!(plan.content.queue.is_none());
+        assert_eq!(plan.destination, destination);
         assert!(
             plan.content
                 .reference_settings

@@ -14,6 +14,14 @@ TARGET = "x86_64-unknown-linux-gnu"
 
 
 class ReleasePreviewTests(unittest.TestCase):
+    def test_source_policy_gate_supplies_its_required_report_argument(self):
+        workflow = (Path(__file__).resolve().parent.parent / ".github/workflows/release-preview.yml").read_text()
+        commands = [line.strip().removeprefix("run: ") for line in workflow.splitlines()
+                    if "run: python -B scripts/test_source_release.py" in line]
+        self.assertEqual(commands, [
+            'python -B scripts/test_source_release.py --report "$RUNNER_TEMP/source-release-tests.json"'
+        ])
+
     def test_each_product_builds_only_production_packages_and_binds_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

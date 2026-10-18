@@ -66,7 +66,7 @@ jobs:
           python -B scripts/test_environment_boundaries.py
       - name: Test private-source omission and completeness policy
         if: runner.os == 'Linux'
-        run: python -B scripts/test_source_release.py
+        run: python -B scripts/test_source_release.py --report "$RUNNER_TEMP/source-release-tests.json"
       - name: Run application contract tests
         # Retain the full bulk suite with the same cold-host budget as CI.
         timeout-minutes: 45
