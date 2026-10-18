@@ -48,7 +48,7 @@ INTERNAL_DOCS = frozenset({"ACTIVE_WORK.md", "IMPLEMENTATION_STATUS.md",
                            "phase0-design.md", "spike-surface.md", "foundation-surface.md",
                            "crawling-surface.md", "auth-and-capture-surface.md",
                             "analysis-and-review-surface.md", "portability-and-storage-surface.md",
-                            "ci.md", "local-first-ux.md", "ux-improvement-plan.md", "ux-writing.md",
+                            "ci.md", "release-checklist.md", "local-first-ux.md", "ux-improvement-plan.md", "ux-writing.md",
                             "whole-app-ui-plan.md", "workflow-revamp.md"})
 INTERNAL_ROOT = frozenset({"DESIGN.md", "PLAN.md", "PRODUCT.md", "AGENTS.md", ".impeccable"})
 PRIVATE_DIRS = frozenset({".runtime", "target", "artifacts", "node_modules", "__pycache__",
