@@ -31,6 +31,63 @@ impl Drop for Stop {
     }
 }
 
+/// Independently query the OS, not the launcher under test. A hosted job that
+/// denies breakaway cannot qualify a detached daemon; it must prove refusal.
+fn host_blocks_breakaway() -> anyhow::Result<bool> {
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::System::{JobObjects::*, Threading::GetCurrentProcess};
+        let mut in_job = 0;
+        anyhow::ensure!(
+            unsafe { IsProcessInJob(GetCurrentProcess(), std::ptr::null_mut(), &mut in_job) } != 0,
+            "Cannot inspect the Windows test host: {}",
+            std::io::Error::last_os_error()
+        );
+        if in_job == 0 {
+            return Ok(false);
+        }
+        let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        anyhow::ensure!(
+            unsafe {
+                QueryInformationJobObject(
+                    std::ptr::null_mut(),
+                    JobObjectExtendedLimitInformation,
+                    (&mut limits as *mut JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+                    std::mem::size_of_val(&limits) as u32,
+                    std::ptr::null_mut(),
+                )
+            } != 0,
+            "Cannot inspect Windows job limits: {}",
+            std::io::Error::last_os_error()
+        );
+        Ok(limits.BasicLimitInformation.LimitFlags
+            & (JOB_OBJECT_LIMIT_BREAKAWAY_OK | JOB_OBJECT_LIMIT_SILENT_BREAKAWAY_OK)
+            == 0)
+    }
+    #[cfg(not(windows))]
+    {
+        Ok(false)
+    }
+}
+
+fn assert_blocked_host_refusal(output: &std::process::Output) -> anyhow::Result<()> {
+    assert!(
+        !output.status.success(),
+        "A non-breakaway host must not claim an independent engine"
+    );
+    assert_eq!(output.status.code(), Some(6));
+    let reply: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert_eq!(reply["code"], "operation_failed", "{reply}");
+    assert_eq!(reply["exit_status"], 6, "{reply}");
+    let message = reply["data"]["message"].as_str().unwrap_or_default();
+    assert!(
+        message.contains("Cannot start installed engine executable")
+            && message.contains("os error 5"),
+        "Only the independently verified Windows breakaway denial is expected: {reply}"
+    );
+    Ok(())
+}
+
 #[test]
 fn stopped_protocol_eight_endpoint_upgrades_without_removing_data() -> anyhow::Result<()> {
     let root = tempfile::tempdir()?;
@@ -48,9 +105,23 @@ fn stopped_protocol_eight_endpoint_upgrades_without_removing_data() -> anyhow::R
     std::fs::write(&sentinel, b"preserve existing data")?;
     let client = Client::existing(owner.paths.clone())?;
     let _stop = Stop(client.clone());
+    let descriptor = std::fs::read(owner.directory.join("endpoint.json"))?;
     drop(owner); // A successful explicit stop leaves this unowned descriptor.
 
     let started = command(root.path(), "start").output()?;
+    if host_blocks_breakaway()? {
+        assert_blocked_host_refusal(&started)?;
+        assert_eq!(
+            std::fs::read(paths.data.join("engine-v1/endpoint.json"))?,
+            descriptor
+        );
+        assert_eq!(std::fs::read(sentinel)?, b"preserve existing data");
+        let _owner = Ownership::acquire(&paths)?;
+        eprintln!(
+            "PASS: OS-confirmed non-breakaway host refusal preserves existing data/descriptor. Detached upgrade success is NOT QUALIFIED on this host."
+        );
+        return Ok(());
+    }
     assert!(
         started.status.success(),
         "{}\n{}",
@@ -86,6 +157,22 @@ fn simultaneous_autostarts_stale_endpoint_status_and_graceful_stop() -> anyhow::
         starts.push(thread::spawn(move || c.output().unwrap()));
     }
     let results: Vec<_> = starts.into_iter().map(|t| t.join().unwrap()).collect();
+    if host_blocks_breakaway()? {
+        for result in &results {
+            assert_blocked_host_refusal(result)?;
+        }
+        let paths = regressee_storage::AppPaths::isolated(root.path());
+        assert!(
+            !paths.database().exists(),
+            "Refused detachment must not initialize a store"
+        );
+        assert!(!paths.data.join("engine-v1/endpoint.json").exists());
+        let _owner = Ownership::acquire(&paths)?;
+        eprintln!(
+            "PASS: all six autostarts truthfully refuse the OS-confirmed non-breakaway job; no store/owner was started. Detached lifetime success is NOT QUALIFIED on this host."
+        );
+        return Ok(());
+    }
     for r in &results {
         assert!(
             r.status.success(),

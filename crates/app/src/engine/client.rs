@@ -209,7 +209,7 @@ impl Client {
         ownership::private_directory(path.parent().unwrap())?;
         ownership::private_file(&path, 4096)?;
         let descriptor: serde_json::Value = serde_json::from_slice(&std::fs::read(path)?)?;
-        Ok(matches!(descriptor["version"].as_u64(), Some(6 | 7 | 8)))
+        Ok(matches!(descriptor["version"].as_u64(), Some(6..=8)))
     }
     pub fn request(&self, request: Request) -> Result<Response> {
         let credential = self.credential.lock().unwrap().clone();
@@ -236,7 +236,7 @@ impl Client {
         let wire_version = descriptor["version"].as_u64();
         ensure!(
             wire_version == Some(VERSION as u64)
-                || (lifecycle_stop && matches!(wire_version, Some(6 | 7 | 8))),
+                || (lifecycle_stop && matches!(wire_version, Some(6..=8))),
             "version_mismatch: background engine protocol {} differs from this build ({VERSION}). Close older desktop windows and finish active work, then run `regressee engine stop` with the same data/cache directories and reopen the desktop. For unsupported engine versions, stop it using its matching executable. Project data must not be deleted to resolve this.",
             wire_version.map_or_else(|| "unknown".into(), |version| version.to_string())
         );

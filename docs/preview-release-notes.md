@@ -13,6 +13,10 @@ the exact build; the application crate version remains `0.1.0`.
   source-policy report argument, fresh package parent and canonical Windows test
   destination. Named manual releases create their version tag only after checks.
   Source/privacy checks and application tests remain mandatory on both platforms.
+- A Windows host job that forbids detached processes remains unsupported for
+  background-engine launch. The launcher refuses rather than silently tying the
+  engine to the client's lifetime. Hosted tests verify that refusal against the
+  OS job policy; successful native Windows detachment still needs qualification.
 - Capture **Screenshots only**, **Screenshots + DOM snapshots**, or **DOM snapshots
   only**. Baselines freeze that mode. DOM source is inert, read-only text with
   kind-specific comparison, review and approval; missing or failed checks are not

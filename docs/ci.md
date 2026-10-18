@@ -58,6 +58,14 @@ engine` runs the isolated multi-client/ownership/durability/control tests; nativ
 `--features ui-tests --test engine_client` attaches the production GUI facade to
 an engine over IPC. Neither substitutes for native Windows/macOS IPC qualification.
 
+The Windows lifecycle test independently queries the current OS job's breakaway
+flags. On a host that disallows detachment it requires the exact access-denied
+startup refusal, an unowned/uninitialized store, and unchanged retained upgrade
+data/descriptor. It does not treat an arbitrary launch error as expected or claim
+detached-success qualification there. Hosts that permit breakaway still run all
+six-autostart, attachment, stop and upgrade-success assertions. The production
+launcher never drops its required detachment flag to make CI pass.
+
 `test-support` exposes owned-loopback fixture helpers without pulling in GPUI.
 The `product_flow` integration target requires it; `ui-tests` and `--all-features`
 also enable it. Plain `cargo test --locked` still runs ordinary tests, but omits
