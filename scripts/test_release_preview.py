@@ -14,6 +14,19 @@ TARGET = "x86_64-unknown-linux-gnu"
 
 
 class ReleasePreviewTests(unittest.TestCase):
+    def test_manual_version_tag_is_deferred_to_the_existing_publish_gate(self):
+        workflow = (Path(__file__).resolve().parent.parent / ".github/workflows/release-preview.yml").read_text()
+        build, publish = workflow.split("\n  publish:", 1)
+        self.assertIn("needs: build", publish)
+        self.assertIn("RELEASE_TAG: ${{ inputs.release_tag }}", publish)
+        self.assertIn('git ls-remote origin "refs/tags/$RELEASE_TAG"', publish)
+        self.assertIn('--target "$GITHUB_SHA"', publish)
+        self.assertNotIn("git tag ", build)
+        self.assertNotIn("gh release create", build)
+        self.assertIn("Check Windows engine lifecycle before the long suite", build)
+        self.assertLess(build.index("cargo test --locked -p regressee-cli --test engine_lifecycle"),
+                        build.index("cargo test --locked --workspace"))
+
     def test_workflow_prepares_only_the_package_parent_before_building(self):
         workflow = (Path(__file__).resolve().parent.parent / ".github/workflows/release-preview.yml").read_text()
         build = workflow.split("\n  publish:", 1)[0]

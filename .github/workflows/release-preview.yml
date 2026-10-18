@@ -2,6 +2,12 @@ name: Downloadable Linux and Windows previews
 
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Optional new vX.Y.Z-preview.N tag; created only after both builds pass
+        type: string
+        required: false
+        default: ''
   push:
     tags: ['v*']
 
@@ -67,6 +73,9 @@ jobs:
       - name: Test private-source omission and completeness policy
         if: runner.os == 'Linux'
         run: python -B scripts/test_source_release.py --report "$RUNNER_TEMP/source-release-tests.json"
+      - name: Check Windows engine lifecycle before the long suite
+        if: runner.os == 'Windows'
+        run: python scripts/ci-run.py cargo test --locked -p regressee-cli --test engine_lifecycle --target ${{ matrix.target }} -- --nocapture
       - name: Run application contract tests
         # Retain the full bulk suite with the same cold-host budget as CI.
         timeout-minutes: 45
@@ -171,10 +180,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         shell: bash
         run: |
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then
             tag="$GITHUB_REF_NAME"
+          elif [[ -n "$RELEASE_TAG" ]]; then
+            if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-preview\.[0-9]+$ ]]; then
+              echo 'Expected a new vX.Y.Z-preview.N tag' >&2
+              exit 1
+            fi
+            if [[ -n "$(git ls-remote origin "refs/tags/$RELEASE_TAG")" ]]; then
+              echo 'Requested version tag already exists; choose a new version' >&2
+              exit 1
+            fi
+            tag="$RELEASE_TAG"
           else
             tag="preview-${GITHUB_RUN_NUMBER}-${GITHUB_SHA:0:7}"
           fi

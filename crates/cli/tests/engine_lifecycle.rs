@@ -87,7 +87,13 @@ fn simultaneous_autostarts_stale_endpoint_status_and_graceful_stop() -> anyhow::
     }
     let results: Vec<_> = starts.into_iter().map(|t| t.join().unwrap()).collect();
     for r in &results {
-        assert!(r.status.success(), "{}", String::from_utf8_lossy(&r.stderr));
+        assert!(
+            r.status.success(),
+            "engine start exited {}\nstdout: {}\nstderr: {}",
+            r.status,
+            String::from_utf8_lossy(&r.stdout),
+            String::from_utf8_lossy(&r.stderr)
+        );
     }
     let snapshots: Vec<serde_json::Value> = results
         .iter()

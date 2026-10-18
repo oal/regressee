@@ -1,4 +1,4 @@
-# DOM comparisons and project management — preview.7
+# DOM comparisons and project management — preview.8
 
 This preview adds independent DOM snapshot comparisons, complete project-removal
 controls, and fixes for new-project access saves and engine upgrade recovery,
@@ -9,8 +9,9 @@ the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
 
-- This retries the unpublished `preview.6` build with the required Linux source
-  policy report argument and a canonical Windows test-fixture destination.
+- This retries the unpublished `preview.6` / `preview.7` builds with the required
+  source-policy report argument, fresh package parent and canonical Windows test
+  destination. Named manual releases create their version tag only after checks.
   Source/privacy checks and application tests remain mandatory on both platforms.
 - Capture **Screenshots only**, **Screenshots + DOM snapshots**, or **DOM snapshots
   only**. Baselines freeze that mode. DOM source is inert, read-only text with
@@ -27,7 +28,15 @@ the exact build; the application crate version remains `0.1.0`.
   recorded History; mapping removal remains a draft until Save settings.
 - Creating another project clears the previous project's environment/login state,
   fixing a **No login required** save failure. Save failures retain their causes.
-- Upgrading from engine protocol 6/7 has an explicit graceful-stop path in the new
+- A blocked setup task can offer **Update browser…** in context, with explicit
+  replacement consent and normal installer progress. Continuing setup does not
+  automatically retry website visits or change a saved baseline.
+- Native feedback, menus and dialogs use restrained motion. A remembered
+  **Reduce motion** preference is available in App settings; captured evidence and
+  interaction targets remain immediate and unchanged.
+- The read-only native DOM viewer adds syntax highlighting without executing
+  captured source or changing its search, selection or copy contents.
+- Upgrading from engine protocol 6/7/8 has an explicit graceful-stop path in the new
   executable: close old desktop windows, finish active work, run `regressee engine
   stop`, and reopen. No active engine is automatically killed, and no project data
   needs deleting. Keep both packaged executables together and upgrade both.
@@ -37,7 +46,7 @@ the exact build; the application crate version remains `0.1.0`.
   evidence/crops/reviews/baselines/history/local-report/sharing/runtime commands,
   durable jobs and named renewable agent sessions. GUI following is a human opt-in
   with exclusive control, immediate takeover and temporary handoff. Both clients
-  use one shared local engine, not independent store owners (protocol 8/schema 1).
+  use one shared local engine, not independent store owners (protocol 9/schema 1).
   `regressee-cli-<platform>` archives contain only the CLI;
   `regressee-desktop-<platform>` archives contain **both** separate executables.
   Portable skill, public help, product-specific license inventories, source/build

@@ -816,15 +816,11 @@ fn exact_confirmation_rejects_missing_stale_wrong_action_and_replay() -> Result<
             )
             .is_err()
     );
-    assert_eq!(
-        h.client
-            .execute(
-                Operation::ForgetLogin(regressee_core::domain::ProjectId::new()),
-                Some(ticket.id)
-            )?
-            .state,
-        JobState::Failed
-    );
+    let wrong_action = h.client.execute(
+        Operation::ForgetLogin(regressee_core::domain::ProjectId::new()),
+        Some(ticket.id),
+    )?;
+    assert_eq!(wrong_action.state, JobState::Failed, "{wrong_action:?}");
     let wrong = Operation::DiagnosticExport {
         report: report.clone(),
         path: h.root.path().join("wrong.json"),
