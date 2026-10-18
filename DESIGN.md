@@ -1166,6 +1166,19 @@ operation-specific recovery, with full available diagnostics separate. Installer
 recovery follows its actual stage. Updating does not make an old baseline
 automatically comparable: checks still require matching browser components.
 
+**Inline browser update — 2026-10-18.** A website task blocked by a different
+installed browser release offers **Update browser…** directly, with **Back to
+setup** (or **Return to workspace**) as a secondary action. Reuse the existing
+Cancel-first replacement confirmation and verified background installer; opening
+or cancelling the prompt never starts a download. Preserve the original task's
+setup stage and focus return, project settings, unsaved drafts and saved evidence.
+Successful setup offers **Continue setup** without automatically saving, visiting
+the website or retrying the failed task. Installer failures retain their existing
+diagnostics/settings recovery; unavailable builds and repair retain their existing
+routes. Keep baseline-version compatibility guidance. No new palette, controls,
+asset or motion is introduced by this refinement. Scoped checks, native offscreen
+inspection and concurrent-build limits: `docs/research/inline-browser-update-20261018.md`.
+
 **Partial baseline recovery — 2026-10-15.** A finished baseline capture with at
 least one successful screenshot keeps **Save baseline…** available even when
 other captures failed. The compact amber next step states actual saved/intended

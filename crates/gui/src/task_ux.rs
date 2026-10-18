@@ -42,6 +42,7 @@ pub(super) struct Outcome {
     failed: bool,
     destination: Option<(Screen, ReviewSurface)>,
     pub(super) recovery: Option<Destination>,
+    pub(super) update_browser: bool,
     diagnostic: Option<String>,
     tone: Tone,
     icon: StatusIcon,
@@ -61,6 +62,14 @@ enum Counts {
 }
 
 impl Task {
+    pub(super) fn can_update_browser(&self) -> bool {
+        self.state == State::Finished
+            && self
+                .result
+                .as_ref()
+                .is_some_and(|result| result.update_browser)
+    }
+
     fn controls(&self) -> Vec<Control> {
         let mut controls = Vec::new();
         for index in 0..regressee_gui::task::MAX_TASK_LINKS {
@@ -72,6 +81,9 @@ impl Task {
             }
         }
         if self.state == State::Finished {
+            if self.can_update_browser() {
+                controls.push(Control::SetupRuntime);
+            }
             controls.push(Control::TaskContinue);
         } else if matches!(self.state, State::Running | State::Pausing) {
             if self.spec.stop_label.is_some() {
@@ -123,6 +135,7 @@ impl Task {
             failed: false,
             destination: None,
             recovery: None,
+            update_browser: false,
             diagnostic: None,
             tone: Tone::Neutral,
             icon: StatusIcon::Saved,
@@ -379,6 +392,24 @@ impl Task {
                 }
                 outcome.recovery = Some(problem.destination());
                 outcome.action = problem.destination().label();
+                if self.spec.kind != Kind::Setup
+                    && matches!(
+                        problem,
+                        Problem::Browser(regressee_app::product::RuntimeState::UpdateRequired)
+                    )
+                {
+                    outcome.update_browser = true;
+                    outcome.recovery = Some(Destination::Workspace);
+                    outcome.action = if self.origin == Screen::Setup {
+                        "Back to setup"
+                    } else {
+                        "Return to workspace"
+                    };
+                    outcome.message = "The installed private-browser components do not match this app build. Choose Update browser to download and verify the matching components here, then retry your task. Your project settings, saved screenshots and baseline are kept. Updating does not visit your website.".into();
+                    if self.spec.kind == Kind::Check {
+                        outcome.message.push_str(" Checks still need the browser version used for the baseline; updating may not make an older baseline comparable.");
+                    }
+                }
                 if self.project_id.is_none() && problem.destination() == Destination::History {
                     outcome.recovery = Some(Destination::AppSettings);
                     outcome.action = "Open App settings";
@@ -415,6 +446,9 @@ impl Task {
                     outcome.title = "Browser setup needs attention".into();
                     outcome.tone = Tone::Warning;
                     outcome.icon = StatusIcon::Warning;
+                } else if self.origin == Screen::Setup {
+                    outcome.action = "Continue setup";
+                    outcome.message.push_str(" Your project settings are kept. Return to setup to retry your task; no website was visited by this update.");
                 }
             }
             Reply::Environment(status) => {
@@ -1053,7 +1087,11 @@ impl Shell {
                 task.details = false;
             }
             task.scroll.set_offset(gpui::point(px(0.), px(0.)));
-            self.presentation_focus = Some(Control::TaskContinue);
+            self.presentation_focus = Some(if task.can_update_browser() {
+                Control::SetupRuntime
+            } else {
+                Control::TaskContinue
+            });
         } else {
             let restore = task.restore;
             let origin = task.origin;
@@ -1143,6 +1181,32 @@ impl Shell {
         window.focus(&self.root_focus);
         self.refresh_visible(cx);
         cx.notify();
+    }
+
+    /// Reuse the normal installer only after explicit consent. Keep the blocked
+    /// task mounted if submission fails, and carry its setup/focus origin forward.
+    pub(super) fn setup_browser(&mut self, cx: &mut Context<Self>) {
+        if self.pending.is_some()
+            || self
+                .task
+                .as_ref()
+                .is_some_and(|task| !task.can_update_browser())
+        {
+            return;
+        }
+        let previous = self.task.take();
+        self.error = None;
+        self.queue(Work::SetupRuntime, cx);
+        if let Some(previous) = previous {
+            if let Some(task) = &mut self.task {
+                task.origin = previous.origin;
+                task.restore = previous.restore;
+                task.spec.title = "Updating browser";
+            } else {
+                self.task = Some(previous);
+            }
+        }
+        self.focus.capturing = self.pending.is_some();
     }
 
     fn task_panel(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -1407,10 +1471,22 @@ impl Shell {
             .gap_3()
             .min_h(px(40.));
         if let Some(result) = &task.result {
+            if result.update_browser {
+                actions = actions.child(self.button(
+                    Control::SetupRuntime,
+                    "Update browser…",
+                    ActionStyle::Primary,
+                    cx,
+                ));
+            }
             actions = actions.child(self.button(
                 Control::TaskContinue,
                 result.action,
-                ActionStyle::Primary,
+                if result.update_browser {
+                    ActionStyle::Secondary
+                } else {
+                    ActionStyle::Primary
+                },
                 cx,
             ));
         } else if matches!(task.state, State::Running | State::Pausing) {

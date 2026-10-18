@@ -313,8 +313,7 @@ impl Shell {
                     "Replace browser components",
                 );
                 self.confirm_destructive(prompt, window, cx, |s, cx| {
-                    s.queue(Work::SetupRuntime, cx);
-                    s.focus.capturing = s.pending.is_some();
+                    s.setup_browser(cx);
                 });
             }
             Control::Guided(13) if self.preview.is_some() => {

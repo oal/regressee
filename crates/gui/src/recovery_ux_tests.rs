@@ -10,9 +10,7 @@ use regressee_runtime::protocol::FailureCode;
 
 #[cfg(all(target_arch = "x86_64", any(target_os = "linux", windows)))]
 #[gpui::test]
-fn title_save_then_discovery_reports_old_install_and_opens_real_update_control(
-    cx: &mut TestAppContext,
-) {
+fn title_save_then_discovery_offers_inline_update_without_leaving_setup(cx: &mut TestAppContext) {
     let temp = tempfile::tempdir().unwrap();
     let paths = AppPaths::isolated(temp.path());
     let mut store = regressee_storage::Store::open(paths.clone()).unwrap();
@@ -55,33 +53,48 @@ fn title_save_then_discovery_reports_old_install_and_opens_real_update_control(
                     .message
                     .starts_with("Your project settings were saved.")
             );
-            assert!(result.message.contains("choose Update browser"));
-            assert_eq!(result.action, "Open App settings");
+            assert!(result.message.contains("Choose Update browser"));
+            assert!(result.update_browser);
+            assert_eq!(result.action, "Back to setup");
             assert!(
                 !task.details,
                 "essential recovery must not be hidden in details"
             );
             assert!(s.control_enabled(Control::TaskContinue, cx));
+            assert!(s.control_enabled(Control::SetupRuntime, cx));
             assert!(s.preview.is_none() && s.evidence.latest.is_none());
-            s.activate_control(Control::TaskContinue, window, cx);
-            finish_jobs(s, cx);
-            assert_eq!(s.focus.screen, Screen::Settings);
-            assert!(
-                s.summary.is_some() && s.network_status.is_some(),
-                "the old error must not block settings reads"
+            let request = s.next_request;
+            s.activate_control(Control::SetupRuntime, window, cx);
+            assert_eq!(
+                s.next_request, request,
+                "confirmation must precede download"
             );
+            assert!(s.native_prompt);
+            assert_eq!(s.focus.screen, Screen::Setup);
+        })
+    });
+    assert!(vcx.pending_prompt().unwrap().1.contains("Saved projects"));
+    vcx.simulate_prompt_answer("Cancel");
+    vcx.run_until_parked();
+    vcx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            assert!(!s.native_prompt);
+            assert!(s.task.as_ref().unwrap().can_update_browser());
+            assert!(s.handle(Control::SetupRuntime, cx).is_focused(window));
             assert_eq!(
                 s.runtime_readiness.as_ref().unwrap().status,
                 RuntimeState::UpdateRequired
             );
             assert!(s.control_enabled(Control::SetupRuntime, cx));
-            // Opening recovery is not permission to install or visit a website.
+            // Cancel keeps both the old install and the blocked task intact.
             assert_eq!(
                 std::fs::read_to_string(root.join("READY")).unwrap(),
                 previous
             );
-            s.navigate(Screen::Setup, window, cx);
+            s.activate_control(Control::TaskContinue, window, cx);
             finish_jobs(s, cx);
+            assert!(s.task.is_none());
+            assert_eq!(s.focus.screen, Screen::Setup);
             assert_eq!(s.name.read(cx).content.as_ref(), "Title corrected");
         })
     });
@@ -181,8 +194,16 @@ fn recovery_matrix(cx: &mut TestAppContext, render: bool) {
                     let result = task.result.as_ref().unwrap();
                     if let Some(problem) = problem {
                         assert_eq!(result.title, problem.title());
-                        assert_eq!(result.message, problem.message());
-                        assert_eq!(result.action, problem.destination().label());
+                        if label == "update" {
+                            assert!(result.update_browser);
+                            assert!(result.message.contains("here, then retry"));
+                            assert_eq!(result.action, "Back to setup");
+                            assert!(s.control_enabled(Control::SetupRuntime, cx));
+                            assert_eq!(s.presentation_focus, Some(Control::SetupRuntime));
+                        } else {
+                            assert_eq!(result.message, problem.message());
+                            assert_eq!(result.action, problem.destination().label());
+                        }
                         assert!(!task.details && !task.has_details());
                     } else {
                         assert!(result.message.contains("required local file"));
@@ -204,6 +225,11 @@ fn recovery_matrix(cx: &mut TestAppContext, render: bool) {
                 "essential recovery must fit without opening details"
             );
             assert!(action.bottom() <= px(height) && action.top() >= body.bottom());
+            if label == "update" {
+                let update = vcx.debug_bounds("action-SetupRuntime").unwrap();
+                assert!(update.top() >= body.bottom() && update.bottom() <= px(height));
+                assert!(update.right() <= action.left());
+            }
             #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
             if let Some(root) = &capture_root {
                 crate::ui_renderer_capture::capture(
@@ -218,6 +244,7 @@ fn recovery_matrix(cx: &mut TestAppContext, render: bool) {
                     s.activate_control(Control::TaskContinue, window, cx);
                     assert!(s.task.is_none());
                     let expected = match problem.map(Problem::destination) {
+                        _ if label == "update" => Screen::Setup,
                         Some(Destination::AppSettings) => Screen::Settings,
                         Some(Destination::History) => Screen::History,
                         _ => Screen::Setup,
@@ -231,7 +258,7 @@ fn recovery_matrix(cx: &mut TestAppContext, render: bool) {
                         s.project.as_ref().unwrap().project.active_baseline,
                         baseline
                     );
-                    if matches!(problem, Some(Problem::Browser(_))) {
+                    if label == "repair" {
                         assert!(s.control_mounted(Control::SetupRuntime));
                         assert!(s.control_enabled(Control::SetupRuntime, cx));
                     }
@@ -258,7 +285,7 @@ fn recovery_matrix(cx: &mut TestAppContext, render: bool) {
                     &format!("recovery-{width:.0}x{height:.0}-{label}-destination"),
                 )
                 .unwrap();
-                if matches!(label, "update" | "repair") {
+                if label == "repair" {
                     assert!(vcx.debug_bounds("app-settings-body").unwrap().size.width <= px(680.));
                     assert!(
                         vcx.debug_bounds("action-SetupRuntime").unwrap().bottom() <= px(height),
@@ -344,4 +371,238 @@ fn recovery_copy_respects_checks_exports_and_projectless_setup(cx: &mut TestAppC
         })
     });
     owned.join_after_ui();
+}
+
+#[gpui::test]
+fn inline_update_confirmation_dispatches_only_setup_and_preserves_the_draft(
+    cx: &mut TestAppContext,
+) {
+    let temp = tempfile::tempdir().unwrap();
+    let paths = AppPaths::isolated(temp.path());
+    let (store, project, _, _, _) = approval_fixture::fixture(temp.path());
+    let original = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    // This backend cannot download or visit websites, even after confirmation.
+    let (jobs, events) = Jobs::start_without_runtime(paths.clone());
+    let owned = jobs.clone();
+    let (shell, vcx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    let request = vcx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            load_review(s, project, cx);
+            s.focus.screen = Screen::Setup;
+            s.focus.setup_stage = SetupStage::Settings;
+            s.name
+                .update(cx, |input, cx| input.set_value("Unsaved title", cx));
+            s.last_action = Some(Control::Guided(13));
+            s.next_request += 1;
+            s.pending = Some(s.next_request);
+            s.begin_task(Spec::for_work(&Work::Discover(project)).unwrap());
+            s.apply_update(
+                Update {
+                    id: s.next_request,
+                    reply: Reply::ActionRequired(Problem::Browser(RuntimeState::UpdateRequired)),
+                },
+                cx,
+            );
+            let request = s.next_request;
+            // The task must honor current availability, not just its old warning.
+            s.runtime_readiness.as_mut().unwrap().setup_available = false;
+            assert!(!s.control_enabled(Control::SetupRuntime, cx));
+            s.activate_control(Control::SetupRuntime, window, cx);
+            assert!(!s.native_prompt);
+            assert_eq!(s.next_request, request);
+            s.runtime_readiness.as_mut().unwrap().setup_available = true;
+            s.activate_control(Control::SetupRuntime, window, cx);
+            s.activate_control(Control::SetupRuntime, window, cx);
+            assert!(s.native_prompt);
+            assert_eq!(s.next_request, request);
+            request
+        })
+    });
+    vcx.simulate_prompt_answer("Replace browser components");
+    vcx.run_until_parked();
+    vcx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            assert_eq!(s.next_request, request + 1);
+            let task = s.task.as_ref().unwrap();
+            assert_eq!(task.spec.kind, regressee_gui::task::Kind::Setup);
+            assert_eq!(task.spec.title, "Updating browser");
+            assert_eq!(task.origin, Screen::Setup);
+            assert_eq!(task.restore, Some(Control::Guided(13)));
+            assert_eq!(task.state, regressee_gui::task::State::Running);
+            assert_eq!(s.focus.setup_stage, SetupStage::Settings);
+            assert!(s.error.is_none());
+            assert!(s.control_enabled(Control::CancelCapture, cx));
+            assert!(!s.control_enabled(Control::SetupRuntime, cx));
+            s.activate_control(Control::SetupRuntime, window, cx);
+            assert_eq!(s.next_request, request + 1);
+            finish_jobs(s, cx);
+            let result = s.task.as_ref().unwrap().result.as_ref().unwrap();
+            assert!(
+                !result.update_browser,
+                "installer failures must not offer an update loop"
+            );
+            assert_eq!(result.recovery, Some(Destination::AppSettings));
+            assert_eq!(s.name.read(cx).content.as_ref(), "Unsaved title");
+            assert!(s.unsaved(cx));
+        })
+    });
+    owned.join_after_ui();
+    let store = regressee_storage::Store::open(paths).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        original
+    );
+    assert_ne!(
+        store.load_project(project).unwrap().project.name,
+        "Unsaved title"
+    );
+}
+
+#[gpui::test]
+fn inline_update_terminal_states_return_to_setup_without_visiting(cx: &mut TestAppContext) {
+    inline_update_terminal_matrix(cx, false);
+}
+
+#[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+#[gpui::test]
+#[ignore = "bounded inline browser update inspection; synthetic states, no downloads or visits"]
+fn renderer_capture_inline_browser_update(cx: &mut TestAppContext) {
+    inline_update_terminal_matrix(cx, true);
+}
+
+fn inline_update_terminal_matrix(cx: &mut TestAppContext, render: bool) {
+    #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+    let root = render.then(|| {
+        cx.enable_offscreen_renderer().unwrap();
+        crate::ui_renderer_capture::output_root().unwrap()
+    });
+    #[cfg(not(all(feature = "ui-renderer-capture", target_os = "linux")))]
+    assert!(!render);
+    let temp = tempfile::tempdir().unwrap();
+    let paths = AppPaths::isolated(temp.path());
+    let (store, project, _, _, _) = approval_fixture::fixture(temp.path());
+    let original = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    drop(store);
+    for (width, height) in [(1280., 800.), (820., 600.)] {
+        for (theme, appearance) in [
+            ("light", AppAppearance::Light),
+            ("dark", AppAppearance::Dark),
+        ] {
+            let (jobs, events) = Jobs::start_without_runtime(paths.clone());
+            let owned = jobs.clone();
+            owned.appearance.wait_loaded();
+            owned.appearance.choose(appearance);
+            let (shell, vcx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            vcx.simulate_resize(size(px(width), px(height)));
+            shell.update(vcx, |s, cx| {
+                load_review(s, project, cx);
+                s.focus.screen = Screen::Setup;
+                s.focus.setup_stage = SetupStage::Settings;
+                s.name
+                    .update(cx, |input, cx| input.set_value("Retained setup draft", cx));
+            });
+            for label in ["required", "running", "ready", "cancelled"] {
+                vcx.update(|_, cx| {
+                    shell.update(cx, |s, cx| {
+                        s.task = None;
+                        s.last_action = Some(Control::Guided(13));
+                        s.next_request += 1;
+                        s.pending = Some(s.next_request);
+                        s.focus.busy = true;
+                        s.begin_task(
+                            Spec::for_work(&if label == "required" {
+                                Work::Discover(project)
+                            } else {
+                                Work::SetupRuntime
+                            })
+                            .unwrap(),
+                        );
+                        let reply = match label {
+                            "required" => Reply::ActionRequired(Problem::Browser(
+                                RuntimeState::UpdateRequired,
+                            )),
+                            "running" => {
+                                s.task.as_mut().unwrap().spec.title = "Updating browser";
+                                Reply::Progress {
+                                    message: "Downloading private browser".into(),
+                                    completed: 25,
+                                    total: Some(100),
+                                }
+                            }
+                            "ready" => {
+                                Reply::RuntimeReadiness(regressee_app::product::RuntimeReadiness {
+                                    status: RuntimeState::Ready,
+                                    setup_available: true,
+                                    message: "Browser ready.",
+                                    identity: None,
+                                    scope: None,
+                                })
+                            }
+                            "cancelled" => Reply::Cancelled,
+                            _ => unreachable!(),
+                        };
+                        s.apply_update(
+                            Update {
+                                id: s.next_request,
+                                reply,
+                            },
+                            cx,
+                        );
+                        assert_eq!(s.focus.screen, Screen::Setup);
+                        assert_eq!(s.name.read(cx).content.as_ref(), "Retained setup draft");
+                        assert!(s.unsaved(cx));
+                        cx.notify();
+                    })
+                });
+                vcx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                let body = vcx.debug_bounds("task-body").unwrap();
+                let action = vcx
+                    .debug_bounds(if label == "running" {
+                        "action-CancelCapture"
+                    } else {
+                        "action-TaskContinue"
+                    })
+                    .unwrap();
+                assert!(action.top() >= body.bottom() && action.bottom() <= px(height));
+                #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+                if let Some(root) = &root {
+                    crate::ui_renderer_capture::capture(
+                        vcx,
+                        root,
+                        &format!("inline-update-{width:.0}x{height:.0}-{theme}-{label}"),
+                    )
+                    .unwrap();
+                }
+                if matches!(label, "ready" | "cancelled") {
+                    vcx.update(|window, cx| {
+                        shell.update(cx, |s, cx| {
+                            if label == "ready" {
+                                assert_eq!(
+                                    s.task.as_ref().unwrap().result.as_ref().unwrap().action,
+                                    "Continue setup"
+                                );
+                            }
+                            let request = s.next_request;
+                            s.activate_control(Control::TaskContinue, window, cx);
+                            assert!(s.task.is_none());
+                            assert_eq!(s.focus.screen, Screen::Setup);
+                            assert_eq!(s.focus.setup_stage, SetupStage::Settings);
+                            assert_eq!(s.next_request, request, "returning must not retry or save");
+                            assert_eq!(s.name.read(cx).content.as_ref(), "Retained setup draft");
+                            assert!(s.unsaved(cx));
+                        })
+                    });
+                }
+            }
+            owned.join_after_ui();
+        }
+    }
+    let store = regressee_storage::Store::open(paths).unwrap();
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        original
+    );
 }

@@ -1575,7 +1575,11 @@ impl Shell {
             .as_ref()
             .is_some_and(|task| task.state == regressee_gui::task::State::Finished)
         {
-            self.presentation_focus = Some(Control::TaskContinue);
+            self.presentation_focus = Some(if self.control_enabled(Control::SetupRuntime, cx) {
+                Control::SetupRuntime
+            } else {
+                Control::TaskContinue
+            });
         } else if completing_task
             && self.task.is_none()
             && self
@@ -5964,8 +5968,7 @@ impl Shell {
                 cx.notify();
             }
             Control::SetupRuntime => {
-                self.queue(Work::SetupRuntime, cx);
-                self.focus.capturing = self.pending.is_some();
+                self.setup_browser(cx);
             }
             Control::CaptureBaseline | Control::CheckChanges => {
                 if self.unsaved(cx) {
@@ -6429,7 +6432,15 @@ impl Shell {
             return false;
         }
         if self.task.is_some() {
-            return !self.native_prompt && self.visible_controls().contains(&control);
+            return !self.native_prompt
+                && self.visible_controls().contains(&control)
+                && (control != Control::SetupRuntime
+                    || (self.pending.is_none()
+                        && self.runtime_readiness.as_ref().is_some_and(|status| {
+                            status.setup_available
+                                && status.status
+                                    == regressee_app::product::RuntimeState::UpdateRequired
+                        })));
         }
         if !self.focus.can_activate(control)
             || !self.control_mounted(control)

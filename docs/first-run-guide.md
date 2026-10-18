@@ -128,8 +128,12 @@ whole-project deletion does not require deleting records individually first.
 
 If **Find pages**, login or capture reports **Browser update required**,
 the installed private-browser components do not match this app build. Choose
-**Open App settings** → **Update browser**, then return to your project and retry.
-**Private browser needs repair** instead leads to **Repair browser**. Both actions
+**Update browser…** on that screen and confirm the replacement. Download and
+verification happen without opening App settings. During project setup, choose
+**Continue setup** when finished; otherwise return to your workspace. Retry your
+task when ready; updating does not visit your website automatically.
+**Back to setup** lets you keep working without updating. **Private browser needs
+repair** instead leads to **App settings** → **Repair browser**. Both actions
 require your explicit choice; neither deletes saved screenshots or changes your
 baseline. An update alone does not make an older baseline comparable: checks
 still require its matching browser components.
