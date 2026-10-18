@@ -175,8 +175,112 @@ pub fn write_json(path: &Path, value: &impl serde::Serialize) -> Result<()> {
     regressee_core::platform::protect(temporary.path())?;
     temporary.write_all(&bytes)?;
     temporary.as_file().sync_all()?;
+    #[cfg(windows)]
+    persist_windows(temporary, path)?;
+    #[cfg(not(windows))]
     temporary.persist(path).map_err(|e| e.error)?;
     #[cfg(unix)]
     File::open(path.parent().unwrap())?.sync_all()?;
     Ok(())
+}
+
+/// Windows scanners/readers can briefly deny replacement. Retry only publishing
+/// these already-written, synced bytes, never a product operation. Keep the old
+/// receipt until atomic replacement succeeds, and retain all owner/path checks.
+#[cfg(windows)]
+fn persist_windows(mut temporary: tempfile::NamedTempFile, path: &Path) -> Result<()> {
+    for attempt in 0..=20 {
+        match temporary.persist(path) {
+            Ok(_) => return Ok(()),
+            Err(error) => {
+                if attempt == 20 || !matches!(error.error.raw_os_error(), Some(5 | 32 | 33)) {
+                    return Err(error.error).context("Atomic engine journal replacement failed");
+                }
+                temporary = error.file;
+                std::thread::sleep(std::time::Duration::from_millis(10));
+                if path.exists() {
+                    private_file(path, crate::protocol::MAX_FRAME as u64)?;
+                }
+            }
+        }
+    }
+    unreachable!("bounded replacement loop returns on its final attempt")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn journal_replacement_preserves_valid_complete_json() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("receipt.json");
+        for sequence in 0..20 {
+            let value = serde_json::json!({"sequence":sequence,"state":"explicit receipt"});
+            write_json(&path, &value)?;
+            assert_eq!(
+                serde_json::from_slice::<serde_json::Value>(&fs::read(&path)?)?,
+                value
+            );
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    fn deny_replacement(path: &Path) -> Result<File> {
+        use std::os::windows::fs::OpenOptionsExt;
+        // Permit reads/writes, but withhold FILE_SHARE_DELETE from replacement.
+        Ok(OpenOptions::new()
+            .read(true)
+            .share_mode(0x1 | 0x2)
+            .open(path)?)
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn transient_windows_reader_lock_allows_same_receipt_to_publish() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("receipt.json");
+        write_json(&path, &serde_json::json!({"sequence":0}))?;
+        let reader = deny_replacement(&path)?;
+        let release = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(60));
+            drop(reader);
+        });
+        let value = serde_json::json!({"sequence":1,"state":"same synced receipt"});
+        let result = write_json(&path, &value);
+        release.join().unwrap();
+        result?;
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(path)?)?,
+            value
+        );
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn persistent_windows_lock_fails_closed_and_keeps_the_old_receipt() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("receipt.json");
+        let original = serde_json::json!({"sequence":0,"state":"old durable receipt"});
+        write_json(&path, &original)?;
+        let before = fs::read(&path)?;
+        let reader = deny_replacement(&path)?;
+        let error = write_json(&path, &serde_json::json!({"sequence":1})).unwrap_err();
+        assert!(
+            error.chain().any(|cause| cause
+                .downcast_ref::<std::io::Error>()
+                .is_some_and(|io| matches!(io.raw_os_error(), Some(5 | 32 | 33)))),
+            "{error:#}"
+        );
+        assert_eq!(fs::read(&path)?, before);
+        drop(reader);
+        write_json(&path, &serde_json::json!({"sequence":2}))?;
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&fs::read(path)?)?["sequence"],
+            2
+        );
+        Ok(())
+    }
 }

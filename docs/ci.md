@@ -40,8 +40,8 @@ are diagnosable. This does not enable product-worker stderr logging.
 
 ```sh
 cargo fmt --all -- --check
-cargo test --locked --workspace --features regressee-app/test-support
-cargo test --locked --workspace --all-features
+cargo test --locked --workspace --features regressee-app/test-support -- --test-threads=1
+cargo test --locked --workspace --all-features -- --test-threads=1
 cargo clippy --locked --workspace --all-targets --all-features -- -D warnings
 ```
 
@@ -50,6 +50,8 @@ The native target is now `cargo build --locked -p regressee-gui --features ui
 application/product tests remain in `regressee-app` with `test-support`.
 The independent CLI target is `cargo build --locked -p regressee-cli
 --bin regressee`; its normal/build dependency closure must remain free of GPUI.
+Serialize local test fixtures on many-core hosts: otherwise parallel synthetic
+workers can legitimately exceed the unchanged global eight-browser safety cap.
 
 The CLI test target also exercises six simultaneous real engine autostarts,
 read-only status without a display/keychain, protocol mismatch refusal, stale
@@ -65,6 +67,13 @@ data/descriptor. It does not treat an arbitrary launch error as expected or clai
 detached-success qualification there. Hosts that permit breakaway still run all
 six-autostart, attachment, stop and upgrade-success assertions. The production
 launcher never drops its required detachment flag to make CI pass.
+
+The early Windows engine gate also exercises temporary and persistent reader
+locks against the real atomic journal writer. Only recognized Win32 access,
+sharing and lock errors retry publication, for at most 20 ten-millisecond waits;
+the same already-synced bytes are retained. Permanent errors keep the previous
+receipt and preserve the engine's uncertain-completion behavior. Test-support
+builds print the underlying durability error without changing production replies.
 
 `test-support` exposes owned-loopback fixture helpers without pulling in GPUI.
 The `product_flow` integration target requires it; `ui-tests` and `--all-features`

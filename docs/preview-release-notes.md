@@ -17,6 +17,9 @@ the exact build; the application crate version remains `0.1.0`.
   background-engine launch. The launcher refuses rather than silently tying the
   engine to the client's lifetime. Hosted tests verify that refusal against the
   OS job policy; successful native Windows detachment still needs qualification.
+- Atomic Windows journal publication tolerates brief file-sharing locks with a
+  bounded retry of the same synced receipt. Persistent failures still report
+  uncertain completion; operations are never automatically replayed.
 - Capture **Screenshots only**, **Screenshots + DOM snapshots**, or **DOM snapshots
   only**. Baselines freeze that mode. DOM source is inert, read-only text with
   kind-specific comparison, review and approval; missing or failed checks are not

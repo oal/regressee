@@ -31,6 +31,23 @@ actual job receipt when it fails. Its durability cause is not claimed fixed.
 
 ## Other retained facts
 
+Candidate `39123766440` at `70f9fcc` passed the OS-aware Windows lifecycle tests,
+then failed two engine contracts at **result durability**, not detachment. The
+receipts explicitly said `Result durability failed; the operation may have
+committed`. The .7 unexpected Interrupted outcome therefore remains relevant;
+accepting Interrupted as success or discarding its prior receipt is not allowed.
+
+The next correction adds bounded retry only around Windows atomic publication
+of the exact already-written and synced temporary journal file. Win32 errors
+5/32/33 may retry 20 times at 10 ms, revalidating existing owner/path constraints.
+No worker operation or admission is replayed, no delete-then-rename is used,
+and persistent/other failures retain the old receipt and existing Interrupted
+semantics. Unix publication is unchanged. Windows-only tests hold actual reader
+handles without FILE_SHARE_DELETE: one releases during the retry window, the
+other remains locked and must fail without changing old bytes. The early Windows
+engine gate must execute these; no local Linux execution claims those branches.
+Test-support-only diagnostics now retain the actual receipt-write cause.
+
 - Linux .7 passed its entire ordinary application contract suite, then packaging
   failed because `artifacts/` did not exist. Commit `584b8e7` creates only that
   parent, preserving the packager's fresh-output requirement and privacy gates.

@@ -160,7 +160,9 @@ impl Shared {
             job.terminal_state(&outcome)
         };
         job.outcome = Some(outcome);
-        if self.save(job).is_err() {
+        if let Err(_error) = self.save(job) {
+            #[cfg(feature = "test-support")]
+            eprintln!("Engine receipt durability failed: {_error:#}");
             job.state = JobState::Interrupted;
             job.outcome=Some(Outcome::ProductFailure("Result durability failed; the operation may have committed. Inspect saved data before issuing a new request. This request will not be executed again.".into()));
             state.failed = true;

@@ -76,6 +76,12 @@ jobs:
       - name: Check Windows engine lifecycle before the long suite
         if: runner.os == 'Windows'
         run: python scripts/ci-run.py cargo test --locked -p regressee-cli --test engine_lifecycle --target ${{ matrix.target }} -- --nocapture
+      - name: Check Windows journal locking and engine contracts early
+        if: runner.os == 'Windows'
+        run: |
+          python scripts/ci-run.py cargo test --locked -p regressee-app --features test-support --lib engine:: --target ${{ matrix.target }} -- --nocapture
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python scripts/ci-run.py cargo test --locked -p regressee-app --features test-support --test engine --target ${{ matrix.target }} -- --nocapture
       - name: Run application contract tests
         # Retain the full bulk suite with the same cold-host budget as CI.
         timeout-minutes: 45
