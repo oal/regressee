@@ -24,6 +24,8 @@ mod ui_copy_capture;
 mod ui_dialog_capture;
 #[path = "ui_dom_capture.rs"]
 mod ui_dom_capture;
+#[path = "ui_dom_syntax_capture.rs"]
+mod ui_dom_syntax_capture;
 #[path = "ui_icon_spacing_capture.rs"]
 mod ui_icon_spacing_capture;
 #[path = "ui_image_controls_capture.rs"]
@@ -263,6 +265,8 @@ fn write_frame(
             ("dom_workflow_tests_source_sha256", include_bytes!("dom_workflow_tests.rs").as_slice()),
             ("dom_diff_source_sha256", include_bytes!("ui/dom_diff.rs").as_slice()),
             ("dom_diff_tests_source_sha256", include_bytes!("ui/dom_diff_tests.rs").as_slice()),
+            ("dom_syntax_source_sha256", include_bytes!("ui/dom_syntax.rs").as_slice()),
+            ("dom_syntax_harness_source_sha256", include_bytes!("ui_dom_syntax_capture.rs").as_slice()),
             ("dom_source_adapter_sha256", include_bytes!("dom_source.rs").as_slice()),
             ("dom_jobs_source_sha256", include_bytes!("dom_jobs.rs").as_slice()),
             ("dom_ux_source_sha256", include_bytes!("dom_ux.rs").as_slice()),

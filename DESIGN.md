@@ -46,6 +46,20 @@ colors:
   dark-warning: "#f1ca7d"
   dark-warning-surface: "#382d1b"
   dark-shadow: "#080808"
+  dom-structure: "#235d96"
+  dom-attribute: "#6e468b"
+  dom-value: "#77501f"
+  dom-added: "#eff8f5"
+  dom-removed: "#fff2f2"
+  dom-selection: "#c5e9e2"
+  dom-search: "#fff0bd"
+  dark-dom-structure: "#9ac7f5"
+  dark-dom-attribute: "#cdb2ea"
+  dark-dom-value: "#e2c28d"
+  dark-dom-added: "#24332f"
+  dark-dom-removed: "#40282f"
+  dark-dom-selection: "#315d52"
+  dark-dom-search: "#4b3c1e"
 typography:
   headline:
     fontFamily: "Segoe UI, .AppleSystemUIFont, DejaVu Sans"
@@ -1564,6 +1578,29 @@ Committed deletion with incomplete file cleanup reports that distinction; App
 settings shows pending cleanup and engine startup keeps other projects usable.
 Scope, app-wide lifecycle review, offscreen inspection and qualification limits:
 `docs/research/project-removal-20261018.md`.
+
+## DOM source readability — 2026-10-18
+
+User-approved focused Operate refinement, not a viewer redesign. Preserve the
+neutral/teal shell, native geometry, controls and inert normalized DOM records.
+Source-only semantic roles distinguish blue structure/element names, violet
+attributes and warm quoted attribute values. Namespace/depth/punctuation use
+readable muted ink; actual page text stays in primary ink. Both themes have
+explicit tokens in `ui/theme.rs`; no new dependency, font, raster or motion.
+
+Added/removed rows use quiet independent backgrounds and retain old/new numbers
+and `+`/`−`. Passive search matches use a warm background; the current match uses
+teal/on-accent ink. Manual selection supersedes syntax and search with primary
+ink on a distinct selection background. Visiting a match retains the existing
+selected-text Copy behavior. All syntax colors meet 4.5:1 on ordinary, added and
+removed rows; interaction text is checked against its actual background.
+
+The display worker indexes bounded UTF-8 token spans without changing source.
+Unknown/malformed or over-budget syntax stays plain, not missing evidence.
+Only visible wrapped segments are shaped. Exact text, offsets, selection/copy,
+folding, navigation, stale-load/input guards and capture/review/baseline authority
+remain unchanged. Verification scope and native/platform limits:
+`docs/research/dom-syntax-highlighting-20261018.md`.
 
 ## Do's and Don'ts
 

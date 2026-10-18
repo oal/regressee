@@ -16,6 +16,20 @@ pub(super) fn fixture(mode: CaptureMode, dom_ok: bool) -> Fixture {
     fixture_with_image_change(mode, dom_ok, false)
 }
 fn fixture_with_image_change(mode: CaptureMode, dom_ok: bool, image_changes: bool) -> Fixture {
+    fixture_with_source(mode, dom_ok, image_changes, false)
+}
+
+#[cfg(feature = "ui-renderer-capture")]
+pub(super) fn syntax_fixture(mode: CaptureMode) -> Fixture {
+    fixture_with_source(mode, true, false, true)
+}
+
+fn fixture_with_source(
+    mode: CaptureMode,
+    dom_ok: bool,
+    image_changes: bool,
+    syntax: bool,
+) -> Fixture {
     let root = tempfile::tempdir().unwrap();
     let paths = AppPaths::isolated(root.path());
     let mut store = regressee_storage::Store::open(paths).unwrap();
@@ -162,18 +176,43 @@ fn fixture_with_image_change(mode: CaptureMode, dom_ok: bool, image_changes: boo
                     attributes: vec![],
                 },
             ];
-            for i in 0..3200 {
-                nodes.push(DomNode::Text {
-                    depth: 2,
-                    text: if after && i == 1600 {
-                        format!(
-                            "Changed hydrated text 🦀 </pre><script> inert & {}",
-                            "long source ".repeat(500)
-                        )
-                    } else {
-                        format!("Recorded line {i}: {}", "ordinary text ".repeat(8))
-                    },
-                });
+            if syntax {
+                nodes = DomSnapshot::from_canonical(include_bytes!(
+                    "../../core/tests/fixtures/dom-v1.ndjson"
+                ))
+                .unwrap()
+                .nodes;
+                if after {
+                    for node in &mut nodes {
+                        match node {
+                            DomNode::Element { attributes, .. } => {
+                                for attribute in attributes {
+                                    if attribute.name == "class" {
+                                        attribute.value = "review ready".into();
+                                    }
+                                }
+                            }
+                            DomNode::Text { text, .. } if text == "Continue" => {
+                                *text = "Continue to review 🦀".into();
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            } else {
+                for i in 0..3200 {
+                    nodes.push(DomNode::Text {
+                        depth: 2,
+                        text: if after && i == 1600 {
+                            format!(
+                                "Changed hydrated text 🦀 </pre><script> inert & {}",
+                                "long source ".repeat(500)
+                            )
+                        } else {
+                            format!("Recorded line {i}: {}", "ordinary text ".repeat(8))
+                        },
+                    });
+                }
             }
             let snapshot = DomSnapshot { nodes };
             let bytes = snapshot.canonical_bytes().unwrap();

@@ -80,6 +80,43 @@ pub const DARK: Palette = Palette {
     shadow: 0x080808,
 };
 
+/// Source-only roles. Syntax describes structure, never review/diff status.
+/// Selection/search use neutral foregrounds rather than mixing token colors.
+#[derive(Clone, Copy, Debug)]
+pub struct DomPalette {
+    pub structure: u32,
+    pub attribute: u32,
+    pub value: u32,
+    pub added: u32,
+    pub removed: u32,
+    pub selection: u32,
+    pub search: u32,
+}
+
+pub const DOM_LIGHT: DomPalette = DomPalette {
+    structure: 0x235d96,
+    attribute: 0x6e468b,
+    value: 0x77501f,
+    added: 0xeff8f5,
+    removed: LIGHT.error_surface,
+    selection: 0xc5e9e2,
+    search: 0xfff0bd,
+};
+
+pub const DOM_DARK: DomPalette = DomPalette {
+    structure: 0x9ac7f5,
+    attribute: 0xcdb2ea,
+    value: 0xe2c28d,
+    added: 0x24332f,
+    removed: DARK.error_surface,
+    selection: 0x315d52,
+    search: 0x4b3c1e,
+};
+
+pub fn dom_palette() -> DomPalette {
+    if is_dark() { DOM_DARK } else { DOM_LIGHT }
+}
+
 thread_local! {
     // GPUI paints all windows on its one UI thread. Keep this thread-local, not
     // process-global: independent test apps/renderer threads cannot recolor each
@@ -157,6 +194,29 @@ pub(super) fn contrast(foreground: u32, background: u32) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn dom_syntax_and_interaction_layers_meet_body_contrast_in_both_themes() {
+        for (p, dom) in [(LIGHT, DOM_LIGHT), (DARK, DOM_DARK)] {
+            for background in [p.surface, dom.added, dom.removed] {
+                for ink in [p.ink, p.muted, dom.structure, dom.attribute, dom.value] {
+                    assert!(
+                        contrast(ink, background) >= 4.5,
+                        "{ink:06x} on {background:06x}"
+                    );
+                }
+            }
+            for background in [dom.selection, dom.search] {
+                assert!(contrast(p.ink, background) >= 4.5);
+            }
+            assert!(contrast(p.on_accent, p.accent_hover) >= 4.5);
+            assert!(contrast(p.accent_hover, dom.added) >= 4.5);
+            assert!(contrast(p.error, dom.removed) >= 4.5);
+            assert_ne!(dom.selection, dom.added);
+            assert_ne!(dom.search, dom.selection);
+            assert_ne!(dom.search, dom.removed);
+        }
+    }
 
     #[test]
     fn both_shells_share_neutral_surfaces_and_ink_not_separate_hue_families() {

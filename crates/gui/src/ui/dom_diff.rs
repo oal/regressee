@@ -27,7 +27,9 @@
 //! uses original UTF-8 byte boundaries, spans folded/offscreen context and copies
 //! source only, without gutters or added/removed prefixes. Search is literal,
 //! case-sensitive, includes folded source, and runs in cancellable background
-//! work. This component has no review, baseline, capture, image or file actions.
+//! work. Format-aware syntax is indexed on the document worker. Syntax, diff,
+//! search and selection are independent paint layers with unchanged source bytes.
+//! This component has no review, baseline, capture, image or file actions.
 
 use std::{
     collections::BTreeSet,
@@ -39,9 +41,13 @@ use std::{
     },
 };
 
+#[path = "dom_syntax.rs"]
+mod syntax;
+
 // This dependency-free model is also exercised by standalone rustc tests when
 // the workspace's serialized Cargo slot is unavailable.
 mod model {
+    use super::syntax;
     use super::{Arc, AtomicBool, Ordering, Range, fmt};
 
     pub const WRAP_COLUMNS: usize = 80;
@@ -127,6 +133,7 @@ mod model {
         pub(super) removed: usize,
         pub(super) max_columns: usize,
         pub(super) number_digits: usize,
+        pub(super) syntax: Vec<Vec<syntax::Span>>,
     }
 
     impl DomDiffDocument {
@@ -241,6 +248,17 @@ mod model {
                 }
                 row_segments.push(start..segments.len());
             }
+            // This constructor runs on the display worker, never during paint.
+            // Bound cosmetic metadata independently from the source/evidence.
+            let mut budget = syntax::MAX_SPANS;
+            let syntax = rows
+                .iter()
+                .map(|row| {
+                    let spans = syntax::highlight(&row.text, budget);
+                    budget -= spans.len();
+                    spans
+                })
+                .collect();
             Ok(Self {
                 mode,
                 rows,
@@ -253,6 +271,7 @@ mod model {
                 removed,
                 max_columns,
                 number_digits: old.max(new).max(1).ilog10() as usize + 1,
+                syntax,
             })
         }
 
@@ -310,6 +329,95 @@ mod model {
             }
             out
         }
+
+        /// Resolve only the visible segment. All offsets remain original UTF-8
+        /// bytes; colors never affect layout, hit testing, search or copying.
+        pub(super) fn styled_segment(
+            &self,
+            row: usize,
+            bytes: Range<usize>,
+            selection: Selection,
+            results: &SearchResults,
+            current_match: Option<usize>,
+        ) -> Vec<StyledSpan> {
+            let syntax = &self.syntax[row];
+            let start = syntax.partition_point(|span| span.bytes.end <= bytes.start);
+            let syntax = &syntax[start..];
+            let syntax = &syntax[..syntax.partition_point(|span| span.bytes.start < bytes.end)];
+            let start = results.matches.partition_point(|found| {
+                found.row < row || (found.row == row && found.bytes.end <= bytes.start)
+            });
+            let matches = &results.matches[start..];
+            let matches = &matches[..matches
+                .partition_point(|found| found.row == row && found.bytes.start < bytes.end)];
+            let (from, to) = selection.ordered();
+            let selected = if (from.row..=to.row).contains(&row) {
+                (if row == from.row { from.byte } else { 0 })..(if row == to.row {
+                    to.byte
+                } else {
+                    self.rows[row].text.len()
+                })
+            } else {
+                0..0
+            };
+            // Visiting a match historically also selects it for Copy. Keep that
+            // behavior, but give this exact search-owned selection its own ink.
+            let search_selection = current_match
+                .and_then(|index| results.matches.get(index))
+                .is_some_and(|found| {
+                    from == (SourcePosition {
+                        row: found.row,
+                        byte: found.bytes.start,
+                    }) && to
+                        == (SourcePosition {
+                            row: found.row,
+                            byte: found.bytes.end,
+                        })
+                });
+            let mut boundaries = vec![bytes.start, bytes.end];
+            for range in syntax
+                .iter()
+                .map(|span| &span.bytes)
+                .chain(matches.iter().map(|found| &found.bytes))
+                .chain(std::iter::once(&selected))
+            {
+                boundaries.push(range.start.clamp(bytes.start, bytes.end));
+                boundaries.push(range.end.clamp(bytes.start, bytes.end));
+            }
+            boundaries.sort_unstable();
+            boundaries.dedup();
+            let mut spans: Vec<StyledSpan> = Vec::new();
+            for pair in boundaries.windows(2) {
+                let at = pair[0];
+                let kind = syntax
+                    .iter()
+                    .find(|span| span.bytes.contains(&at))
+                    .map_or(syntax::Kind::Plain, |span| span.kind);
+                let found = matches.iter().position(|found| found.bytes.contains(&at));
+                let emphasis = if selected.contains(&at) && !search_selection {
+                    Emphasis::Selection
+                } else if found.is_some_and(|index| current_match == Some(start + index)) {
+                    Emphasis::CurrentMatch
+                } else if found.is_some() {
+                    Emphasis::Match
+                } else {
+                    Emphasis::None
+                };
+                if let Some(last) = spans
+                    .last_mut()
+                    .filter(|span| span.kind == kind && span.emphasis == emphasis)
+                {
+                    last.bytes.end = pair[1];
+                } else {
+                    spans.push(StyledSpan {
+                        bytes: pair[0]..pair[1],
+                        kind,
+                        emphasis,
+                    });
+                }
+            }
+            spans
+        }
     }
 
     fn context_blocks(range: Range<usize>, blocks: &mut Vec<Block>) {
@@ -363,9 +471,24 @@ mod model {
         pub matches: Vec<SearchMatch>,
         pub limited: bool,
     }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub(super) enum Emphasis {
+        None,
+        Match,
+        CurrentMatch,
+        Selection,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub(super) struct StyledSpan {
+        pub bytes: Range<usize>,
+        pub kind: syntax::Kind,
+        pub emphasis: Emphasis,
+    }
 }
 
-use model::{Block, SearchResults, Selection, SourcePosition, WRAP_COLUMNS};
+use model::{Block, Emphasis, SearchResults, Selection, SourcePosition, WRAP_COLUMNS};
 pub use model::{
     DomDiffDocument, DomDiffError, DomDiffHunk, DomDiffMode, DomDiffRow, DomDiffRowKind,
 };
@@ -1352,6 +1475,26 @@ fn word_range(text: &str, byte: usize) -> Range<usize> {
     start..end
 }
 
+fn source_colors(kind: syntax::Kind, emphasis: Emphasis) -> (u32, Option<u32>) {
+    let p = palette();
+    let dom = dom_palette();
+    match emphasis {
+        Emphasis::Selection => (p.ink, Some(dom.selection)),
+        Emphasis::CurrentMatch => (p.on_accent, Some(p.accent_hover)),
+        Emphasis::Match => (p.ink, Some(dom.search)),
+        Emphasis::None => (
+            match kind {
+                syntax::Kind::Plain => p.ink,
+                syntax::Kind::Metadata => p.muted,
+                syntax::Kind::Structure | syntax::Kind::Element => dom.structure,
+                syntax::Kind::Attribute => dom.attribute,
+                syntax::Kind::Value => dom.value,
+            },
+            None,
+        ),
+    }
+}
+
 impl DomDiff {
     fn source_surface(&self, cx: &Context<Self>) -> impl IntoElement + use<> {
         let layout_entity = cx.entity();
@@ -1505,12 +1648,28 @@ impl DomDiff {
                     let (row_index, bytes) = &document.segments[segment];
                     let row = &document.rows[*row_index];
                     let text: SharedString = row.text[bytes.clone()].to_owned().into();
-                    let line = window.text_system().shape_line(
-                        text,
-                        px(SOURCE_SIZE),
-                        &[mono_run(bytes.len(), palette().ink)],
-                        None,
-                    );
+                    let mut runs = document
+                        .styled_segment(
+                            *row_index,
+                            bytes.clone(),
+                            self.selection,
+                            &self.results,
+                            self.current_match,
+                        )
+                        .into_iter()
+                        .map(|span| {
+                            let (ink, background) = source_colors(span.kind, span.emphasis);
+                            let mut run = mono_run(span.bytes.len(), ink);
+                            run.background_color = background.map(|color| rgb(color).into());
+                            run
+                        })
+                        .collect::<Vec<_>>();
+                    if runs.is_empty() {
+                        runs.push(mono_run(0, palette().ink));
+                    }
+                    let line = window
+                        .text_system()
+                        .shape_line(text, px(SOURCE_SIZE), &runs, None);
                     let source_bounds = Bounds::new(
                         point(bounds.left() + self.gutter_width + self.offset.x, top),
                         size(line.width, px(SOURCE_HEIGHT)),
@@ -1664,6 +1823,23 @@ impl DomDiff {
                         gutter,
                     } => {
                         let (row_index, bytes) = &document.segments[segment];
+                        let background = match document.rows[*row_index].kind {
+                            DomDiffRowKind::Added => Some(dom_palette().added),
+                            DomDiffRowKind::Removed => Some(dom_palette().removed),
+                            DomDiffRowKind::Context => None,
+                        };
+                        if let Some(background) = background {
+                            window.paint_quad(fill(
+                                Bounds::new(
+                                    row.bounds.origin,
+                                    size(
+                                        (row.bounds.size.width - px(scrollbar::GUTTER)).max(px(0.)),
+                                        row.bounds.size.height,
+                                    ),
+                                ),
+                                rgb(background),
+                            ));
+                        }
                         let source_clip = Bounds::new(
                             point(bounds.left() + self.gutter_width, bounds.top()),
                             size(
@@ -1677,6 +1853,12 @@ impl DomDiff {
                                 bounds: source_clip,
                             }),
                             |window| {
+                                let _ = line.paint_background(
+                                    source_bounds.origin,
+                                    px(SOURCE_HEIGHT),
+                                    window,
+                                    cx,
+                                );
                                 if *row_index >= selected_start.row
                                     && *row_index <= selected_end.row
                                 {
@@ -1692,8 +1874,11 @@ impl DomDiff {
                                     };
                                     let start = from.max(bytes.start).min(bytes.end) - bytes.start;
                                     let end = to.min(bytes.end).max(bytes.start) - bytes.start;
-                                    if start < end
-                                        || (*row_index < selected_end.row && to >= bytes.end)
+                                    // A selected newline on an empty/end-of-line
+                                    // segment still needs a visible hit of ink.
+                                    if start == end
+                                        && *row_index < selected_end.row
+                                        && to >= bytes.end
                                     {
                                         let x = line.x_for_index(start);
                                         let width = (line.x_for_index(end) - x).max(px(3.));
@@ -1702,7 +1887,7 @@ impl DomDiff {
                                                 point(source_bounds.left() + x, row.bounds.top()),
                                                 size(width, px(SOURCE_HEIGHT)),
                                             ),
-                                            rgb(palette().selected),
+                                            rgb(dom_palette().selection),
                                         ));
                                     }
                                 }
@@ -1713,12 +1898,23 @@ impl DomDiff {
                                 {
                                     let x = source_bounds.left()
                                         + line.x_for_index(self.selection.caret.byte - bytes.start);
+                                    let on_current_match = self
+                                        .current_match
+                                        .and_then(|index| self.results.matches.get(index))
+                                        .is_some_and(|found| {
+                                            found.row == *row_index
+                                                && found.bytes.contains(&self.selection.caret.byte)
+                                        });
                                     window.paint_quad(fill(
                                         Bounds::new(
                                             point(x, row.bounds.top()),
                                             size(px(1.), px(SOURCE_HEIGHT)),
                                         ),
-                                        rgb(palette().accent),
+                                        rgb(if on_current_match {
+                                            palette().on_accent
+                                        } else {
+                                            palette().accent
+                                        }),
                                     ));
                                 }
                                 let _ =

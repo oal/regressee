@@ -290,6 +290,140 @@ fn word_selection_is_scalar_safe_at_empty_and_unicode_edges() {
     assert_eq!(word_range("", 0), 0..0);
 }
 
+fn syntax_document() -> DomDiffDocument {
+    DomDiffDocument::new(
+        DomDiffMode::AfterOnly,
+        vec![DomDiffRow {
+            kind: DomDiffRowKind::Context,
+            old_line: None,
+            new_line: Some(1),
+            text: format!(
+                r#"[1] element "namespace" "div" "":"class"="{}" "":"title"="café 🦀""#,
+                "a🦀".repeat(100)
+            )
+            .into(),
+        }],
+        vec![],
+        None,
+    )
+    .unwrap()
+}
+
+#[test]
+fn model_syntax_survives_wrapping_with_exact_bytes_and_neutral_page_text() {
+    let document = syntax_document();
+    let row = &document.rows[0].text;
+    let mut reconstructed = String::new();
+    for (_, bytes) in &document.segments {
+        let spans = document.styled_segment(
+            0,
+            bytes.clone(),
+            Selection::default(),
+            &SearchResults::default(),
+            None,
+        );
+        assert_eq!(
+            spans.iter().map(|span| span.bytes.len()).sum::<usize>(),
+            bytes.len()
+        );
+        for span in spans {
+            reconstructed.push_str(&row[span.bytes.clone()]);
+            if bytes.start > row.find("class").unwrap() && bytes.end < row.find("title").unwrap() {
+                assert_eq!(span.kind, syntax::Kind::Value);
+            }
+        }
+    }
+    assert_eq!(reconstructed, row.as_ref());
+    assert_eq!(
+        document.selected_text(Selection {
+            anchor: SourcePosition::default(),
+            caret: SourcePosition {
+                row: 0,
+                byte: row.len()
+            },
+        }),
+        row.as_ref()
+    );
+    let plain = unchanged(1);
+    assert!(plain.syntax[0].is_empty());
+}
+
+#[test]
+fn model_search_selection_precedence_clips_to_original_wrapped_utf8_ranges() {
+    let document = syntax_document();
+    let results = document.search("a🦀", &AtomicBool::new(false));
+    assert_eq!(results.matches.len(), 100);
+    let found = &results.matches[0];
+    let search_selection = Selection {
+        anchor: SourcePosition {
+            row: 0,
+            byte: found.bytes.start,
+        },
+        caret: SourcePosition {
+            row: 0,
+            byte: found.bytes.end,
+        },
+    };
+    let spans = document.styled_segment(
+        0,
+        0..document.rows[0].text.len(),
+        search_selection,
+        &results,
+        Some(0),
+    );
+    assert_eq!(
+        spans
+            .iter()
+            .find(|span| span.bytes.contains(&found.bytes.start))
+            .unwrap()
+            .emphasis,
+        Emphasis::CurrentMatch
+    );
+    assert_eq!(
+        spans
+            .iter()
+            .find(|span| span.bytes.contains(&results.matches[1].bytes.start))
+            .unwrap()
+            .emphasis,
+        Emphasis::Match
+    );
+    let selection = Selection {
+        anchor: search_selection.anchor,
+        caret: SourcePosition {
+            row: 0,
+            byte: results.matches[3].bytes.end,
+        },
+    };
+    for (_, bytes) in &document.segments {
+        for span in document.styled_segment(0, bytes.clone(), selection, &results, Some(0)) {
+            if (selection.anchor.byte..selection.caret.byte).contains(&span.bytes.start) {
+                assert_eq!(span.emphasis, Emphasis::Selection);
+            }
+            assert!(document.rows[0].text.is_char_boundary(span.bytes.start));
+            assert!(document.rows[0].text.is_char_boundary(span.bytes.end));
+        }
+    }
+}
+
+#[test]
+fn model_highlighting_budget_is_independent_of_evidence_and_verdict() {
+    let rows = (1..=70_000)
+        .map(|n| context(n, r#"[1] element "namespace" "div""#))
+        .collect();
+    let document = DomDiffDocument::new(DomDiffMode::Unchanged, rows, vec![], None).unwrap();
+    assert_eq!(document.rows.len(), 70_000);
+    assert_eq!(
+        document.syntax.iter().map(Vec::len).sum::<usize>(),
+        syntax::MAX_SPANS
+    );
+    assert!(document.syntax.last().unwrap().is_empty());
+    assert_eq!(document.mode(), DomDiffMode::Unchanged);
+    assert_eq!(
+        document.rows.last().unwrap().text.as_ref(),
+        r#"[1] element "namespace" "div""#
+    );
+}
+
 #[cfg(feature = "ui-tests")]
 mod native {
     use super::*;
@@ -329,6 +463,80 @@ mod native {
         let diff = cx.update(|_, cx| host.read(cx).diff.clone());
         cx.run_until_parked();
         (diff, cx)
+    }
+
+    #[gpui::test]
+    fn syntax_search_selection_and_theme_changes_preserve_native_text_geometry(
+        cx: &mut TestAppContext,
+    ) {
+        let (diff, cx) = setup(cx, syntax_document(), 420.);
+        cx.update(|window, cx| {
+            diff.update(cx, |this, cx| {
+                let original = this.document().unwrap().clone();
+                let text = original.rows[0].text.clone();
+                let bounds = this.viewport.unwrap();
+                let old_dark = is_dark();
+                let mut first_geometry = None;
+                for dark in [false, true] {
+                    set_dark(dark);
+                    this.results = original.search("a🦀", &AtomicBool::new(false));
+                    this.visit_match(0);
+                    let frame = this.prepare_frame(bounds, window, cx);
+                    let mut geometry = Vec::new();
+                    for frame in frame {
+                        if let FrameContent::Source { segment, line, .. } = frame.content {
+                            let bytes = &original.segments[segment].1;
+                            assert_eq!(line.text.as_ref(), &text[bytes.clone()]);
+                            let baseline = window.text_system().shape_line(
+                                line.text.clone(),
+                                px(SOURCE_SIZE),
+                                &[TextRun {
+                                    len: bytes.len(),
+                                    font: Font {
+                                        family: MONO.into(),
+                                        ..window.text_style().font()
+                                    },
+                                    color: rgb(palette().ink).into(),
+                                    background_color: None,
+                                    underline: None,
+                                    strikethrough: None,
+                                }],
+                                None,
+                            );
+                            assert_eq!(line.width, baseline.width);
+                            for (byte, _) in line.text.char_indices() {
+                                assert_eq!(line.x_for_index(byte), baseline.x_for_index(byte));
+                            }
+                            geometry.push((segment, line.width));
+                        }
+                    }
+                    if let Some(first) = &first_geometry {
+                        assert_eq!(&geometry, first);
+                    } else {
+                        first_geometry = Some(geometry);
+                    }
+                    assert_eq!(this.document().unwrap().rows[0].text, text);
+                    assert_eq!(
+                        source_colors(syntax::Kind::Attribute, Emphasis::CurrentMatch),
+                        (palette().on_accent, Some(palette().accent_hover))
+                    );
+                    assert_eq!(
+                        source_colors(syntax::Kind::Value, Emphasis::Selection),
+                        (palette().ink, Some(dom_palette().selection))
+                    );
+                }
+                set_dark(old_dark);
+                window.focus(&this.source_focus);
+            });
+        });
+        cx.simulate_keystrokes("ctrl-a ctrl-c");
+        cx.update(|_, cx| {
+            let this = diff.read(cx);
+            assert_eq!(
+                cx.read_from_clipboard().unwrap().text().unwrap(),
+                this.document().unwrap().rows[0].text.as_ref()
+            );
+        });
     }
 
     #[gpui::test]
