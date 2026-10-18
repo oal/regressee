@@ -3,6 +3,8 @@
 #[cfg(feature = "ui")]
 pub mod activity;
 #[cfg(feature = "ui")]
+pub mod dom_source;
+#[cfg(feature = "ui")]
 pub mod jobs;
 pub mod launch;
 #[cfg(all(feature = "ui", any(test, feature = "test-support")))]

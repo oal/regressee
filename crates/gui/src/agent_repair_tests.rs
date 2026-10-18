@@ -183,6 +183,7 @@ fn agent_return_cancels_preexisting_scrollbar_callbacks_during_transition_and_ac
     agent
         .execute(
             Operation::SelectAgent(Selection {
+                kind: Default::default(),
                 project,
                 run: None,
                 analysis: None,

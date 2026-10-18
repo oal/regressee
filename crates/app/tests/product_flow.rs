@@ -10,7 +10,7 @@ use regressee_core::domain::*;
 use regressee_runtime::protocol::EventKind;
 use regressee_runtime::{
     distribution::{self, Distribution, Entry, Manifest, Scope},
-    protocol::{Command, FailureCode, Request},
+    protocol::{Command, FailureCode, PROTOCOL_VERSION, Request},
     supervisor::{ProcessSupervisor, Worker, WorkerFailure},
 };
 use regressee_storage::{AppPaths, Store};
@@ -310,6 +310,7 @@ fn development_pack(source: &Path, pack: &Path) -> Result<SigningKey> {
     for name in [
         "src/index.mjs",
         "src/capture.mjs",
+        "src/dom.mjs",
         "src/discover.mjs",
         "src/protocol.mjs",
         "src/sessions.mjs",
@@ -319,6 +320,7 @@ fn development_pack(source: &Path, pack: &Path) -> Result<SigningKey> {
         "test/phase4.browser.test.mjs",
         "test/phase5.browser.test.mjs",
         "test/fixtures/session-requests.ndjson",
+        "test/fixtures/capture-events.ndjson",
     ] {
         let path = project.join("worker/product").join(name);
         inputs.insert(
@@ -1366,7 +1368,7 @@ fn actual_phase4_auth_environment_and_capture() -> Result<()> {
     let error = worker
         .request(
             Request {
-                version: 2,
+                version: PROTOCOL_VERSION,
                 request_id: 2,
                 job,
                 command: Command::InstallSession {
@@ -1389,7 +1391,7 @@ fn actual_phase4_auth_environment_and_capture() -> Result<()> {
     let error = worker
         .request(
             Request {
-                version: 2,
+                version: PROTOCOL_VERSION,
                 request_id: 3,
                 job,
                 command: Command::DiscoverAuthenticated {
@@ -2102,7 +2104,7 @@ fn worker_scratch_browser_child() -> Result<()> {
     profile.runtime = installed.manifest.identity.clone();
     profile.user_agent = "Regressee owned scratch regression".into();
     let request = |address: String| Request {
-        version: 2,
+        version: PROTOCOL_VERSION,
         request_id: 2,
         job: RunId::new(),
         command: Command::CaptureTarget {
@@ -2113,6 +2115,7 @@ fn worker_scratch_browser_child() -> Result<()> {
             address,
             profile: Box::new(profile.clone()),
             session: None,
+            plan: CapturePlan::default(),
         },
     };
     let mut captured = None;
@@ -2121,10 +2124,14 @@ fn worker_scratch_browser_child() -> Result<()> {
         Instant::now() + Duration::from_secs(30),
         cancel.clone(),
         &mut |event| {
-            if let EventKind::TargetCaptured {
-                output_token,
-                width,
-                height,
+            if let EventKind::ChannelCaptured {
+                capture:
+                    regressee_runtime::protocol::CapturedChannel::Screenshot {
+                        output_token,
+                        width,
+                        height,
+                        ..
+                    },
                 ..
             } = event.event
             {
@@ -2287,10 +2294,14 @@ fn worker_scratch_browser_child() -> Result<()> {
         Instant::now() + Duration::from_secs(30),
         Arc::new(AtomicBool::new(false)),
         &mut |event| {
-            if let EventKind::TargetCaptured {
-                output_token,
-                width,
-                height,
+            if let EventKind::ChannelCaptured {
+                capture:
+                    regressee_runtime::protocol::CapturedChannel::Screenshot {
+                        output_token,
+                        width,
+                        height,
+                        ..
+                    },
                 ..
             } = event.event
             {
@@ -2564,7 +2575,7 @@ fn actual_signed_http_product_flow() -> Result<()> {
     let crash = worker
         .request(
             Request {
-                version: 2,
+                version: PROTOCOL_VERSION,
                 request_id: 2,
                 job,
                 command: Command::CaptureTarget {
@@ -2572,6 +2583,7 @@ fn actual_signed_http_product_flow() -> Result<()> {
                     address: format!("{}/hang", site.address),
                     profile: Box::new(profile),
                     session: None,
+                    plan: CapturePlan::default(),
                 },
             },
             Instant::now() + Duration::from_secs(10),

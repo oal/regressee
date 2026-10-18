@@ -237,6 +237,10 @@ impl Shell {
         section = section
             .child(self.setting_line("Saved projects", &summary.projects.to_string()))
             .child(self.setting_line("Screenshots & data", &human_bytes(summary.artifact_bytes)));
+        if summary.pending_cleanup > 0 {
+            section=section.child(div().debug_selector(||"settings-pending-cleanup".into()).text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().warning))
+                .child(format!("{} {} awaiting removal after a confirmed deletion. Check folder permissions in your operating system; Regressee retries cleanup when it starts. Other saved projects remain available.",summary.pending_cleanup,if summary.pending_cleanup==1 {"file is"} else {"files are"})));
+        }
         section.child(self.inline_disclosure(Control::Details(Detail::LocalStorage), "Storage locations", "", self.details.contains(&Detail::LocalStorage),
                 div().debug_selector(|| "settings-storage-details".into()).flex().flex_col().gap_3()
                     .child(storage_path("Project data", summary.paths.data.display().to_string()))
@@ -296,9 +300,16 @@ impl Shell {
                 fields,
                 cx,
             ))
-            .when(!self.form_errors(cx).is_empty(), |section| {
-                section.child(self.form_error_summary(cx))
-            })
+            .when(
+                self.details.contains(&Detail::ManagedNetwork) || !self.form_errors(cx).is_empty(),
+                |section| {
+                    section.child(
+                        div()
+                            .min_h(px(CONTROL_HEIGHT))
+                            .child(self.form_error_summary(cx)),
+                    )
+                },
+            )
     }
 
     pub(super) fn app_settings(&self, cx: &mut Context<Self>) -> AnyElement {

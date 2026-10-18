@@ -72,6 +72,7 @@ impl Shell {
             && matches!(
                 control,
                 Control::Phase6(1 | 3 | 6 | 7 | 13 | 14 | 15)
+                    | Control::DeleteProject(_)
                     | Control::Phase7(_)
                     | Control::Details(_)
                     | Control::CrawlField(17 | 18)
@@ -83,7 +84,7 @@ impl Shell {
             );
         if !secondary_action
             && (self.focus.screen != Screen::Setup
-                || !matches!(control,Control::Name|Control::Address|Control::CrawlField(_)|Control::Choice(_)|Control::Environment(_)|Control::EnvironmentOptions|Control::Guided(1..=12|25|27|31..=38)|Control::Details(Detail::Capture)|Control::CloseMappingPreview)
+                || !matches!(control,Control::CaptureMode(_)|Control::Name|Control::Address|Control::CrawlField(_)|Control::Choice(_)|Control::Environment(_)|Control::EnvironmentOptions|Control::Guided(1..=12|25|27|31..=38)|Control::Details(Detail::Capture|Detail::Portability)|Control::Phase6(6|7)|Control::DeleteCurrentProject|Control::RemoveEnvironment|Control::RemoveMapping(_)|Control::CloseMappingPreview)
                 || (self.focus.setup_stage == SetupStage::Access
                     && matches!(control, Control::Guided(31 | 32))))
         {
@@ -197,34 +198,22 @@ impl Shell {
             .w_full()
             .flex_shrink_0()
             .flex()
-            .flex_col()
-            .gap_1()
+            .items_center()
+            .gap_2()
             .text_size(px(13.))
             .line_height(px(HELP_LINE_HEIGHT))
             .text_color(rgb(palette().error))
-            .child(
-                div()
-                    .font_weight(FontWeight::SEMIBOLD)
-                    .child("Correct these fields before saving"),
-            )
-            .children(
-                errors
-                    .iter()
-                    .take(3)
-                    .map(|(_, label, message)| div().child(format!("{label}: {message}"))),
-            )
-            .when(errors.len() > 3, |body| {
-                body.child(format!(
-                    "{} other fields also need attention.",
-                    errors.len() - 3
-                ))
-            })
             .child(self.button(
                 Control::ValidationNext,
-                "Go to next correction",
+                if errors.len() == 1 {
+                    "Fix 1 field".to_owned()
+                } else {
+                    format!("Fix {} fields", errors.len())
+                },
                 ActionStyle::Secondary,
                 cx,
             ))
+            .child(div().child("Not saved"))
             .into_any_element()
     }
 
@@ -460,7 +449,239 @@ mod ui_tests {
     use super::*;
     use crate::phase1_setup_tests::inside as assert_bounds_inside;
     use crate::workflow_refinement_tests::finish_jobs;
-    use gpui::TestAppContext;
+    use gpui::{TestAppContext, VisualTestContext};
+
+    fn draw(cx: &mut VisualTestContext) {
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            let _ = window.draw(cx);
+        });
+    }
+
+    fn stable_validation_matrix(
+        cx: &mut TestAppContext,
+        mut capture: impl FnMut(&str, &mut VisualTestContext),
+    ) {
+        cx.update(crate::keyboard_navigation_tests::bind);
+        let dir = tempfile::tempdir().unwrap();
+        for appearance in [AppAppearance::Light, AppAppearance::Dark] {
+            regressee_storage::AppPreferences { appearance }
+                .save(&AppPaths::isolated(dir.path()))
+                .unwrap();
+            let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+            let owned = jobs.clone();
+            owned.appearance.wait_loaded();
+            let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+            cx.update(|window, _| window.activate_window());
+            shell.update(cx, finish_jobs);
+            for (width, height) in [(1280., 800.), (820., 600.)] {
+                cx.simulate_resize(size(px(width), px(height)));
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        s.focus.screen = Screen::Setup;
+                        s.focus.setup_stage = SetupStage::Website;
+                        s.error = None;
+                        s.notice = None;
+                        s.name
+                            .update(cx, |i, cx| i.set_value("Example website", cx));
+                        s.address
+                            .update(cx, |i, cx| i.set_value("https://example.com", cx));
+                        s.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
+                        window.focus(&s.handle(Control::Address, cx));
+                        cx.notify();
+                    })
+                });
+                draw(cx);
+                cx.simulate_keystrokes("ctrl-a");
+                cx.simulate_input("lindekleiv.com");
+                draw(cx);
+                shell.read_with(cx, |s, cx| assert!(!s.address.read(cx).touched));
+                let selectors = [
+                    "field-Project name",
+                    "field-Starting addresses",
+                    "setup-footer",
+                    "action-Save",
+                    "setup-footer-status",
+                ];
+                let before = selectors.map(|selector| cx.debug_bounds(selector).unwrap());
+                let offset = shell.read_with(cx, |s, _| s.screen_scroll.offset());
+                let requests = shell.read_with(cx, |s, _| s.next_request);
+                let prefix = format!(
+                    "validation-{}-{width:.0}x{height:.0}",
+                    appearance.label().to_lowercase()
+                );
+                capture(&format!("{prefix}-editing"), cx);
+
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        window.focus(&s.handle(Control::Name, cx));
+                    })
+                });
+                draw(cx);
+                for (selector, bounds) in selectors.into_iter().zip(before) {
+                    assert_eq!(
+                        cx.debug_bounds(selector).unwrap(),
+                        bounds,
+                        "blur moved {selector}"
+                    );
+                }
+                shell.read_with(cx, |s, cx| {
+                    assert_eq!(s.screen_scroll.offset(), offset);
+                    assert_eq!(s.next_request, requests);
+                    assert_eq!(s.address.read(cx).content.as_ref(), "lindekleiv.com");
+                    assert!(s.address.read(cx).touched);
+                    assert!(s.address.read(cx).supporting_text.is_some());
+                });
+                let correction = cx.debug_bounds("field-correction").unwrap();
+                assert_bounds_inside(correction, before[1]);
+                assert_bounds_inside(
+                    cx.debug_bounds("form-correction-summary").unwrap(),
+                    before[2],
+                );
+                capture(&format!("{prefix}-blur"), cx);
+
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        s.activate_control(Control::Save, window, cx);
+                        assert!(s.pending.is_none());
+                        assert_eq!(s.next_request, requests);
+                        assert_eq!(s.presentation_focus, Some(Control::Address));
+                        window.focus(&s.handle(Control::Save, cx));
+                        s.move_focus(false, window, cx);
+                        assert_eq!(s.focused(window, cx), Some(Control::ValidationNext));
+                        s.activate_control(Control::ValidationNext, window, cx);
+                        assert_eq!(s.next_request, requests);
+                    })
+                });
+                draw(cx);
+                capture(&format!("{prefix}-save-rejected"), cx);
+                // Explicit correction navigation may scroll to reveal the field;
+                // correcting it must retain that newly chosen position too.
+                let revealed = selectors.map(|selector| cx.debug_bounds(selector).unwrap());
+                cx.update(|window, cx| {
+                    shell.update(cx, |s, cx| {
+                        window.focus(&s.handle(Control::Address, cx));
+                    })
+                });
+                draw(cx);
+                cx.simulate_keystrokes("ctrl-a");
+                cx.simulate_input("https://lindekleiv.com");
+                draw(cx);
+                shell.read_with(cx, |s, cx| {
+                    assert_eq!(
+                        s.address.read(cx).content.as_ref(),
+                        "https://lindekleiv.com"
+                    );
+                    assert!(
+                        s.form_errors(cx).is_empty(),
+                        "remaining errors: {:?}",
+                        s.form_errors(cx)
+                    );
+                });
+                // GPUI retains debug selector entries from older frames; state
+                // and the optional renderer capture establish disappearance.
+                for (selector, bounds) in selectors.into_iter().zip(revealed) {
+                    assert_eq!(
+                        cx.debug_bounds(selector).unwrap(),
+                        bounds,
+                        "correction moved {selector}"
+                    );
+                }
+                shell.read_with(cx, |s, cx| {
+                    assert_eq!(s.next_request, requests);
+                    assert!(!s.control_enabled(Control::ValidationNext, cx));
+                    assert!(s.address.read(cx).touched);
+                });
+                capture(&format!("{prefix}-corrected"), cx);
+            }
+            owned.join_after_ui();
+            cx.update(|window, _| window.remove_window());
+        }
+        set_dark(false);
+    }
+
+    #[gpui::test]
+    fn validation_blur_and_correction_preserve_form_footer_and_scroll(cx: &mut TestAppContext) {
+        stable_validation_matrix(cx, |_, _| {});
+    }
+
+    #[gpui::test]
+    fn optional_proxy_validation_keeps_wrapped_help_geometry_and_recovery(cx: &mut TestAppContext) {
+        cx.update(crate::keyboard_navigation_tests::bind);
+        let dir = tempfile::tempdir().unwrap();
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        cx.update(|window, _| window.activate_window());
+        shell.update(cx, finish_jobs);
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    s.focus.screen = Screen::Settings;
+                    s.details.insert(Detail::ManagedNetwork);
+                    s.network_status = Some("Network settings loaded.".into());
+                    s.network_load_started = true;
+                    s.crawl_fields[17].update(cx, |i, cx| i.set_value("", cx));
+                    window.focus(&s.handle(Control::CrawlField(17), cx));
+                    cx.notify();
+                })
+            });
+            draw(cx);
+            cx.simulate_input("http://proxy.example:3128/page");
+            draw(cx);
+            let selectors = [
+                "field-Proxy server (optional)",
+                "field-Trusted certificate file (optional)",
+                "managed-network-section",
+                "settings-support-tools",
+            ];
+            let before = selectors.map(|selector| cx.debug_bounds(selector).unwrap());
+            let requests = shell.read_with(cx, |s, _| s.next_request);
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    window.focus(&s.handle(Control::CrawlField(18), cx));
+                })
+            });
+            draw(cx);
+            shell.read_with(cx, |s, cx| {
+                assert!(s.crawl_fields[17].read(cx).touched);
+                assert!(s.crawl_fields[17].read(cx).validation_error().is_some());
+            });
+            for (selector, bounds) in selectors.into_iter().zip(before) {
+                assert_eq!(
+                    cx.debug_bounds(selector).unwrap(),
+                    bounds,
+                    "proxy blur moved {selector}"
+                );
+            }
+            cx.update(|window, cx| {
+                shell.update(cx, |s, cx| {
+                    s.activate_control(Control::Guided(41), window, cx);
+                    assert!(s.pending.is_none());
+                    assert_eq!(s.next_request, requests);
+                    s.details.remove(&Detail::ManagedNetwork);
+                    assert!(s.control_enabled(Control::ValidationNext, cx));
+                    s.activate_control(Control::ValidationNext, window, cx);
+                    assert!(s.details.contains(&Detail::ManagedNetwork));
+                    assert_eq!(s.presentation_focus, Some(Control::CrawlField(17)));
+                    assert_eq!(s.next_request, requests);
+                })
+            });
+        }
+        owned.join_after_ui();
+    }
+
+    #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
+    #[gpui::test]
+    #[ignore = "explicit two-size light/dark native validation layout inspection"]
+    fn renderer_capture_stable_validation(cx: &mut TestAppContext) {
+        let root = crate::ui_renderer_capture::output_root().unwrap();
+        cx.enable_offscreen_renderer().unwrap();
+        stable_validation_matrix(cx, |label, cx| {
+            crate::ui_renderer_capture::capture(cx, &root, label).unwrap();
+        });
+    }
 
     #[gpui::test]
     fn about_repository_supports_pointer_keyboard_and_dialog_guards(cx: &mut TestAppContext) {

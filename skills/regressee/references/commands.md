@@ -22,13 +22,13 @@ Use explicit paths on every command, including desktop attachment.
 
 | Area | Commands |
 | --- | --- |
-| Projects/configuration | `project list/create/show/update`, `profiles/environments/scope show/set`, `environment select/save` |
+| Projects/configuration | `project list/create/show/update`, `checks show/set --mode screenshots|both|dom`, `profiles/environments/scope show/set`, `environment select/save` |
 | Discovery | `discovery start/status/inventory/existing/include/exclude` |
 | Capture | `capture preview/baseline/check/resume` |
 | Jobs | `jobs list/show/wait/pause/cancel/retry/ack` |
-| Evidence | `results list/artifacts`, `crop preview/export` |
+| Evidence | `results list/artifacts [--kind screenshot|dom]`, `snapshot source/diff`, screenshot-only `crop preview/export` |
 | Analysis/reviews | `analysis show/select/reanalyze`, `masks save`, `review set/history` |
-| Baselines/history | `baseline save/preview/accept/restore`, `history list/show` |
+| Baselines/history | `baseline save/preview/accept/restore`, explicit `baseline preview-kinds/accept-kinds`, `history list/show` |
 | Sharing/maintenance | `report preview/export`, `archive export-preview/export/import-preview/import`, `storage usage/delete-preview/delete`, `repair preview/clean/delete-unreferenced`, `diagnostics preview/export` |
 | Runtime/settings | `browser status/setup`, `network status/set`, `appearance show/set`, `login status/open/confirm/close/forget/probe` (desktop login only) |
 | Control | `agent start/list/show/renew/end/select/handoff`, `engine start/serve/status/stop` |
@@ -55,6 +55,8 @@ Use explicit paths on every command, including desktop attachment.
 - Entity/request/session/job IDs are UUIDs. Target keys are
   `{page:UUID,profile:UUID}`. Review history decision IDs are numeric keyset cursors.
 - `results list`: `--offset 0 --limit 50`, limit 1–200; continue `next_offset`.
+  DOM pages additionally stop at 4 MiB encoded JSON. Follow the actual returned
+  cursor; oversized reads fail explicitly rather than draining the engine.
   Outcome filter: changed/unchanged/failed/noncomparable. Capture-state filter:
   pending/captured/failed/skipped/cancelled. Project/history `--page` is zero-based
   (64 records, `more`). Review history `--limit` 1–200 / `--before` = `next_before`.
@@ -62,7 +64,7 @@ Use explicit paths on every command, including desktop attachment.
 | Exit | Meaning |
 | --- | --- |
 | 0 | Success, admission or prepared ticket; inspect receipt state |
-| 1 | Completed visual differences (`ok:true`), not a bug verdict |
+| 1 | Completed screenshot and/or DOM differences (`ok:true`), not a bug verdict |
 | 2 | Invalid request/input |
 | 3 | Incomplete/noncomparable/failed capture, pause or cancellation |
 | 4 | Action/setup/human/confirmation/display required, unsupported or busy |
@@ -74,6 +76,36 @@ Use explicit paths on every command, including desktop attachment.
 Queries can exit 0 while their returned evidence contains failures. Incomplete
 or uncertain outcomes take precedence over differences. Do not discard JSON
 because `set -e` or an automation harness treats exit 1 as a shell failure.
+
+## DOM and independent kinds
+
+Kind-specific results, analysis, review, history-show and baseline-preview/accept
+commands default to `screenshot`; specify `--kind dom` with the independent DOM
+analysis UUID. Capture/check/resume never accept a kind override: they use the
+saved plan. DOM-only has no fake PNG, dimensions or crop.
+
+```sh
+r results list --kind dom --project "$PROJECT" --run "$RUN"
+r snapshot source --project "$PROJECT" --run "$RUN" --analysis "$DOM_ANALYSIS" --page "$PAGE" --profile "$PROFILE" --pane after --format plaintext --offset 0 --limit 65536
+r snapshot diff --project "$PROJECT" --run "$RUN" --analysis "$DOM_ANALYSIS" --page "$PAGE" --profile "$PROFILE" --offset 0 --limit 200
+r review set --kind dom --analysis "$DOM_ANALYSIS" --page "$PAGE" --profile "$PROFILE" --state intentional --note 'Authorized change inspected'
+```
+
+Source limits: 4–262144 UTF-8 bytes, character-boundary offsets, `page.next_offset`.
+Diff limits: 1–1000 emitted rows, `--context` 0–100, `page.next_offset`;
+`page.summary.display_limited/fallback` describes bounded detail, never unchanged.
+`--format canonical` is exact normalized NDJSON, not executable HTML.
+Aggregate results retain summaries/sources, not diff bodies. DOM review/history
+and approval identities never share screenshot decisions or masks.
+
+`baseline preview --kind dom` and `baseline accept --kind dom` select DOM only.
+For atomic multi-kind consent, `baseline preview-kinds --file FILE` takes
+`{screenshot:{analysis,selected:[{page,profile}]},dom:{analysis,selected:[...]}}`,
+with unselected kinds explicitly null. Inspect the returned preview, then
+`baseline accept-kinds --file PREVIEW --prepare` and exact confirmation. Never
+infer a sibling selection. A missing baseline reference requires a new baseline
+capture, not selective filling. Reports include all enabled kinds; optional
+`--dom-analysis` pins its independent exact analysis.
 
 ## Confirmation, retry, lifecycle
 

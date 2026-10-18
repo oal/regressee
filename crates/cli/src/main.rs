@@ -6,7 +6,11 @@ use regressee_app::{
     engine::{Client, Launcher, Rejected, ownership},
     protocol::*,
 };
-use regressee_core::domain::{Classification, Project};
+use regressee_core::{
+    dom_snapshot::DomComparisonOutcome,
+    domain::{Classification, Project, RunIntent, TargetOutcome},
+    evidence::ProjectEvidence,
+};
 use regressee_storage::AppPaths;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -166,34 +170,8 @@ fn result(j: Job) -> Result<Output> {
                 exit = c.1;
             }
             Outcome::Captured(e) => {
-                let check_without_complete_analysis = e.latest.as_ref().is_some_and(|r| {
-                    matches!(
-                        r.run.intent,
-                        regressee_core::domain::RunIntent::Check { .. }
-                    ) && e.comparison.as_ref().is_none_or(|a| {
-                        a.revision.results.is_empty()
-                            || a.revision.results.len() != r.run.targets.len()
-                    })
-                });
-                if j.state == JobState::Succeeded && check_without_complete_analysis {
-                    code = "incomplete_capture";
-                    exit = 3;
-                } else if j.state == JobState::Succeeded
-                    && let Some(a) = &e.comparison
-                {
-                    let classes = a.review_classifications();
-                    if classes.values().any(|c| {
-                        matches!(
-                            c,
-                            Classification::CouldNotCapture | Classification::NotComparable
-                        )
-                    }) {
-                        code = "incomplete_capture";
-                        exit = 3;
-                    } else if classes.values().any(|c| *c == Classification::Changed) {
-                        code = "visual_differences";
-                        exit = 1;
-                    }
+                if j.state == JobState::Succeeded {
+                    (code, exit) = capture_verdict(e);
                 } else if j.state == JobState::Failed {
                     code = "incomplete_capture";
                     exit = 3;
@@ -209,7 +187,7 @@ fn result(j: Job) -> Result<Output> {
     let value = j.outcome.as_ref().map(|o| {
         let v = serde_json::to_value(o).unwrap_or(Value::Null);
         let v = v.get("value").cloned().unwrap_or(v);
-        if matches!(o, Outcome::Terminal(_)) {
+        if matches!(o, Outcome::Terminal(_) | Outcome::Dom(_)) {
             v.get("value").cloned().unwrap_or(v)
         } else if matches!(o, Outcome::History { .. }) {
             v.get("history").cloned().unwrap_or(v)
@@ -246,6 +224,85 @@ fn result(j: Job) -> Result<Output> {
     }
     Ok(output)
 }
+fn capture_verdict(evidence: &ProjectEvidence) -> (&'static str, u8) {
+    let Some(record) = &evidence.latest else {
+        return ("incomplete_capture", 3);
+    };
+    let run = &record.run;
+    if run.state != regressee_core::domain::JobState::Completed
+        || run.targets.is_empty()
+        || run.targets.iter().any(|t| !t.requested_kinds_captured())
+    {
+        return ("incomplete_capture", 3);
+    }
+    if !matches!(run.intent, RunIntent::Check { .. }) {
+        return ("ok", 0);
+    }
+    let Some(baseline) = &evidence.baseline else {
+        return ("incomplete_capture", 3);
+    };
+    // Preserve legacy screenshot-only fixed-subset check exits. DOM-enabled
+    // analyses explicitly expose intended-slot omissions as noncomparability.
+    if baseline.capture_plan.mode.dom_snapshots()
+        && baseline
+            .capture_plan
+            .kinds()
+            .any(|kind| baseline.reference_count(kind) < baseline.intended_count as usize)
+    {
+        return ("incomplete_capture", 3);
+    }
+    let screenshots = evidence
+        .comparison
+        .as_ref()
+        .map(|a| a.review_classifications())
+        .unwrap_or_default();
+    let dom = evidence
+        .dom_comparison
+        .as_ref()
+        .map(|a| {
+            a.revision
+                .results
+                .iter()
+                .map(|r| (&r.key, &r.outcome))
+                .collect::<std::collections::BTreeMap<_, _>>()
+        })
+        .unwrap_or_default();
+    let mut verdicts = Vec::new();
+    for target in &run.targets {
+        if !matches!(target.outcome, TargetOutcome::NotRequested) {
+            verdicts.push(match screenshots.get(&target.key) {
+                Some(Classification::Changed) => Some(true),
+                Some(Classification::NoSignificantChange) => Some(false),
+                _ => None,
+            });
+        }
+        if !target.dom_outcome.is_not_requested() {
+            verdicts.push(match dom.get(&target.key) {
+                Some(DomComparisonOutcome::Changed) => Some(true),
+                Some(DomComparisonOutcome::Unchanged) => Some(false),
+                _ => None,
+            });
+        }
+    }
+    classify_check_outcomes(run.capture_plan.mode.dom_snapshots(), &verdicts)
+}
+fn classify_check_outcomes(dom_enabled: bool, verdicts: &[Option<bool>]) -> (&'static str, u8) {
+    if verdicts.is_empty() || verdicts.iter().any(Option::is_none) {
+        return ("incomplete_capture", 3);
+    }
+    if verdicts.contains(&Some(true)) {
+        (
+            if dom_enabled {
+                "check_differences"
+            } else {
+                "visual_differences"
+            },
+            1,
+        )
+    } else {
+        ("ok", 0)
+    }
+}
 fn error_code(message: &str) -> (&'static str, u8) {
     // Engine-owned tagged failures, not incidental words in prose. Local
     // parser/domain validation is independently classified by InvalidRequest.
@@ -262,9 +319,11 @@ fn error_code(message: &str) -> (&'static str, u8) {
         | "authority_conflict"
         | "confirmation_replayed" => ("conflict", 5),
         "incomplete_capture" => ("incomplete_capture", 3),
+        "response_too_large" => ("response_too_large", 2),
         "invalid_request" | "invalid_input" | "invalid_arguments" | "invalid_path"
         | "request_too_large" => ("invalid_request", 2),
         "not_found" => ("not_found", 6),
+        "storage_write_failed" => ("storage_write_failed", 6),
         "busy" | "job_quota" | "engine_draining" => ("busy", 4),
         "version_mismatch" => ("version_mismatch", 6),
         _ => ("operation_failed", 6),
@@ -469,6 +528,18 @@ fn save_new(path: &Path, value: &impl Serialize) -> Result<()> {
 fn envelope(output: &Output) -> Value {
     json!({"schema_version":1,"ok":output.exit<=1,"code":output.code,"exit_status":output.exit,"data":output.data})
 }
+fn plaintext_destination(path: &Path) -> Result<()> {
+    let extension = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    ensure!(
+        ["txt", "json", "jsonl", "ndjson"].contains(&extension.as_str()),
+        "invalid_path: DOM source/diff saves require .txt, .json, .jsonl or .ndjson, never executable HTML/SVG/Markdown previews"
+    );
+    Ok(())
+}
 fn persist_output(mut output: Output, destination: Option<&Path>) -> Output {
     let Some(path) = destination else {
         return output;
@@ -490,7 +561,18 @@ fn persist_output(mut output: Output, destination: Option<&Path>) -> Output {
     } else {
         envelope(&output)
     };
-    match save_new(path, &saved) {
+    let focused_dom = output.data["job"]["outcome"]["result"] == "Dom"
+        && matches!(
+            output.data["job"]["outcome"]["value"]["kind"].as_str(),
+            Some("Source" | "Diff")
+        );
+    let write = (|| -> Result<()> {
+        if focused_dom {
+            plaintext_destination(path)?;
+        }
+        save_new(path, &saved)
+    })();
+    match write {
         Ok(()) => {}
         Err(error) => {
             if !output.data.is_object() {
@@ -532,7 +614,7 @@ fn run(args: &[String], o: &mut Options) -> Result<Output> {
     if a.words == ["capabilities"] {
         a.done().context(InvalidRequest)?;
         return Output::ok(
-            json!({"cli_schema_version":1,"protocol_version":VERSION,"product_workflows":true,"static_local_reports":true,"crop_coordinate_space":"screenshot_pixels","headless":"public_sites_only","desktop_login":true,"agent_sessions":true,"agent_follow":true,"agent_follow_policy":"gui_opt_in_only","human_handoff":"full_temporary_gui_control","headless_handoff":"agent_paused_action_required_gui_follow_or_session_end","lease_seconds":{"default":90,"minimum":10,"maximum":300},"upload":false,"max_input_bytes":commands::MAX_INPUT,"max_results_page":200,"commands":commands::HELP}),
+            json!({"cli_schema_version":1,"protocol_version":VERSION,"product_workflows":true,"capture_modes":["screenshots","both","dom"],"default_kind":"screenshot","capture_check_kind":"frozen_plan","independent_kind_reviews":true,"explicit_kind_approvals":true,"dom_source_page_max_bytes":regressee_app::engine::text::MAX_SOURCE_PAGE_BYTES,"dom_diff_page_max_rows":regressee_app::engine::text::MAX_DIFF_PAGE_ROWS,"dom_results_max_json_bytes":regressee_app::engine::text::MAX_RESULT_PAGE_BYTES,"max_read_result_bytes":MAX_READ_RESULT_BYTES,"dom_source_offsets":"utf8_bytes","dom_diff_offsets":"emitted_rows","static_local_reports":true,"crop_coordinate_space":"screenshot_pixels","headless":"public_sites_only","desktop_login":true,"agent_sessions":true,"agent_follow":true,"agent_follow_policy":"gui_opt_in_only","human_handoff":"full_temporary_gui_control","headless_handoff":"agent_paused_action_required_gui_follow_or_session_end","lease_seconds":{"default":90,"minimum":10,"maximum":300},"upload":false,"max_input_bytes":commands::MAX_INPUT,"max_results_page":200,"commands":commands::HELP}),
         );
     }
     o.detach = a.flag("--detach");
@@ -580,6 +662,18 @@ fn run(args: &[String], o: &mut Options) -> Result<Output> {
         let plan = commands::plan(&mut a)?;
         a.done()?;
         plan.validate_local()?;
+        if matches!(
+            &plan,
+            Plan::Operation(Operation::Dom(
+                regressee_app::engine::dom::Command::Source { .. }
+                    | regressee_app::engine::dom::Command::Diff { .. }
+            ))
+        ) && let Some(path) = &o.save
+        {
+            o.save_rejected = true;
+            plaintext_destination(path)?;
+            o.save_rejected = false;
+        }
         if matches!(
             &plan,
             Plan::Agent(
@@ -944,6 +1038,64 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn detailed_save_failures_keep_the_storage_write_exit_code() {
+        assert_eq!(
+            error_code(
+                "storage_write_failed: The selected environment does not belong to this project."
+            ),
+            ("storage_write_failed", 6)
+        );
+    }
+
+    #[test]
+    fn recovered_dom_body_cannot_be_saved_as_an_active_preview() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        for extension in ["html", "htm", "svg", "xhtml", "md"] {
+            let path = root.path().join(format!("unsafe.{extension}"));
+            let output = Output {
+                code: "ok".into(),
+                exit: 0,
+                data: json!({"job":{"outcome":{"result":"Dom","value":{"kind":"Source"}}},"value":{"page":{"text":"</pre></script><script>evil()</script>"}}}),
+            };
+            let output = persist_output(output, Some(&path));
+            assert_eq!(output.exit, 6);
+            assert_eq!(output.data["command_outcome"]["exit_status"], 0);
+            assert!(!path.exists());
+        }
+        for extension in ["txt", "json", "jsonl", "ndjson"] {
+            plaintext_destination(&root.path().join(format!("safe.{extension}")))?;
+        }
+        Ok(())
+    }
+    #[test]
+    fn requested_kind_failure_precedes_either_change_and_disabled_kinds_are_absent() {
+        for outcomes in [
+            vec![Some(true), None],
+            vec![None, Some(true)],
+            vec![Some(false), None],
+            vec![],
+        ] {
+            assert_eq!(
+                classify_check_outcomes(true, &outcomes),
+                ("incomplete_capture", 3)
+            );
+        }
+        assert_eq!(
+            classify_check_outcomes(true, &[Some(false), Some(true)]),
+            ("check_differences", 1)
+        );
+        assert_eq!(
+            classify_check_outcomes(true, &[Some(false), Some(false)]),
+            ("ok", 0)
+        );
+        // Disabled siblings are not represented as failed/unchanged verdicts.
+        assert_eq!(classify_check_outcomes(true, &[Some(false)]), ("ok", 0));
+        assert_eq!(
+            classify_check_outcomes(false, &[Some(true)]),
+            ("visual_differences", 1)
+        );
+    }
     #[test]
     fn explicit_save_preserves_every_exit_family_and_uncertain_diagnostics() -> Result<()> {
         let root = tempfile::tempdir()?;

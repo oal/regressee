@@ -37,8 +37,8 @@ default workflow should require.
 
 ## Product Purpose
 
-Make it practical to capture a whole website as a visual baseline and inspect
-what changed after development or deployment, without writing tests, using a
+Make it practical to capture a whole website as a visual and/or structural
+baseline and inspect what changed after development or deployment, without writing tests, using a
 terminal, or manually installing developer tooling.
 
 Typical project size is **100–1,000 distinct pages**, with one or more screen
@@ -88,6 +88,12 @@ failures in ordinary language rather than exposing an automation framework.
 ### Projects and crawling
 
 - Multiple local projects.
+- Confirmed on **2026-10-18**: permanently delete a project after inspecting its
+  named local-data impact. Remove its captures, baselines, review history and
+  saved logins; keep other projects, shared files, browser components and exported
+  ZIPs. Added environments and individual address mappings have removal actions;
+  at least one environment and mapping remain. Mapping removal stays a draft
+  until saved, and environment removal preserves recorded History.
 - A base URL or URL list supplies the starting addresses for discovery.
 - Guided controls plus an advanced section. Plain-language controls include a
   page limit, website/section boundaries, skipped URL text, and speed presets.
@@ -101,9 +107,19 @@ failures in ordinary language rather than exposing an automation framework.
 ### Capture and comparison
 
 - Users can capture a replacement baseline or compare against an existing one.
+- Confirmed on **2026-10-17**: choose **Screenshots only** (the default for new and
+  existing projects), **Screenshots + DOM snapshots**, or **DOM snapshots only**.
+  The saved baseline freezes that choice; changing future capture settings does
+  not change the checks performed against an older baseline.
+- DOM snapshots record normalized live page structure after JavaScript, including
+  template contents and open shadow roots, but not iframe documents or closed
+  shadow roots. The native viewer shows inert source and unified text differences.
+- Screenshot and DOM outcomes, notes, review decisions and reference approvals are
+  independent. Approve either kind or both explicitly; neither changes the other
+  without selection. Missing or unstable DOM is not an unchanged result.
 - Optional image/photo replacement is chosen before baseline capture. A
   comparison must use the same mode; changing it requires another baseline.
-- Balanced default sensitivity, adjustable after capture without recrawling.
+- Balanced default screenshot sensitivity, adjustable after capture without recrawling.
 - Percentage difference and other change heuristics support result analysis.
 - Users can draw ignored rectangles after capture, per page and screen size.
 - Users can approve selected page/screen-size results into a new baseline
@@ -115,9 +131,11 @@ failures in ordinary language rather than exposing an automation framework.
 - Automatically download the app's private Node, Playwright, and browser
   runtime on first use. Internet is required for that setup.
 - No reliance on a system Node installation or developer package manager.
-- Projects, screenshots, and review data remain local.
+- Projects, screenshots, DOM snapshots and review data remain local.
 - ZIP export includes project settings and a selected baseline, not login
-  sessions or cookies. Screenshots themselves can contain private information.
+  sessions or cookies. Screenshots and DOM text, hidden content, attributes and
+  URLs can contain private information. DOM capture excludes script bodies,
+  inline handlers and form values before storage; this is not complete redaction.
 - Keep history until the user explicitly deletes it. Show storage usage,
   low-space warnings, and a cleanup workflow.
 
@@ -180,6 +198,11 @@ failures in ordinary language rather than exposing an automation framework.
 5. Keep automation local and sharing explicit; never export authentication.
 
 ## Evidence on Hand
+
+The DOM extension's implementation/acceptance contract is
+`docs/dom-snapshot-plan.md`; actual scoped results and remaining qualification
+gates are recorded in `docs/research/dom-snapshot-verification-20261017.md`.
+The confirmed scope above is not a claim of whole-app or cross-platform acceptance.
 
 The project directory was empty at the original planning interview, but that is
 no longer the current state. The maintained native application lives in

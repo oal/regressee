@@ -690,6 +690,25 @@ explain the System fallback. A failed write keeps the session choice and reports
 that it was not saved, with retry guidance. Choosing appearance queues no project,
 capture, review or baseline operation. See `docs/research/dark-mode-20261016.md`.
 
+### Stable field validation — 2026-10-18
+
+Blur-time validation belongs to its field, not a paragraph inserted above the
+form. Website and settings inputs share one help/correction region below the
+40px control. An intrinsic grid measures the helper and known correction at the
+actual wrapping width; only the current copy is painted. Error ink and a thin
+error border identify invalid inputs; teal keyboard focus remains authoritative.
+Starting-address website/subdomain scope stays separately visible. No motion is
+needed: feedback changes without moving the form or its scroll position.
+
+The setup footer replaces its supporting status with **Fix 1 field / Fix N fields**
+and **Not saved**, in the same allocated space. Detailed corrections stay inline,
+not repeated above the form. App settings reserves equivalent correction space
+while Network settings is expanded and keeps correction recovery available after
+collapse. Tab follows the painted footer/disclosure order; correction navigation
+still reveals the actual field/stage without submitting. Save, draft and IME
+guards are unchanged. Both themes/two-size native offscreen confirmation and
+qualification limits: `docs/research/validation-layout-20261018.md`.
+
 ### Guided setup — native connected progression
 
 **1 Website → 2 Access → 3 Pages & sizes** is a connected, numbered progress
@@ -1446,6 +1465,58 @@ Tools, empty-message/help and capture-only corrections in fresh source-bound
 pixels at 1280×800 and 820×600. See
 `docs/research/ui-carry-through-verification-20261011.md`; this is offscreen-layout
 acceptance, not native input, accessibility or public-release certification.
+
+## DOM snapshot evidence — 2026-10-17
+
+User-confirmed extension of the current neutral/teal Clear wayfinding workspace,
+not a redesign. **What to check** offers Screenshots only (default), Screenshots +
+DOM snapshots, and DOM snapshots only. The saved baseline's frozen choice remains
+distinct from a future-capture draft.
+
+Both-mode review adds **Screenshots / DOM snapshot** with independent outcomes.
+DOM-only does not mount image tools, mask editing or pixel sensitivity, including
+keyboard actions. The existing project/page/profile/source context and queue stay
+attached while the evidence stage shows native read-only source. Literal source
+uses monospace, old/new line gutters and `+`/`−` alongside semantic color. Bounded
+rows, wrapping, collapsed context, search, change navigation and selection/copy
+use the incumbent controls, focus and scroll treatment. Captured markup never
+becomes an active web page or linkified executable source.
+
+Notes, review decisions, Next unreviewed and selected references bind to the
+check kind and immutable analysis/source identities. Consent names the selected
+screenshot/DOM references and inherited ones; either kind or both may be updated.
+Updating one must not strand the other from the same check while its original
+Before is unchanged. Dirty drafts, occlusion, stale replies and explicit save/
+approval guards remain. A successful sibling never hides missing/corrupt/unstable
+evidence. History, partial coverage and ZIP previews disclose kinds and DOM privacy.
+
+No new palette, decorative raster, font dependency or motion. Current source/model
+and real-IPC tests pass within their recorded scope; final native/offscreen finish
+review is pending. Verification and remaining OS-input/accessibility/platform
+limits: `docs/research/dom-snapshot-verification-20261017.md`.
+
+**New-project access save — 2026-10-18.** A new project starts with its own
+environment selection and empty private login fields, never the previous
+project's selection or login draft. Access-save activity says **Saving website
+access settings** without implying login is required. Save errors show the
+reported cause and preserve the full local error chain in Details; do not replace
+an unknown cause with guesses about disk space. Drafts and explicit save/visit
+boundaries remain unchanged. Scoped regressions and limits:
+`docs/research/project-access-save-20261018.md`.
+
+**Project and settings removal — 2026-10-18.** Preserve the current neutral/teal
+Operate workspace. Projects rows expose **Delete project…**, with the same action
+in a separated Project settings section. Read the actual impact off the UI
+thread, then show one named, Cancel-first confirmation with scrollable details
+and pinned actions. Distinguish permanent whole-project deletion, confirmed saved
+environment removal, and draft-only mapping removal. Keep the last environment
+and mapping; retain frozen History when removing an environment. History actions
+say **Delete run… / Delete baseline…**. No generic reset, bulk erase or archive.
+Locked/foreign credentials block deletion, not silently orphan private state.
+Committed deletion with incomplete file cleanup reports that distinction; App
+settings shows pending cleanup and engine startup keeps other projects usable.
+Scope, app-wide lifecycle review, offscreen inspection and qualification limits:
+`docs/research/project-removal-20261018.md`.
 
 ## Do's and Don'ts
 

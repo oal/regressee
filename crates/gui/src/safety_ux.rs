@@ -33,10 +33,20 @@ impl Shell {
             let confirmed = answer.await == Ok(1);
             let _ = this.update_in(cx, |this, window, cx| {
                 this.native_prompt = false;
+                let scope_cancelled = !confirmed
+                    && prompt.restore == Control::Phase6(6)
+                    && this.scope_deletion_preview();
+                let removal_restore = this.removal_restore;
                 if confirmed {
                     commit(this, cx);
+                } else if scope_cancelled {
+                    this.clear_portability_previews();
                 }
-                let restore = if this.control_enabled(prompt.restore, cx) {
+                let restore = if scope_cancelled
+                    && removal_restore.is_some_and(|c| this.control_enabled(c, cx))
+                {
+                    removal_restore.unwrap()
+                } else if this.control_enabled(prompt.restore, cx) {
                     prompt.restore
                 } else if this.control_enabled(Control::CaptureBaseline, cx) {
                     Control::CaptureBaseline
@@ -166,22 +176,77 @@ impl Shell {
                 });
             }
             Control::Phase6(6) => {
+                self.scope_confirmation_due = false;
                 let Some(preview) = self.deletion_preview.clone() else {
                     return true;
                 };
-                let prompt = base(
-                    "Permanently delete the selected history record?",
-                    format!(
-                        "Delete the record shown in the preview, {} and {} used only by this record ({}). This cannot be undone. Files shared with other records or needed by saved baselines will be kept.",
-                        workflow::count_label(preview.analyses, "analysis", "analyses"),
-                        workflow::count_label(preview.objects, "file", "files"),
-                        human_bytes(preview.bytes)
-                    ),
-                    "Delete permanently",
-                );
+                let signature = self.exit_signature(cx);
+                let prompt = if let Some(scope) = &preview.scope {
+                    let project = preview.item == regressee_storage::DeleteItem::Project;
+                    base(
+                        &format!(
+                            "{} “{}” permanently?",
+                            if project {
+                                "Delete project"
+                            } else {
+                                "Remove environment"
+                            },
+                            scope.name
+                        ),
+                        format!(
+                            "{}\n\n{}\n{}",
+                            if project {
+                                if scope.source_count > 1 {
+                                    format!(
+                                        "{} · {} starting addresses",
+                                        scope.address, scope.source_count
+                                    )
+                                } else {
+                                    scope.address.clone()
+                                }
+                            } else {
+                                format!("Project: {}\n{}", scope.project_name, scope.address)
+                            },
+                            self.scope_deletion_summary(&preview),
+                            if project
+                                && self
+                                    .project
+                                    .as_ref()
+                                    .is_some_and(|p| p.project.id == preview.project)
+                                && self.unsaved(cx)
+                            {
+                                "Unsaved work for this project will also be discarded."
+                            } else {
+                                ""
+                            }
+                        ),
+                        if project {
+                            "Delete project"
+                        } else {
+                            "Remove environment"
+                        },
+                    )
+                } else {
+                    base(
+                        if matches!(preview.item, regressee_storage::DeleteItem::Run(_)) {
+                            "Permanently delete this run?"
+                        } else {
+                            "Permanently delete this baseline version?"
+                        },
+                        format!(
+                            "Delete the record shown in the preview, {} and {} used only by this record ({}). This cannot be undone. Files shared with other records or needed by saved baselines will be kept.",
+                            workflow::count_label(preview.analyses, "analysis", "analyses"),
+                            workflow::count_label(preview.objects, "file", "files"),
+                            human_bytes(preview.bytes)
+                        ),
+                        "Delete permanently",
+                    )
+                };
                 self.confirm_destructive(prompt, window, cx, move |s, cx| {
-                    if s.deletion_preview.as_ref() == Some(&preview) {
+                    if !s.agent_locked() && s.deletion_preview.as_ref() == Some(&preview) && s.exit_signature(cx) == signature {
                         s.queue(Work::Delete(Box::new(preview)), cx);
+                    } else {
+                        s.error = Some("Your project or draft changed while the confirmation was open. Nothing was deleted; review deletion again.".into());
                     }
                 });
             }

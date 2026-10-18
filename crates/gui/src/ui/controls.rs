@@ -1082,11 +1082,26 @@ pub fn field(label: &'static str, hint: &'static str, input: AnyElement) -> Div 
                 .child(label),
         )
         .child(input)
-        .child(
-            help_copy()
-                .debug_selector(move || format!("field-hint-{label}"))
-                .child(hint),
-        )
+        .when(!hint.is_empty(), |field| {
+            field.child(
+                help_copy()
+                    .debug_selector(move || format!("field-hint-{label}"))
+                    .child(hint),
+            )
+        })
+}
+
+/// One persistent label and one stable help/correction region per form input.
+pub fn validated_field(
+    label: &'static str,
+    hint: &'static str,
+    input: Entity<super::text_input::TextInput>,
+) -> Div {
+    field(
+        label,
+        "",
+        super::text_input::SupportedInput { input, hint }.into_any_element(),
+    )
 }
 
 /// A native activity mark, never a completion fraction. The open arc remains

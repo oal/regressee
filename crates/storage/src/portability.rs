@@ -12,8 +12,8 @@ use std::{
 pub const ARCHIVE_BYTES: u64 = 1024 * 1024 * 1024;
 pub const MANIFEST_BYTES: u64 = 8 * 1024 * 1024;
 pub const ARCHIVE_ENTRIES: u16 = 10001;
-pub const PRIVACY: &str = "Original screenshots may contain private information, including ignored areas. Page addresses and private URL parameters remain in this ZIP. Login sessions, cookies, browser profiles, saved-secret references, logs, local file paths and browser components are not included.";
-pub const COMPATIBILITY: &str = "These imported screenshots have not been verified on this computer. Review the website mappings, log in yourself and install matching browser components before running a check against the saved page list. Different computers, fonts and operating systems can change how pages look. Comparison warnings do not mean a release passed. Importing does not visit websites or run their content.";
+pub const PRIVACY: &str = "Original screenshots may contain private information, including ignored areas. DOM snapshots can expose private hidden text, attributes and URLs; script/form exclusions are not complete redaction. Page addresses and private URL parameters remain in this ZIP. Login sessions, cookies, browser profiles, saved-secret references, logs, local file paths and browser components are not included.";
+pub const COMPATIBILITY: &str = "These imported captures have not been verified on this computer. Review the website mappings, log in yourself and install matching browser components before running a check against the saved page list. Different computers, fonts and operating systems can change how pages look. Comparison warnings do not mean a release passed. Importing does not visit websites or run their content.";
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ExportPreview {
     pub project: ProjectId,
@@ -88,15 +88,62 @@ impl Store {
         baseline: BaselineId,
     ) -> Result<ArchiveManifest> {
         let p = self.load_project(project)?;
-        let mut b = self.load_baseline(baseline)?;
+        let (mut b, frozen) = self.frozen_baseline_source(baseline)?;
         ensure!(b.project == project, "Baseline belongs to another project");
-        let inventory = self.load_inventory(b.inventory)?;
+        let inventory = frozen.run.inventory.clone();
         // Ancestors are intentionally not included; the complete reference map stands alone.
         b.parent = None;
         let mut runs = BTreeMap::new();
         let mut artifacts = BTreeMap::new();
         let mut masks = Vec::new();
         let mut captures = BTreeMap::new();
+        let mut dom_captures = BTreeMap::new();
+        for run in b.source_runs() {
+            let source = self.load_run_snapshot(run)?;
+            ensure!(
+                source.run.project == project
+                    && source.run.inventory.id == b.inventory
+                    && source.run.capture_plan == b.capture_plan,
+                "Portable source binding mismatch"
+            );
+            for capture in source.all_captures() {
+                captures.insert(
+                    (run, capture.metadata.key.clone()),
+                    capture.metadata.clone(),
+                );
+            }
+            for capture in &source.dom_captures {
+                dom_captures.insert(
+                    (run, capture.metadata.key.clone()),
+                    capture.metadata.clone(),
+                );
+            }
+            runs.insert(
+                run,
+                CaptureProvenance {
+                    run,
+                    rendering: source.run.rendering.clone(),
+                    profiles: source.run.profiles.clone(),
+                    environment: portable_env(&source.run.environment),
+                    started_at: source
+                        .run
+                        .started_at
+                        .context("Source capture date missing")?,
+                    finished_at: source
+                        .run
+                        .finished_at
+                        .context("Source capture date missing")?,
+                    captures: vec![],
+                    dom_captures: vec![],
+                    capture_plan: source.run.capture_plan.clone(),
+                    discovery: source
+                        .queue
+                        .as_ref()
+                        .map(|q| q.discovery.clone())
+                        .unwrap_or_default(),
+                },
+            );
+        }
         for r in &b.references {
             if let std::collections::btree_map::Entry::Vacant(e) = runs.entry(r.run) {
                 // Load frozen metadata once per source. Only selected originals are
@@ -119,6 +166,8 @@ impl Store {
                         .finished_at
                         .context("Source capture date missing")?,
                     captures: vec![],
+                    dom_captures: vec![],
+                    capture_plan: source.run.capture_plan.clone(),
                     discovery: source
                         .queue
                         .as_ref()
@@ -148,8 +197,57 @@ impl Store {
                 });
             }
         }
+        for reference in &b.dom_references {
+            let metadata = dom_captures
+                .get(&(reference.run, reference.key.clone()))
+                .context("DOM reference original missing")?;
+            ensure!(
+                metadata.sha256 == reference.artifact && metadata.policy == reference.policy,
+                "Portable DOM reference mismatch"
+            );
+            self.read_dom_snapshot(reference.run, &reference.key)?;
+            runs.get_mut(&reference.run)
+                .unwrap()
+                .dom_captures
+                .push(metadata.clone());
+            artifacts
+                .entry(reference.artifact.clone())
+                .or_insert(self.verify_artifact(&reference.artifact)?);
+        }
+        // V1 has no frozen-source/intended-key fields. It is lossless only when
+        // its first selected source is the original configuration owner and the
+        // inventory/profile product already expresses every intended target.
+        // Otherwise keep explicit hints in V2, even for screenshot-only bytes.
+        let intended: BTreeSet<_> = inventory
+            .pages
+            .iter()
+            .filter(|page| page.included)
+            .flat_map(|page| {
+                frozen.run.profiles.iter().map(move |profile| TargetKey {
+                    page: page.id,
+                    profile: profile.id,
+                })
+            })
+            .collect();
+        let legacy_compatible = p.project.capture_plan.is_default()
+            && b.capture_plan.is_default()
+            && b.dom_references.is_empty()
+            && b.references
+                .first()
+                .is_some_and(|reference| reference.run == frozen.run.id)
+            && b.intended_target_keys(&frozen.run)? == intended;
+        let version = if legacy_compatible {
+            ARCHIVE_VERSION
+        } else {
+            DOM_ARCHIVE_VERSION
+        };
+        if legacy_compatible {
+            // Adapt only this portable copy. Historical DB JSON is immutable.
+            b.source_run = None;
+            b.intended_targets.clear();
+        }
         let m = ArchiveManifest {
-            version: ARCHIVE_VERSION,
+            version,
             project: PortableProject::from(&p.project),
             inventory,
             baseline: b,
@@ -171,7 +269,7 @@ impl Store {
             revision: self.load_project(project)?.revision,
             baseline,
             manifest_hash: identity_hash(&m)?,
-            targets: m.baseline.references.len(),
+            targets: m.baseline.target_keys().len(),
             originals: m.artifacts.len(),
             bytes: m.artifacts.iter().map(|a| a.bytes).sum(),
             sources: m.provenance.len(),
@@ -209,15 +307,34 @@ impl Store {
             for a in &m.artifacts {
                 check_cancel(cancel)?;
                 let path = self.artifact_path(&a.id)?;
-                let dimensions = validate_png(&path, cancel)?;
-                ensure!(
-                    m.provenance
+                if a.kind == ArtifactKind::Screenshot {
+                    let dimensions = validate_png(&path, cancel)?;
+                    ensure!(
+                        m.provenance
+                            .iter()
+                            .flat_map(|p| &p.captures)
+                            .filter(|c| c.sha256 == a.id)
+                            .all(|c| dimensions == (c.width, c.height)),
+                        "Original screenshot PNG dimensions conflict"
+                    );
+                } else {
+                    ensure!(
+                        a.kind == ArtifactKind::DomSnapshot,
+                        "Unsupported portable original kind"
+                    );
+                    let (_, bytes) = self.read_verified_artifact(
+                        &a.id,
+                        regressee_core::dom_snapshot::MAX_DOM_BYTES as u64,
+                    )?;
+                    for c in m
+                        .provenance
                         .iter()
-                        .flat_map(|p| &p.captures)
+                        .flat_map(|p| &p.dom_captures)
                         .filter(|c| c.sha256 == a.id)
-                        .all(|c| dimensions == (c.width, c.height)),
-                    "Original screenshot PNG dimensions conflict"
-                );
+                    {
+                        c.verify_snapshot(&bytes)?;
+                    }
+                }
                 zip.start_file(artifact_entry(&a.id), options)?;
                 let mut f = fs::File::open(path)?;
                 let mut buf = [0; 65536];
@@ -311,6 +428,7 @@ impl Store {
                 })
                 .collect(),
             profiles: future,
+            capture_plan: m.project.capture_plan.clone(),
             active_baseline: Some(baseline_id),
         };
         // Build in an isolated private store. Failed decoding/derivative writes never touch recipient evidence.
@@ -344,6 +462,7 @@ impl Store {
                 e
             };
             let mut captures = Vec::new();
+            let mut dom_captures = Vec::new();
             for meta in &mut origin.captures {
                 meta.key = key(&meta.key);
                 meta.profile.id = meta.key.profile;
@@ -358,6 +477,15 @@ impl Store {
                     image,
                 });
             }
+            for meta in &mut origin.dom_captures {
+                check_cancel(cancel)?;
+                meta.key = key(&meta.key);
+                meta.profile.id = meta.key.profile;
+                meta.run = run_ids[&origin.run];
+                let file =
+                    fs::File::open(validated.stage.path().join(artifact_entry(&meta.sha256)))?;
+                dom_captures.push(staged.ingest_validated_dom_snapshot(file, meta)?);
+            }
             let mut targets = Vec::new();
             for page in m.inventory.pages.iter().filter(|p| p.included) {
                 for profile in &origin.profiles {
@@ -366,21 +494,39 @@ impl Store {
                         profile: profile.id,
                     };
                     let c = captures.iter().find(|c| c.metadata.key == k);
+                    let d = dom_captures.iter().find(|c| c.metadata.key == k);
                     targets.push(CaptureTarget {
                         key: k,
                         requested: page.canonical.clone(),
                         final_url: c
-                            .map(|c| url::Url::parse(&c.metadata.final_url))
+                            .map(|c| c.metadata.final_url.as_str())
+                            .or_else(|| d.map(|c| c.metadata.final_url.as_str()))
+                            .map(url::Url::parse)
                             .transpose()?,
-                        attempts: if c.is_some() { 1 } else { 0 },
+                        attempts: if c.is_some() || d.is_some() { 1 } else { 0 },
                         outcome: c
                             .map(|c| TargetOutcome::Captured {
                                 artifact: c.image.original.clone(),
                                 width: c.image.width,
                                 height: c.image.height,
                             })
-                            .unwrap_or(TargetOutcome::Skipped {
-                                reason: "Not part of this selected portable snapshot".into(),
+                            .unwrap_or(if origin.capture_plan.mode.screenshots() {
+                                TargetOutcome::Skipped {
+                                    reason: "Not part of this selected portable snapshot".into(),
+                                }
+                            } else {
+                                TargetOutcome::NotRequested
+                            }),
+                        dom_outcome: d
+                            .map(|d| DomTargetOutcome::Captured {
+                                artifact: d.metadata.sha256.clone(),
+                            })
+                            .unwrap_or(if origin.capture_plan.mode.dom_snapshots() {
+                                DomTargetOutcome::Skipped {
+                                    reason: "Not part of this selected portable snapshot".into(),
+                                }
+                            } else {
+                                DomTargetOutcome::NotRequested
                             }),
                         warnings: vec![],
                     });
@@ -393,9 +539,10 @@ impl Store {
                     intent: RunIntent::NewBaseline,
                     inventory: m.inventory.clone(),
                     profiles: origin.profiles.clone(),
+                    capture_plan: origin.capture_plan.clone(),
                     environment: env,
                     rendering: origin.rendering.clone(),
-                    state: if captures.len() == targets.len() {
+                    state: if targets.iter().all(CaptureTarget::requested_kinds_captured) {
                         JobState::Completed
                     } else {
                         JobState::CompletedWithErrors
@@ -406,6 +553,7 @@ impl Store {
                 },
                 capture: None,
                 captures,
+                dom_captures,
                 queue: Some(QueueSettings {
                     discovery: origin.discovery.clone(),
                     project_revision: 1,
@@ -423,7 +571,15 @@ impl Store {
         m.baseline.project = project_id;
         m.baseline.inventory = inventory_id;
         m.baseline.parent = None;
+        m.baseline.source_run = m.baseline.frozen_source_run().map(|r| run_ids[&r]);
+        for target in &mut m.baseline.intended_targets {
+            *target = key(target);
+        }
         for r in &mut m.baseline.references {
+            r.key = key(&r.key);
+            r.run = run_ids[&r.run];
+        }
+        for r in &mut m.baseline.dom_references {
             r.key = key(&r.key);
             r.run = run_ids[&r.run];
         }
@@ -509,13 +665,30 @@ impl Store {
                     pin(&tx, &self.paths, &ArtifactOwner::Baseline(baseline_id), &a)?;
                 }
             }
+            for c in &r.dom_captures {
+                pin(
+                    &tx,
+                    &self.paths,
+                    &ArtifactOwner::Run(r.run.id),
+                    &c.metadata.sha256,
+                )?;
+                pin(
+                    &tx,
+                    &self.paths,
+                    &ArtifactOwner::Baseline(baseline_id),
+                    &c.metadata.sha256,
+                )?;
+            }
         }
         tx.execute(
             "INSERT INTO baselines VALUES(?1,?2,?3,?4)",
             params![
                 baseline_id.to_string(),
                 project_id.to_string(),
-                records[0].run.id.to_string(),
+                m.baseline
+                    .frozen_source_run()
+                    .context("Portable frozen source missing")?
+                    .to_string(),
                 encode(&m.baseline)?
             ],
         )?;
@@ -672,6 +845,10 @@ fn archive(root: &Path) -> Result<PathBuf> {
                 captured_at: 2,
             }],
             intended_count: 1,
+            dom_references: vec![],
+            capture_plan: CapturePlan::default(),
+            source_run: None,
+            intended_targets: vec![],
             explicitly_partial: false,
         },
         artifacts: vec![artifact],
@@ -690,6 +867,8 @@ fn archive(root: &Path) -> Result<PathBuf> {
             started_at: 1,
             finished_at: 2,
             captures: vec![metadata],
+            dom_captures: vec![],
+            capture_plan: CapturePlan::default(),
             discovery: project.discovery,
         }],
         masks: vec![],
@@ -863,10 +1042,10 @@ pub fn space_budget(available: u128, bytes: u64) -> Result<()> {
 }
 fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
     ensure!(
-        m.version == ARCHIVE_VERSION,
+        matches!(m.version, ARCHIVE_VERSION | DOM_ARCHIVE_VERSION),
         "Unsupported/newer baseline archive version {}; this app supports {}",
         m.version,
-        ARCHIVE_VERSION
+        DOM_ARCHIVE_VERSION
     );
     ensure!(
         serde_json::to_vec(m)?.len() as u64 <= MANIFEST_BYTES,
@@ -874,6 +1053,13 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
     );
     m.inventory.validate()?;
     m.baseline.validate()?;
+    m.validate_version()?;
+    if m.version == ARCHIVE_VERSION {
+        ensure!(
+            m.baseline.source_run.is_none() && m.baseline.intended_targets.is_empty(),
+            "Frozen-source metadata requires archive version 2"
+        );
+    }
     ensure!(
         m.baseline.project == m.inventory.project
             && m.baseline.inventory == m.inventory.id
@@ -901,15 +1087,39 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
             })
             .collect(),
         profiles: m.project.profiles.clone(),
+        capture_plan: m.project.capture_plan.clone(),
         active_baseline: None,
     };
     p.validate()?;
     ensure!(
-        !m.provenance.is_empty() && m.provenance.len() <= m.baseline.references.len(),
+        !m.provenance.is_empty() && m.provenance.len() == m.baseline.source_runs().len(),
         "Invalid provenance count"
     );
     let profiles = &m.provenance[0].profiles;
     let intended = m.inventory.pages.iter().filter(|p| p.included).count() * profiles.len();
+    if !m.baseline.intended_targets.is_empty() {
+        let expected: BTreeSet<_> = m
+            .inventory
+            .pages
+            .iter()
+            .filter(|p| p.included)
+            .flat_map(|page| {
+                profiles.iter().map(move |profile| TargetKey {
+                    page: page.id,
+                    profile: profile.id,
+                })
+            })
+            .collect();
+        ensure!(
+            m.baseline
+                .intended_targets
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+                == expected,
+            "Foreign/omitted intended target identities"
+        );
+    }
     ensure!(
         intended == m.baseline.intended_count as usize,
         "Fixed inventory/profile coverage mismatch"
@@ -922,13 +1132,18 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
     );
     let mut runs = BTreeSet::new();
     let mut captures = BTreeMap::new();
+    let mut dom_captures = BTreeMap::new();
     for origin in &m.provenance {
         ensure!(
             !origin.run.0.is_nil()
                 && runs.insert(origin.run)
                 && origin.profiles == *profiles
                 && origin.rendering == m.provenance[0].rendering
-                && !origin.captures.is_empty()
+                && (origin.run == m.baseline.frozen_source_run().unwrap()
+                    || !origin.captures.is_empty()
+                    || !origin.dom_captures.is_empty())
+                && m.baseline.source_runs().contains(&origin.run)
+                && origin.capture_plan == m.baseline.capture_plan
                 && origin.started_at > 0
                 && origin.finished_at >= origin.started_at,
             "Duplicate/incompatible/empty provenance"
@@ -938,6 +1153,7 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
             ensure!(p.ready_for_capture(), "Original profile runtime missing");
         }
         origin.discovery.validate()?;
+        origin.capture_plan.validate()?;
         let e = Environment {
             id: EnvironmentId::new(),
             name: origin.environment.name.clone(),
@@ -1005,12 +1221,43 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
                     .context("Unexpected portable replacement metadata")?;
             }
         }
+        for c in &origin.dom_captures {
+            c.validate()?;
+            let page = m
+                .inventory
+                .pages
+                .iter()
+                .find(|p| p.id == c.key.page && p.included)
+                .context("Foreign DOM capture page")?;
+            let profile = origin
+                .profiles
+                .iter()
+                .find(|p| p.id == c.key.profile)
+                .context("Foreign DOM capture profile")?;
+            ensure!(
+                c.run == origin.run
+                    && c.profile == *profile
+                    && c.runtime == profile.runtime
+                    && Some(c.policy) == origin.capture_plan.dom_policy
+                    && c.requested
+                        == regressee_core::environment::map_url(&page.canonical, &e)?.as_str()
+                    && dom_captures
+                        .insert((origin.run, c.key.clone()), c)
+                        .is_none(),
+                "Invalid/duplicate DOM provenance binding"
+            );
+        }
     }
     ensure!(
         captures.len() == m.baseline.references.len(),
         "Unselected history or missing capture included"
     );
+    ensure!(
+        dom_captures.len() == m.baseline.dom_references.len(),
+        "Unselected DOM history or missing capture included"
+    );
     let mut needed = BTreeSet::new();
+    let mut needed_kinds = BTreeMap::new();
     for r in &m.baseline.references {
         let c = captures
             .get(&(r.run, r.key.clone()))
@@ -1021,6 +1268,31 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
             "Reference hash/date mismatch"
         );
         needed.insert(&r.artifact);
+        needed_kinds.insert(&r.artifact, ArtifactKind::Screenshot);
+    }
+    for r in &m.baseline.dom_references {
+        let c = dom_captures
+            .get(&(r.run, r.key.clone()))
+            .context("DOM baseline source missing")?;
+        let origin = m
+            .provenance
+            .iter()
+            .find(|p| p.run == r.run)
+            .context("DOM provenance missing")?;
+        ensure!(
+            c.sha256 == r.artifact
+                && c.policy == r.policy
+                && r.captured_at == origin.finished_at
+                && c.baseline_ready(),
+            "DOM reference hash/policy/date mismatch"
+        );
+        needed.insert(&r.artifact);
+        ensure!(
+            needed_kinds
+                .insert(&r.artifact, ArtifactKind::DomSnapshot)
+                .is_none_or(|k| k == ArtifactKind::DomSnapshot),
+            "Original kind conflict"
+        );
     }
     ensure!(
         m.artifacts.len() == needed.len() && m.artifacts.len() < ARCHIVE_ENTRIES as usize,
@@ -1030,7 +1302,7 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
     let mut total = 0u64;
     for a in &m.artifacts {
         ensure!(
-            a.kind == ArtifactKind::Screenshot
+            needed_kinds.get(&a.id) == Some(&a.kind)
                 && (1..=MAX_ARTIFACT_BYTES).contains(&a.bytes)
                 && needed.contains(&a.id)
                 && seen.insert(&a.id),
@@ -1041,6 +1313,9 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
             .context("Archive size overflow")?;
         for c in captures.values().filter(|c| c.sha256 == a.id) {
             ensure!(c.bytes == a.bytes, "Capture original size mismatch");
+        }
+        for c in dom_captures.values().filter(|c| c.sha256 == a.id) {
+            ensure!(c.bytes == a.bytes, "DOM original size mismatch");
         }
     }
     ensure!(
@@ -1070,6 +1345,50 @@ fn validate_manifest(m: &ArchiveManifest) -> Result<()> {
                 .collect(),
         }
         .validate()?;
+    }
+    Ok(())
+}
+fn validate_v1_wire_fields(bytes: &[u8]) -> Result<()> {
+    let raw: serde_json::Value = serde_json::from_slice(bytes)
+        .map_err(|_| anyhow::anyhow!("Malformed archive version 1 manifest"))?;
+    let manifest = raw
+        .as_object()
+        .context("Archive version 1 manifest must be an object")?;
+    let baseline = manifest
+        .get("baseline")
+        .and_then(serde_json::Value::as_object)
+        .context("Archive version 1 baseline must be an object")?;
+    ensure!(
+        [
+            "source_run",
+            "intended_targets",
+            "capture_plan",
+            "dom_references"
+        ]
+        .iter()
+        .all(|key| !baseline.contains_key(*key)),
+        "Archive version 1 contains newer baseline fields"
+    );
+    let project = manifest
+        .get("project")
+        .and_then(serde_json::Value::as_object)
+        .context("Archive version 1 project must be an object")?;
+    ensure!(
+        !project.contains_key("capture_plan"),
+        "Archive version 1 contains newer project fields"
+    );
+    let provenance = manifest
+        .get("provenance")
+        .and_then(serde_json::Value::as_array)
+        .context("Archive version 1 provenance must be an array")?;
+    for source in provenance {
+        let source = source
+            .as_object()
+            .context("Archive version 1 source must be an object")?;
+        ensure!(
+            !source.contains_key("capture_plan") && !source.contains_key("dom_captures"),
+            "Archive version 1 contains newer source fields"
+        );
     }
     Ok(())
 }
@@ -1162,6 +1481,9 @@ fn validate_archive(path: &Path, data: &Path, cancel: &AtomicBool) -> Result<Val
     let m: ArchiveManifest =
         serde_json::from_slice(&bytes).context("Malformed/unsupported baseline manifest")?;
     validate_manifest(&m)?;
+    if m.version == ARCHIVE_VERSION {
+        validate_v1_wire_fields(&bytes)?;
+    }
     ensure!(
         zip.len() == m.artifacts.len() + 1,
         "Unlisted/duplicate ZIP entries"
@@ -1179,23 +1501,41 @@ fn validate_archive(path: &Path, data: &Path, cancel: &AtomicBool) -> Result<Val
         ensure!(n == a.bytes, "Truncated/oversized ZIP original");
         f.sync_all()?;
         verify_file(&target, &a.id, a.bytes)?;
-        let dimensions = validate_png(&target, cancel)?;
-        for c in m
-            .provenance
-            .iter()
-            .flat_map(|p| &p.captures)
-            .filter(|c| c.sha256 == a.id)
-        {
+        if a.kind == ArtifactKind::Screenshot {
+            let dimensions = validate_png(&target, cancel)?;
+            for c in m
+                .provenance
+                .iter()
+                .flat_map(|p| &p.captures)
+                .filter(|c| c.sha256 == a.id)
+            {
+                ensure!(
+                    dimensions == (c.width, c.height),
+                    "PNG dimensions disagree with manifest"
+                );
+            }
+        } else {
             ensure!(
-                dimensions == (c.width, c.height),
-                "PNG dimensions disagree with manifest"
+                a.kind == ArtifactKind::DomSnapshot
+                    && a.bytes <= regressee_core::dom_snapshot::MAX_DOM_BYTES as u64,
+                "Invalid DOM archive original"
             );
+            let bytes = fs::read(&target)?;
+            regressee_core::dom_snapshot::DomSnapshot::from_canonical(&bytes)?;
+            for c in m
+                .provenance
+                .iter()
+                .flat_map(|p| &p.dom_captures)
+                .filter(|c| c.sha256 == a.id)
+            {
+                c.verify_snapshot(&bytes)?;
+            }
         }
     }
     let preview = ImportPreview {
         archive_hash,
         name: m.project.name.clone(),
-        targets: m.baseline.references.len(),
+        targets: m.baseline.target_keys().len(),
         originals: m.artifacts.len(),
         bytes: m.artifacts.iter().map(|a| a.bytes).sum(),
         masks: m.masks.len(),

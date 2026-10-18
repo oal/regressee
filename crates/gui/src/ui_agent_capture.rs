@@ -248,7 +248,7 @@ fn renderer_capture_agent_control(cx: &mut TestAppContext) {
                     ),
                 )
                 .unwrap();
-                shell.update(cx, |s, cx| finish_jobs(s, cx));
+                shell.update(cx, finish_jobs);
                 owner.join_after_ui();
                 cx.update(|w, _| w.remove_window());
             }

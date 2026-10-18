@@ -20,8 +20,20 @@ impl ActivityLabel for Work {
             Self::History { .. } => "Loading capture and baseline history…",
             Self::InspectRun { .. } => "Loading saved screenshots and results…",
             Self::Extension(_) => "Loading screenshot…",
+            Self::DeletePreview {
+                item: regressee_storage::DeleteItem::Project,
+                ..
+            } => "Checking project deletion impact…",
+            Self::DeletePreview {
+                item: regressee_storage::DeleteItem::Environment(_),
+                ..
+            } => "Checking environment removal…",
             Self::DeletePreview { .. } => "Preparing deletion preview…",
-            Self::Delete(_) => "Deleting selected history…",
+            Self::Delete(preview) => match preview.item {
+                regressee_storage::DeleteItem::Project => "Deleting project…",
+                regressee_storage::DeleteItem::Environment(_) => "Removing environment…",
+                _ => "Deleting selected history…",
+            },
             Self::RepairPreview => "Checking local storage…",
             Self::CleanupTemporaries(_) => "Removing confirmed temporary files…",
             Self::DeleteUnreferenced(_) => "Deleting recovery files…",
@@ -38,7 +50,7 @@ impl ActivityLabel for Work {
             Self::ExistingInventory(_) => "Loading saved page list…",
             Self::EnvironmentStatus(_) => "Loading login and environment settings…",
             Self::SaveEnvironment { .. } | Self::SaveReplacementEnvironment { .. } => {
-                "Saving login and environment settings…"
+                "Saving website access settings…"
             }
             Self::OpenLogin(_) => "Opening login browser…",
             Self::ConfirmLogin(_) => "Checking and saving login…",
@@ -52,6 +64,17 @@ impl ActivityLabel for Work {
             Self::Review(_) => "Saving review decision…",
             Self::LoadAnalysis(_) => "Loading saved comparison…",
             Self::Approval { .. } => "Preparing baseline update preview…",
+            Self::Dom(command) => match command {
+                regressee_app::engine::dom::Command::Review(_)
+                | regressee_app::engine::dom::Command::SetReview { .. } => {
+                    "Saving DOM review decision…"
+                }
+                regressee_app::engine::dom::Command::Approval(_) => {
+                    "Preparing baseline update preview…"
+                }
+                regressee_app::engine::dom::Command::Accept(_) => "Saving baseline…",
+                _ => "Reading saved DOM evidence…",
+            },
             Self::PreviewImages { .. } => "Capturing a preview screenshot…",
         }
     }

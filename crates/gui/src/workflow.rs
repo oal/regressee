@@ -9,9 +9,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub(super) struct ReviewIndex {
     classifications: BTreeMap<TargetKey, Classification>,
     captured: BTreeSet<TargetKey>,
-    eligible: BTreeSet<TargetKey>,
-    target_labels: BTreeMap<TargetKey, String>,
-    profile_labels: BTreeMap<regressee_core::domain::ProfileId, String>,
+    pub(super) eligible: BTreeSet<TargetKey>,
+    pub(super) target_labels: BTreeMap<TargetKey, String>,
+    pub(super) profile_labels: BTreeMap<regressee_core::domain::ProfileId, String>,
 }
 impl ReviewIndex {
     fn build(
@@ -66,11 +66,34 @@ impl ReviewIndex {
         let Some(baseline) = evidence
             .baseline
             .as_ref()
-            .filter(|b| Some(b.id) == active && b.id == comparison.revision.baseline)
+            .filter(|b| Some(b.id) == active)
+            .or_else(|| evidence.baselines.iter().find(|b| Some(b.id) == active))
         else {
             return index;
         };
-        let references: BTreeSet<_> = baseline.references.iter().map(|r| &r.key).collect();
+        let checked = evidence
+            .baselines
+            .iter()
+            .find(|b| b.id == comparison.revision.baseline)
+            .or_else(|| {
+                evidence
+                    .baseline
+                    .as_ref()
+                    .filter(|b| b.id == comparison.revision.baseline)
+            });
+        let references: BTreeSet<_> = baseline
+            .references
+            .iter()
+            .filter(|reference| {
+                baseline.id == comparison.revision.baseline
+                    || checked.is_some_and(|checked| {
+                        checked.capture_plan == baseline.capture_plan
+                            && checked.inventory == baseline.inventory
+                            && checked.references.iter().any(|before| before == *reference)
+                    })
+            })
+            .map(|r| &r.key)
+            .collect();
         let captures: BTreeSet<_> = run
             .all_captures()
             .filter(|c| c.metadata.baseline_ready())
@@ -152,11 +175,16 @@ impl Shell {
     pub(super) fn capture_is_saved_baseline(&self) -> bool {
         self.evidence.latest.as_ref().is_some_and(|run| {
             self.evidence.baseline.as_ref().is_some_and(|baseline| {
-                !baseline.references.is_empty()
+                (!baseline.references.is_empty() || !baseline.dom_references.is_empty())
                     && baseline.references.len() == run.all_captures().count()
+                    && baseline.dom_references.len() == run.dom_captures.len()
                     && baseline.intended_count as usize == run.run.targets.len()
                     && baseline
                         .references
+                        .iter()
+                        .all(|reference| reference.run == run.run.id)
+                    && baseline
+                        .dom_references
                         .iter()
                         .all(|reference| reference.run == run.run.id)
             })
@@ -165,7 +193,7 @@ impl Shell {
 
     pub(super) fn review_title(&self) -> &'static str {
         if self.history_inspection.is_some() {
-            return if self.evidence.comparison.is_some() {
+            return if self.has_kind_comparison() {
                 "Saved check · read-only"
             } else {
                 "Saved capture · read-only"
@@ -177,9 +205,15 @@ impl Shell {
             "Capture coverage"
         } else if self.focus.candidate {
             "Inspect capture"
-        } else if self.evidence.comparison.is_none() && self.evidence.latest.is_some() {
+        } else if !self.has_kind_comparison() && self.evidence.latest.is_some() {
             if self.capture_is_saved_baseline() {
-                "Baseline screenshots"
+                if self.recorded_mode() == CaptureMode::DomSnapshotsOnly {
+                    "Baseline DOM snapshots"
+                } else if self.recorded_mode() == CaptureMode::ScreenshotsAndDomSnapshots {
+                    "Baseline captures"
+                } else {
+                    "Baseline screenshots"
+                }
             } else {
                 "Inspect capture"
             }
@@ -195,8 +229,10 @@ impl Shell {
                 .evidence
                 .latest
                 .as_ref()
-                .and_then(|r| r.baseline_save_counts())
-                .is_some_and(|(captured, intended)| captured < intended)
+                .and_then(regressee_gui::task::baseline_consent_coverage)
+                .is_some_and(|c| {
+                    c.screenshot_captures < c.screenshot_intended || c.dom_captures < c.dom_intended
+                })
     }
 
     pub(super) fn baseline_save_confirmation(
@@ -209,6 +245,51 @@ impl Shell {
         } else {
             "All capture results, including failures, are kept in History."
         };
+        if self.recorded_mode().dom_snapshots()
+            && let Some(coverage) = self
+                .evidence
+                .latest
+                .as_ref()
+                .and_then(regressee_gui::task::baseline_consent_coverage)
+        {
+            let mut included = Vec::new();
+            if coverage.screenshot_intended > 0 {
+                included.push(format!(
+                    "{} of {} screenshots",
+                    coverage.screenshot_captures, coverage.screenshot_intended
+                ));
+            }
+            if coverage.dom_intended > 0 {
+                included.push(format!(
+                    "{} of {} DOM snapshots",
+                    coverage.dom_captures, coverage.dom_intended
+                ));
+            }
+            let partial = coverage.screenshot_captures < coverage.screenshot_intended
+                || coverage.dom_captures < coverage.dom_intended;
+            return (
+                if partial {
+                    "Save baseline and skip missing checks?"
+                } else {
+                    "Save these captures as the baseline?"
+                }
+                .into(),
+                format!(
+                    "{} will become the references for future checks. {captured} of {intended} page and screen-size pairs have at least one eligible capture. Screenshots and DOM snapshots keep separate references. Unstable DOM snapshots are retained but excluded from the baseline. {} {retained}",
+                    included.join(" and "),
+                    if partial {
+                        "Missing kinds will be omitted, not retried automatically. Capture and save a replacement baseline to add missing coverage."
+                    } else {
+                        "Future checks use this saved page list and these check kinds."
+                    }
+                ),
+                if partial {
+                    "Save & skip missing"
+                } else {
+                    "Save baseline"
+                },
+            );
+        }
         if captured < intended {
             let missing = count_label(intended - captured, "screenshot", "screenshots");
             (
@@ -233,10 +314,33 @@ impl Shell {
         if self.history_inspection.is_some() {
             return None;
         }
-        if self.evidence.comparison.is_some() || self.preview.is_some() || self.focus.capturing {
+        if self.has_kind_comparison() || self.preview.is_some() || self.focus.capturing {
             return None;
         }
         let run = self.evidence.latest.as_ref()?;
+        if run.run.capture_plan.mode.dom_snapshots() {
+            if self.capture_is_saved_baseline() {
+                return Some("Baseline saved · Run check to compare its saved kinds.".into());
+            }
+            if let Some(c) = regressee_gui::task::baseline_consent_coverage(run) {
+                return Some(format!(
+                    "Captured {} screenshots and {} DOM snapshots. Save baseline explicitly to use these references for future checks{}.",
+                    c.screenshot_captures,
+                    c.dom_captures,
+                    if c.screenshot_captures < c.screenshot_intended
+                        || c.dom_captures < c.dom_intended
+                    {
+                        "; missing kinds will be skipped"
+                    } else {
+                        ""
+                    }
+                ));
+            }
+            return Some(
+                "Capture incomplete. Inspect each requested kind; no baseline has been saved."
+                    .into(),
+            );
+        }
         if self.capture_is_saved_baseline() {
             return Some("Baseline saved · Run check to compare.".into());
         }
@@ -295,6 +399,21 @@ impl Shell {
             return "Could not load saved results".into();
         }
         if let Some(baseline) = &self.evidence.baseline {
+            if baseline.capture_plan.mode.dom_snapshots() {
+                return if baseline.capture_plan.mode.screenshots() {
+                    format!(
+                        "{} screenshots\n{} DOM snapshots",
+                        baseline.references.len(),
+                        baseline.dom_references.len()
+                    )
+                } else {
+                    count_label(
+                        baseline.dom_references.len(),
+                        "baseline DOM snapshot",
+                        "baseline DOM snapshots",
+                    )
+                };
+            }
             count_label(
                 baseline.references.len(),
                 "baseline screenshot",
@@ -308,7 +427,21 @@ impl Shell {
         {
             "Saved baseline".into()
         } else if self.focus.candidate && self.partial_baseline_capture() {
-            "Ready to save baseline\nSome screenshots will be skipped".into()
+            if self.recorded_mode().dom_snapshots() {
+                if self
+                    .evidence
+                    .latest
+                    .as_ref()
+                    .and_then(regressee_gui::task::baseline_consent_coverage)
+                    .is_some_and(|c| c.captured_targets == 0)
+                {
+                    "No baseline-ready captures\nInspect missing or unstable kinds".into()
+                } else {
+                    "Ready to save baseline\nMissing or unstable kinds will be skipped".into()
+                }
+            } else {
+                "Ready to save baseline\nSome screenshots will be skipped".into()
+            }
         } else if self.focus.candidate {
             "Ready to save baseline".into()
         } else if self.evidence.latest.as_ref().is_some_and(|run| {
@@ -686,7 +819,11 @@ impl Shell {
         {
             actions = actions.child(self.guided_button(16, "Use recorded pages", cx));
         }
-        if self.preview.is_some() {
+        if self
+            .preview
+            .as_ref()
+            .is_some_and(|p| p.settings.capture_plan.mode.screenshots())
+        {
             actions = actions.child(self.button(
                 Control::Phase5(30),
                 "Preview first included page…",
@@ -744,7 +881,7 @@ impl Shell {
                             .child(actions),
                     )
                     .when_some(self.preview.as_ref(), |header, preview| {
-                        header.child(div().debug_selector(|| "discovery-capture-plan".into()).w_full().text_size(px(13.)).line_height(px(18.)).text_color(rgb(palette().muted)).child(format!("{} included × {} = {}. {} {}", count_label(preview.included(), "page", "pages"), count_label(preview.settings.profiles.len(), "screen size", "screen sizes"), count_label(preview.included() * preview.settings.profiles.len(), "screenshot", "screenshots"), preview.inventory.coverage.label(), if preview.included() == 0 { "Include at least one eligible page before capturing." } else if !self.discovery_plan_current() { "Settings changed. In Project settings, choose Find pages again before capturing." } else { "Adjust settings and find pages again to expand this list." })))
+                        header.child(div().debug_selector(|| "discovery-capture-plan".into()).w_full().text_size(px(13.)).line_height(px(18.)).text_color(rgb(palette().muted)).child(format!("{} included × {} = {}. {} {}", count_label(preview.included(), "page", "pages"), count_label(preview.settings.profiles.len(), "screen size", "screen sizes"), planned_capture_count(preview), preview.inventory.coverage.label(), if preview.included() == 0 { "Include at least one eligible page before capturing." } else if !self.discovery_plan_current() { "Settings changed. In Project settings, choose Find pages again before capturing." } else { "Adjust settings and find pages again to expand this list." })))
                     })
                     .when_some(self.capture_next_step(), |header, next| {
                         header.child(
@@ -778,6 +915,7 @@ impl Shell {
                     }),
             )
             .when(!pages, |body| body.child(self.coverage_summary()))
+            .when(!pages && self.recorded_mode() == CaptureMode::ScreenshotsAndDomSnapshots, |body| body.child(self.evidence_kind_choices(cx)))
             .when(self.inspection_chrome_mounted(), |body| {
                 body.child(self.evidence_toolbar(cx))
             })
@@ -839,7 +977,7 @@ impl Shell {
                         workspace.child(self.options_panel(cx))
                     }),
             )
-            .when(!pages && self.evidence.comparison.is_some(), |workspace| {
+            .when(!pages && self.has_kind_comparison(), |workspace| {
                 workspace.child(self.ordinary_review_bar(cx))
             })
             .into_any_element()
@@ -892,6 +1030,28 @@ impl Shell {
             } else {
                 "Latest capture page list · Find pages to prepare a new list; saved baseline unchanged.".into()
             };
+        }
+        if self.dom_active()
+            && let Some(comparison) = &self.evidence.dom_comparison
+        {
+            let historical = self
+                .project
+                .as_ref()
+                .is_some_and(|p| p.project.active_baseline != Some(comparison.revision.baseline));
+            return format!(
+                "{}baseline · DOM check {} · {}",
+                if historical {
+                    "Historical "
+                } else {
+                    "Compared "
+                },
+                short_id(comparison.revision.run.to_string()),
+                self.displayed_run().map_or("environment not loaded", |r| r
+                    .run
+                    .environment
+                    .name
+                    .as_str())
+            );
         }
         let reference = self
             .evidence
@@ -950,6 +1110,9 @@ impl Shell {
     }
 
     pub(super) fn pane_caption(&self, pane: usize) -> (String, String, String) {
+        if self.dom_active() {
+            return self.dom_pane_caption(pane);
+        }
         let key = self.selected_key.as_ref();
         let run = self.displayed_run();
         let profile = run
@@ -1043,7 +1206,7 @@ impl Shell {
             .unwrap_or_else(|| "Target record not loaded".into());
         let (_, _, profile) = self.pane_caption(1);
         let (before, after) = self.inspection_sources();
-        let context = if self.evidence.comparison.is_some() {
+        let context = if self.has_kind_comparison() {
             format!("{profile} · Before: {before} · After: {after}")
         } else {
             format!("{profile} · Capture: {after}")
@@ -1074,6 +1237,9 @@ impl Shell {
     }
 
     pub(super) fn approval_decision(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.recorded_mode().dom_snapshots() {
+            return self.kind_approval_decision(cx);
+        }
         let Some(preview) = self.approval.as_ref().filter(|p| self.approval_matches(p)) else {
             return div().into_any_element();
         };
@@ -1283,6 +1449,9 @@ impl Shell {
 
     pub(super) fn review_index(&self) -> ReviewIndex {
         let active = if self.history_inspection.is_some()
+            || self
+                .kind_read_error(regressee_core::domain::CheckKind::Screenshot)
+                .is_some()
             || self.viewer_read_failed
             || self.mask_dirty
             || self.analysis_due.is_some()
@@ -1298,6 +1467,9 @@ impl Shell {
     }
 
     pub(super) fn approval_selection_eligible(&self) -> bool {
+        if self.recorded_mode().dom_snapshots() {
+            return self.kind_approval_selection_valid();
+        }
         let index = self.review_index();
         !self.approval_selection.is_empty()
             && self
@@ -1355,6 +1527,19 @@ impl Shell {
     }
 
     pub(super) fn ordinary_review_status(&self) -> &'static str {
+        if self.dom_active() {
+            if self.dom_result().is_some_and(|r| {
+                r.outcome == regressee_core::dom_snapshot::DomComparisonOutcome::Unchanged
+            }) {
+                return "DOM snapshots are identical";
+            }
+            return match self.dom_note_template().map(|d| d.state) {
+                Some(regressee_core::domain::ReviewState::Intentional) => "Reviewed · intentional",
+                Some(regressee_core::domain::ReviewState::NeedsFix) => "Reviewed · needs fix",
+                Some(regressee_core::domain::ReviewState::Unreviewed) => "Unreviewed DOM changes",
+                None => "Not compared",
+            };
+        }
         let Some(comparison) = &self.evidence.comparison else {
             return "Not compared";
         };
@@ -1377,6 +1562,9 @@ impl Shell {
     }
 
     pub(super) fn review_progress_summary(&self) -> String {
+        if self.dom_active() {
+            return self.dom_review_progress();
+        }
         let Some(comparison) = &self.evidence.comparison else {
             return "No comparison to review.".into();
         };
@@ -1411,6 +1599,17 @@ impl Shell {
     }
 
     pub(super) fn baseline_update_mounted(&self) -> bool {
+        if self.recorded_mode().dom_snapshots() {
+            return !self.approval_selection.is_empty()
+                || !self.dom.selected.is_empty()
+                || self.selected_key.as_ref().is_some_and(|key| {
+                    if self.dom_active() {
+                        self.dom_approval_candidate(key).is_some()
+                    } else {
+                        self.approval_eligible(key)
+                    }
+                });
+        }
         !self.approval_selection.is_empty()
             || self
                 .selected_key
@@ -1419,6 +1618,9 @@ impl Shell {
     }
 
     pub(super) fn approval_bar(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.recorded_mode().dom_snapshots() {
+            return self.kind_approval_bar(cx);
+        }
         let index = self.review_index();
         let eligible = self
             .approval_selection
@@ -1569,6 +1771,7 @@ impl Shell {
     pub(super) fn setup_footer(&self, cx: &mut Context<Self>) -> AnyElement {
         let stage = self.focus.setup_stage;
         div()
+            .debug_selector(|| "setup-footer".into())
             .shadow(regressee_gui::ui::depth::Elevation::Footer.shadows())
             .flex_shrink_0()
             .flex()
@@ -1688,11 +1891,14 @@ impl Shell {
                 div()
                     .flex_1()
                     .min_w(px(180.))
+                    .min_h(px(CONTROL_HEIGHT))
+                    .grid()
+                    .grid_cols(1)
                     .text_size(px(13.))
                     .line_height(px(HELP_LINE_HEIGHT))
                     .text_color(rgb(palette().muted))
                     .debug_selector(|| "setup-footer-status".into())
-                    .child(if stage == SetupStage::Access {
+                    .child(div().col_start(1).row_start(1).when(!self.form_errors(cx).is_empty(), |copy| copy.invisible()).child(if stage == SetupStage::Access {
                         if self.unsaved(cx) {
                             "Draft access: save first. Login opens separately."
                         } else if self.environment.as_ref().is_some_and(|e| e.login_open) {
@@ -1708,9 +1914,12 @@ impl Shell {
                         "Save the project settings first. No website is visited."
                     } else if self.unsaved(cx) {
                         "Save before visiting the website. Existing baseline unchanged."
+                    } else if self.draft_settings.capture_plan.mode.dom_snapshots() {
+                        "Settings saved. Capture the selected kinds, then choose Save baseline to use them for comparisons."
                     } else {
-                "Settings saved. Capture screenshots, then choose Save baseline to use them for comparisons."
-                    }),
+                        "Settings saved. Capture screenshots, then choose Save baseline to use them for comparisons."
+                    }))
+                    .child(div().col_start(1).row_start(1).child(self.form_error_summary(cx))),
             )
             .into_any_element()
     }
@@ -1830,6 +2039,9 @@ impl Shell {
     }
 
     pub(super) fn coverage_summary(&self) -> AnyElement {
+        if self.recorded_mode().dom_snapshots() {
+            return self.kind_coverage_summary();
+        }
         let Some(run) = &self.evidence.latest else {
             return div().into_any_element();
         };
@@ -1988,7 +2200,7 @@ pub(super) fn count_label(count: usize, singular: &str, plural: &str) -> String 
     format!("{count} {}", if count == 1 { singular } else { plural })
 }
 
-fn compact_profile(profile: &regressee_core::domain::CaptureProfile) -> String {
+pub(super) fn compact_profile(profile: &regressee_core::domain::CaptureProfile) -> String {
     format!(
         "{} · {} × {} pixels",
         profile.name, profile.width, profile.height
@@ -2011,6 +2223,17 @@ fn discovery_summary(preview: &DiscoveryPreview) -> String {
         ),
         preview.inventory.coverage.label()
     )
+}
+
+fn planned_capture_count(preview: &DiscoveryPreview) -> String {
+    let count = preview.included() * preview.settings.profiles.len();
+    match preview.settings.capture_plan.mode {
+        CaptureMode::ScreenshotsOnly => count_label(count, "screenshot", "screenshots"),
+        CaptureMode::DomSnapshotsOnly => count_label(count, "DOM snapshot", "DOM snapshots"),
+        CaptureMode::ScreenshotsAndDomSnapshots => {
+            format!("{} screenshots + {count} DOM snapshots", count)
+        }
+    }
 }
 
 fn viewer_pane_width(working: f32, queue: f32, panes: usize) -> f32 {
@@ -2119,7 +2342,7 @@ fn capture_origin(address: &str) -> String {
 }
 
 /// Exact UTC civil time, never a claim about the user's local timezone.
-fn capture_time(timestamp: i64) -> String {
+pub(super) fn capture_time(timestamp: i64) -> String {
     let days = timestamp.div_euclid(86_400);
     let seconds = timestamp.rem_euclid(86_400);
     let z = days + 719_468;

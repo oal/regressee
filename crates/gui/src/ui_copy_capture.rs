@@ -129,7 +129,7 @@ fn renderer_capture_ui_copy(cx: &mut TestAppContext) {
                 &format!("ui-copy-{width:.0}x{height:.0}-{scene}"),
             )
             .unwrap();
-            shell.update(cx, |s, cx| finish_jobs(s, cx));
+            shell.update(cx, finish_jobs);
             owned.join_after_ui();
         }
     }

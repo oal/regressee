@@ -5,7 +5,7 @@ use anyhow::{Context, Result, ensure};
 use regressee_core::{domain::*, environment::map_url};
 use regressee_runtime::{
     distribution,
-    protocol::{Command, EventKind, FailureCode, Request, SecretPayload},
+    protocol::{Command, EventKind, FailureCode, PROTOCOL_VERSION, Request, SecretPayload},
     secrets::{EncryptedSessions, SecretError, SessionMaterial, SessionSecrets},
     supervisor::{ProcessSupervisor, Worker, WorkerFailure},
 };
@@ -51,7 +51,7 @@ impl AuthState {
     pub fn install(&self, worker: &mut Worker, job: RunId, cancel: Arc<AtomicBool>) -> Result<()> {
         worker.request(
             Request {
-                version: 2,
+                version: PROTOCOL_VERSION,
                 request_id: 7000,
                 job,
                 command: Command::InstallSession {
@@ -184,6 +184,16 @@ impl AuthOwner {
         id: SessionId,
         ephemeral: bool,
     ) -> Result<()> {
+        self.remove_material_at(&store.paths().data, project, environment, id, ephemeral)
+    }
+    fn remove_material_at(
+        &mut self,
+        data: &std::path::Path,
+        project: ProjectId,
+        environment: EnvironmentId,
+        id: SessionId,
+        ephemeral: bool,
+    ) -> Result<()> {
         // Only the session ID comes from a local reference. Ownership comes from
         // the actual operation's project/environment, never reference claims.
         // Do not use auth_state: expired/origin-changed owners may still Forget.
@@ -200,7 +210,7 @@ impl AuthOwner {
                 self.ephemeral.remove(&scope.id);
             }
         } else {
-            match self.vault(store)?.delete(&scope) {
+            match self.vault_at(data)?.delete(&scope) {
                 Ok(()) | Err(SecretError::Missing) => (),
                 Err(e) => return Err(e.into()),
             }
@@ -274,15 +284,65 @@ impl AuthOwner {
         Ok(())
     }
     fn vault(&mut self, store: &Store) -> Result<&mut EncryptedSessions> {
+        self.vault_at(&store.paths().data)
+    }
+    fn vault_at(&mut self, data: &std::path::Path) -> Result<&mut EncryptedSessions> {
         if self.vault.is_none() {
-            self.vault = Some(EncryptedSessions::open(
-                &store.paths().data.join("private-sessions"),
-            )?);
+            self.vault = Some(EncryptedSessions::open(&data.join("private-sessions"))?);
         }
         Ok(self.vault.as_mut().unwrap())
     }
 }
 impl Product {
+    /// Explicit deletion owns both SQLite records and private session material.
+    /// A locked/corrupt/foreign vault never turns into an apparent success.
+    pub(crate) fn delete_saved_scope(
+        &self,
+        store: &mut Store,
+        preview: &regressee_storage::DeletionPreview,
+    ) -> Result<bool> {
+        use regressee_storage::DeleteItem;
+        if !matches!(
+            preview.item,
+            DeleteItem::Project | DeleteItem::Environment(_)
+        ) {
+            return store.delete_confirmed(preview).map(|_| false);
+        }
+        let data = store.paths().data.clone();
+        store.delete_confirmed_with_cleanup(preview, |sessions| {
+            let mut owner = self.auth.lock().unwrap();
+            // Authenticate every persistent owner before removing the first one.
+            for (scope, ephemeral) in sessions {
+                if *ephemeral {
+                    if let Some(saved) = owner.ephemeral.get(&scope.id) {
+                        ensure!(saved.scope == *scope, "Saved login belongs to another scope; nothing was removed");
+                    }
+                } else {
+                    match owner.vault_at(&data)?.load(scope) {
+                        Ok(material) => drop(material),
+                        Err(SecretError::Missing) => (),
+                        Err(error) => return Err(error.into()),
+                    }
+                }
+            }
+            if owner.login.as_ref().is_some_and(|login| login.scope.project == preview.project
+                && match preview.item { DeleteItem::Environment(id) => login.scope.environment == id, _ => true }) {
+                let mut login = owner.login.take().unwrap();
+                if let Err(error) = login.worker.stop(Instant::now() + Duration::from_secs(3)) {
+                    owner.login = Some(login);
+                    return Err(error);
+                }
+            }
+            for (scope, ephemeral) in sessions {
+                owner.remove_material_at(&data, scope.project, scope.environment, scope.id, *ephemeral)?;
+            }
+            owner.probe = None;
+            Ok(())
+        }).map_err(|error| {
+            let message=format!("Deletion could not finish: {error:#}\nProject records were kept; some logins may already have been forgotten. Resolve the reported problem and review deletion again.");
+            error.context(message)
+        })
+    }
     pub fn environment_status(
         &self,
         store: &Store,
@@ -465,7 +525,7 @@ impl Product {
         worker.handshake(job, cancel.clone())?;
         worker.request(
             Request {
-                version: 2,
+                version: PROTOCOL_VERSION,
                 request_id: 3,
                 job,
                 command: Command::OpenLogin {
@@ -534,7 +594,7 @@ impl Product {
         let scope = login.scope.clone();
         let result = login.worker.request(
             Request {
-                version: 2,
+                version: PROTOCOL_VERSION,
                 request_id: 5,
                 job: RunId::new(),
                 command: Command::ConfirmLogin {
@@ -588,8 +648,12 @@ impl Product {
     ) -> Result<Vec<(String, String)>> {
         let p = store.load_project(project)?.project;
         let (addresses, discovery) = if let Some(id) = p.active_baseline {
-            let baseline = store.load_baseline(id)?;
-            let source = store.load_run(baseline.references[0].run)?;
+            let (baseline, source) = store.frozen_baseline_source(id)?;
+            let saved_pages: std::collections::BTreeSet<_> = baseline
+                .target_keys()
+                .into_iter()
+                .map(|key| key.page)
+                .collect();
             let discovery = source.queue.map(|q| q.discovery).unwrap_or_default();
             (
                 source
@@ -597,7 +661,7 @@ impl Product {
                     .inventory
                     .pages
                     .into_iter()
-                    .filter(|p| p.included)
+                    .filter(|p| p.included && saved_pages.contains(&p.id))
                     .map(|p| p.canonical)
                     .collect(),
                 discovery,
@@ -648,7 +712,7 @@ impl Product {
             let mut redirect = false;
             worker.request(
                 Request {
-                    version: 2,
+                    version: PROTOCOL_VERSION,
                     request_id: 9 + i as u64 * 2,
                     job,
                     command,
@@ -724,12 +788,239 @@ mod tests {
             }),
         )?)?)
     }
+    #[test]
+    fn scope_removal_authenticates_logins_and_keeps_foreign_private_material() -> Result<()> {
+        use regressee_storage::DeleteItem;
+        let root = tempfile::tempdir()?;
+        let mut store = Store::open(AppPaths::isolated(root.path()))?;
+        let a = Project::draft("Delete me".into(), "https://a.example.test/")?;
+        let b = Project::draft("Keep me".into(), "https://b.example.test/")?;
+        store.save_project(&a, None)?;
+        store.save_project(&b, None)?;
+        let scope = |p: &Project| SessionReference {
+            id: SessionId::new(),
+            project: p.id,
+            environment: p.environments[0].id,
+        };
+        let a_scope = scope(&a);
+        let b_scope = scope(&b);
+        let vault_root = root.path().join("vault");
+        let mut vault = EncryptedSessions::with_provider(&vault_root, Box::new(FixtureKey))?;
+        for (p, s) in [(&a, &a_scope), (&b, &b_scope)] {
+            vault.save(s, &fixture_material(&p.environments[0])?)?;
+            store.save_session_reference(s, false)?;
+        }
+        let product = Product {
+            distribution: None,
+            official_runtime: false,
+            runtime_cache: root.path().join("cache"),
+            auth: std::sync::Mutex::new(AuthOwner {
+                vault: Some(vault),
+                ..Default::default()
+            }),
+        };
+        // A forged local reference must not authorize deleting another owner's file.
+        let forged = SessionReference {
+            id: b_scope.id,
+            ..a_scope.clone()
+        };
+        store.save_session_reference(&forged, false)?;
+        let preview = store.deletion_preview(a.id, DeleteItem::Project)?;
+        assert!(product.delete_saved_scope(&mut store, &preview).is_err());
+        assert!(store.load_project(a.id).is_ok());
+        assert!(vault_root.join(format!("{}.session", b_scope.id)).is_file());
+        store.save_session_reference(&a_scope, false)?;
+        let preview = store.deletion_preview(a.id, DeleteItem::Project)?;
+        assert!(!product.delete_saved_scope(&mut store, &preview)?);
+        assert!(store.load_project(a.id).is_err());
+        assert!(!vault_root.join(format!("{}.session", a_scope.id)).exists());
+        assert!(vault_root.join(format!("{}.session", b_scope.id)).is_file());
+        assert!(
+            store
+                .session_reference(b.id, b.environments[0].id)?
+                .is_some()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn scope_removal_locked_key_keeps_the_project_and_login_reference() -> Result<()> {
+        struct LockedKey;
+        impl KeyProvider for LockedKey {
+            fn key(&mut self) -> std::result::Result<zeroize::Zeroizing<[u8; 32]>, SecretError> {
+                Err(SecretError::SecureStoreUnavailable)
+            }
+        }
+        let root = tempfile::tempdir()?;
+        let mut store = Store::open(AppPaths::isolated(root.path()))?;
+        let p = Project::draft("Locked login".into(), "https://example.test/")?;
+        store.save_project(&p, None)?;
+        let scope = SessionReference {
+            id: SessionId::new(),
+            project: p.id,
+            environment: p.environments[0].id,
+        };
+        let path = root.path().join("vault");
+        EncryptedSessions::with_provider(&path, Box::new(FixtureKey))?
+            .save(&scope, &fixture_material(&p.environments[0])?)?;
+        store.save_session_reference(&scope, false)?;
+        let product = Product {
+            distribution: None,
+            official_runtime: false,
+            runtime_cache: root.path().join("cache"),
+            auth: std::sync::Mutex::new(AuthOwner {
+                vault: Some(EncryptedSessions::with_provider(
+                    &path,
+                    Box::new(LockedKey),
+                )?),
+                ..Default::default()
+            }),
+        };
+        let preview = store.deletion_preview(p.id, regressee_storage::DeleteItem::Project)?;
+        let error = product
+            .delete_saved_scope(&mut store, &preview)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("locked"));
+        assert!(error.contains("Project records were kept"));
+        assert_eq!(store.load_project(p.id)?.revision, 1);
+        assert!(store.session_reference(p.id, scope.environment)?.is_some());
+        assert!(path.join(format!("{}.session", scope.id)).is_file());
+        Ok(())
+    }
+
+    #[test]
+    fn scope_removal_forgets_only_the_removed_environments_ephemeral_login() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let mut store = Store::open(AppPaths::isolated(root.path()))?;
+        let mut p = Project::draft("Ephemeral environments".into(), "https://example.test/")?;
+        let mut staging = p.environments[0].clone();
+        staging.id = EnvironmentId::new();
+        staging.name = "Staging".into();
+        p.environments.push(staging.clone());
+        store.save_project(&p, None)?;
+        let mut owner = AuthOwner::default();
+        let mut scopes = Vec::new();
+        for env in &p.environments {
+            let scope = SessionReference {
+                id: SessionId::new(),
+                project: p.id,
+                environment: env.id,
+            };
+            store.save_session_reference(&scope, true)?;
+            owner.ephemeral.insert(
+                scope.id,
+                EphemeralSession {
+                    scope: scope.clone(),
+                    material: fixture_material(env)?,
+                },
+            );
+            scopes.push(scope);
+        }
+        let product = Product {
+            distribution: None,
+            official_runtime: false,
+            runtime_cache: root.path().join("cache"),
+            auth: std::sync::Mutex::new(owner),
+        };
+        let preview =
+            store.deletion_preview(p.id, regressee_storage::DeleteItem::Environment(staging.id))?;
+        product.delete_saved_scope(&mut store, &preview)?;
+        assert!(
+            product
+                .auth
+                .lock()
+                .unwrap()
+                .ephemeral
+                .contains_key(&scopes[0].id)
+        );
+        assert!(
+            !product
+                .auth
+                .lock()
+                .unwrap()
+                .ephemeral
+                .contains_key(&scopes[1].id)
+        );
+        assert!(
+            store
+                .session_reference(p.id, scopes[0].environment)?
+                .is_some()
+        );
+        let preview = store.deletion_preview(p.id, regressee_storage::DeleteItem::Project)?;
+        product.delete_saved_scope(&mut store, &preview)?;
+        assert!(product.auth.lock().unwrap().ephemeral.is_empty());
+        Ok(())
+    }
     fn assert_needs_login(result: Result<Option<AuthState>>) {
         let error = result.err().expect("must refuse invalid saved login");
         assert_eq!(
             error.downcast_ref::<WorkerFailure>().unwrap().0,
             FailureCode::NeedsLogin
         );
+    }
+    #[test]
+    fn auth_worker_requests_use_current_protocol_without_changing_bound_session_version()
+    -> Result<()> {
+        let project = Project::draft("Auth wire version".into(), "http://127.0.0.1:8010/auth")?;
+        let env = &project.environments[0];
+        let session = SessionReference {
+            id: SessionId::new(),
+            project: project.id,
+            environment: env.id,
+        };
+        let commands = [
+            Command::InstallSession {
+                session: session.clone(),
+                origins: origins(env),
+                material: SecretPayload(String::from_utf8(
+                    fixture_material(env)?.expose().to_vec(),
+                )?),
+            },
+            Command::OpenLogin {
+                session: session.clone(),
+                address: project.sources[0].to_string(),
+                representative: project.sources[0].to_string(),
+                origins: origins(env),
+                identity_origins: vec![],
+            },
+            Command::ConfirmLogin {
+                session: session.clone(),
+            },
+            Command::DiscoverAuthenticated {
+                address: project.sources[0].to_string(),
+                section: None,
+                session,
+            },
+            Command::DiscoverPage {
+                address: project.sources[0].to_string(),
+                section: None,
+            },
+        ];
+        for (index, command) in commands.into_iter().enumerate() {
+            let request = Request {
+                version: PROTOCOL_VERSION,
+                request_id: index as u64 + 1,
+                job: RunId::new(),
+                command,
+            };
+            let bytes = regressee_runtime::protocol::encode_request(&request)?;
+            let decoded: Request = serde_json::from_slice(&bytes)?;
+            assert_eq!(decoded.version, PROTOCOL_VERSION);
+            let obsolete = Request {
+                version: 2,
+                ..request
+            };
+            assert!(regressee_runtime::protocol::encode_request(&obsolete).is_err());
+        }
+        // The encrypted local payload is independent of worker wire version 3.
+        let bound = BoundSession {
+            version: 2,
+            binding: SessionBinding::intended(env),
+            material: String::from_utf8(fixture_material(env)?.expose().to_vec())?,
+        };
+        assert_eq!(serde_json::to_value(&bound)?["version"], 2);
+        Ok(())
     }
     #[test]
     fn encrypted_binding_restart_legacy_wrongbinding_tamper_and_policy_are_closed() -> Result<()> {

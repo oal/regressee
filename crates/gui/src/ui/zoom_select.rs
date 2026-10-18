@@ -668,11 +668,9 @@ mod tests {
         cx.run_until_parked();
         let button = cx.debug_bounds("zoom-select-button").unwrap();
         assert_eq!(button.size, size(px(132.), px(CONTROL_HEIGHT)));
-        for selector in ["zoom-value"] {
-            let line = cx.debug_bounds(selector).unwrap();
-            assert_eq!(line.size.height, px(CONTROL_LINE_HEIGHT));
-            assert!(line.top() >= button.top() && line.bottom() <= button.bottom());
-        }
+        let line = cx.debug_bounds("zoom-value").unwrap();
+        assert_eq!(line.size.height, px(CONTROL_LINE_HEIGHT));
+        assert!(line.top() >= button.top() && line.bottom() <= button.bottom());
     }
 
     #[gpui::test]

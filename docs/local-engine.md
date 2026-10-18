@@ -1,4 +1,4 @@
-# Local application engine (protocol 6)
+# Local application engine (protocol 8)
 
 This is the shared application foundation. Phase 3 adds the public
 [CLI workflows and evidence contract](cli.md); the
@@ -15,14 +15,28 @@ settings. Phase 3 independently passed its repaired scope. Protocol 5 adds priva
 session/frontend authority envelopes, owner-bound confirmations, control lifecycle
 DTOs and exact agent viewer selections. Protocol 6 closes anonymous frontend-role
 minting with an engine-minted private GUI bootstrap capability. Rebuild/restart
-both entrypoints and the engine; protocol-1/2/3/4/5 peers are
-refused rather than silently attached. The private `engine-v1/` directory name
+both entrypoints and the engine; older peers are
+refused for product operations rather than silently attached. The private `engine-v1/` directory name
 remains the on-disk journal/endpoint location, not the negotiated wire version.
-For a protocol upgrade, stop the old owner using the old executable first, then
-explicitly run the rebuilt `regressee engine serve` once against the same paths
-(Ctrl-C drains/stops it). This lock-protected explicit start publishes the new
-descriptor; subsequent autostarts work normally. Autostart does not delete an
-old-version descriptor or assume that a version mismatch is merely stale.
+For a protocol upgrade from 6 or 7, close old desktop windows, finish active work,
+then run the rebuilt `regressee engine stop` against the same data/cache paths and
+reopen the desktop. The explicit stop negotiates only the known unchanged
+Hello/Stop envelope; it verifies owner identity and cache and retains the old
+engine's active-job, login and agent-session refusal. No product operation or
+credential crosses versions. Other incompatible versions require their matching
+executable to stop. Autostart replaces a previous-6/7 descriptor only after
+acquiring the ownership lock and proving no engine still owns the store. It never
+deletes a lock/descriptor or automatically stops a live engine. Alternatively,
+explicit `engine serve` publishes a fresh descriptor while holding the same lock.
+
+Protocol 7 adds canonical screenshot/DOM capture plans and kind-aware semantic
+agent selections. `Selection.kind` defaults to `Screenshot` for legacy records;
+its analysis UUID belongs exclusively to that kind. Capture/check operations do
+not apply that legacy kind default: they obey the frozen run/baseline plan.
+Mode/policy replacement is protected like other baseline-bound configuration.
+
+Protocol 8 adds project/environment deletion scopes, impact details, and a receipt
+that distinguishes committed deletion from pending physical file cleanup.
 
 ## Entrypoints and lifetime
 
@@ -233,7 +247,7 @@ A deleted/off-page History selection becomes no selection, not another row.
 History's paged baseline list is not replaced by an exact-run metadata read.
 Notes, ignored areas and raw analysis-policy/IME drafts defer evidence replacement.
 
-### Exclusive authority (protocol 6)
+### Exclusive authority (protocol 7)
 
 See [agent CLI and desktop control usage](cli.md#agent-control-and-optional-gui-following).
 Named agent sessions have renewable monotonic 10–300-second leases (90 default).
@@ -304,6 +318,68 @@ GUI reads/hashes/decodes those files without a live database handle and owns a
 64 MiB/256-tile native image cache, latest-intent mailbox and silent prefetch.
 Caches are display-only, never approval/export/deletion authority. Historical
 inspection retains recorded analysis settings rather than borrowing today's.
+
+### Focused DOM client contract
+
+`Operation::Dom(engine::dom::Command)` and `Outcome::Dom(Box<engine::dom::Output>)`
+also map to native `jobs::Command::Dom` / `JobReply::Dom`. The strict public DTOs
+live in `crates/app/src/engine/dom.rs`; core owns every canonical source, policy,
+comparison, diff and review model. `Selection {project,run,analysis}` uses
+`DomAnalysisId`, independently of screenshot `AnalysisId`.
+
+| Native request | Focused reply |
+| --- | --- |
+| `Source {selection,key,pane: Before\|After,format: Canonical\|Plaintext,offset,limit}` | `Source {selection,key,pane,format,source: DomSourceIdentity,page: SourcePage}` |
+| `Diff {selection,key,options: DomDiffOptions,offset,limit}` | `Diff {selection,key,before,after,outcome,options,page: DiffPage}` |
+| `Artifacts {selection,key}` | Exact optional `Original {source,artifact,metadata}` Before/After, canonical result without body, text-free `diff_summary`, capture outcome/warnings/privacy/coverage |
+| `Results {selection,offset,limit,page,profile,outcome,capture_state}` | Resolved selection, state/baseline/coverage, bounded rows with canonical result, `diff_summary`, authoritative current DOM reviews, omissions and next offset |
+
+`SourcePage = {offset,next_offset,total_bytes,text}`. `DiffPage =
+{summary,hunks,offset,next_offset,total_rows}`; `DiffSummary` preserves exact
+changed/old/new/added/removed line counts, fallback/display-limit state and total
+emitted rows. `HunkPage` carries original `old_start,old_lines,new_start,new_lines`
+plus `row_offset,total_rows,rows: Vec<core::DomDiffRow>`. It is explicitly a view
+window, not an invalid partially rewritten canonical hunk. GUI replies can be
+bound to returned immutable selection/source identities and the echoed diff options.
+Native code should request relevant pages off the UI thread and reject replies
+for an older selection/generation. `ViewerSelection` remains screenshot-specific;
+DOM-only runs reject that image route with an actionable error.
+
+Commands: `Results`, `Artifacts`, `Source`, `Diff`, `Inspect`, `Analysis`,
+`SelectAnalysis`, `Reanalyze`, `Review`, `SetReview`, `ReviewHistory`, `Approval`,
+`Accept`. Source/Artifacts resolve the check's original DOM reference using
+kind-specific storage readers; screenshot corruption is not a fake DOM image.
+Results/artifacts carry text-free count/limit summaries; inspection retains
+canonical outcomes and source identities without embedded diffs. Source pages
+are at most 256 KiB, byte-offset UTF-8 safe; diff pages at most 1,000 emitted core
+rows within the core's 2 MiB text budget. Hunk headers describe full bounded hunks;
+only the row window changes. Replies stay below the 64 MiB IPC ceiling, including
+JSON escaping; jobs/events lists remain body-free metadata. Focused read receipts
+are reclaimable like other reads, not mutation authority.
+
+DOM results also enforce 4 MiB of encoded JSON per page, including escaping and
+current notes. The returned cursor advances by actual rows, which can be fewer
+than the requested limit. Counting is streaming/bounded, not an allocation of the
+oversized frame. A 16 MiB pure-read response guard replaces unexpected oversized
+output with `response_too_large` before receipt persistence; it does not label a
+read as uncertain, set failed/draining, or prevent later jobs.
+
+Consequential kind acceptance regenerates and compares every displayed field:
+nested baselines, inherited counts, provenance and environment labels as well as
+eligibility contexts. Only the proposal's generated new-version ID/date are
+carried across a stateless refresh, consistently in every nested view. Consent
+displays the freshly validated canonical view, never unchecked supplied labels.
+Terminal report cancellation recognizes established typed cancellation through
+the error chain. A completed `Ok` export is never changed by a later cancel flag.
+
+`Approval(KindSelection)` explicitly supplies optional screenshot and DOM
+`{analysis,selected}` lists. `Accept(KindApprovalPreview)` requires exact engine
+preparation/confirmation and revalidates project/run/display/current-parent/
+checked-baseline/policy/source identities before the atomic storage commit. An
+unselected sibling is inherited, never approved. A fresh preview can safely rebase
+after sibling approval; stale tokens cannot. Failed/noncomparable requested
+coverage takes CLI exit 3 precedence over either kind's change (1); complete
+unchanged coverage is 0.
 
 Only explicitly named test-support constructors use the old in-process actor;
 production never silently falls back. The historical `regressee-flow` developer

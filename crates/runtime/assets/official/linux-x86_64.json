@@ -1,5 +1,5 @@
 {
-  "bundled_sha256": "1ec9cc638579d0c47cde02c1f4be17777a186aa8949a05702c5a658fe66f0ce7",
+  "bundled_sha256": "b5f900ff611bb8a7a28b5b19100675341774abadd3ada8b44ad912c8630f56a8",
   "components": [
     {
       "bytes": 58088022,
@@ -2425,29 +2425,34 @@
         "sha256": "8ed3cbfa6a0f1e98438f634d6e0806718e99d1f0dd2dad27700f0a6dca782f9b"
       },
       "worker/src/capture.mjs": {
-        "bytes": 19351,
+        "bytes": 28023,
         "executable": false,
-        "sha256": "41afdf4533fcbc6ec60064c04a1d1cbd240008d0c26aa7b17dc186c114c8620f"
+        "sha256": "3fb34bcf4d76788de5733cb08c39c3832742ee439df4e4d5055c4251abcdd733"
       },
       "worker/src/discover.mjs": {
         "bytes": 3546,
         "executable": false,
         "sha256": "0a8406461b37b6886f1cffa9640d9c50b14abc6f0d5569913ab07fe86d22a2ea"
       },
-      "worker/src/index.mjs": {
-        "bytes": 5780,
+      "worker/src/dom.mjs": {
+        "bytes": 8405,
         "executable": false,
-        "sha256": "c9234994102c37321da6eb51ca4172014f6d84b10669f015f1b4919d41b8dffa"
+        "sha256": "18cad207a75b0276755f8606ed28a21cd02c513e47a3fd49a939f9fef288d98f"
+      },
+      "worker/src/index.mjs": {
+        "bytes": 7064,
+        "executable": false,
+        "sha256": "a776dae05b8946b16fc5385c6fa708ea9460ce845be79605944a42701dbf3f37"
       },
       "worker/src/protocol.d.ts": {
-        "bytes": 3114,
+        "bytes": 3934,
         "executable": false,
-        "sha256": "df9ea5a2bc1136b2abf0c1d1b4fab75633b14b022482d5876e0bbdd415dd038d"
+        "sha256": "c85e68e1755c8196daa72a73eaf81b67a913c25d5cd9db363505d5762c92d30a"
       },
       "worker/src/protocol.mjs": {
-        "bytes": 5378,
+        "bytes": 5835,
         "executable": false,
-        "sha256": "7f62564b0136856f959a4060c83545370265c1e4e34d801914149631b810ddee"
+        "sha256": "c837dbee9ea9f7d5c74ad1bc8362aee9338ef5ad853d087daa48a597a2af4362"
       },
       "worker/src/sessions.mjs": {
         "bytes": 7899,
@@ -2455,13 +2460,13 @@
         "sha256": "89dfa9d8b786e09eb2c8625d667da2438670b54ca72976e509dcfe36fe7a6f28"
       }
     },
-    "id": "official-24.21.0-1.64.0-5.0.1-linux-x86_64",
+    "id": "official-24.21.0-1.64.0-6.0.0-linux-x86_64",
     "identity": {
       "Pinned": {
         "browser": "156.0.8078.4",
         "node": "24.21.0",
         "playwright": "1.64.0",
-        "worker": "5.0.1"
+        "worker": "6.0.0"
       }
     },
     "links": {},
@@ -2948,6 +2953,7 @@
       "worker/package.json": 420,
       "worker/src/capture.mjs": 420,
       "worker/src/discover.mjs": 420,
+      "worker/src/dom.mjs": 420,
       "worker/src/index.mjs": 420,
       "worker/src/protocol.d.ts": 420,
       "worker/src/protocol.mjs": 420,

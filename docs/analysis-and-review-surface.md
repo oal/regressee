@@ -1,5 +1,26 @@
 # Comparison & review surface — Phase 5 proposal
 
+## DOM extension — 2026-10-17
+
+The section below records the historical screenshot proposal, not the full current
+surface. The implemented DOM extension preserves the current neutral/teal light
+and dark themes and adds kind-specific source review beside screenshot review.
+See [DOM snapshot checks](dom-snapshots.md) for the user workflow and
+[verification](research/dom-snapshot-verification-20261017.md) for actual scope.
+
+Both-mode evidence offers **Screenshots / DOM snapshot**; snapshot-only mounts no
+image tools. Native inert unified source uses monospace only for literal code,
+old/new line numbers and `+`/`−` alongside semantic color. Search, wrapped source,
+collapsed-context expansion, change navigation and selection/copy stay in the
+bounded evidence stage. Page/profile/source identity remains outside it.
+
+Per-kind failures are visible beside a successful sibling. Decisions, notes,
+Next unreviewed and approval selections use independent immutable analyses.
+Confirmation identifies screenshots versus DOM and keeps selected versus inherited
+references explicit. No active HTML/webview, automatic approval, new palette,
+decorative asset or motion is introduced. Current native/OS/accessibility limits
+are not superseded by backend or simulated input tests.
+
 Mode: **Operate**, native desktop GPUI, not a mobile app. Extend the proposed
 DESIGN.md system; no palette, typography or human visual approval is invented.
 

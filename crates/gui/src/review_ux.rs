@@ -261,7 +261,9 @@ impl Shell {
                 identity.clone(),
                 self.analysis_fields[9].read(cx).content.to_string(),
             );
-        } else if !self.analysis_fields[9].read(cx).content.is_empty() {
+        } else if self.dom.active_note.is_none()
+            && !self.analysis_fields[9].read(cx).content.is_empty()
+        {
             return Err(
                 "This note is not linked to the open result. Reopen its original result before saving it.",
             );
@@ -287,7 +289,7 @@ impl Shell {
     /// is no longer selected. Committed reply data is deliberately not input.
     pub(super) fn review_exit_signature(&self, cx: &App) -> String {
         format!(
-            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
             self.review_drafts.active,
             self.review_drafts.notes,
             self.analysis_fields[9..14]
@@ -297,7 +299,8 @@ impl Shell {
             self.mask_selected,
             self.mask_rectangles,
             self.mask_drag,
-            self.viewer.as_ref().and_then(|v| v.request.as_ref())
+            self.viewer.as_ref().and_then(|v| v.request.as_ref()),
+            (&self.dom.active_note, &self.dom.notes)
         )
     }
     /// Only retire drafts whose exact identity and text match the authoritative
@@ -345,6 +348,9 @@ impl Shell {
     /// retained when explicit queue navigation changed the inspected target.
     pub(super) fn review_unsaved(&self, cx: &App) -> bool {
         self.review_note_dirty(cx)
+            || self
+                .pending_dom_notes(cx)
+                .map_or(true, |notes| !notes.is_empty())
             || self.mask_geometry_dirty(cx)
             || self
                 .review_drafts
@@ -358,6 +364,8 @@ impl Shell {
                 })
     }
     pub(super) fn discard_review_drafts(&mut self, cx: &mut Context<Self>) {
+        self.dom.active_note = None;
+        self.dom.notes.clear();
         self.review_drafts = Default::default();
         self.sync_review_note(cx);
         self.load_mask_fields(cx);
@@ -385,6 +393,9 @@ impl Shell {
         ))
     }
     pub(super) fn note_for_save(&self, cx: &App) -> Result<String, &'static str> {
+        if self.dom_active() {
+            return self.dom_note_for_save(cx);
+        }
         if self.review_identity().is_none()
             || self.review_identity().as_ref() != self.review_drafts.active.as_ref()
         {
@@ -417,6 +428,16 @@ impl Shell {
         }
     }
     pub(super) fn sync_review_note(&mut self, cx: &mut Context<Self>) {
+        if self.dom_active() {
+            if let Some(old) = self.review_drafts.active.take() {
+                self.review_drafts
+                    .notes
+                    .insert(old, self.analysis_fields[9].read(cx).content.to_string());
+            }
+            self.sync_dom_note(cx);
+            return;
+        }
+        self.retain_dom_note(cx);
         let identity = self.review_identity();
         if identity == self.review_drafts.active {
             return;
@@ -444,6 +465,9 @@ impl Shell {
         self.review_drafts.active = identity;
     }
     pub(super) fn review_note_dirty(&self, cx: &App) -> bool {
+        if self.dom_active() {
+            return self.dom_note_dirty(cx);
+        }
         let Some((analysis, key)) = self.review_identity() else {
             return false;
         };
@@ -456,6 +480,9 @@ impl Shell {
                 .unwrap_or("")
     }
     pub(super) fn review_result_valid(&self) -> bool {
+        if self.dom_active() {
+            return self.dom_review_valid();
+        }
         if self.focus.busy
             || self.focus.dialog
             || self.focus.approval_dialog
@@ -472,6 +499,9 @@ impl Shell {
     /// Presentation and mounted controls use the same predicate; mutation still
     /// requires `review_result_valid` and the authoritative storage checks.
     pub(super) fn review_result_comparable(&self) -> bool {
+        if self.dom_active() {
+            return self.dom_review_comparable();
+        }
         if self.viewer_read_failed {
             return false;
         }
@@ -496,6 +526,12 @@ impl Shell {
         })
     }
     pub(super) fn review_result_unchanged(&self) -> bool {
+        if self.dom_active() {
+            return self.dom_review_comparable()
+                && self.dom_result().is_some_and(|r| {
+                    r.outcome == regressee_core::dom_snapshot::DomComparisonOutcome::Unchanged
+                });
+        }
         self.review_result_comparable()
             && self.evidence.comparison.as_ref().is_some_and(|a| {
                 self.selected_key.as_ref().is_some_and(|key| {
@@ -509,37 +545,74 @@ impl Shell {
     }
 
     pub(super) fn next_unreviewed_key(&self) -> Option<TargetKey> {
-        let a = self.evidence.comparison.as_ref()?;
+        self.next_unreviewed_unit().map(|unit| unit.key)
+    }
+    pub(super) fn next_unreviewed_unit(&self) -> Option<regressee_core::domain::ReviewUnitKey> {
+        use regressee_core::domain::{CheckKind, ReviewUnitKey};
         let run = self.evidence.latest.as_ref()?;
-        if run.run.id != a.revision.run {
-            return None;
-        }
-        let classifications = a.review_classifications();
-        let keys: Vec<_> = self
+        let screenshot = self
+            .evidence
+            .comparison
+            .as_ref()
+            .filter(|a| a.revision.run == run.run.id);
+        let classifications = screenshot
+            .map(|a| a.review_classifications())
+            .unwrap_or_default();
+        let dom = self
+            .evidence
+            .dom_comparison
+            .as_ref()
+            .filter(|a| a.revision.run == run.run.id);
+        let units = self
             .result_indices()
             .into_iter()
-            .map(|i| &run.run.targets[i].key)
-            .collect();
-        let start = keys
+            .flat_map(|index| {
+                run.run.capture_plan.kinds().map(move |kind| ReviewUnitKey {
+                    key: run.run.targets[index].key.clone(),
+                    kind,
+                })
+            })
+            .collect::<Vec<_>>();
+        let current = self.selected_key.as_ref().map(|key| ReviewUnitKey {
+            key: key.clone(),
+            kind: if self.dom_active() {
+                CheckKind::DomSnapshot
+            } else {
+                CheckKind::Screenshot
+            },
+        });
+        let start = units
             .iter()
-            .position(|k| Some(*k) == self.selected_key.as_ref())
+            .position(|u| Some(u) == current.as_ref())
             .map_or(0, |i| i + 1);
-        (0..keys.len())
-            .map(|offset| keys[(start + offset) % keys.len()])
-            .find(|key| {
-                Some(*key) != self.selected_key.as_ref()
-                    && classifications.get(*key) == Some(&Classification::Changed)
-                    && run.evidence(key).is_some()
-                    && run.run.targets.iter().any(|target| {
-                        &target.key == *key
-                            && matches!(target.outcome, TargetOutcome::Captured { .. })
-                    })
-                    && a.revision
-                        .results
-                        .iter()
-                        .any(|r| &r.key == *key && r.eligible_pixels > 0)
-                    && current_decision(&self.evidence.reviews, a.revision.id, key)
-                        .is_none_or(|d| d.state == ReviewState::Unreviewed)
+        (0..units.len())
+            .map(|offset| &units[(start + offset) % units.len()])
+            .find(|unit| {
+                if Some(*unit) == current.as_ref() {
+                    return false;
+                }
+                match unit.kind {
+                    CheckKind::Screenshot => screenshot.is_some_and(|a| {
+                        classifications.get(&unit.key) == Some(&Classification::Changed)
+                            && run.evidence(&unit.key).is_some()
+                            && a.revision
+                                .results
+                                .iter()
+                                .any(|r| r.key == unit.key && r.eligible_pixels > 0)
+                            && current_decision(&self.evidence.reviews, a.revision.id, &unit.key)
+                                .is_none_or(|d| d.state == ReviewState::Unreviewed)
+                    }),
+                    CheckKind::DomSnapshot => dom.is_some_and(|a| {
+                        run.dom_evidence(&unit.key).is_some()
+                            && a.revision
+                                .results
+                                .iter()
+                                .any(|r| r.key == unit.key && r.outcome.needs_review())
+                            && self
+                                .saved_dom_decision(a.revision.id, &unit.key)
+                                .is_none_or(|d| d.state == ReviewState::Unreviewed)
+                    }),
+                }
             })
             .cloned()
     }
@@ -562,12 +635,14 @@ impl Shell {
         }
         match index {
             32 => {
-                let state = self
-                    .review_identity()
-                    .and_then(|(analysis, key)| {
+                let state = if self.dom_active() {
+                    self.dom_note_template().map(|d| d.state)
+                } else {
+                    self.review_identity().and_then(|(analysis, key)| {
                         current_decision(&self.evidence.reviews, analysis, &key).map(|d| d.state)
                     })
-                    .unwrap_or(ReviewState::Unreviewed);
+                }
+                .unwrap_or(ReviewState::Unreviewed);
                 self.phase5_action(
                     match state {
                         ReviewState::Unreviewed => 20,
@@ -586,8 +661,9 @@ impl Shell {
                 ) {
                     return;
                 }
-                if let Some(key) = self.next_unreviewed_key() {
-                    self.selected_key = Some(key);
+                if let Some(unit) = self.next_unreviewed_unit() {
+                    self.selected_key = Some(unit.key);
+                    self.dom.kind = unit.kind;
                     self.reveal_selected_result();
                     self.mask_selected = None;
                     self.pan_x = 0.;
@@ -690,6 +766,9 @@ impl Shell {
         cx.notify();
     }
     pub(super) fn ordinary_review_bar(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.dom_active() {
+            return self.dom_review_bar(cx);
+        }
         if self.image_controls_open {
             return div()
                 .text_size(px(HELP_TEXT_SIZE))

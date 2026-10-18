@@ -14,8 +14,16 @@ use std::{
 };
 mod capture;
 mod history_inspection;
-pub use capture::{CheckpointWork, RunAppender, TargetCheckpoint};
+mod legacy_baseline;
+pub use capture::{CheckpointWork, KindTargetCheckpoint, RunAppender, TargetCheckpoint};
 mod diagnostics;
+mod dom;
+pub use dom::{
+    DomApprovalContext, DomApprovalPreview, DomReviewHistoryEntry, DomReviewHistoryPage,
+    KindApprovalPreview,
+};
+#[cfg(test)]
+mod dom_tests;
 pub use diagnostics::DiagnosticCounts;
 pub mod images;
 #[cfg(test)]
@@ -27,19 +35,146 @@ mod retention;
 mod review;
 pub use portability::require_space;
 pub use portability::{ExportPreview, ImportPreview, ValidatedArchive};
-pub use retention::{DeleteItem, DeletionPreview, HistoryPage, ProjectStorage, RepairPreview};
+pub use retention::{
+    DeleteItem, DeletionPreview, HistoryPage, ProjectStorage, RepairPreview, ScopeDeletion,
+};
 pub fn portability_warning() -> &'static str {
     portability::COMPATIBILITY
 }
 pub use review::{ApprovalContext, ApprovalPreview};
 pub use review::{ReviewHistoryEntry, ReviewHistoryPage};
 
-pub const DB_VERSION: i64 = 9;
+pub const DB_VERSION: i64 = 10;
 pub const MAX_ARTIFACT_BYTES: u64 = 128 * 1024 * 1024;
 pub const PROJECT_PAGE_SIZE: usize = 64;
 #[cfg(test)]
 mod phase5_migration_tests {
     use super::*;
+    #[test]
+    fn version_nine_cas_rebuild_preserves_references_bytes_indexes_and_guards() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        connection
+            .pragma_update(None, "foreign_keys", true)
+            .unwrap();
+        for migration in MIGRATIONS.iter().take(9) {
+            connection.execute_batch(migration).unwrap();
+        }
+        connection.pragma_update(None, "user_version", 9).unwrap();
+        let hash = "a".repeat(64);
+        connection
+            .execute("INSERT INTO artifacts VALUES(?1,7,'Screenshot')", [&hash])
+            .unwrap();
+        for owner in ["Run", "Baseline", "Analysis"] {
+            connection
+                .execute(
+                    "INSERT INTO artifact_refs VALUES(?1,'legacy',?2)",
+                    params![owner, hash],
+                )
+                .unwrap();
+        }
+        connection
+            .execute("INSERT INTO pending_gc VALUES(?1)", [&hash])
+            .unwrap();
+        migrate(&mut connection).unwrap();
+        migrate(&mut connection).unwrap();
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT count(*) FROM artifact_refs WHERE hash=?1",
+                    [&hash],
+                    |r| r.get::<_, u64>(0)
+                )
+                .unwrap(),
+            3
+        );
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT bytes,kind FROM artifacts WHERE hash=?1",
+                    [&hash],
+                    |r| Ok((r.get::<_, u64>(0)?, r.get::<_, String>(1)?))
+                )
+                .unwrap(),
+            (7, "Screenshot".into())
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT count(*) FROM pending_gc", [], |r| r
+                    .get::<_, u64>(0))
+                .unwrap(),
+            1
+        );
+        assert!(
+            connection
+                .execute("DELETE FROM artifacts WHERE hash=?1", [&hash])
+                .is_err()
+        );
+        assert!(
+            connection
+                .execute("UPDATE artifacts SET bytes=8 WHERE hash=?1", [&hash])
+                .is_err()
+        );
+        assert!(
+            connection
+                .execute(
+                    "INSERT INTO artifact_refs VALUES('Run','bad',?1)",
+                    ["b".repeat(64)]
+                )
+                .is_err()
+        );
+        connection
+            .execute(
+                "INSERT INTO artifacts VALUES(?1,5,'DomSnapshot')",
+                ["c".repeat(64)],
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO artifact_refs VALUES('DomAnalysis','dom-fixture',?1)",
+                ["c".repeat(64)],
+            )
+            .unwrap();
+        assert_eq!(
+            connection
+                .query_row("SELECT count(*) FROM pragma_foreign_key_check", [], |r| r
+                    .get::<_, u64>(
+                    0
+                ))
+                .unwrap(),
+            0
+        );
+        assert_eq!(connection.query_row("SELECT count(*) FROM sqlite_master WHERE name IN ('artifact_refs_by_hash','artifacts_immutable')", [], |r| r.get::<_,u64>(0)).unwrap(),2);
+    }
+    #[test]
+    fn failed_dom_migration_rolls_back_parent_child_and_version() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        connection
+            .pragma_update(None, "foreign_keys", true)
+            .unwrap();
+        for migration in MIGRATIONS.iter().take(9) {
+            connection.execute_batch(migration).unwrap();
+        }
+        connection.pragma_update(None, "user_version", 9).unwrap();
+        connection
+            .execute_batch("CREATE TABLE dom_analyses(deliberate_conflict)")
+            .unwrap();
+        assert!(migrate(&mut connection).is_err());
+        assert_eq!(
+            connection
+                .pragma_query_value(None, "user_version", |r| r.get::<_, u64>(0))
+                .unwrap(),
+            9
+        );
+        assert!(
+            connection
+                .execute(
+                    "INSERT INTO artifacts VALUES(?1,5,'DomSnapshot')",
+                    ["c".repeat(64)]
+                )
+                .is_err()
+        );
+        assert_eq!(connection.query_row("SELECT count(*) FROM sqlite_master WHERE name IN ('artifact_refs_by_hash','artifacts_immutable')", [], |r| r.get::<_,u64>(0)).unwrap(),2);
+    }
     #[test]
     fn version_eight_target_delta_migration_preserves_historical_bytes() {
         let mut connection = Connection::open_in_memory().unwrap();
@@ -154,7 +289,7 @@ mod phase5_migration_tests {
         );
     }
 }
-const MIGRATIONS: [&str; 9] = [
+const MIGRATIONS: [&str; 10] = [
     include_str!("../migrations/001-projects.sql"),
     include_str!("../migrations/002-artifacts.sql"),
     include_str!("../migrations/003-capture.sql"),
@@ -164,6 +299,7 @@ const MIGRATIONS: [&str; 9] = [
     include_str!("../migrations/007-approval-context.sql"),
     include_str!("../migrations/008-portability.sql"),
     include_str!("../migrations/009-target-checkpoints.sql"),
+    include_str!("../migrations/010-dom-snapshots.sql"),
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -352,6 +488,8 @@ pub struct StorageSummary {
     pub artifact_bytes: u64,
     pub artifacts: u64,
     pub projects: u64,
+    #[serde(default)]
+    pub pending_cleanup: u64,
     pub paths: AppPaths,
 }
 impl Store {
@@ -534,7 +672,7 @@ impl Store {
                 .environments
                 .iter()
                 .any(|candidate| candidate.id == environment),
-            "Unknown environment"
+            "The selected environment does not belong to this project. Select an environment in Project settings before saving again."
         );
         self.save_project_inner(
             project,
@@ -586,6 +724,7 @@ impl Store {
             ensure!(
                 project.sources == old.sources
                     && project.profiles == old.profiles
+                    && project.capture_plan == old.capture_plan
                     && project.environments == old.environments,
                 "the active single-page baseline fixes its address and capture settings; capture a new baseline before changing them"
             );
@@ -660,13 +799,32 @@ impl Store {
             artifact_bytes,
             artifacts,
             projects,
+            pending_cleanup: self.connection.query_row(
+                "SELECT count(*) FROM pending_gc",
+                [],
+                |r| r.get(0),
+            )?,
             paths: self.paths.clone(),
         })
     }
     /// Sync an owned temporary file, then atomically publish without replacement.
     /// The SQLite writer lock serializes publication/reference/collection across
     /// processes. A crash can leave an unreferenced file, never a partial object.
-    pub fn put_artifact(&mut self, mut input: impl Read, kind: ArtifactKind) -> Result<Artifact> {
+    pub fn put_artifact(&mut self, input: impl Read, kind: ArtifactKind) -> Result<Artifact> {
+        if kind == ArtifactKind::DomSnapshot {
+            // Validate in bounded memory, BEFORE even writing a private pending
+            // file. A correct content hash or policy claim is not privacy proof.
+            use regressee_core::dom_snapshot::{DomSnapshot, MAX_DOM_BYTES};
+            let mut bytes = Vec::new();
+            input
+                .take(MAX_DOM_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)?;
+            DomSnapshot::from_canonical(&bytes)?;
+            return self.put_artifact_inner(bytes.as_slice(), kind);
+        }
+        self.put_artifact_inner(input, kind)
+    }
+    fn put_artifact_inner(&mut self, mut input: impl Read, kind: ArtifactKind) -> Result<Artifact> {
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -733,12 +891,18 @@ impl Store {
             [id.as_str()],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
+        if kind == "DomSnapshot" {
+            return self
+                .read_verified_artifact(id, regressee_core::dom_snapshot::MAX_DOM_BYTES as u64)
+                .map(|(artifact, _)| artifact);
+        }
         verify_file(&self.paths.artifacts().join(id.as_str()), id, bytes)?;
         let kind = match kind.as_str() {
             "Screenshot" => ArtifactKind::Screenshot,
             "Thumbnail" => ArtifactKind::Thumbnail,
             "Tile" => ArtifactKind::Tile,
             "Difference" => ArtifactKind::Difference,
+            "DomSnapshot" => ArtifactKind::DomSnapshot,
             _ => bail!("unknown artifact kind"),
         };
         Ok(Artifact {
@@ -759,8 +923,13 @@ impl Store {
             [id.as_str()],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )?;
+        let kind_maximum = if kind == "DomSnapshot" {
+            regressee_core::dom_snapshot::MAX_DOM_BYTES as u64
+        } else {
+            MAX_ARTIFACT_BYTES
+        };
         ensure!(
-            expected > 0 && expected <= maximum.min(MAX_ARTIFACT_BYTES),
+            expected > 0 && expected <= maximum.min(kind_maximum),
             "artifact exceeds display byte budget"
         );
         let path = self.paths.artifacts().join(id.as_str());
@@ -784,8 +953,12 @@ impl Store {
             "Thumbnail" => ArtifactKind::Thumbnail,
             "Tile" => ArtifactKind::Tile,
             "Difference" => ArtifactKind::Difference,
+            "DomSnapshot" => ArtifactKind::DomSnapshot,
             _ => bail!("unknown artifact kind"),
         };
+        if kind == ArtifactKind::DomSnapshot {
+            regressee_core::dom_snapshot::DomSnapshot::from_canonical(&bytes)?;
+        }
         Ok((
             Artifact {
                 id: id.clone(),
@@ -861,6 +1034,7 @@ fn owner_parts(owner: &ArtifactOwner) -> (&'static str, String) {
         ArtifactOwner::Run(id) => ("Run", id.to_string()),
         ArtifactOwner::Baseline(id) => ("Baseline", id.to_string()),
         ArtifactOwner::Analysis(id) => ("Analysis", id.to_string()),
+        ArtifactOwner::DomAnalysis(id) => ("DomAnalysis", id.to_string()),
     }
 }
 fn kind_name(kind: ArtifactKind) -> &'static str {
@@ -869,6 +1043,7 @@ fn kind_name(kind: ArtifactKind) -> &'static str {
         ArtifactKind::Thumbnail => "Thumbnail",
         ArtifactKind::Tile => "Tile",
         ArtifactKind::Difference => "Difference",
+        ArtifactKind::DomSnapshot => "DomSnapshot",
     }
 }
 fn verify_file(path: &Path, id: &ArtifactId, expected: u64) -> Result<()> {

@@ -136,7 +136,9 @@ fn simultaneous_autostarts_stale_endpoint_status_and_graceful_stop() -> anyhow::
         assert!(Instant::now() < deadline);
         thread::sleep(Duration::from_millis(10));
     }
-    // A stopped owner's stale descriptor must not permanently pin its old cache.
+    // A stopped older owner's descriptor must not block an upgrade or pin cache.
+    wrong["version"] = serde_json::json!(7);
+    std::fs::write(&descriptor, serde_json::to_vec(&wrong)?)?;
     let changed = Client::autostart(
         mismatched.paths.clone(),
         regressee_app::engine::Launcher::exact(env!("CARGO_BIN_EXE_regressee").into()),

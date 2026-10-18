@@ -14,6 +14,52 @@ pub(super) struct SetupSave {
 }
 
 impl Shell {
+    pub(super) fn capture_mode_choices(&self, cx: &mut Context<Self>) -> Div {
+        let mode = self.draft_settings.capture_plan.mode;
+        let mut group = div()
+            .debug_selector(|| "what-to-check".into())
+            .w_full()
+            .flex()
+            .flex_col()
+            .gap_2()
+            .child(
+                div()
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child("What to check"),
+            );
+        for (value, label, description) in [
+            (
+                CaptureMode::ScreenshotsOnly,
+                "Screenshots only",
+                "Compare how each page looks.",
+            ),
+            (
+                CaptureMode::ScreenshotsAndDomSnapshots,
+                "Screenshots + DOM snapshots",
+                "Check appearance and live page structure independently.",
+            ),
+            (
+                CaptureMode::DomSnapshotsOnly,
+                "DOM snapshots only",
+                "Compare live page structure without taking screenshots.",
+            ),
+        ] {
+            group = group.child(self.choice_button(
+                Control::CaptureMode(value),
+                label,
+                description,
+                mode == value,
+                cx,
+            ));
+        }
+        group = group.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted))
+            .child("Changing what to check requires capturing and saving a new baseline. Run check continues to use your saved baseline’s checks."));
+        if mode.dom_snapshots() {
+            group = group.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted))
+                .child("DOM snapshots include the main document and open shadow roots after JavaScript runs, not iframe documents or closed shadow roots. Script bodies, event-handler code and form values are excluded, but private text, hidden content, attributes and URLs may remain."));
+        }
+        group
+    }
     pub(super) fn setup_login_fields_visible(&self) -> bool {
         self.focus.setup_stage == SetupStage::Settings
             || (self.setup_environment_open && self.setup_login_correction)

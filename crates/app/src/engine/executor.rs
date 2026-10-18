@@ -20,6 +20,9 @@ pub fn execute(
     }
     let result = (|| -> anyhow::Result<Reply> {
         Ok(match work {
+            Work::Dom(command) => {
+                Reply::Dom(Box::new(super::dom::execute(store, command, cancel)?))
+            }
             Work::List { page } => store
                 .list_projects(page)
                 .map(Reply::Projects)
@@ -53,7 +56,7 @@ pub fn execute(
             Work::InspectRun { project, run } => Reply::InspectedRun {
                 project,
                 run,
-                evidence: Box::new(store.inspect_run(project, run)?),
+                evidence: Box::new(jobs::inspect_screenshots(store, project, run)?),
             },
             Work::DiagnosticPreview => Reply::DiagnosticPreview(Box::new(
                 crate::diagnostics::collect(store, product.as_ref().ok(), cancel)?,
@@ -72,7 +75,9 @@ pub fn execute(
             | Work::Delete(_)
             | Work::RepairPreview
             | Work::CleanupTemporaries(_)
-            | Work::DeleteUnreferenced(_)) => jobs::storage_work(store, work, cancel),
+            | Work::DeleteUnreferenced(_)) => {
+                jobs::storage_work(store, work, cancel, product.as_ref().ok())
+            }
             Work::Extension(never) => match never {},
             work => match product {
                 Ok(product) => jobs::product_work(product, store, work, cancel, pause, updates, 0),

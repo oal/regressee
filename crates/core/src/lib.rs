@@ -4,6 +4,7 @@ pub mod analysis_engine;
 pub mod appearance;
 pub mod archive;
 pub mod crawl;
+pub mod dom_snapshot;
 pub mod domain;
 pub mod environment;
 pub mod evidence;

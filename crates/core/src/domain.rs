@@ -9,6 +9,85 @@ pub const SCHEMA_VERSION: u32 = 1;
 pub const MAX_PROJECT_BYTES: usize = 256 * 1024;
 pub const MAX_TARGETS: usize = 30_000;
 
+/// Material capture selection is deliberately outside `CaptureProfile`: adding
+/// DOM checks must not change any historical screenshot profile fingerprint.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub enum CaptureMode {
+    #[default]
+    ScreenshotsOnly,
+    ScreenshotsAndDomSnapshots,
+    DomSnapshotsOnly,
+}
+impl CaptureMode {
+    pub fn screenshots(self) -> bool {
+        self != Self::DomSnapshotsOnly
+    }
+    pub fn dom_snapshots(self) -> bool {
+        self != Self::ScreenshotsOnly
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct CapturePlan {
+    pub version: u32,
+    pub mode: CaptureMode,
+    pub dom_policy: Option<crate::dom_snapshot::DomSnapshotPolicy>,
+}
+impl Default for CapturePlan {
+    fn default() -> Self {
+        Self {
+            version: 1,
+            mode: CaptureMode::ScreenshotsOnly,
+            dom_policy: None,
+        }
+    }
+}
+impl CapturePlan {
+    pub fn for_mode(mode: CaptureMode) -> Self {
+        Self {
+            version: 1,
+            mode,
+            dom_policy: mode.dom_snapshots().then(Default::default),
+        }
+    }
+    pub fn is_default(&self) -> bool {
+        self == &Self::default()
+    }
+    pub fn validate(&self) -> Result<()> {
+        ensure!(self.version == 1, "unsupported capture plan version");
+        ensure!(
+            self.mode.dom_snapshots() == self.dom_policy.is_some(),
+            "capture mode/policy mismatch"
+        );
+        if let Some(policy) = self.dom_policy {
+            policy.validate()?;
+        }
+        Ok(())
+    }
+    pub fn kinds(&self) -> impl Iterator<Item = CheckKind> {
+        [CheckKind::Screenshot, CheckKind::DomSnapshot]
+            .into_iter()
+            .filter(|kind| match kind {
+                CheckKind::Screenshot => self.mode.screenshots(),
+                CheckKind::DomSnapshot => self.mode.dom_snapshots(),
+            })
+    }
+}
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+pub enum CheckKind {
+    #[default]
+    Screenshot,
+    DomSnapshot,
+}
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReviewUnitKey {
+    pub key: TargetKey,
+    pub kind: CheckKind,
+}
+
 macro_rules! ids {
     ($($name:ident),+) => {$ (
         #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -31,6 +110,7 @@ ids!(
     RunId,
     BaselineId,
     AnalysisId,
+    DomAnalysisId,
     MaskId,
     SessionId,
     PageId
@@ -74,6 +154,8 @@ pub struct Project {
     pub discovery: DiscoverySettings,
     pub environments: Vec<Environment>,
     pub profiles: Vec<CaptureProfile>,
+    #[serde(default, skip_serializing_if = "CapturePlan::is_default")]
+    pub capture_plan: CapturePlan,
     pub active_baseline: Option<BaselineId>,
 }
 impl Project {
@@ -108,6 +190,7 @@ impl Project {
                 access: AccessPolicy::Public,
             }],
             profiles: vec![CaptureProfile::desktop()],
+            capture_plan: CapturePlan::default(),
             active_baseline: None,
         };
         project.validate()?;
@@ -128,6 +211,7 @@ impl Project {
             validate_address(address)?;
         }
         self.discovery.validate()?;
+        self.capture_plan.validate()?;
         ensure!(
             (1..=16).contains(&self.environments.len()),
             "choose 1–16 environments"
@@ -563,6 +647,8 @@ pub struct CaptureRun {
     pub intent: RunIntent,
     pub inventory: InventoryRevision,
     pub profiles: Vec<CaptureProfile>,
+    #[serde(default, skip_serializing_if = "CapturePlan::is_default")]
+    pub capture_plan: CapturePlan,
     pub environment: Environment,
     pub rendering: RenderingEnvironment,
     pub state: JobState,
@@ -620,11 +706,30 @@ pub struct CaptureTarget {
     pub final_url: Option<Url>,
     pub attempts: u8,
     pub outcome: TargetOutcome,
+    #[serde(default, skip_serializing_if = "DomTargetOutcome::is_not_requested")]
+    pub dom_outcome: DomTargetOutcome,
     pub warnings: Vec<String>,
 }
 impl CaptureRun {
+    pub fn requested_units(&self) -> impl Iterator<Item = ReviewUnitKey> + '_ {
+        self.targets.iter().flat_map(CaptureTarget::requested_units)
+    }
+    /// Targets, not check kinds: a page/profile with both captures counts once.
+    pub fn successful_target_count(&self) -> usize {
+        self.targets
+            .iter()
+            .filter(|target| target.any_kind_captured())
+            .count()
+    }
+    pub fn complete_target_count(&self) -> usize {
+        self.targets
+            .iter()
+            .filter(|target| target.requested_kinds_captured())
+            .count()
+    }
     pub fn validate(&self) -> Result<()> {
         self.inventory.validate()?;
+        self.capture_plan.validate()?;
         ensure!(
             self.project == self.inventory.project && !self.id.0.is_nil(),
             "run project/inventory mismatch"
@@ -662,6 +767,28 @@ impl CaptureRun {
         // the saved baseline before starting work; membership is checked below.
         let mut keys = BTreeSet::new();
         for target in &self.targets {
+            let checking = matches!(self.intent, RunIntent::Check { .. });
+            let screenshot_requested = !matches!(target.outcome, TargetOutcome::NotRequested);
+            let dom_requested = !target.dom_outcome.is_not_requested();
+            ensure!(
+                !screenshot_requested || self.capture_plan.mode.screenshots(),
+                "unrequested screenshot capture"
+            );
+            ensure!(
+                !dom_requested || self.capture_plan.mode.dom_snapshots(),
+                "unrequested DOM capture"
+            );
+            ensure!(
+                checking
+                    || (self.capture_plan.mode.screenshots() == screenshot_requested
+                        && self.capture_plan.mode.dom_snapshots() == dom_requested),
+                "capture request/mode mismatch"
+            );
+            ensure!(
+                screenshot_requested || dom_requested,
+                "target has no saved/requested slots"
+            );
+            target.dom_outcome.validate()?;
             ensure!(
                 pages.contains_key(&target.key.page)
                     && profiles.contains(&target.key.profile)
@@ -695,6 +822,12 @@ impl CaptureRun {
                     "invalid successful capture metadata"
                 );
             }
+            if matches!(target.dom_outcome, DomTargetOutcome::Captured { .. }) {
+                ensure!(
+                    target.final_url.is_some() && target.attempts > 0,
+                    "invalid successful DOM capture metadata"
+                );
+            }
         }
         ensure!(
             self.finished_at
@@ -705,7 +838,7 @@ impl CaptureRun {
             ensure!(
                 self.targets
                     .iter()
-                    .all(|t| matches!(t.outcome, TargetOutcome::Captured { .. })),
+                    .all(CaptureTarget::requested_kinds_captured),
                 "completed run cannot conceal failed or missing coverage"
             );
         }
@@ -718,7 +851,8 @@ impl CaptureRun {
                     && self
                         .targets
                         .iter()
-                        .all(|t| !matches!(t.outcome, TargetOutcome::Pending)),
+                        .all(|t| !matches!(t.outcome, TargetOutcome::Pending)
+                            && !matches!(t.dom_outcome, DomTargetOutcome::Pending)),
                 "finished run has pending targets or no completion time"
             );
         }
@@ -727,6 +861,7 @@ impl CaptureRun {
 }
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum TargetOutcome {
+    NotRequested,
     Pending,
     Captured {
         artifact: ArtifactId,
@@ -741,7 +876,94 @@ pub enum TargetOutcome {
     },
     Cancelled,
 }
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
+impl CaptureTarget {
+    pub fn requested_kinds_captured(&self) -> bool {
+        matches!(
+            self.outcome,
+            TargetOutcome::NotRequested | TargetOutcome::Captured { .. }
+        ) && matches!(
+            self.dom_outcome,
+            DomTargetOutcome::NotRequested | DomTargetOutcome::Captured { .. }
+        ) && (!matches!(self.outcome, TargetOutcome::NotRequested)
+            || !self.dom_outcome.is_not_requested())
+    }
+    pub fn any_kind_captured(&self) -> bool {
+        matches!(self.outcome, TargetOutcome::Captured { .. })
+            || matches!(self.dom_outcome, DomTargetOutcome::Captured { .. })
+    }
+    pub fn requested_units(&self) -> impl Iterator<Item = ReviewUnitKey> + '_ {
+        [CheckKind::Screenshot, CheckKind::DomSnapshot]
+            .into_iter()
+            .filter(|kind| match kind {
+                CheckKind::Screenshot => !matches!(self.outcome, TargetOutcome::NotRequested),
+                CheckKind::DomSnapshot => !self.dom_outcome.is_not_requested(),
+            })
+            .map(|kind| ReviewUnitKey {
+                key: self.key.clone(),
+                kind,
+            })
+    }
+}
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub enum DomTargetOutcome {
+    #[default]
+    NotRequested,
+    Pending,
+    Captured {
+        artifact: ArtifactId,
+    },
+    Failed {
+        code: DomCaptureError,
+    },
+    Skipped {
+        reason: String,
+    },
+    Cancelled,
+}
+impl DomTargetOutcome {
+    pub fn is_not_requested(&self) -> bool {
+        matches!(self, Self::NotRequested)
+    }
+    pub fn validate(&self) -> Result<()> {
+        if let Self::Skipped { reason } = self {
+            ensure!(reason.len() <= 1024, "oversized DOM skip reason");
+        }
+        if let Self::Failed { code } = self {
+            code.validate()?;
+        }
+        Ok(())
+    }
+}
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub enum DomCaptureError {
+    Capture { code: CaptureError },
+    LimitExceeded,
+    SerializationFailed,
+}
+impl DomCaptureError {
+    pub fn validate(&self) -> Result<()> {
+        ensure!(
+            !matches!(
+                self,
+                Self::Capture {
+                    code: CaptureError::ImageLimit
+                }
+            ),
+            "image limits cannot fail a DOM snapshot"
+        );
+        Ok(())
+    }
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Capture { code } => code.label(),
+            Self::LimitExceeded => "DOM snapshot exceeds safe limits",
+            Self::SerializationFailed => "Could not serialize the DOM snapshot",
+        }
+    }
+}
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub enum CaptureError {
     NeedsLogin,
     AccessDenied,
@@ -786,6 +1008,19 @@ pub struct BaselineVersion {
     pub inventory: InventoryId,
     pub created_at: i64,
     pub references: Vec<BaselineReference>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dom_references: Vec<DomBaselineReference>,
+    #[serde(default, skip_serializing_if = "CapturePlan::is_default")]
+    pub capture_plan: CapturePlan,
+    /// Frozen configuration owner, retained even after independent replacements.
+    /// Legacy roots can verify their original screenshot source directly;
+    /// descendants without this field require verified ancestry recovery.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_run: Option<RunId>,
+    /// Exact original target list. Empty only on legacy screenshot baselines;
+    /// recover those keys from `frozen_source_run`, never the current references.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub intended_targets: Vec<TargetKey>,
     pub intended_count: u32,
     pub explicitly_partial: bool,
 }
@@ -797,25 +1032,390 @@ pub struct BaselineReference {
     pub artifact: ArtifactId,
     pub captured_at: i64,
 }
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DomBaselineReference {
+    pub key: TargetKey,
+    pub run: RunId,
+    pub artifact: ArtifactId,
+    pub captured_at: i64,
+    pub policy: crate::dom_snapshot::DomSnapshotPolicy,
+}
 impl BaselineVersion {
+    pub fn saved_units(&self) -> BTreeSet<ReviewUnitKey> {
+        self.references
+            .iter()
+            .map(|r| ReviewUnitKey {
+                key: r.key.clone(),
+                kind: CheckKind::Screenshot,
+            })
+            .chain(self.dom_references.iter().map(|r| ReviewUnitKey {
+                key: r.key.clone(),
+                kind: CheckKind::DomSnapshot,
+            }))
+            .collect()
+    }
+    fn validate_intent_source(&self, frozen: &CaptureRun) -> Result<BTreeSet<TargetKey>> {
+        frozen.validate()?;
+        ensure!(
+            frozen.intent == RunIntent::NewBaseline
+                && matches!(
+                    frozen.state,
+                    JobState::Completed | JobState::CompletedWithErrors
+                )
+                && frozen.finished_at.is_some()
+                && frozen.project == self.project
+                && frozen.inventory.id == self.inventory
+                && frozen.capture_plan == self.capture_plan,
+            "baseline frozen source mismatch"
+        );
+        let keys: BTreeSet<_> = frozen.targets.iter().map(|t| t.key.clone()).collect();
+        ensure!(
+            keys.len() == self.intended_count as usize
+                && self.target_keys().is_subset(&keys)
+                && (self.intended_targets.is_empty()
+                    || keys == self.intended_targets.iter().cloned().collect()),
+            "baseline intended target mismatch"
+        );
+        Ok(keys)
+    }
+    /// Prove an original legacy capture boundary, not merely a same-inventory
+    /// run: every saved reference must bind to this complete NewBaseline run's
+    /// exact captured target/artifact/time, with no captured slots invented/lost.
+    fn validate_legacy_anchor(&self, frozen: &CaptureRun) -> Result<BTreeSet<TargetKey>> {
+        ensure!(
+            self.capture_plan.is_default() && self.dom_references.is_empty(),
+            "legacy recovery only supports screenshot baselines"
+        );
+        let keys = self.validate_intent_source(frozen)?;
+        let captured: BTreeMap<_, _> = frozen
+            .targets
+            .iter()
+            .filter_map(|target| {
+                if let TargetOutcome::Captured { artifact, .. } = &target.outcome {
+                    Some((&target.key, artifact))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        ensure!(
+            captured.len() == self.references.len()
+                && self.references.iter().all(|reference| {
+                    reference.run == frozen.id
+                        && Some(reference.captured_at) == frozen.finished_at
+                        && captured
+                            .get(&reference.key)
+                            .is_some_and(|artifact| *artifact == &reference.artifact)
+                }),
+            "legacy baseline needs verified ancestry to its original capture"
+        );
+        Ok(keys)
+    }
+    pub fn intended_target_keys(&self, frozen: &CaptureRun) -> Result<BTreeSet<TargetKey>> {
+        self.validate()?;
+        if let Some(source) = self.source_run {
+            ensure!(source == frozen.id, "baseline frozen source mismatch");
+            self.validate_intent_source(frozen)
+        } else {
+            // A legacy composite's current reference owner may be a subset
+            // Check run. Never mistake it for original frozen configuration.
+            self.validate_legacy_anchor(frozen)
+        }
+    }
+    pub fn intended_units(&self, frozen: &CaptureRun) -> Result<BTreeSet<ReviewUnitKey>> {
+        Ok(self
+            .intended_target_keys(frozen)?
+            .into_iter()
+            .flat_map(|key| {
+                self.capture_plan.kinds().map(move |kind| ReviewUnitKey {
+                    key: key.clone(),
+                    kind,
+                })
+            })
+            .collect())
+    }
+    /// Call before replacing legacy references: preserve their original frozen
+    /// configuration/omissions even when the last original source is replaced.
+    pub fn freeze_source(&mut self, frozen: &CaptureRun) -> Result<()> {
+        let intended = self.intended_target_keys(frozen)?;
+        self.source_run = Some(frozen.id);
+        self.intended_targets = intended.into_iter().collect();
+        Ok(())
+    }
+    /// Recover an already selectively approved legacy baseline. `ancestors`
+    /// contains its immutable nearest parent first, ending at the original
+    /// capture boundary (which may itself have an older parent). `frozen` is
+    /// that boundary's complete NewBaseline run. Storage must load/verify the
+    /// actual retained records and artifact provenance, never manufacture them.
+    ///
+    /// Every intervening replacement must bind to a finished Check of a supplied
+    /// ancestor, request exactly its saved slots and retain compatible material
+    /// configuration. A new baseline capture, missing/cyclic chain, unrelated
+    /// same-inventory run or After-only coverage cannot serve as an update proof.
+    /// Nothing is mutated until the entire proof succeeds. This normalizes a
+    /// copy for new work; it need not rewrite historical serialized identities.
+    pub fn recover_legacy_source(
+        &mut self,
+        ancestors: &[BaselineVersion],
+        frozen: &CaptureRun,
+        mut load_update: impl FnMut(RunId) -> Result<CaptureRun>,
+    ) -> Result<()> {
+        self.validate()?;
+        ensure!(
+            self.source_run.is_none()
+                && self.intended_targets.is_empty()
+                && self.capture_plan.is_default(),
+            "baseline does not need legacy source recovery"
+        );
+        ensure!(
+            ancestors.len() < MAX_TARGETS,
+            "baseline ancestry exceeds limit"
+        );
+        let mut seen = BTreeSet::from([self.id]);
+        let mut child: &BaselineVersion = self;
+        for parent in ancestors {
+            parent.validate()?;
+            ensure!(
+                child.parent == Some(parent.id) && seen.insert(parent.id),
+                "missing or cyclic baseline ancestry"
+            );
+            ensure!(
+                parent.project == self.project
+                    && parent.inventory == self.inventory
+                    && parent.capture_plan == self.capture_plan
+                    && parent.intended_count == self.intended_count
+                    && parent.saved_units() == self.saved_units(),
+                "incompatible legacy baseline ancestry"
+            );
+            child = parent;
+        }
+        ensure!(
+            child.parent.is_none_or(|parent| !seen.contains(&parent)),
+            "cyclic terminal baseline ancestry"
+        );
+        let intended = child.validate_legacy_anchor(frozen)?;
+        for record in std::iter::once(&*self).chain(ancestors.iter()) {
+            ensure!(
+                record.source_run.is_none_or(|id| id == frozen.id)
+                    && (record.intended_targets.is_empty()
+                        || record
+                            .intended_targets
+                            .iter()
+                            .cloned()
+                            .collect::<BTreeSet<_>>()
+                            == intended),
+                "conflicting frozen baseline ancestry"
+            );
+        }
+        for (index, parent) in ancestors.iter().enumerate() {
+            let child = if index == 0 {
+                &*self
+            } else {
+                &ancestors[index - 1]
+            };
+            let previous: BTreeMap<_, _> = parent.references.iter().map(|r| (&r.key, r)).collect();
+            for reference in &child.references {
+                let before = previous
+                    .get(&reference.key)
+                    .ok_or_else(|| anyhow::anyhow!("legacy approval filled an omitted slot"))?;
+                if *before == reference {
+                    continue;
+                }
+                let update = load_update(reference.run)?;
+                ensure!(
+                    update.id == reference.run
+                        && update.project == self.project
+                        && update.inventory == frozen.inventory
+                        && update.capture_plan == frozen.capture_plan
+                        && crate::environment::compatibility(
+                            &frozen.profiles,
+                            &update.profiles,
+                            &frozen.rendering,
+                            &update.rendering
+                        ) != crate::environment::Compatibility::MaterialMismatch
+                        && matches!(
+                            update.state,
+                            JobState::Completed | JobState::CompletedWithErrors
+                        )
+                        && update.finished_at == Some(reference.captured_at),
+                    "invalid legacy approval capture provenance"
+                );
+                let RunIntent::Check { baseline } = update.intent else {
+                    anyhow::bail!("new baseline capture is not a selective approval");
+                };
+                let checked = ancestors[index..]
+                    .iter()
+                    .find(|b| b.id == baseline)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!("legacy update did not check a verified ancestor")
+                    })?;
+                ensure!(
+                    checked.references.iter().any(|r| r == *before),
+                    "legacy selected Before changed since its check"
+                );
+                checked.validate_check_slots(&update)?;
+                ensure!(update.targets.iter().any(|target| target.key == reference.key && matches!(&target.outcome, TargetOutcome::Captured { artifact, .. } if artifact == &reference.artifact)), "legacy approval artifact/source mismatch");
+            }
+        }
+        self.source_run = Some(frozen.id);
+        self.intended_targets = intended.into_iter().collect();
+        Ok(())
+    }
+    /// The current run must request exactly the saved slots, never an omitted
+    /// counterpart or a newly discovered page. Frozen profiles/environment are
+    /// additionally bound to the retained source run by storage.
+    pub fn validate_check_slots(&self, run: &CaptureRun) -> Result<()> {
+        self.validate()?;
+        run.validate()?;
+        ensure!(
+            run.project == self.project
+                && run.intent == (RunIntent::Check { baseline: self.id })
+                && run.capture_plan == self.capture_plan,
+            "check/baseline configuration mismatch"
+        );
+        let requested = run
+            .targets
+            .iter()
+            .flat_map(CaptureTarget::requested_units)
+            .collect::<BTreeSet<_>>();
+        ensure!(
+            requested == self.saved_units(),
+            "check must request exactly saved baseline slots"
+        );
+        Ok(())
+    }
+    pub fn omitted_units(&self, frozen: &CaptureRun) -> Result<Vec<ReviewUnitKey>> {
+        Ok(self.missing_units(
+            &self
+                .intended_target_keys(frozen)?
+                .into_iter()
+                .collect::<Vec<_>>(),
+        ))
+    }
+    pub fn target_keys(&self) -> BTreeSet<TargetKey> {
+        self.references
+            .iter()
+            .map(|r| r.key.clone())
+            .chain(self.dom_references.iter().map(|r| r.key.clone()))
+            .collect()
+    }
+    pub fn frozen_source_run(&self) -> Option<RunId> {
+        // A legacy descendant's current references cannot identify its original
+        // capture. Resolve its verified ancestry before using/retaining/exporting
+        // frozen configuration. For a legacy root this is only a candidate;
+        // freeze_source/intended_target_keys still verify the NewBaseline proof.
+        self.source_run.or_else(|| {
+            self.parent
+                .is_none()
+                .then(|| self.references.first().map(|r| r.run))
+                .flatten()
+        })
+    }
+    /// Includes the frozen configuration owner, not only current artifact owners.
+    pub fn source_runs(&self) -> BTreeSet<RunId> {
+        self.references
+            .iter()
+            .map(|r| r.run)
+            .chain(self.dom_references.iter().map(|r| r.run))
+            .chain(self.frozen_source_run())
+            .collect()
+    }
+    pub fn reference_count(&self, kind: CheckKind) -> usize {
+        match kind {
+            CheckKind::Screenshot => self.references.len(),
+            CheckKind::DomSnapshot => self.dom_references.len(),
+        }
+    }
+    pub fn missing_units(&self, intended: &[TargetKey]) -> Vec<ReviewUnitKey> {
+        let screenshots: BTreeSet<_> = self.references.iter().map(|r| &r.key).collect();
+        let dom: BTreeSet<_> = self.dom_references.iter().map(|r| &r.key).collect();
+        intended
+            .iter()
+            .flat_map(|key| {
+                let screenshots = &screenshots;
+                let dom = &dom;
+                self.capture_plan.kinds().filter_map(move |kind| {
+                    let found = match kind {
+                        CheckKind::Screenshot => screenshots.contains(key),
+                        CheckKind::DomSnapshot => dom.contains(key),
+                    };
+                    (!found).then(|| ReviewUnitKey {
+                        key: key.clone(),
+                        kind,
+                    })
+                })
+            })
+            .collect()
+    }
     /// Validation boundary, not baseline creation/activation functionality.
     pub fn validate(&self) -> Result<()> {
+        self.capture_plan.validate()?;
         ensure!(
-            !self.references.is_empty() && self.references.len() <= MAX_TARGETS,
+            self.capture_plan.is_default()
+                || (!self.intended_targets.is_empty() && self.source_run.is_some()),
+            "DOM baselines require frozen intended targets/source"
+        );
+        if !self.intended_targets.is_empty() {
+            let intended: BTreeSet<_> = self.intended_targets.iter().cloned().collect();
+            ensure!(
+                intended.len() == self.intended_targets.len()
+                    && intended.len() == self.intended_count as usize
+                    && self.target_keys().is_subset(&intended),
+                "invalid frozen intended targets"
+            );
+        }
+        ensure!(
+            !(self.references.is_empty() && self.dom_references.is_empty())
+                && self.references.len() <= MAX_TARGETS
+                && self.dom_references.len() <= MAX_TARGETS,
             "baseline requires successful captures"
         );
         ensure!(
-            self.intended_count > 0 && self.references.len() <= self.intended_count as usize,
+            self.intended_count > 0
+                && self.intended_count as usize <= MAX_TARGETS
+                && self.target_keys().len() <= self.intended_count as usize,
             "invalid intended coverage"
         );
         ensure!(
-            self.explicitly_partial || self.references.len() == self.intended_count as usize,
+            self.explicitly_partial
+                || self
+                    .capture_plan
+                    .kinds()
+                    .all(|kind| self.reference_count(kind) == self.intended_count as usize),
             "partial coverage requires explicit confirmation"
         );
         let mut keys = BTreeSet::new();
+        ensure!(
+            self.capture_plan.mode.screenshots() || self.references.is_empty(),
+            "unrequested screenshot references"
+        );
+        ensure!(
+            self.capture_plan.mode.dom_snapshots() || self.dom_references.is_empty(),
+            "unrequested DOM references"
+        );
         for reference in &self.references {
             ensure!(keys.insert(&reference.key), "duplicate baseline target");
         }
+        keys.clear();
+        for reference in &self.dom_references {
+            ensure!(keys.insert(&reference.key), "duplicate DOM baseline target");
+            ensure!(
+                !reference.run.0.is_nil()
+                    && !reference.key.page.0.is_nil()
+                    && !reference.key.profile.0.is_nil(),
+                "invalid DOM baseline source identity"
+            );
+            reference.policy.validate()?;
+            ensure!(
+                Some(reference.policy) == self.capture_plan.dom_policy,
+                "DOM baseline policy mismatch"
+            );
+        }
+        ensure!(
+            self.source_run.is_none_or(|run| !run.0.is_nil()),
+            "empty frozen source run"
+        );
         ensure!(
             self.parent != Some(self.id),
             "baseline cannot inherit itself"
@@ -1006,12 +1606,14 @@ pub enum ArtifactKind {
     Thumbnail,
     Tile,
     Difference,
+    DomSnapshot,
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ArtifactOwner {
     Run(RunId),
     Baseline(BaselineId),
     Analysis(AnalysisId),
+    DomAnalysis(DomAnalysisId),
 }
 
 /// Avoid map keys made from structs in JSON. Baseline references remain arrays.
@@ -1128,6 +1730,10 @@ mod tests {
             inventory: InventoryId::new(),
             created_at: 2,
             references: vec![reference.clone()],
+            dom_references: vec![],
+            capture_plan: CapturePlan::default(),
+            source_run: None,
+            intended_targets: vec![],
             intended_count: 2,
             explicitly_partial: false,
         };
@@ -1209,6 +1815,7 @@ mod tests {
                 coverage: DiscoveryCoverage::Complete,
             },
             profiles: vec![profile.clone()],
+            capture_plan: CapturePlan::default(),
             environment: project.environments[0].clone(),
             rendering: RenderingEnvironment {
                 os: "test".into(),
@@ -1230,6 +1837,7 @@ mod tests {
                 final_url: None,
                 attempts: 0,
                 outcome: TargetOutcome::Pending,
+                dom_outcome: DomTargetOutcome::NotRequested,
                 warnings: vec![],
             }],
         };

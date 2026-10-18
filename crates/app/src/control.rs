@@ -75,6 +75,9 @@ pub enum View {
 pub struct Selection {
     pub project: ProjectId,
     pub run: Option<RunId>,
+    /// The analysis UUID is interpreted only within this kind's identity space.
+    #[serde(default)]
+    pub kind: CheckKind,
     pub analysis: Option<AnalysisId>,
     pub key: Option<TargetKey>,
     #[serde(default)]

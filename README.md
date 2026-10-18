@@ -1,7 +1,7 @@
-# Regressee — local visual regression checks
+# Regressee — local website regression checks
 
-Regressee is a local-first desktop app for spotting visual changes on websites.
-Capture reference screenshots, check the same pages again, and review differences
+Regressee is a local-first desktop app for spotting visual and DOM changes on websites.
+Capture reference screenshots, normalized DOM snapshots, or both, then review differences
 before deciding which changes to accept.
 
 **Regressee is a public beta, available on [GitHub](https://github.com/oal/regressee).**
@@ -15,6 +15,8 @@ See [platform availability](#platform-availability) before getting started.
   review the page list, and capture at your chosen screen sizes.
 - **Check for visual changes:** compare against a saved baseline with synchronized
   before, after, and diff views.
+- **Check page structure:** optionally capture normalized live DOM and review an
+  inert source diff. Screenshot and DOM results and approvals stay independent.
 - **Fine-tune your review:** adjust sensitivity and mark ignored areas without
   changing the original screenshots.
 - **Approve selected changes:** create a new baseline version while keeping
@@ -30,10 +32,11 @@ See [platform availability](#platform-availability) before getting started.
    **Save project & continue**.
 2. Choose whether the site needs a login. If it does, save the settings, open the
    login browser, finish signing in, and select **Confirm login**.
-3. Choose which pages and screen sizes to capture. Save the settings, then use
+3. Choose which pages and screen sizes to capture, and **What to check**:
+   screenshots (the default), DOM snapshots, or both. Save the settings, then use
    **Find pages** to review the included pages.
 4. Capture the reviewed pages, inspect screenshots and warnings, and explicitly
-   **Save baseline**. A baseline is your approved set of reference screenshots.
+   **Save baseline**. A baseline is your approved set of reference captures.
 5. Open **Review changes** and choose **Run check**. The check revisits the fixed
    baseline page list using the same capture profiles.
 6. Review differences and failures. Select the changes you want to accept and
@@ -44,6 +47,8 @@ access, but you do not need to install Node.js, npm, or Playwright yourself.
 Browser installation and repair are also available in **App settings**.
 
 For a walkthrough and troubleshooting, see the [first-run guide](docs/first-run-guide.md).
+DOM coverage, exclusions and independent review are explained in
+[DOM snapshot checks](docs/dom-snapshots.md).
 
 ### Download a beta build
 
@@ -104,13 +109,14 @@ reported counts always reflect actual work.
 
 ## Privacy and local storage
 
-- Projects, screenshots, baselines, and history are stored locally, outside the
+- Projects, screenshots, DOM snapshots, baselines, and history are stored locally, outside the
   repository. Website capture still visits the sites you authorize.
 - Saved login sessions are encrypted using an OS-protected key. If secure storage
   is unavailable, you must explicitly choose a session-only login; there is no
   plaintext fallback.
-- **Baseline ZIPs contain original screenshots and page addresses, including URL
-  queries. Ignored areas do not redact exported images.** Inspect the export
+- **Baseline ZIPs contain selected original captures and page addresses, including
+  URL queries. DOM snapshots may reveal private hidden text and attributes;
+  exclusions are not complete redaction. Ignored areas do not redact images.** Inspect the export
   preview and share only with authorized recipients. Login sessions and secret
   keys are excluded.
 - Diagnostics are previewed before you explicitly save a local file. They exclude
@@ -135,6 +141,10 @@ browser setup availability is not a guarantee of full platform support.
   Failed or missing captures are never treated as unchanged pages.
 - Fonts, operating systems, dynamic content, and incomplete page loading can
   affect comparisons. Review capture warnings before trusting a result.
+- DOM snapshots cover the live main document, templates and open shadow roots,
+  not iframe documents, closed roots or every interactive/virtualized state. They
+  exclude script bodies, inline handlers and form values. Changing capture mode
+  or snapshot policy needs a new baseline; existing baselines keep their checks.
 - Phone and tablet profiles use Chromium emulation, not actual Safari or iOS
   devices. Screenshots do not cover every interactive state, hidden tab, or
   virtualized list, and full-page capture has size limits.

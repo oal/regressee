@@ -245,6 +245,7 @@ fn real_engine_gui_opt_in_exact_selection_handoff_return_takeover_and_external_j
     let selected = agent
         .execute(
             Operation::SelectAgent(Selection {
+                kind: Default::default(),
                 project,
                 run: Some(run),
                 analysis: Some(masked),
@@ -319,6 +320,7 @@ fn real_engine_gui_opt_in_exact_selection_handoff_return_takeover_and_external_j
     });
     for selection in [
         Selection {
+            kind: Default::default(),
             project: other_project.id,
             run: None,
             analysis: None,
@@ -326,6 +328,7 @@ fn real_engine_gui_opt_in_exact_selection_handoff_return_takeover_and_external_j
             view: View::Compare,
         },
         Selection {
+            kind: Default::default(),
             project,
             run: Some(run),
             analysis: Some(original),
@@ -333,6 +336,7 @@ fn real_engine_gui_opt_in_exact_selection_handoff_return_takeover_and_external_j
             view: View::Compare,
         },
         Selection {
+            kind: Default::default(),
             project,
             run: Some(run),
             analysis: Some(masked),
@@ -652,6 +656,7 @@ fn agent_passive_evidence_refreshes_clean_notes_but_keeps_drafts_and_ime(cx: &mu
         shell.update(cx, |s, cx| {
             load_review(s, project, cx);
             let selection = Selection {
+                kind: Default::default(),
                 project,
                 run: s.evidence.latest.as_ref().map(|r| r.run.id),
                 analysis: s.evidence.comparison.as_ref().map(|a| a.revision.id),

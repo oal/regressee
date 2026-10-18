@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {randomUUID} from 'node:crypto';
 import {readFileSync} from 'node:fs';
-import {parseRequest, encodeEvent, MAX_FRAME, COMMANDS} from '../src/protocol.mjs';
-const envelope = command => ({version: 2, request_id: 1, job: randomUUID(), command});
+import {parseRequest, encodeEvent, MAX_FRAME, COMMANDS,VERSION} from '../src/protocol.mjs';
+const envelope = command => ({version: VERSION, request_id: 1, job: randomUUID(), command});
 const frame = request => Buffer.from(JSON.stringify(request) + '\n');
 test('shared Rust-emitted session frames require all three non-nil IDs', () => {
   const fixtures = readFileSync(new URL('./fixtures/session-requests.ndjson', import.meta.url), 'utf8');
@@ -49,4 +49,22 @@ test('outgoing frames include JSON escaping and newline in the private budget',(
   assert.equal(JSON.parse(encodeEvent(r,'Completed')).event.type,'Completed');
   assert.throws(()=>encodeEvent(r,'SessionReady',{material:'\u0001'.repeat(512*1024)}),{code:'PayloadLimit'});
   assert.throws(()=>encodeEvent(r,'LinksFound',{addresses:['x'.repeat(MAX_FRAME)]}),{code:'PayloadLimit'});
+});
+test('v3 capture selection is exact, versioned and never silently defaults on the wire',()=>{
+  const request=JSON.parse(readFileSync(new URL('./fixtures/session-requests.ndjson',import.meta.url),'utf8').trimEnd().split('\n')[1]);
+  for(const mode of ['ScreenshotsOnly','ScreenshotsAndDomSnapshots','DomSnapshotsOnly']){
+    const changed=structuredClone(request);changed.command.payload.plan={version:1,mode,dom_policy:mode==='ScreenshotsOnly'?null:{version:1}};
+    assert.equal(parseRequest(frame(changed)).command.payload.plan.mode,mode);
+  }
+  for(const bad of [undefined,{}, {version:2,mode:'ScreenshotsOnly',dom_policy:null},{version:1,mode:'ScreenshotsOnly',dom_policy:{version:1}},{version:1,mode:'DomSnapshotsOnly',dom_policy:null},{version:1,mode:'DomSnapshotsOnly',dom_policy:{version:2}},{version:1,mode:'DomSnapshotsOnly',dom_policy:{version:1,secret:'x'}}]){
+    const changed=structuredClone(request);changed.command.payload.plan=bad;assert.throws(()=>parseRequest(frame(changed)),{code:'InvalidRequest'});
+  }
+  assert.throws(()=>parseRequest(frame({...request,version:2})),{code:'UnsupportedVersion'});
+});
+test('shared Rust-validated channel frames have exact Node wire bytes and no snapshot body',()=>{
+  for(const line of readFileSync(new URL('./fixtures/capture-events.ndjson',import.meta.url),'utf8').trimEnd().split('\n')){
+    const event=JSON.parse(line);
+    assert.equal(encodeEvent(event,event.event.type,event.event.payload),line+'\n');
+    assert(Buffer.byteLength(line)<MAX_FRAME);assert(!line.includes('regressee-dom'));
+  }
 });

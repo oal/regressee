@@ -44,6 +44,7 @@ pub fn both(
 
 type MetricsFn = Box<dyn Fn(Bounds<Pixels>, &App) -> ScrollMetrics>;
 type ChangeFn = Rc<dyn Fn(Point<Pixels>, &mut Window, &mut App)>;
+type DragState = Rc<Cell<Option<(Axis, f32, u64)>>>;
 
 #[derive(Clone, Copy)]
 pub struct ScrollMetrics {
@@ -56,7 +57,7 @@ pub struct ScrollMetrics {
 #[derive(Default)]
 struct ElementState {
     handle: ScrollHandle,
-    drag: Rc<Cell<Option<(Axis, f32, u64)>>>,
+    drag: DragState,
     hovered: Rc<Cell<bool>>,
 }
 
@@ -67,7 +68,7 @@ pub struct Scrollbars {
     metrics: Option<MetricsFn>,
     change: Option<ChangeFn>,
     horizontal: bool,
-    drag: Option<Rc<Cell<Option<(Axis, f32, u64)>>>>,
+    drag: Option<DragState>,
 }
 
 fn scrollable_element(
@@ -115,7 +116,7 @@ pub struct BarLayout {
 
 pub struct ScrollbarLayoutState {
     child: AnyElement,
-    drag: Rc<Cell<Option<(Axis, f32, u64)>>>,
+    drag: DragState,
     hovered: Rc<Cell<bool>>,
 }
 
@@ -447,7 +448,7 @@ impl ScrollbarGeometry {
 
 #[derive(Clone, Default)]
 pub struct ScrollbarState {
-    drag: Rc<Cell<Option<(Axis, f32, u64)>>>,
+    drag: DragState,
 }
 impl ScrollbarState {
     pub fn cancel_drag(&self) {

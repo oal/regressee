@@ -1,20 +1,40 @@
-# Clearer expandable sections test preview
+# DOM comparisons and project management — preview.6
 
-This preview makes expandable sections distinct from selection menus and includes
-the latest browser recovery, capture and settings improvements, plus the earlier
-whole-app UI implementation and feasible validation from Phases 1–7 on
-2026-10-12–13. It remains an **unsigned experimental prerelease**, not a supported
+This preview adds independent DOM snapshot comparisons, complete project-removal
+controls, and fixes for new-project access saves and engine upgrade recovery,
+alongside the existing desktop and CLI workflows.
+It remains an **unsigned experimental prerelease**, not a supported
 release. The release's source commit and each archive's `build-info.json` identify
 the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
+
+- Capture **Screenshots only**, **Screenshots + DOM snapshots**, or **DOM snapshots
+  only**. Baselines freeze that mode. DOM source is inert, read-only text with
+  kind-specific comparison, review and approval; missing or failed checks are not
+  silently called unchanged. CLI reports and baseline ZIPs support retained DOM
+  originals. See [DOM snapshots](dom-snapshots.md) for coverage and privacy limits.
+- **Delete project…** is available in Projects and Project settings. One named,
+  measured-impact confirmation removes local settings, captures, baselines,
+  reviews and logins, while retaining other projects, shared files, the installed
+  browser and exported ZIPs. Locked or invalid login ownership blocks deletion.
+  Incomplete physical file cleanup is reported separately and retried on startup.
+- Added environments and individual address mappings now have removal controls.
+  The last environment/mapping is protected. Saved environment removal preserves
+  recorded History; mapping removal remains a draft until Save settings.
+- Creating another project clears the previous project's environment/login state,
+  fixing a **No login required** save failure. Save failures retain their causes.
+- Upgrading from engine protocol 6/7 has an explicit graceful-stop path in the new
+  executable: close old desktop windows, finish active work, run `regressee engine
+  stop`, and reopen. No active engine is automatically killed, and no project data
+  needs deleting. Keep both packaged executables together and upgrade both.
 
 - Source builds now use `regressee-desktop` for the existing native application.
   The separate `regressee` CLI includes public project/discovery/capture/check,
   evidence/crops/reviews/baselines/history/local-report/sharing/runtime commands,
   durable jobs and named renewable agent sessions. GUI following is a human opt-in
   with exclusive control, immediate takeover and temporary handoff. Both clients
-  use one shared local engine, not independent store owners (protocol 6/schema 1).
+  use one shared local engine, not independent store owners (protocol 8/schema 1).
   `regressee-cli-<platform>` archives contain only the CLI;
   `regressee-desktop-<platform>` archives contain **both** separate executables.
   Portable skill, public help, product-specific license inventories, source/build
@@ -67,7 +87,11 @@ the exact build; the application crate version remains `0.1.0`.
 
 ## Limits and privacy
 
-Source/controller/storage and Linux GPUI offscreen checks passed independently.
+Focused source/controller/storage/IPC and Linux GPUI offscreen checks passed.
+The wider UI-inclusive suite is not green: recorded-History filter/default-source,
+Discovery-details availability and a long-name project-header layout assertion
+remain known issues. A Project-settings Tab test also retains an outdated
+Capture-plan jump expectation. These are not hidden by the focused removal checks.
 Native desktop input, accessibility, clean installation, default graphics,
 cross-platform usability and full release/license qualification remain pending
 or blocked. Windows/NVDA and macOS/VoiceOver have not been qualified; macOS is
@@ -75,8 +99,10 @@ not a downloadable target and still has a process-supervision code gap. CI
 compilation or simulated controls do not establish those capabilities.
 
 Data remains local unless explicitly shared. Baseline archives contain website
-pixels and addresses, but do not export login sessions/cookies. Ignored regions
-are comparison policy, **not pixel redaction**. Browser installation on first use
+pixels, DOM text/attributes when enabled, and addresses, but do not export login
+sessions/cookies. DOM filtering is **not complete redaction**; hidden text, URLs
+and attributes may still contain private information. Ignored regions are
+comparison policy, **not redaction**. Browser installation on first use
 needs internet access; downloads do not include the development `.runtime` tree.
 Do not disable operating-system or browser security protections to run a preview.
 

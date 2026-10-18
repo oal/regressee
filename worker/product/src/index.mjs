@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 import {parseRequest,encodeEvent,MAX_FRAME} from './protocol.mjs';
-import {launch,capture,fail,PLAYWRIGHT_VERSION,WORKER_VERSION} from './capture.mjs';
+import {launch,capture,fail,captureFailureCode,PLAYWRIGHT_VERSION,WORKER_VERSION} from './capture.mjs';
 import {discover,robots} from './discover.mjs';
 import {Sessions,openLogin,confirmLogin} from './sessions.mjs';
 import fs from 'node:fs/promises';
@@ -24,15 +24,20 @@ async function run(r) {
     send(r,'Completed');process.stdin.pause();return;
   }
   if(active || closing) {failure(r,'InvalidRequest');return;}
-  active={job:r.job,cancelled:false};const task=active;
+  active={job:r.job,cancelled:false,published:new Set()};const task=active;
   try {
     if(type==='Handshake') {
       if(!identity?.Pinned || !output || !['public','loopback'].includes(scope))throw fail('InvalidRequest');
       browser=await launch();
        if(browser.version()!==identity.Pinned.browser || process.version.slice(1)!==identity.Pinned.node || PLAYWRIGHT_VERSION!==identity.Pinned.playwright || identity.Pinned.worker!==WORKER_VERSION)throw fail('InvalidRequest');
       const smoke=await browser.newContext();context=smoke;
-      try {const page=await smoke.newPage();await page.setContent('<html><body>Regressee runtime smoke</body></html>');const png=await page.screenshot({timeout:10000});if(png.length<32)throw fail('CaptureFailed');}finally{await smoke.close();context=null;}
-       send(r,'Ready',{worker_version:WORKER_VERSION,browser_version:browser.version()});
+       try {const page=await smoke.newPage();await page.setContent('<html><body>Regressee runtime smoke</body></html>');if(!await page.evaluate(()=>document.readyState==='complete'))throw fail('CaptureFailed');}finally{await smoke.close();context=null;}
+        send(r,'Ready',{worker_version:WORKER_VERSION,browser_version:browser.version()});
+    } else if(type==='InstallSmoke') {
+      if(!browser)throw fail('InvalidRequest');
+      const smoke=await browser.newContext();context=smoke;
+      try {const page=await smoke.newPage();await page.setContent('<html><body>Regressee installer pixel smoke</body></html>');const png=await page.screenshot({timeout:10000});if(png.length<32)throw fail('CaptureFailed');}finally{await smoke.close();context=null;}
+      send(r,'Completed');
     } else if(type==='OpenLogin') {
       if(!browser||login)throw fail('InvalidRequest');
       const headed=await launch(false);
@@ -50,9 +55,16 @@ async function run(r) {
      } else if(type==='CaptureTarget') {
        if(!browser)throw fail('InvalidRequest');
        const trace=process.env.REGRESSEE_PRIVATE_CAPTURE_DIAGNOSTICS==='1'?[]:null;
-       const result=await capture(browser,r.command.payload,{identity,scope,output,sessions,onContext:c=>{context=c;},progress:(completed,total)=>send(r,'Progress',{completed,total}),warning:code=>send(r,'Warning',{code}),diagnostics:e=>{if(trace&&trace.length<128)trace.push(e);}});
-       if(trace)await fs.writeFile(path.join(output,`${result.output_token}.trace.json`),JSON.stringify(trace),{flag:'wx',mode:0o600});
-      if(task.cancelled)send(r,'Cancelled');else send(r,'TargetCaptured',result);
+       await capture(browser,r.command.payload,{identity,scope,output,sessions,run:r.job,onContext:c=>{context=c;},progress:(completed,total)=>send(r,'Progress',{completed,total}),warning:(code,kind)=>send(r,'ChannelWarning',{key:r.command.payload.key,kind,code}),diagnostics:e=>{if(trace&&trace.length<128)trace.push(e);},onChannel:async result=>{
+         const {key,kind,failure:code,...fields}=result;
+         if(task.cancelled)return;
+         if(task.published.has(kind))throw fail('InvalidRequest');
+         if(trace&&kind==='Screenshot'&&fields.artifact)await fs.writeFile(path.join(output,`${fields.output_token}.trace.json`),JSON.stringify(trace),{flag:'wx',mode:0o600});
+         task.published.add(kind);
+         if(code)send(r,'ChannelFailed',{key,kind,code,retryable:['Timeout','WorkerStopped','RateLimited','ServerError'].includes(code)});
+         else send(r,'ChannelCaptured',{key,capture:{kind,...fields}});
+       }});
+      if(task.cancelled)send(r,'Cancelled');else send(r,'CaptureCompleted',{key:r.command.payload.key});
     } else if(type==='DiscoverPage'||type==='DiscoverAuthenticated') {
       if(!browser)throw fail('InvalidRequest');
       const result=await discover(browser,r.command.payload,{scope,sessions,onContext:c=>{context=c;}});
@@ -62,7 +74,13 @@ async function run(r) {
       if(task.cancelled)send(r,'Cancelled');else send(r,'RobotsFound',result);
     } else throw fail('InvalidRequest');
   } catch(e) {
-    if(task.cancelled)send(r,'Cancelled');else failure(r,['NeedsLogin','AccessDenied','NotFound','RedirectOutsideScope','ImageLimit','InvalidRequest','Timeout','RateLimited','ServerError','PayloadLimit'].includes(e.code)?e.code:e.name==='TimeoutError'?'Timeout':'CaptureFailed');
+    if(task.cancelled)send(r,'Cancelled');
+    else if(type==='CaptureTarget'){
+      const {key,plan}=r.command.payload,code=captureFailureCode(e);
+      const kinds=[...(plan.mode!=='DomSnapshotsOnly'?['Screenshot']:[]),...(plan.mode!=='ScreenshotsOnly'?['DomSnapshot']:[])];
+      for(const kind of kinds)if(!task.published.has(kind))send(r,'ChannelFailed',{key,kind,code,retryable:['Timeout','WorkerStopped','RateLimited','ServerError'].includes(code)});
+      send(r,'CaptureCompleted',{key});
+    }else failure(r,captureFailureCode(e));
   } finally {active=null;}
 }
 process.stdin.on('data',chunk=>{

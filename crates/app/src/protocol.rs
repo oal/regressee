@@ -11,8 +11,10 @@ use std::{
 };
 use uuid::Uuid;
 
-pub const VERSION: u32 = 6;
+pub const VERSION: u32 = 8;
 pub const MAX_FRAME: usize = 64 * 1024 * 1024;
+/// Leaves room for the bounded request/frozen project and receipt envelope.
+pub const MAX_READ_RESULT_BYTES: usize = 16 * 1024 * 1024;
 pub const MAX_CONNECTIONS: usize = 16;
 pub const MAX_JOBS: usize = 4096;
 pub const MAX_EVENTS: usize = 512;
@@ -78,6 +80,7 @@ operations! {
     Approval {analysis: AnalysisId, selected: Vec<TargetKey>},
     Accept {preview: Box<ApprovalPreview>, context: ApprovalContext}, Restore {baseline: BaselineId, revision: u64},
     PreviewImages {project: ProjectId, preview: Box<DiscoveryPreview>},
+    Dom(value: crate::engine::dom::Command),
 }
 
 impl Operation {
@@ -101,6 +104,9 @@ impl Operation {
         )
     }
     pub fn needs_confirmation(&self) -> bool {
+        if let Self::Dom(command) = self {
+            return command.needs_confirmation();
+        }
         if let Self::Terminal(command) = self {
             return command.writes();
         }
@@ -121,6 +127,9 @@ impl Operation {
         )
     }
     pub fn mutates(&self) -> bool {
+        if let Self::Dom(command) = self {
+            return command.writes();
+        }
         if let Self::Terminal(command) = self {
             return command.writes();
         }
@@ -180,6 +189,7 @@ impl Operation {
             Self::Viewer(v) => Some(v.project),
             Self::SelectedEvidence(v) => Some(v.project),
             Self::Terminal(c) => c.project(),
+            Self::Dom(c) => c.project(),
             Self::Accept { context, .. } => Some(context.project),
             Self::Delete(preview) => Some(preview.project),
             Self::Export { preview, .. } => Some(preview.project),
@@ -275,13 +285,40 @@ macro_rules! outcomes {
                 })
             }
             pub(crate) fn from_reply(reply: jobs::Reply) -> Self {
-                match reply {
+                let mut outcome = match reply {
                     $(jobs::Reply::$name $(($binding))? $({$($field),*})? => Self::$name $(($binding))? $({$($field),*})?),*,
                     jobs::Reply::RuntimeReadiness(r) => Self::RuntimeReadiness(Readiness {status:r.status, setup_available:r.setup_available, message:r.message.into(), identity:r.identity, scope:r.scope}),
                     jobs::Reply::Extension(never) => match never {},
-                }
+                };
+                outcome.without_dom_bodies();
+                outcome
             }
             pub fn failed(&self) -> bool { matches!(self, Self::Failure(_) | Self::ProductFailure(_) | Self::ActionRequired(_) | Self::UnverifiedCapture {..}) }
+        }
+    }
+}
+/// Snapshot bodies and diff rows are focused evidence, never aggregate job data.
+/// Keep canonical verdict/source identities valid; focused DTOs project counts
+/// and display-limit state separately instead of mutating canonical diff hunks.
+pub fn strip_dom_diff_bodies(evidence: &mut ProjectEvidence) {
+    if let Some(comparison) = &mut evidence.dom_comparison {
+        for result in &mut comparison.revision.results {
+            result.diff = None;
+        }
+    }
+}
+impl Outcome {
+    pub(crate) fn without_dom_bodies(&mut self) {
+        match self {
+            Self::Evidence(e) | Self::Captured(e) | Self::InspectedRun { evidence: e, .. } => {
+                strip_dom_diff_bodies(e)
+            }
+            Self::AgentLocation(location) => {
+                if let Some(evidence) = &mut location.evidence {
+                    strip_dom_diff_bodies(evidence);
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -293,6 +330,8 @@ outcomes! {
     Cancelled, Runtime(value: String), Network {settings: NetworkSettings, message: String}, Evidence(value: Box<ProjectEvidence>), Captured(value: Box<ProjectEvidence>),
     InspectedRun {project: ProjectId, run: RunId, evidence: Box<ProjectEvidence>}, Analysis(value: Box<ComparisonEvidence>), Approval(value: Box<ApprovalPreview>),
     SavedReview(value: Vec<ReviewDecision>), SavedMask, Discovery(value: Box<DiscoveryPreview>), Environment(value: Box<auth::EnvironmentStatus>),
+    Dom(value: Box<crate::engine::dom::Output>),
+    ScopeDeleted {project: ProjectId, item: DeleteItem, cleanup_pending: bool},
     Progress {message: String, completed: u32, total: Option<u32>}, CaptureStatus(value: task::CaptureStatus),
 }
 
@@ -381,9 +420,28 @@ impl Job {
                 .comparison
                 .as_ref()
                 .is_some_and(|a| a.revision.run != record.run.id)
+            || evidence
+                .dom_comparison
+                .as_ref()
+                .is_some_and(|a| a.revision.run != record.run.id)
         {
             return Some(
                 "capture_result_mismatch: capture intent or analysis belongs to another operation",
+            );
+        }
+        if let RunIntent::Check { baseline } = record.run.intent
+            && (evidence.baseline.as_ref().is_none_or(|b| b.id != baseline)
+                || evidence
+                    .comparison
+                    .as_ref()
+                    .is_some_and(|a| a.revision.baseline != baseline)
+                || evidence
+                    .dom_comparison
+                    .as_ref()
+                    .is_some_and(|a| a.revision.baseline != baseline))
+        {
+            return Some(
+                "capture_result_mismatch: requested kinds do not share this check's exact original baseline",
             );
         }
         None
@@ -402,6 +460,12 @@ impl Job {
                 return JobState::Failed;
             }
             if let Outcome::Captured(evidence) = outcome {
+                if evidence.latest.as_ref().is_some_and(|r| {
+                    r.run.state == regressee_core::domain::JobState::Completed
+                        && r.run.targets.iter().any(|t| !t.requested_kinds_captured())
+                }) {
+                    return JobState::Failed;
+                }
                 return capture_terminal_state(evidence.latest.as_ref().map(|r| r.run.state));
             }
         }
@@ -542,8 +606,7 @@ impl Response {
 }
 
 #[cfg(test)]
-#[path = "../tests/support/approval_fixture.rs"]
-mod receipt_fixture;
+use crate::approval_fixture as receipt_fixture;
 #[cfg(test)]
 mod tests {
     use super::receipt_fixture as fixture;

@@ -30,6 +30,14 @@ guided workflow. This is direction/brief approval, not native input or usability
 qualification. Screen-reader semantics/backend coverage must be qualified
 independently, not inferred from textual labels or simulated keyboard actions.
 
+DOM snapshot support does not expand this platform matrix. Core/storage, strict
+wire/bundled-worker and owned Linux loopback capture/crash-recovery checks have
+scoped independent evidence; native DOM review uses the same GPUI backend and
+remaining OS-input/accessibility qualification. Existing baselines still require
+their recorded compatible runtime; updating the app's worker does not relabel old
+capture identities. See [DOM coverage and privacy](dom-snapshots.md) and
+[verification scope](research/dom-snapshot-verification-20261017.md).
+
 The 2026-10-10 UI sweep has independently passing focus/layout/action and
 persistence regressions. Its single isolated X11/llvmpipe native attempt mapped
 but captured entirely black pixels, stopping before input. The corrected binary

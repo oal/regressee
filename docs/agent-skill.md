@@ -28,8 +28,14 @@ Copying files or an implementor smoke is not an independent real-agent exercise.
 The [consumer exercise](cli-consumer-exercise.md) supports a separate agent using
 only packaged binaries/public help/this skill and an owned loopback website.
 
-The skill targets CLI schema 1/protocol 6. It teaches fixed-inventory checks,
+The skill targets CLI schema 1/protocol 7. It teaches fixed-inventory checks,
 actual before/after/difference and derived-crop inspection, warnings/coverage,
 privacy previews, exact confirmations/retries and optional human-opt-in following.
 It never grants permission to accept baselines simply to get a clean report,
 open unrelated data, weaken a browser sandbox or upload evidence.
+
+It also documents the three canonical check modes, bounded normalized DOM
+source/diff pages, distinct per-kind analysis/review identities, explicit
+single-/multi-kind baseline selections and inert local DOM report evidence.
+DOM-only workflows require text inspection, not invented screenshot/crop IDs;
+hidden text and attributes remain potentially sensitive despite exclusions.

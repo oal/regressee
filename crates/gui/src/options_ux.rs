@@ -302,7 +302,12 @@ impl Shell {
                         .flex()
                         .justify_between()
                         .gap_3()
-                        .child(div().text_size(px(14.)).line_height(px(CONTROL_LINE_HEIGHT)).child(label))
+                        .child(
+                            div()
+                                .text_size(px(14.))
+                                .line_height(px(CONTROL_LINE_HEIGHT))
+                                .child(label),
+                        )
                         .child(
                             div()
                                 .text_size(px(14.))

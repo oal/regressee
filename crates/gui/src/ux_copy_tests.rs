@@ -365,6 +365,7 @@ fn deletion_copy_uses_singular_and_plural_counts(cx: &mut TestAppContext) {
                     shared_bytes: 84,
                     objects: count,
                     analyses: count,
+                    scope: None,
                 });
                 s.activate_control(Control::Phase6(6), window, cx);
             });

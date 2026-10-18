@@ -136,6 +136,7 @@ pub enum Command<W> {
         project: ProjectId,
         preview: Box<DiscoveryPreview>,
     },
+    Dom(crate::engine::dom::Command),
     /// Private in-process extension, not a public command/protocol surface.
     Extension(W),
 }
@@ -163,6 +164,11 @@ pub enum JobReply<R> {
     ProjectStorage(regressee_storage::ProjectStorage),
     DeletePreview(Box<regressee_storage::DeletionPreview>),
     Deleted,
+    ScopeDeleted {
+        project: ProjectId,
+        item: regressee_storage::DeleteItem,
+        cleanup_pending: bool,
+    },
     RepairPreview(Box<regressee_storage::RepairPreview>),
     CleanedTemporaries,
     Failure(StorageFailure),
@@ -191,6 +197,7 @@ pub enum JobReply<R> {
     SavedMask,
     Discovery(Box<DiscoveryPreview>),
     Environment(Box<crate::auth::EnvironmentStatus>),
+    Dom(Box<crate::engine::dom::Output>),
     Progress {
         message: String,
         completed: u32,
@@ -404,7 +411,9 @@ impl<E: Extension> BackgroundJobs<E> {
                         Command::Extension(work) => extension.execute(store, work, speculative)
                             .map(JobReply::Extension)
                             .unwrap_or_else(|e| JobReply::ProductFailure(e.to_string())),
-                        Work::InspectRun { project, run } => store.inspect_run(project, run)
+                        Work::Dom(command) => operation_reply(crate::engine::dom::execute(store, command, &cancel)
+                            .map(|value| Reply::Dom(Box::new(value)))),
+                        Work::InspectRun { project, run } => inspect_screenshots(store, project, run)
                             .map(|evidence| Reply::InspectedRun { project, run, evidence: Box::new(evidence) })
                             .unwrap_or_else(|e| Reply::ProductFailure(e.to_string())),
                         Work::List { page } => store
@@ -439,7 +448,7 @@ impl<E: Extension> BackgroundJobs<E> {
                             .summary()
                             .map(Reply::Storage)
                             .unwrap_or(Reply::Failure(StorageFailure::Unavailable)),
-                        work @ (Work::ExportPreview {..} | Work::Export {..} | Work::ImportPreview(_) | Work::Import {..} | Work::History {..} | Work::ProjectStorage(_) | Work::DeletePreview {..} | Work::Delete(_) | Work::RepairPreview | Work::CleanupTemporaries(_) | Work::DeleteUnreferenced(_)) => storage_work(store,work,&cancel),
+                         work @ (Work::ExportPreview {..} | Work::Export {..} | Work::ImportPreview(_) | Work::Import {..} | Work::History {..} | Work::ProjectStorage(_) | Work::DeletePreview {..} | Work::Delete(_) | Work::RepairPreview | Work::CleanupTemporaries(_) | Work::DeleteUnreferenced(_)) => storage_work(store,work,&cancel,product.as_ref().ok()),
                         work=>match &product {
                              Err(_) if matches!(&work, Work::RuntimeStatus) => Reply::RuntimeReadiness(crate::product::RuntimeReadiness::invalid_configuration()),
                               Err(_)=>Reply::ActionRequired(crate::recovery::Problem::Browser(crate::product::RuntimeState::UnavailableDistribution)),
@@ -803,6 +812,36 @@ pub(crate) fn product_work<W, R>(
     })();
     operation_reply(result)
 }
+/// Preserve screenshot inspection behavior, adding an actionable DOM-only route.
+pub(crate) fn inspect_screenshots(
+    store: &Store,
+    project: ProjectId,
+    run: RunId,
+) -> anyhow::Result<ProjectEvidence> {
+    match store.inspect_run(project, run) {
+        Ok(evidence) => {
+            anyhow::ensure!(
+                evidence
+                    .latest
+                    .as_ref()
+                    .is_some_and(|r| r.run.capture_plan.mode.screenshots()),
+                "invalid_request: this run requested DOM snapshots only; use history show --kind dom"
+            );
+            Ok(evidence)
+        }
+        Err(error) => {
+            if store
+                .load_screenshot_run(run)
+                .is_ok_and(|r| !r.run.capture_plan.mode.screenshots())
+            {
+                anyhow::bail!(
+                    "invalid_request: this run requested DOM snapshots only; use history show --kind dom"
+                );
+            }
+            Err(error)
+        }
+    }
+}
 /// Keep the service's exact run identity. The separate Evidence command remains
 /// a newest-workspace refresh and must never be a capture's terminal receipt.
 pub(crate) fn capture_reply<R>(
@@ -974,6 +1013,7 @@ pub(crate) fn storage_work<W, R>(
     store: &mut Store,
     work: Command<W>,
     cancel: &AtomicBool,
+    product: Option<&Product>,
 ) -> JobReply<R> {
     use {Command as Work, JobReply as Reply};
     let result = (|| -> anyhow::Result<JobReply<R>> {
@@ -1001,8 +1041,23 @@ pub(crate) fn storage_work<W, R>(
                 store.deletion_preview(project, item)?,
             ))),
             Work::Delete(preview) => {
-                store.delete_confirmed(&preview)?;
-                Ok(Reply::Deleted)
+                let cleanup_pending = if let Some(product) = product {
+                    product.delete_saved_scope(store, &preview)?
+                } else {
+                    store.delete_confirmed_with_cleanup(&preview, |sessions| {
+                        anyhow::ensure!(sessions.is_empty(), "Saved logins could not be removed. Restore access to the app's private login storage before deleting this project or environment.");
+                        Ok(())
+                    })?
+                };
+                Ok(if preview.scope.is_some() {
+                    Reply::ScopeDeleted {
+                        project: preview.project,
+                        item: preview.item,
+                        cleanup_pending,
+                    }
+                } else {
+                    Reply::Deleted
+                })
             }
             Work::RepairPreview => Ok(Reply::RepairPreview(Box::new(store.repair_preview()?))),
             Work::CleanupTemporaries(preview) => {
@@ -1018,7 +1073,20 @@ pub(crate) fn storage_work<W, R>(
     })();
     operation_reply(result)
 }
+pub(crate) fn typed_cancellation(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause.is::<crate::analysis_engine::Cancelled>()
+            || cause
+                .downcast_ref::<regressee_runtime::supervisor::WorkerFailure>()
+                .is_some_and(|failure| {
+                    failure.0 == regressee_runtime::protocol::FailureCode::Cancelled
+                })
+    })
+}
 fn cancellation_error(error: &anyhow::Error) -> bool {
+    if typed_cancellation(error) {
+        return true;
+    }
     error.chain().any(|cause| {
         if let Some(failure) = cause.downcast_ref::<regressee_runtime::supervisor::WorkerFailure>()
         {
@@ -1076,16 +1144,60 @@ fn io_recovery(error: &anyhow::Error) -> Option<crate::recovery::Problem> {
 
 pub(crate) fn storage_failure<R>(error: anyhow::Error, fallback: StorageFailure) -> JobReply<R> {
     use JobReply as Reply;
-    io_recovery(&error).map_or(Reply::Failure(fallback), Reply::ActionRequired)
+    if let Some(problem) = io_recovery(&error) {
+        Reply::ActionRequired(problem)
+    } else if fallback == StorageFailure::ConflictOrWrite {
+        // Keep the existing write-failure category for CLI consumers, but do
+        // not throw away the cause before the GUI can explain it or show Details.
+        Reply::ProductFailure(format!("storage_write_failed: {error:#}"))
+    } else {
+        Reply::Failure(fallback)
+    }
 }
 
 #[cfg(test)]
-#[path = "../tests/support/approval_fixture.rs"]
-mod capture_fixture;
+use crate::approval_fixture as capture_fixture;
 
 #[cfg(test)]
 mod task_reply_tests {
     use super::*;
+
+    #[test]
+    fn environment_save_failure_keeps_its_cause_and_does_not_change_saved_settings() {
+        let root = tempfile::tempdir().unwrap();
+        let mut store = Store::open(AppPaths::isolated(root.path())).unwrap();
+        let project = Project::draft("Public website".into(), "https://example.test/").unwrap();
+        let saved = store.save_project(&project, None).unwrap();
+        let reply: Reply = environment_work(
+            &mut store,
+            Work::SaveEnvironment {
+                project: Box::new(project.clone()),
+                revision: saved.revision,
+                environment: regressee_core::domain::EnvironmentId::new(),
+                settings: Default::default(),
+            },
+        );
+        let Reply::ProductFailure(error) = reply else {
+            panic!("the actual save failure must not be replaced by generic storage advice")
+        };
+        assert!(error.starts_with("storage_write_failed:"));
+        assert!(error.contains("selected environment does not belong to this project"));
+        assert!(!error.contains("space"));
+        let current = store.load_project(project.id).unwrap();
+        assert_eq!(current.revision, saved.revision);
+        assert_eq!(current.project, project);
+        assert_eq!(
+            store.local_login_settings(project.id).unwrap(),
+            Default::default()
+        );
+
+        let reply: Reply = storage_failure(
+            anyhow::anyhow!("underlying database cause").context("Saving access settings"),
+            StorageFailure::ConflictOrWrite,
+        );
+        assert!(matches!(reply, Reply::ProductFailure(error)
+            if error == "storage_write_failed: Saving access settings: underlying database cause"));
+    }
 
     #[test]
     fn capture_reply_uses_the_returned_record_not_a_newer_workspace_run() -> anyhow::Result<()> {
@@ -1137,6 +1249,13 @@ mod task_reply_tests {
 
     #[test]
     fn acknowledged_cancellation_is_distinct_from_failures_and_committed_success() {
+        let typed =
+            anyhow::Error::new(crate::analysis_engine::Cancelled).context("Rendering DOM evidence");
+        assert!(matches!(operation_reply(Err(typed)), Reply::Cancelled));
+        assert!(matches!(
+            operation_reply(Err(anyhow::anyhow!("DOM analysis cancelled"))),
+            Reply::ProductFailure(_)
+        ));
         let cancelled = anyhow::anyhow!("operation cancelled").context("Preparing browser");
         assert!(matches!(operation_reply(Err(cancelled)), Reply::Cancelled));
         let failure = regressee_runtime::supervisor::WorkerFailure(
@@ -1211,7 +1330,7 @@ mod task_reply_tests {
                 anyhow::anyhow!("revision changed"),
                 StorageFailure::ConflictOrWrite
             ),
-            Reply::Failure(StorageFailure::ConflictOrWrite)
+            Reply::ProductFailure(error) if error == "storage_write_failed: revision changed"
         ));
     }
 
@@ -1358,10 +1477,10 @@ mod tests {
         store.save_project(&project, None)?;
         let cancel = AtomicBool::new(false);
         assert!(
-            matches!(storage_work(&mut store, Work::History { project: project.id, page: 0 }, &cancel), Reply::History { history } if history.runs.is_empty())
+            matches!(storage_work(&mut store, Work::History { project: project.id, page: 0 }, &cancel, None), Reply::History { history } if history.runs.is_empty())
         );
         assert!(
-            matches!(storage_work(&mut store, Work::ProjectStorage(project.id), &cancel), Reply::ProjectStorage(storage) if storage.project == project.id && storage.bytes == 0)
+            matches!(storage_work(&mut store, Work::ProjectStorage(project.id), &cancel, None), Reply::ProjectStorage(storage) if storage.project == project.id && storage.bytes == 0)
         );
         Ok(())
     }

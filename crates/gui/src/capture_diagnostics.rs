@@ -122,6 +122,37 @@ fn timestamp(value: Option<i64>) -> String {
 
 impl Shell {
     pub(super) fn capture_diagnostics(&self) -> Report {
+        if self.dom_active() {
+            let mut sections = vec![Section {
+                title: "DOM capture context",
+                fields: self
+                    .dom_capture_summary()
+                    .into_iter()
+                    .map(|(label, value)| Field {
+                        label: "Recorded detail",
+                        value: format!("{label}: {value}"),
+                        json: false,
+                    })
+                    .collect(),
+            }];
+            if let Some(frame) = &self.dom.frame {
+                for (title, source) in [
+                    ("Before DOM snapshot", frame.artifacts.before.as_ref()),
+                    ("After DOM snapshot", frame.artifacts.after.as_ref()),
+                ] {
+                    if let Some(source) = source {
+                        sections.push(Section {
+                            title,
+                            fields: vec![
+                                Field::record("Source identity (JSON)", &source.source),
+                                Field::record("Capture metadata (JSON)", &source.metadata),
+                            ],
+                        });
+                    }
+                }
+            }
+            return Report(sections);
+        }
         let mut sections = vec![Section {
             title: "Capture context",
             fields: vec![Field::text("Context", self.comparison_context())],

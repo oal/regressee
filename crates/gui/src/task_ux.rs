@@ -195,7 +195,7 @@ impl Task {
                         .as_ref()
                         .is_none_or(|status| status.run == run.run.id)
                 {
-                    let counts = crawl::TargetCounts::from_run(&run.run);
+                    let counts = regressee_app::task::target_counts(&run.run);
                     outcome.title = match run.run.state {
                         JobState::Paused => "Capture paused",
                         JobState::Cancelled => "Capture stopped",
@@ -228,6 +228,25 @@ impl Task {
                     {
                         outcome.message = "You can save the successful screenshots as your baseline and skip those that could not be captured. Review the results, then choose Save baseline.".into();
                     }
+                    if run.run.capture_plan.mode.dom_snapshots() {
+                        outcome.title = match run.run.state {
+                            JobState::Paused => "Capture paused",
+                            JobState::Cancelled => "Capture stopped",
+                            JobState::CompletedWithErrors | JobState::Interrupted => {
+                                "Capture needs attention"
+                            }
+                            _ if self.spec.kind == Kind::Check => "Website check finished",
+                            _ => "Page capture finished",
+                        }
+                        .into();
+                        outcome.message = "Review each requested kind independently. A saved screenshot does not mean the DOM snapshot succeeded, or vice versa.".into();
+                        if regressee_gui::task::baseline_consent_coverage(run).is_some_and(|c| {
+                            c.dom_captures < c.dom_intended
+                                || c.screenshot_captures < c.screenshot_intended
+                        }) {
+                            outcome.message.push_str(" Save baseline requires explicit consent to omit each missing kind; missing coverage needs a new baseline capture.");
+                        }
+                    }
                     outcome.tone = if run.run.state == JobState::Completed {
                         Tone::Neutral
                     } else {
@@ -243,7 +262,12 @@ impl Task {
                     outcome.capture = Some(CaptureDetails::from_run(&run.run));
                     outcome.note = Some((
                         "Your baseline is unchanged",
-                        "Saved screenshots are kept.".into(),
+                        if run.run.capture_plan.mode.dom_snapshots() {
+                            "Saved captures are kept."
+                        } else {
+                            "Saved screenshots are kept."
+                        }
+                        .into(),
                     ));
                     outcome.failed = matches!(
                         run.run.state,
@@ -309,7 +333,9 @@ impl Task {
             }
             Reply::ProductFailure(error) => {
                 outcome.title = format!("{} could not finish", self.spec.title);
-                let explanation: String = error
+                let write_error = error.strip_prefix("storage_write_failed: ");
+                let explanation: String = write_error
+                    .unwrap_or(error)
                     .lines()
                     .next()
                     .filter(|line| !line.trim().is_empty())
@@ -322,6 +348,9 @@ impl Task {
                     "{explanation}\n{}",
                     regressee_gui::task::failure_recovery(self.spec.kind)
                 );
+                if write_error.is_some() {
+                    outcome.title = "Project settings could not be saved".into();
+                }
                 if error.starts_with(regressee_runtime::setup_diagnostics::FAILURE_PREFIX) {
                     outcome.title = "Browser setup could not finish".into();
                     outcome.message = format!(
@@ -440,6 +469,31 @@ fn count_group() -> Div {
         .border_t_1()
         .border_b_1()
         .border_color(rgb(palette().line))
+}
+
+fn kind_capture_counts(setup: &CaptureStatus) -> Div {
+    let mut group = div()
+        .debug_selector(|| "task-kind-coverage".into())
+        .flex()
+        .flex_col()
+        .gap_2();
+    for (enabled, label, counts) in [
+        (
+            setup.capture_plan.mode.screenshots(),
+            "Screenshots",
+            &setup.screenshots,
+        ),
+        (
+            setup.capture_plan.mode.dom_snapshots(),
+            "DOM snapshots",
+            &setup.dom_snapshots,
+        ),
+    ] {
+        if enabled {
+            group = group.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).child(format!("{label}: {} / {} saved · {} failed · {} skipped or stopped · {} pending · {} baseline omissions", counts.captured, counts.requested, counts.failed, counts.skipped + counts.cancelled, counts.pending, counts.baseline_omitted)));
+        }
+    }
+    group
 }
 
 fn capture_counts(counts: &crawl::TargetCounts, running: bool) -> Div {
@@ -609,11 +663,16 @@ fn capture_setup(setup: &CaptureStatus) -> Div {
             format!("{} · not scheduled for capture", setup.excluded_pages),
         ))
         .child(detail_row(
-            "Screenshots",
-            format!(
-                "{} planned screenshots · one per page and screen size",
-                setup.total
-            ),
+            "What to check",
+            match setup.capture_plan.mode {
+                CaptureMode::ScreenshotsOnly => "Screenshots only",
+                CaptureMode::ScreenshotsAndDomSnapshots => "Screenshots + DOM snapshots",
+                CaptureMode::DomSnapshotsOnly => "DOM snapshots only",
+            },
+        ))
+        .child(detail_row(
+            "Page and screen-size pairs",
+            setup.total.to_string(),
         ))
         .child(detail_row("Environment", setup.environment.clone()));
     for profile in &setup.profiles {
@@ -701,6 +760,14 @@ fn task_details(shell: &Shell, cx: &mut Context<Shell>) -> AnyElement {
                             shell.task_link(1 + index * 2, false, cx),
                         ))
                         .child(detail_row("Screen size", gap.profile.clone()))
+                        .child(detail_row(
+                            "Check kind",
+                            if gap.kind == regressee_core::domain::CheckKind::Screenshot {
+                                "Screenshot"
+                            } else {
+                                "DOM snapshot"
+                            },
+                        ))
                         .child(detail_row("Attempts", gap.attempts.to_string()));
                     if let Some(code) = gap.failure {
                         row = row.child(detail_row("Next step", capture_recovery(code)));
@@ -726,7 +793,7 @@ fn task_details(shell: &Shell, cx: &mut Context<Shell>) -> AnyElement {
                 }
                 if capture.gap_count > capture.gaps.len() {
                     gaps = gaps.child(div().text_color(rgb(palette().muted)).child(format!(
-                        "Showing {} of {} missing screenshots. Review captured pages to see the complete list.", capture.gaps.len(), capture.gap_count)));
+                        "Showing {} of {} missing checks. Review captured pages to see the complete list.", capture.gaps.len(), capture.gap_count)));
                 }
                 details = details.child(gaps);
             }
@@ -875,7 +942,15 @@ impl Shell {
         controls
     }
 
-    pub(super) fn begin_task(&mut self, spec: Spec) {
+    pub(super) fn begin_task(&mut self, mut spec: Spec) {
+        if spec.kind == Kind::Capture
+            && self
+                .project
+                .as_ref()
+                .is_some_and(|p| p.project.capture_plan.mode.dom_snapshots())
+        {
+            spec.title = "Capturing pages";
+        }
         if matches!(
             spec.kind,
             Kind::Discovery
@@ -1128,7 +1203,15 @@ impl Shell {
             }
             if let Some(counts) = &outcome.counts {
                 body = body.child(match counts {
-                    Counts::Capture(counts) => capture_counts(counts, false),
+                    Counts::Capture(counts) => {
+                        if let Some(details) = &outcome.capture
+                            && details.setup.capture_plan.mode.dom_snapshots()
+                        {
+                            kind_capture_counts(&details.setup)
+                        } else {
+                            capture_counts(counts, false)
+                        }
+                    }
                     Counts::Discovery {
                         included,
                         excluded,
@@ -1226,7 +1309,11 @@ impl Shell {
                                 }
                             )),
                     )
-                    .child(capture_counts(&capture.counts, true));
+                    .child(if capture.capture_plan.mode.dom_snapshots() {
+                        kind_capture_counts(capture)
+                    } else {
+                        capture_counts(&capture.counts, true)
+                    });
             }
             if task.spec.kind == Kind::Discovery
                 && task.state == State::Running
@@ -1635,6 +1722,7 @@ mod tests {
         r.run.targets = r.run.inventory.pages[..5]
             .iter()
             .map(|page| regressee_core::domain::CaptureTarget {
+                dom_outcome: Default::default(),
                 key: regressee_core::domain::TargetKey {
                     page: page.id,
                     profile,
@@ -1806,6 +1894,69 @@ mod tests {
             let update = shell.events.recv_timeout(Duration::from_secs(3)).unwrap();
             shell.apply_update(update, cx);
         }
+    }
+
+    #[gpui::test]
+    fn access_save_error_shows_the_actual_cause_and_keeps_details_and_the_draft(
+        cx: &mut TestAppContext,
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let (store, project, _, _, _) = crate::approval_fixture::fixture(dir.path());
+        let saved = store.load_project(project).unwrap();
+        drop(store);
+        let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
+        let owned = jobs.clone();
+        let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                crate::workflow_refinement_tests::load_review(s, project, cx);
+                s.focus.screen = Screen::Setup;
+                s.focus.setup_stage = SetupStage::Access;
+                // Reproduce an invalid selection left by an older app build.
+                s.environment_draft = Some(regressee_core::domain::EnvironmentId::new());
+                s.name.update(cx, |f, cx| f.set_value("Retained draft", cx));
+                s.activate_control(Control::Save, window, cx);
+                crate::workflow_refinement_tests::finish_jobs(s, cx);
+                let task = s.task.as_ref().unwrap();
+                let result = task.result.as_ref().unwrap();
+                assert_eq!(result.title, "Project settings could not be saved");
+                assert!(
+                    result
+                        .message
+                        .contains("selected environment does not belong to this project")
+                );
+                assert!(result.message.contains("Your draft is kept"));
+                assert!(!result.message.contains("storage_write_failed:"));
+                assert!(!result.message.contains("disk space"));
+                assert!(
+                    result
+                        .diagnostic
+                        .as_ref()
+                        .unwrap()
+                        .starts_with("storage_write_failed:")
+                );
+                assert!(task.has_details());
+                assert_eq!(s.name.read(cx).content.as_ref(), "Retained draft");
+                assert_eq!(s.project.as_ref().unwrap().revision, saved.revision);
+                assert_eq!(s.focus.setup_stage, SetupStage::Access);
+                s.activate_control(Control::TaskDetails, window, cx);
+            })
+        });
+        for (width, height) in [(1280., 800.), (820., 600.)] {
+            cx.simulate_resize(size(px(width), px(height)));
+            cx.update(|window, cx| {
+                let _ = window.draw(cx);
+            });
+            assert!(cx.debug_bounds("task-error-details").is_some());
+            let action = cx.debug_bounds("action-TaskContinue").unwrap();
+            assert!(action.top() >= px(0.) && action.bottom() <= px(height));
+        }
+        owned.join_after_ui();
+        let store = regressee_storage::Store::open(AppPaths::isolated(dir.path())).unwrap();
+        assert_eq!(
+            store.load_project(project).unwrap().revision,
+            saved.revision
+        );
     }
 
     #[gpui::test]

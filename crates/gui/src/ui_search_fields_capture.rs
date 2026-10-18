@@ -64,7 +64,7 @@ fn renderer_capture_queue_focus(cx: &mut TestAppContext) {
                 .unwrap();
                 assert_complete_ring(cx, bounds);
             }
-            shell.update(cx, |s, cx| finish_jobs(s, cx));
+            shell.update(cx, finish_jobs);
             owned.join_after_ui();
             cx.update(|w, _| w.remove_window());
         }
@@ -209,7 +209,7 @@ fn renderer_capture_search_fields(cx: &mut TestAppContext) {
                     cx.run_until_parked();
                     capture(cx, &root, &format!("{label}-focused-query")).unwrap();
                 }
-                shell.update(cx, |s, cx| finish_jobs(s, cx));
+                shell.update(cx, finish_jobs);
                 owned.join_after_ui();
                 cx.update(|w, _| w.remove_window());
             }

@@ -163,17 +163,37 @@ pub struct TargetCounts {
     pub skipped: usize,
     pub cancelled: usize,
     pub pending: usize,
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub not_requested: usize,
+}
+fn is_zero(value: &usize) -> bool {
+    *value == 0
 }
 impl TargetCounts {
     pub fn from_run(run: &CaptureRun) -> Self {
         let mut c = Self::default();
         for t in &run.targets {
             match t.outcome {
+                TargetOutcome::NotRequested => c.not_requested += 1,
                 TargetOutcome::Captured { .. } => c.captured += 1,
                 TargetOutcome::Failed { .. } => c.failed += 1,
                 TargetOutcome::Skipped { .. } => c.skipped += 1,
                 TargetOutcome::Cancelled => c.cancelled += 1,
                 TargetOutcome::Pending => c.pending += 1,
+            }
+        }
+        c
+    }
+    pub fn dom_from_run(run: &CaptureRun) -> Self {
+        let mut c = Self::default();
+        for target in &run.targets {
+            match target.dom_outcome {
+                DomTargetOutcome::NotRequested => c.not_requested += 1,
+                DomTargetOutcome::Pending => c.pending += 1,
+                DomTargetOutcome::Captured { .. } => c.captured += 1,
+                DomTargetOutcome::Failed { .. } => c.failed += 1,
+                DomTargetOutcome::Skipped { .. } => c.skipped += 1,
+                DomTargetOutcome::Cancelled => c.cancelled += 1,
             }
         }
         c

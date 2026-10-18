@@ -35,8 +35,14 @@ pub fn analyze_run(
     cancel: &AtomicBool,
 ) -> Result<ComparisonEvidence> {
     policy.validate()?;
-    ensure!(!cancel.load(Ordering::Acquire), "analysis cancelled");
-    let run = store.load_run(id)?;
+    if cancel.load(Ordering::Acquire) {
+        return Err(e::Cancelled.into());
+    }
+    let run = store.load_screenshot_run(id)?;
+    ensure!(
+        run.run.capture_plan.mode.screenshots(),
+        "This run has no requested screenshots. Analyze its saved DOM snapshots instead."
+    );
     // Beginning an analysis invalidates previews, including cancellation/cache hits.
     store.invalidate_approval(id)?;
     let baseline_id = match run.run.intent {
@@ -47,7 +53,11 @@ pub fn analyze_run(
         run.run.state.terminal(),
         "Capture must finish before reanalysis"
     );
-    let baseline = store.load_baseline(baseline_id)?;
+    let baseline = store.load_screenshot_baseline(baseline_id)?;
+    ensure!(
+        !baseline.references.is_empty(),
+        "This baseline has no saved screenshot references. Its screenshot coverage is omitted; inspect DOM snapshots or capture a new baseline."
+    );
     let mut requests = Vec::new();
     // Keep one fully verified source snapshot within this worker operation.
     // A 1,000-page baseline otherwise rehashes every source artifact 1,000 times.
@@ -57,7 +67,7 @@ pub fn analyze_run(
     for reference in &baseline.references {
         ensure!(!cancel.load(Ordering::Acquire), "analysis cancelled");
         if source.as_ref().is_none_or(|s| s.run.id != reference.run) {
-            source = Some(store.load_run(reference.run)?);
+            source = Some(store.load_screenshot_run(reference.run)?);
         }
         let old = source.as_ref().unwrap();
         if let (Some(before), Some(after)) =
@@ -94,7 +104,14 @@ pub fn analyze_run(
     let mut reports = Vec::new();
     let mut failures = Vec::new();
     let mut heatmaps = Vec::new();
-    for target in &run.run.targets {
+    let reference_keys: std::collections::BTreeSet<_> =
+        baseline.references.iter().map(|r| &r.key).collect();
+    for target in run
+        .run
+        .targets
+        .iter()
+        .filter(|t| reference_keys.contains(&t.key))
+    {
         if cancel.load(Ordering::Acquire) {
             return Err(e::Cancelled.into());
         }
@@ -158,7 +175,9 @@ pub fn analyze_run(
         }
         results.push(result);
     }
-    ensure!(!cancel.load(Ordering::Acquire), "analysis cancelled");
+    if cancel.load(Ordering::Acquire) {
+        return Err(e::Cancelled.into());
+    }
     let a = ComparisonEvidence {
         revision: AnalysisRevision {
             id: AnalysisId::new(),
@@ -186,6 +205,44 @@ pub fn analyze_run(
     };
     store.save_analysis(&a)?;
     Ok(a)
+}
+
+/// Analyze each requested kind from its retained originals. This never starts a
+/// browser, changes the frozen capture selection, or applies image masks or
+/// sensitivity settings to DOM evidence. Legacy `analyze_run` remains image-only.
+pub fn analyze_saved_run(
+    store: &mut Store,
+    id: RunId,
+    policy: e::Policy,
+    cancel: &AtomicBool,
+) -> Result<()> {
+    if cancel.load(Ordering::Acquire) {
+        return Err(e::Cancelled.into());
+    }
+    // Each kind has its own integrity authority. Do not replace a failed read
+    // with an aggregate fallback or let an unrelated corrupt sibling suppress
+    // the healthy kind's analysis. Both operations run before returning errors.
+    let screenshot = match store.load_run_kind(id, CheckKind::Screenshot) {
+        Ok(run)
+            if run
+                .run
+                .targets
+                .iter()
+                .any(|t| !matches!(t.outcome, TargetOutcome::NotRequested)) =>
+        {
+            analyze_run(store, id, policy, cancel).map(|_| ())
+        }
+        Ok(_) => Ok(()),
+        Err(error) => Err(error),
+    };
+    let dom = match store.load_run_kind(id, CheckKind::DomSnapshot) {
+        Ok(run) if run.run.capture_plan.mode.dom_snapshots() => {
+            crate::dom_snapshot::analyze_run(store, id, cancel).map(|_| ())
+        }
+        Ok(_) => Ok(()),
+        Err(error) => Err(error),
+    };
+    screenshot.and(dom)
 }
 fn analyze_pair(
     store: &mut Store,
@@ -243,7 +300,9 @@ fn analyze_pair(
         stream.finish()?;
     }
     writer.finish()?;
-    ensure!(!cancel.load(Ordering::Acquire), "analysis cancelled");
+    if cancel.load(Ordering::Acquire) {
+        return Err(e::Cancelled.into());
+    }
     // Nothing staged is ingested until BOTH complete PNGs pass the engine.
     Ok((
         report,

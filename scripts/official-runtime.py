@@ -28,7 +28,8 @@ ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / 'crates/runtime/assets/official'
 NODE = '24.21.0'
 PW = '1.64.0'
-WORKER = '5.0.1'
+WORKER = '6.0.0'
+WORKER_PROTOCOL = 3
 NPM_KEY_ID = 'SHA256:DhQ8wR5APBvFHLF/+Tc+AYvPOdTpcIDqOhxsBHRwC7U'
 NPM_KEY = 'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEY6Ya7W++7aUPzvMTrezH6Ycx3c+HOKYCcNGybJZSCJq/fd7Qa8uuAKtdIkUQtQiEKERhAmE5lMMJhP8OkDOa2g=='
 # 2027-01-10 UTC: pin updates require a new reviewed catalog, never "latest".
@@ -232,6 +233,10 @@ def worker_payload(entries):
     package = json.loads((product / 'package.json').read_text())
     if package['dependencies'] != {'playwright': PW}:
         raise ValueError('Worker dependency pin mismatch')
+    if f"WORKER_VERSION='{WORKER}'" not in (product / 'src/capture.mjs').read_text() or f'export const VERSION = {WORKER_PROTOCOL};' not in (product / 'src/protocol.mjs').read_text():
+        raise ValueError('Worker identity/protocol differs from build pins')
+    if not (product / 'src/dom.mjs').is_file():
+        raise ValueError('DOM collector missing from shipping worker source')
     for source in sorted((product / 'src').rglob('*')):
         if source.is_symlink():
             raise ValueError('Worker source symlink')

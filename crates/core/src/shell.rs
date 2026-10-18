@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Testable navigation/focus rules shared by the native shell.
 use crate::appearance::AppAppearance;
+use crate::domain::{CaptureMode, CheckKind};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Choice {
     AddressesOnly,
@@ -118,6 +119,10 @@ impl SetupStage {
             Self::Access => matches!(
                 control,
                 Environment(_)
+                    | RemoveEnvironment
+                    | RemoveMapping(_)
+                    | Phase6(6 | 7)
+                    | Details(Detail::Portability)
                     | EnvironmentOptions
                     | Guided(6 | 27 | 31..=38)
                     | CloseMappingPreview
@@ -133,7 +138,7 @@ impl SetupStage {
                     | Save
             ),
             Self::Pages => {
-                matches!(control, Guided(1..=3 | 6..=10 | 12 | 13 | 25) | CrawlField(0..=8) | Choice(self::Choice::AddressesOnly | self::Choice::AddressesAndLinks | self::Choice::FullPage | self::Choice::VisibleScreen | self::Choice::Gentle | self::Choice::Balanced | self::Choice::Fast | self::Choice::OriginalImages | self::Choice::ReplaceImages) | Details(Detail::Capture) | Save)
+                matches!(control, CaptureMode(_) | Guided(1..=3 | 6..=10 | 12 | 13 | 25) | CrawlField(0..=8) | Choice(self::Choice::AddressesOnly | self::Choice::AddressesAndLinks | self::Choice::FullPage | self::Choice::VisibleScreen | self::Choice::Gentle | self::Choice::Balanced | self::Choice::Fast | self::Choice::OriginalImages | self::Choice::ReplaceImages) | Details(Detail::Capture) | Save)
             }
         }
     }
@@ -168,6 +173,10 @@ pub enum ReviewSurface {
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Control {
+    CaptureMode(CaptureMode),
+    EvidenceKind(CheckKind),
+    DomSource(usize),
+    DomViewer(usize),
     Appearance(AppAppearance),
     Navigate(Screen),
     SetupStage(SetupStage),
@@ -180,6 +189,10 @@ pub enum Control {
     Address,
     Save,
     OpenProject(usize),
+    DeleteProject(usize),
+    DeleteCurrentProject,
+    RemoveEnvironment,
+    RemoveMapping(usize),
     SelectProject(usize),
     ChooseProject,
     CancelProjectChoice,
@@ -258,6 +271,7 @@ pub struct FocusState {
     pub resumable: bool,
     pub pausable: bool,
     pub environments: usize,
+    pub mappings: usize,
     pub history_baselines: usize,
     pub history_runs: usize,
 }
@@ -285,6 +299,7 @@ impl Default for FocusState {
             resumable: false,
             pausable: false,
             environments: 1,
+            mappings: 1,
             history_baselines: 0,
             history_runs: 0,
         }
@@ -381,6 +396,7 @@ impl FocusState {
                 controls.push(Control::SelectProject(index));
                 if self.screen == Screen::Projects {
                     controls.push(Control::OpenProject(index));
+                    controls.push(Control::DeleteProject(index));
                 }
             }
             if self.page > 0 {
@@ -393,6 +409,11 @@ impl FocusState {
         }
         match self.screen {
             Screen::Setup => {
+                controls.extend([
+                    Control::Phase6(6),
+                    Control::Details(Detail::Portability),
+                    Control::Phase6(7),
+                ]);
                 controls.extend(SetupStage::ALL.into_iter().map(Control::SetupStage));
                 if self.setup_stage == SetupStage::Settings {
                     controls.extend(
@@ -406,9 +427,16 @@ impl FocusState {
                 }
                 // Match the rendered form, with disclosed children immediately
                 // after their trigger and pinned footer actions last.
-                controls.push(Control::ValidationNext);
                 controls.extend([Control::Name, Control::Address]);
                 controls.push(Control::Guided(11));
+                controls.extend(
+                    [
+                        CaptureMode::ScreenshotsOnly,
+                        CaptureMode::ScreenshotsAndDomSnapshots,
+                        CaptureMode::DomSnapshotsOnly,
+                    ]
+                    .map(Control::CaptureMode),
+                );
                 controls.extend([1, 2, 3].map(Control::Guided));
                 controls.extend([Choice::FullPage, Choice::VisibleScreen].map(Control::Choice));
                 controls.extend(
@@ -439,8 +467,14 @@ impl FocusState {
                     controls.push(Control::EnvironmentOptions);
                     controls.extend((0..self.environments.min(16)).map(Control::Environment));
                     controls.push(Control::Guided(27));
+                    if self.environments > 1 {
+                        controls.push(Control::RemoveEnvironment);
+                    }
                     controls.extend((13..15).map(Control::CrawlField));
                     controls.extend([37, 38].map(Control::Guided));
+                    if self.mappings > 1 {
+                        controls.extend((0..self.mappings.min(1000)).map(Control::RemoveMapping));
+                    }
                     controls.extend([15, 16].map(Control::CrawlField));
                     controls.extend([Choice::LightTheme, Choice::DarkTheme].map(Control::Choice));
                     if self.setup_stage == SetupStage::Settings {
@@ -448,6 +482,9 @@ impl FocusState {
                     }
                     controls.extend([33, 34, 35, 36].map(Control::Guided));
                     controls.push(Control::CloseMappingPreview);
+                }
+                if self.project_saved && self.setup_stage == SetupStage::Settings {
+                    controls.push(Control::DeleteCurrentProject);
                 }
                 controls.push(Control::SetupBack);
                 controls.push(Control::Save);
@@ -457,6 +494,7 @@ impl FocusState {
                 if self.project_saved {
                     controls.push(Control::Guided(13));
                 }
+                controls.push(Control::ValidationNext);
             }
             Screen::Settings => {
                 // App settings follows its rendered groups. The app removes
@@ -469,12 +507,12 @@ impl FocusState {
                     Control::Appearance(AppAppearance::Dark),
                     Control::Details(Detail::LocalStorage),
                     Control::Details(Detail::ManagedNetwork),
-                    Control::ValidationNext,
                     Control::CrawlField(17),
                     Control::CrawlField(18),
                     Control::Guided(42),
                     Control::Guided(41),
                     Control::Details(Detail::Network),
+                    Control::ValidationNext,
                     Control::Details(Detail::SupportTools),
                     Control::Phase7(0),
                     Control::Phase7(1),
@@ -510,6 +548,9 @@ impl FocusState {
                         Control::RefreshEvidence,
                         Control::Guided(51),
                     ]);
+                    controls.extend(
+                        [CheckKind::Screenshot, CheckKind::DomSnapshot].map(Control::EvidenceKind),
+                    );
                     controls.extend([Control::Guided(50), Control::Guided(54)]);
                     // View's popup is arrow-key navigated; Tab continues from
                     // its trigger. Keep its candidates in painted menu order.
@@ -548,6 +589,8 @@ impl FocusState {
                     if self.viewer {
                         controls.extend([Control::Viewer, Control::SplitDivider]);
                     }
+                    controls.extend((0..3).map(Control::DomSource));
+                    controls.extend((0..10).map(Control::DomViewer));
                     controls.extend([10, 11].map(Control::Phase5));
                     controls.push(Control::Phase5(39));
                     // Mutually exclusive inspectors share Close, then their
@@ -620,6 +663,39 @@ impl FocusState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn removal_actions_follow_their_objects_and_protect_last_item_focus() {
+        let mut state = FocusState {
+            screen: Screen::Setup,
+            busy: false,
+            project_saved: true,
+            environments: 2,
+            mappings: 2,
+            ..Default::default()
+        };
+        assert_eq!(
+            state.next(Control::Guided(27), false),
+            Some(Control::RemoveEnvironment)
+        );
+        assert_eq!(
+            state.next(Control::RemoveEnvironment, false),
+            Some(Control::CrawlField(13))
+        );
+        assert_eq!(
+            state.next(Control::Guided(38), false),
+            Some(Control::RemoveMapping(0))
+        );
+        assert_eq!(
+            state.next(Control::RemoveMapping(1), false),
+            Some(Control::CrawlField(15))
+        );
+        state.environments = 1;
+        state.mappings = 1;
+        assert!(!state.can_activate(Control::RemoveEnvironment));
+        assert!(!state.can_activate(Control::RemoveMapping(0)));
+        state.busy = true;
+        assert!(!state.can_activate(Control::DeleteCurrentProject));
+    }
     #[test]
     fn review_candidates_follow_rail_toolbar_queue_evidence_and_footer_order() {
         let state = FocusState {
@@ -874,9 +950,16 @@ mod tests {
         for (before, after) in [
             (
                 Control::SettingsSection(SettingsSection::Access),
-                Control::ValidationNext,
+                Control::Name,
             ),
-            (Control::Guided(11), Control::Guided(1)),
+            (
+                Control::Guided(11),
+                Control::CaptureMode(CaptureMode::ScreenshotsOnly),
+            ),
+            (
+                Control::CaptureMode(CaptureMode::DomSnapshotsOnly),
+                Control::Guided(1),
+            ),
             (Control::Guided(3), Control::Choice(Choice::FullPage)),
             (
                 Control::Choice(Choice::VisibleScreen),
@@ -892,6 +975,7 @@ mod tests {
             (Control::CrawlField(6), Control::Guided(8)),
             (Control::Guided(10), Control::CrawlField(7)),
             (Control::Guided(25), Control::Details(Detail::Capture)),
+            (Control::Guided(13), Control::ValidationNext),
             (
                 Control::Details(Detail::Capture),
                 Control::Choice(Choice::PublicAccess),
@@ -913,13 +997,14 @@ mod tests {
             screen: Screen::Setup,
             ..Default::default()
         };
+        assert_eq!(s.next(Control::Save, false), Some(Control::ValidationNext));
         assert_eq!(
-            s.next(Control::Save, false),
+            s.next(Control::ValidationNext, false),
             Some(Control::Navigate(Screen::Projects))
         );
         assert_eq!(
             s.next(Control::Navigate(Screen::Projects), true),
-            Some(Control::Save)
+            Some(Control::ValidationNext)
         );
         s.busy = true;
         assert!(!s.can_activate(Control::Save));

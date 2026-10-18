@@ -87,6 +87,7 @@ pub(super) fn fixture_with_capture_warnings(
     for sequence in 0..3 {
         let mut run = RunRecord {
             run: CaptureRun {
+                capture_plan: Default::default(),
                 id: RunId::new(),
                 project: project.id,
                 intent: baseline.map_or(RunIntent::NewBaseline, |baseline| RunIntent::Check {
@@ -111,6 +112,7 @@ pub(super) fn fixture_with_capture_warnings(
                     .iter()
                     .flat_map(|page| {
                         project.profiles.iter().map(move |profile| CaptureTarget {
+                            dom_outcome: Default::default(),
                             key: TargetKey {
                                 page: page.id,
                                 profile: profile.id,
@@ -125,6 +127,7 @@ pub(super) fn fixture_with_capture_warnings(
                     .collect(),
             },
             capture: None,
+            dom_captures: vec![],
             captures: vec![],
             queue: None,
         };

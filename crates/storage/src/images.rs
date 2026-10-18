@@ -111,6 +111,10 @@ pub fn ingest(
     kind: ArtifactKind,
     cancel: &AtomicBool,
 ) -> Result<ImageEvidence> {
+    ensure!(
+        kind != ArtifactKind::DomSnapshot,
+        "DOM snapshots use canonical text ingestion, not PNG processing"
+    );
     let mut rows = Rows::open(path, cancel)?;
     let (w, h) = (rows.w, rows.h);
     crate::portability::require_space(&store.paths.cache, u64::from(w) * u64::from(h) * 4)?;

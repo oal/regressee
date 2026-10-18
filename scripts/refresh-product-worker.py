@@ -59,6 +59,8 @@ def main():
     provenance['worker'] = build['WORKER']
     provenance['bundled_sha256'] = bundled_hash
     provenance['worker_source_refresh'] = {
+        'as_of': '2026-10-17',
+        'worker_protocol': build['WORKER_PROTOCOL'],
         'previous_bundled_sha256': old_hash,
         'verification': 'Pinned dependency bytes and vendor component inventories retained; only local worker sources refreshed',
     }

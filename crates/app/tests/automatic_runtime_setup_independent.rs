@@ -349,6 +349,7 @@ fn baseline(root: &Path) -> Result<(Store, ProjectId, RunId)> {
             intent: RunIntent::NewBaseline,
             inventory,
             profiles: project.profiles.clone(),
+            capture_plan: CapturePlan::default(),
             environment: project.environments[0].clone(),
             rendering: RenderingEnvironment {
                 os: "synthetic".into(),
@@ -367,11 +368,13 @@ fn baseline(root: &Path) -> Result<(Store, ProjectId, RunId)> {
                 final_url: None,
                 attempts: 1,
                 outcome: TargetOutcome::Pending,
+                dom_outcome: DomTargetOutcome::NotRequested,
                 warnings: vec![],
             }],
         },
         capture: None,
         captures: vec![],
+        dom_captures: vec![],
         queue: None,
     };
     store.begin_run(&record)?;

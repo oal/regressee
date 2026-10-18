@@ -102,7 +102,7 @@ fn result_arrows_reveal_each_selection_in_both_directions_and_filtered_order(
                     });
                     draw(cx);
                     selected_row_visible(&shell, cx);
-                    shell.update(cx, |s, cx| finish_jobs(s, cx));
+                    shell.update(cx, finish_jobs);
                     draw(cx);
                     selected_row_visible(&shell, cx);
                 }
@@ -194,7 +194,7 @@ fn next_unreviewed_reveals_distant_results_and_wraps_to_the_first(cx: &mut TestA
             assert!(s.control_mounted(Control::Phase5(33)));
             assert!(!s.control_enabled(Control::Phase5(33), cx));
         });
-        shell.update(cx, |s, cx| finish_jobs(s, cx));
+        shell.update(cx, finish_jobs);
         draw(cx);
         selected_row_visible(&shell, cx);
     }
@@ -275,7 +275,7 @@ fn result_reveal_preserves_visible_rows_and_manual_scroll(cx: &mut TestAppContex
         cx.notify();
     });
     draw(cx);
-    shell.update(cx, |s, cx| finish_jobs(s, cx));
+    shell.update(cx, finish_jobs);
     draw(cx);
     shell.read_with(cx, |s, _| {
         assert_eq!(
@@ -362,17 +362,18 @@ fn toolbar_loading_matrix(cx: &mut TestAppContext, render: bool) {
                     );
                 }
                 #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
-                if let Some(root) = &root {
-                    if action == 24 && matches!(mode, 0 | 4 | 5) {
-                        crate::ui_renderer_capture::capture(
-                            cx,
-                            root,
-                            &format!("navigation-{width:.0}x{height:.0}-mode-{mode}-loading"),
-                        )
-                        .unwrap();
-                    }
+                if let Some(root) = &root
+                    && action == 24
+                    && matches!(mode, 0 | 4 | 5)
+                {
+                    crate::ui_renderer_capture::capture(
+                        cx,
+                        root,
+                        &format!("navigation-{width:.0}x{height:.0}-mode-{mode}-loading"),
+                    )
+                    .unwrap();
                 }
-                shell.update(cx, |s, cx| finish_jobs(s, cx));
+                shell.update(cx, finish_jobs);
                 draw(cx);
                 for ((_, name), expected) in controls.iter().zip(&bounds) {
                     assert_eq!(
@@ -382,15 +383,16 @@ fn toolbar_loading_matrix(cx: &mut TestAppContext, render: bool) {
                     );
                 }
                 #[cfg(all(feature = "ui-renderer-capture", target_os = "linux"))]
-                if let Some(root) = &root {
-                    if action == 24 && matches!(mode, 0 | 4 | 5) {
-                        crate::ui_renderer_capture::capture(
-                            cx,
-                            root,
-                            &format!("navigation-{width:.0}x{height:.0}-mode-{mode}-ready"),
-                        )
-                        .unwrap();
-                    }
+                if let Some(root) = &root
+                    && action == 24
+                    && matches!(mode, 0 | 4 | 5)
+                {
+                    crate::ui_renderer_capture::capture(
+                        cx,
+                        root,
+                        &format!("navigation-{width:.0}x{height:.0}-mode-{mode}-ready"),
+                    )
+                    .unwrap();
                 }
             }
         }

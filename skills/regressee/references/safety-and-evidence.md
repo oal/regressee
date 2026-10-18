@@ -24,6 +24,13 @@ browser/runtime identity, screenshot dimensions, DPR, locale/timezone/image mode
 saved sensitivity, masks and reference provenance. Legacy unknown settings stay
 unknown; do not infer them from today's configuration.
 
+Include check kind and its independent analysis/source identities. For DOM, read
+the actual normalized source and unified diff pages, not only metrics. Equality
+is exact normalized DOM equality under compatible policy/runtime/material and
+stability gates. An image pass cannot conceal DOM failure/change. Display limits
+never mean unchanged; retrieve originals through bounded source pages. Iframe
+documents and closed shadow roots are outside coverage.
+
 Actually view before/after/difference pixels. For long pages use bounded crops in
 physical screenshot pixels, retaining source hashes, rectangle, pane and derived
 labels. Difference/overlay/region hints are analysis, not automatic defects or
@@ -46,6 +53,10 @@ Review the exact selection, privacy inventory, content and destination before
 local export. Exports do not upload, redact or establish recipient authorization.
 Report HTML is escaped/static/no remote resources; still treat its content as
 untrusted. Never add sessions/cookies/keys/private logs/network configuration.
+DOM evidence may also reveal private hidden text and ordinary attributes/URLs.
+Script/event/form-value exclusions are minimization, not complete redaction.
+Normalized originals are plaintext/canonical JSON; do not rename or embed them as
+executable HTML. Report links are generated local files, never captured URL links.
 
 ## Limits and truthful finish
 

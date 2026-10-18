@@ -11,6 +11,7 @@ import {spawn} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {launch,navigationBoundary,capture,literalLoopback,PLAYWRIGHT_VERSION} from '../src/capture.mjs';
 import {discover} from '../src/discover.mjs';
+import {VERSION} from '../src/protocol.mjs';
 
 const profile=JSON.parse((await fs.readFile(new URL('fixtures/session-requests.ndjson',import.meta.url),'utf8')).trim().split('\n')[1]).command.payload.profile;
 const listen=s=>new Promise((resolve,reject)=>{s.once('error',reject);s.listen(0,'127.0.0.1',resolve);});
@@ -210,24 +211,28 @@ test('signed Chromium native scope boundary: real resources, zero forbidden visi
         const waiter={match,resolve:f=>{clearTimeout(timer);resolve(f);}};waiters.push(waiter);
       });
       const send=(type,payload,job=crypto.randomUUID())=>{
-        const id=++requestId;child.stdin.write(JSON.stringify({version:2,request_id:id,job,command:payload===undefined?{type}:{type,payload}})+'\n');return id;
+        const id=++requestId;child.stdin.write(JSON.stringify({version:VERSION,request_id:id,job,command:payload===undefined?{type}:{type,payload}})+'\n');return id;
       };
-      const target=(address,session=null)=>({address,session,profile,key:{page:crypto.randomUUID(),profile:profile.id}});
+      const target=(address,session=null)=>({address,session,profile,key:{page:crypto.randomUUID(),profile:profile.id},plan:{version:1,mode:'ScreenshotsOnly',dom_policy:null}});
       try {
         assert.equal((await wait(send('Handshake'),['Ready','Failure'])).event.type,'Ready');
-        const captureEvent=await wait(send('CaptureTarget',target(mainOrigin+'/scope/resources')),['TargetCaptured','Failure']);
-        assert.equal(captureEvent.event.type,'TargetCaptured');
-        const metadata=JSON.parse(await fs.readFile(path.join(workerOutput,captureEvent.event.payload.output_token+'.json'),'utf8'));
+        const captureId=send('CaptureTarget',target(mainOrigin+'/scope/resources'));
+        const captureEvent=await wait(captureId,['ChannelCaptured','ChannelFailed','Failure']);
+        assert.equal(captureEvent.event.type,'ChannelCaptured');
+        await wait(captureId,['CaptureCompleted']);
+        const metadata=JSON.parse(await fs.readFile(path.join(workerOutput,captureEvent.event.payload.capture.output_token+'.json'),'utf8'));
         assert.deepEqual(metadata.runtime,identity);assert.equal(metadata.requested,mainOrigin+'/scope/resources');assert.equal(metadata.final_url,metadata.requested);assert.deepEqual(metadata.warnings,[]);
         const redirectEvent=await wait(send('DiscoverPage',{address:mainOrigin+'/scope/doc-cross',section:'/scope'}),['RedirectFound','Failure']);
         assert.deepEqual(redirectEvent.event,{type:'RedirectFound',payload:{address:secondOrigin+'/forbidden-document'}});zero();
         for(const name of ['unauthorized','forbidden']) {
-          const event=await wait(send('CaptureTarget',target(mainOrigin+'/scope/'+name)),['Failure','TargetCaptured']);
-          assert.equal(event.event.type,'Failure');assert.equal(event.event.payload.code,'AccessDenied');
+          const id=send('CaptureTarget',target(mainOrigin+'/scope/'+name));
+          const event=await wait(id,['ChannelFailed','ChannelCaptured']);
+          assert.equal(event.event.type,'ChannelFailed');assert.equal(event.event.payload.code,'AccessDenied');await wait(id,['CaptureCompleted']);
         }
         const before=count('main','/scope/resources');
         const session={id:crypto.randomUUID(),project:crypto.randomUUID(),environment:crypto.randomUUID()};
-        const refused=await wait(send('CaptureTarget',target(mainOrigin+'/scope/resources',session)),['Failure','TargetCaptured']);
+        const refusedId=send('CaptureTarget',target(mainOrigin+'/scope/resources',session));
+        const refused=await wait(refusedId,['ChannelFailed','ChannelCaptured']);await wait(refusedId,['CaptureCompleted']);
         assert.equal(refused.event.payload.code,'InvalidRequest');assert.equal(count('main','/scope/resources'),before);
         const job=crypto.randomUUID(),slowBefore=count('main','/scope/slow');
         const slowId=send('CaptureTarget',target(mainOrigin+'/scope/slow'),job);
@@ -236,7 +241,7 @@ test('signed Chromium native scope boundary: real resources, zero forbidden visi
         assert.equal(count('main','/scope/slow'),slowBefore+1);
         const started=Date.now(),cancelId=send('Cancel',undefined,job);
         assert.equal((await wait(cancelId,['Cancelled','Failure'])).event.type,'Cancelled');
-        assert.equal((await wait(slowId,['Cancelled','Failure','TargetCaptured'])).event.type,'Cancelled');assert.ok(Date.now()-started<1500);
+        assert.equal((await wait(slowId,['Cancelled','Failure','CaptureCompleted'])).event.type,'Cancelled');assert.ok(Date.now()-started<1500);
         assert.equal((await wait(send('Shutdown'),['Completed','Failure'])).event.type,'Completed');
         assert.deepEqual(await exit,{code:0,signal:null});
         report.cases.push({name:'actual-worker-ipc-resource-capture-cancel',metadata,cancel_wall_ms:Date.now()-started,passed:true});

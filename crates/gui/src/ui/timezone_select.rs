@@ -462,7 +462,12 @@ impl TimezoneSelect {
                                 .child(zone),
                         )
                         .when(current, |el| {
-                            el.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).child("Current"))
+                            el.child(
+                                div()
+                                    .text_size(px(HELP_TEXT_SIZE))
+                                    .line_height(px(HELP_LINE_HEIGHT))
+                                    .child("Current"),
+                            )
                         })
                 })
                 .collect::<Vec<_>>()

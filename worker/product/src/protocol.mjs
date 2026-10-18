@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
-// Maintained product v2 boundary. Capture repeats immutable profile validation.
-export const VERSION = 2;
+// Maintained product v3 boundary. Capture repeats immutable profile validation.
+export const VERSION = 3;
 export const MAX_FRAME = 1024 * 1024;
-export const COMMANDS = Object.freeze(['Handshake', 'SetupLogin', 'OpenLogin', 'ConfirmLogin', 'InstallSession', 'DiscoverAuthenticated', 'DiscoverPage', 'FetchRobots', 'CaptureTarget', 'Cancel', 'Shutdown']);
+export const COMMANDS = Object.freeze(['Handshake', 'InstallSmoke', 'SetupLogin', 'OpenLogin', 'ConfirmLogin', 'InstallSession', 'DiscoverAuthenticated', 'DiscoverPage', 'FetchRobots', 'CaptureTarget', 'Cancel', 'Shutdown']);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const nil = '00000000-0000-0000-0000-000000000000';
 const uuid = value => typeof value === 'string' && UUID.test(value) && value !== nil;
@@ -16,6 +16,10 @@ const address = value => {
 // explicitly use null for unauthenticated capture; SetupLogin requires a reference.
 const session = value => exactKeys(value, ['id', 'project', 'environment']) && ['id', 'project', 'environment'].every(key => uuid(value[key]));
 const origins=value=>Array.isArray(value)&&value.length<=16&&value.every(o=>{if(!address(o))return false;const u=new URL(o);return u.href===u.origin+'/';});
+export function validatePlan(plan) {
+  if(!exactKeys(plan,['version','mode','dom_policy'])||plan.version!==1||!['ScreenshotsOnly','ScreenshotsAndDomSnapshots','DomSnapshotsOnly'].includes(plan.mode)||(plan.mode==='ScreenshotsOnly'?plan.dom_policy!==null:!exactKeys(plan.dom_policy,['version'])||plan.dom_policy.version!==1))throw new ProtocolError('InvalidRequest');
+  return plan;
+}
 export class ProtocolError extends Error {
   constructor(code) { super(code); this.code = code; }
 }
@@ -32,7 +36,7 @@ export function parseRequest(frame) {
   if (!exactKeys(request, ['version', 'request_id', 'job', 'command']) || request.version !== VERSION) throw new ProtocolError('UnsupportedVersion');
   if (!Number.isSafeInteger(request.request_id) || request.request_id <= 0 || !uuid(request.job) || !object(request.command) || !COMMANDS.includes(request.command.type)) throw new ProtocolError('InvalidRequest');
   const {type, payload} = request.command;
-  if (['Handshake', 'Cancel', 'Shutdown'].includes(type)) {
+  if (['Handshake', 'InstallSmoke', 'Cancel', 'Shutdown'].includes(type)) {
     if (!exactKeys(request.command, ['type'])) throw new ProtocolError('InvalidRequest');
   } else {
     if (!exactKeys(request.command, ['type', 'payload'])) throw new ProtocolError('InvalidRequest');
@@ -44,7 +48,8 @@ export function parseRequest(frame) {
     if (type === 'DiscoverPage' && (!exactKeys(payload, ['address','section']) || !address(payload.address) || (payload.section !== null && (typeof payload.section !== 'string' || !payload.section.startsWith('/') || payload.section.length>4096)))) throw new ProtocolError('InvalidRequest');
     if (type === 'FetchRobots' && (!exactKeys(payload, ['address']) || !address(payload.address))) throw new ProtocolError('InvalidRequest');
     if (type === 'CaptureTarget') {
-      if (!exactKeys(payload, ['key', 'address', 'profile', 'session']) || !address(payload.address) || !exactKeys(payload.key, ['page', 'profile']) || !uuid(payload.key.page) || !uuid(payload.key.profile) || (payload.session !== null && !session(payload.session))) throw new ProtocolError('InvalidRequest');
+      if (!exactKeys(payload, ['key', 'address', 'profile', 'session','plan']) || !address(payload.address) || !exactKeys(payload.key, ['page', 'profile']) || !uuid(payload.key.page) || !uuid(payload.key.profile) || (payload.session !== null && !session(payload.session))) throw new ProtocolError('InvalidRequest');
+      validatePlan(payload.plan);
       // Full immutable profile validation is repeated in capture.mjs.
       if (!object(payload.profile) || payload.profile.version !== 1 || !uuid(payload.profile.id) || payload.profile.id !== payload.key.profile || !object(payload.profile.runtime) || !object(payload.profile.runtime.Pinned)) throw new ProtocolError('InvalidRequest');
     }

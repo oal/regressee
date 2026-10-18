@@ -1,0 +1,28 @@
+[0] #document
+[1] !doctype "html" "" ""
+[1] element "http://www.w3.org/1999/xhtml" "html" "":"lang"="en"
+[2] element "http://www.w3.org/1999/xhtml" "body"
+[3] element "http://www.w3.org/1999/xhtml" "div" "":"aria-label"="Private & ordinary" "":"class"="a b" "":"data-quote"="\"\\<&>" "":"hidden"="" "":"id"="app" "":""="bmp" "":"𐀀"="astral"
+[4] text "  café 🦀\r\nline\t\b\f\u0000 �  "
+[4] text "</script></pre><img src=x onerror=alert(1)> & \"'"
+[3] element "http://www.w3.org/1999/xhtml" "script" "":"type"="application/json"
+[3] element "http://www.w3.org/1999/xhtml" "input" "":"name"="password" "":"type"="password"
+[3] element "http://www.w3.org/1999/xhtml" "textarea" "":"name"="message"
+[3] element "http://www.w3.org/1999/xhtml" "select" "":"name"="choice"
+[4] element "http://www.w3.org/1999/xhtml" "option"
+[5] text "Ordinary label"
+[3] element "http://www.w3.org/1999/xhtml" "button" "":"type"="submit"
+[4] text "Continue"
+[3] element "http://www.w3.org/1999/xhtml" "iframe" "":"src"="https://example.test/frame"
+[3] element "http://www.w3.org/1999/xhtml" "template"
+[4] #template-content
+[5] element "http://www.w3.org/1999/xhtml" "x-card"
+[6] text "light"
+[6] #shadow-root (open)
+[7] element "http://www.w3.org/1999/xhtml" "template"
+[8] #template-content
+[9] element "http://www.w3.org/1999/xhtml" "span"
+[10] text "nested template in open shadow"
+[3] element "http://www.w3.org/2000/svg" "svg" "":"viewBox"="0 0 10 10"
+[4] element "http://www.w3.org/2000/svg" "a" "":"href"="/ordinary?q=1&b=2" "http://www.w3.org/1999/xlink":"xlink:href"="#target"
+[5] text "SVG link"

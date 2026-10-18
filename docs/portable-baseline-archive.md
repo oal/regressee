@@ -1,30 +1,37 @@
-# Portable baseline ZIP — version 1
+# Portable baseline ZIP — versions 1 and 2
 
 This is selected-baseline interchange, **not** an application backup or a signed
 claim of capture authenticity. Implementation: `crates/core/src/archive.rs` and
-`crates/storage/src/portability.rs`. Local SQLite migrates from version 7 to 8;
-that database version is independent of archive version 1.
+`crates/storage/src/portability.rs`. Local SQLite schema version 10 is independent
+of the portable archive version. Historical strict-v1 imports remain supported.
 
 ## Contents and privacy
 
 The ZIP contains exactly `manifest.json` and `artifacts/<lowercase SHA-256>` for
-each distinct referenced original PNG. Export resolves the complete reference map
-of the displayed baseline, including inherited images from other source runs.
+each distinct referenced original PNG or canonical DOM snapshot. Export resolves
+the selected baseline's complete per-kind reference map, including inherited
+originals from other source runs. Unapproved siblings are not included merely
+because they share a source run.
 Ancestors and unrelated run/analysis/review history are not included.
 
 The manifest's required top-level fields are:
 
 | Field | Meaning |
 | --- | --- |
-| `version` | Integer `1`; other versions are refused |
+| `version` | `1` for losslessly representable legacy screenshot/settings shape; `2` when DOM settings/evidence or extended frozen provenance require it; unknown versions reject |
 | `project` | Name, source URLs, future discovery/profiles, portable environment names/mappings/access policy |
 | `inventory` | Frozen page identities, canonical URLs, included flags, coverage and URL identity version |
 | `baseline` | Selected version/date, full target-to-source/hash/date map, intended coverage/partial status; parent is null |
-| `artifacts` | Unique original hash, encoded byte count and `Screenshot` kind |
+| `artifacts` | Unique original hash, encoded byte count and `Screenshot` / `DomSnapshot` kind |
 | `provenance` | Necessary source-run identity/dates, frozen profiles/discovery/environment/rendering and selected capture metadata only |
 | `masks` | Target, image dimensions and ignored rectangles; geometry, not recipient pair authority |
 
 Unknown schema fields, missing bindings and unselected payloads are refused.
+V1 exports omit newer internal fields so historical strict readers can open them;
+v1 inputs reject those fields even when null, empty or default-valued. V2 carries
+independent DOM references and necessary frozen configuration. A DOM-enabled
+future-capture draft can require v2 when sharing an older screenshot-only baseline;
+import preserves the draft and baseline's different modes rather than rewriting one.
 Current project settings can differ from the historical capture. Both remain
 separate; a fixed-baseline check/probe uses the historical source configuration,
 not newly edited future profiles or discovery settings.
@@ -33,6 +40,11 @@ not newly edited future profiles or discovery settings.
 account data and other confidential information. Addresses and private URL queries
 remain visible. The export preview requires explicit acknowledgement. Review
 content before sharing; a ZIP is neither encrypted nor a privacy sanitizer.
+
+**DOM text can expose private hidden content, attributes and URLs.** Script bodies,
+handlers and form values are excluded before capture, but this is not complete
+redaction. Image ignored rectangles do not redact snapshots. See
+[DOM snapshot checks](dom-snapshots.md) for the exact coverage/privacy contract.
 
 Portable types have no session/secret-reference fields. Export includes no cookies,
 credentials, browser profile, local secret store, login settings, logs, absolute
@@ -68,8 +80,10 @@ Limits are deliberately bounded:
   no original is converted, rewritten or automatically deleted. Decoded
   dimensions must match metadata.
 
-Every original's size/SHA-256 and complete PNG stream is validated before recipient
-publication. New thumbnails/tiles are constructed privately. Import always creates
+Every original's size/SHA-256 and complete PNG stream or canonical DOM structure/
+privacy policy is validated before recipient publication. DOM has its own 8 MiB,
+node/depth/attribute/string bounds; it never creates image thumbnails/tiles.
+New screenshot thumbnails/tiles are constructed privately. Import always creates
 a new project and rebinds project, inventory, page, profile, baseline, run,
 environment and mask IDs. Name conflicts receive a separate `(imported N)` name.
 It never overwrites a project or automatically visits/executes a website.

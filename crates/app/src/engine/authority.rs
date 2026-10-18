@@ -308,7 +308,56 @@ pub(super) fn location(
         "invalid_request: result/analysis selection requires an exact run"
     );
     let evidence = if let Some(run) = selection.run {
-        let mut e = store.project_evidence_for_run(selection.project, run)?;
+        if selection.kind == regressee_core::domain::CheckKind::DomSnapshot {
+            ensure!(
+                matches!(
+                    selection.view,
+                    View::Compare | View::Before | View::After | View::Difference
+                ),
+                "invalid_request: DOM text supports compare/before/after/difference, not image overlay or split"
+            );
+            let (resolved, e) = super::dom::evidence(
+                store,
+                &super::dom::Selection {
+                    project: selection.project,
+                    run: Some(run),
+                    analysis: selection
+                        .analysis
+                        .map(|id| regressee_core::domain::DomAnalysisId(id.0)),
+                },
+            )?;
+            selection.analysis = resolved
+                .analysis
+                .map(|id| regressee_core::domain::AnalysisId(id.0));
+            if let Some(key) = &selection.key {
+                ensure!(
+                    e.latest
+                        .as_ref()
+                        .is_some_and(|r| r.run.targets.iter().any(|t| &t.key == key)),
+                    "invalid_request: DOM result/page/profile absent from selected run"
+                );
+            }
+            return Ok(Location {
+                selection,
+                project,
+                evidence: Some(e),
+            });
+        }
+        let mut e = if selection.analysis.is_some() {
+            store.viewer_evidence(selection.project, selection.analysis)?
+        } else {
+            store.screenshot_evidence_for_run(selection.project, run)?
+        };
+        ensure!(
+            e.latest.as_ref().is_some_and(|r| r.run.id == run),
+            "invalid_request: exact screenshot analysis/run mismatch"
+        );
+        ensure!(
+            e.latest
+                .as_ref()
+                .is_some_and(|r| r.run.capture_plan.mode.screenshots()),
+            "invalid_request: this run requested DOM snapshots only; select --kind dom"
+        );
         if let Some(id) = selection.analysis {
             let a = store.load_analysis(id)?;
             ensure!(
@@ -319,6 +368,9 @@ pub(super) fn location(
                 "invalid_request: analysis/run/reference mismatch"
             );
             e.comparison = Some(a);
+            e.analyses = vec![id];
+            e.reviews = store.review_history(run)?;
+            e.review_history_truncated = store.review_history_truncated(run)?;
         }
         selection.analysis = e.comparison.as_ref().map(|a| a.revision.id);
         if let Some(key) = &selection.key {

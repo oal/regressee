@@ -147,6 +147,7 @@ impl Client {
         };
         let deadline = Instant::now() + Duration::from_secs(30);
         let mut launched = false;
+        let mut replacing_previous = false;
         loop {
             ensure!(
                 keep_waiting(),
@@ -157,6 +158,31 @@ impl Client {
                 Ok(response) => anyhow::bail!("Engine refused startup: {response:?}"),
                 Err(error) => {
                     let text = error.to_string();
+                    // A stopped previous-version owner leaves its descriptor.
+                    // Prove the store is unowned before replacing it; never
+                    // delete the lock/descriptor or stop a live owner implicitly.
+                    if !launched
+                        && text.contains("version_mismatch")
+                        && client.previous_endpoint()?
+                        && let Ok(owner) = ownership::Ownership::acquire(&client.paths)
+                    {
+                        drop(owner);
+                        launcher.spawn(&client.paths)?;
+                        launched = true;
+                        replacing_previous = true;
+                        continue;
+                    }
+                    if replacing_previous
+                        && text.contains("version_mismatch")
+                        && client.previous_endpoint()?
+                    {
+                        ensure!(
+                            Instant::now() < deadline,
+                            "Engine upgrade startup deadline exceeded; the previous descriptor was kept"
+                        );
+                        std::thread::sleep(Duration::from_millis(25));
+                        continue;
+                    }
                     if text.contains("version_mismatch")
                         || text.contains("Unsafe")
                         || text.contains("private")
@@ -178,8 +204,18 @@ impl Client {
             }
         }
     }
+    fn previous_endpoint(&self) -> Result<bool> {
+        let path = self.paths.data.join("engine-v1/endpoint.json");
+        ownership::private_directory(path.parent().unwrap())?;
+        ownership::private_file(&path, 4096)?;
+        let descriptor: serde_json::Value = serde_json::from_slice(&std::fs::read(path)?)?;
+        Ok(matches!(descriptor["version"].as_u64(), Some(6 | 7)))
+    }
     pub fn request(&self, request: Request) -> Result<Response> {
         let credential = self.credential.lock().unwrap().clone();
+        // Only explicit, uncredentialed lifecycle Stop has the unchanged old
+        // envelope. No status, product operation or authority can cross versions.
+        let lifecycle_stop = credential.is_none() && matches!(request, Request::Stop);
         let request = if let Some(credential) = credential {
             let epoch = match &request {
                 Request::Submit(s) => s.epoch,
@@ -197,10 +233,14 @@ impl Client {
         let path = self.paths.data.join("engine-v1/endpoint.json");
         ownership::private_file(&path, 4096)?;
         let descriptor: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+        let wire_version = descriptor["version"].as_u64();
         ensure!(
-            descriptor["version"].as_u64() == Some(VERSION as u64),
-            "version_mismatch: installed engine protocol differs"
+            wire_version == Some(VERSION as u64)
+                || (lifecycle_stop && matches!(wire_version, Some(6 | 7))),
+            "version_mismatch: background engine protocol {} differs from this build ({VERSION}). Close older desktop windows and finish active work, then run `regressee engine stop` with the same data/cache directories and reopen the desktop. For unsupported engine versions, stop it using its matching executable. Project data must not be deleted to resolve this.",
+            wire_version.map_or_else(|| "unknown".into(), |version| version.to_string())
         );
+        let wire_version = wire_version.unwrap() as u32;
         let declared_cache = serde_json::from_value::<PathBuf>(descriptor["cache"].clone()).ok();
         let expected: Uuid = serde_json::from_value(descriptor["engine"].clone())?;
         let runtime = tokio::runtime::Builder::new_current_thread()
@@ -208,11 +248,11 @@ impl Client {
             .build()?;
         runtime.block_on(async {
             let mut stream = ipc::connect(&self.paths).await?;
-            ipc::write(&mut stream, &Request::Hello { version: VERSION }).await?;
+             ipc::write(&mut stream, &Request::Hello { version: wire_version }).await?;
             match ipc::read(&mut stream).await? {
                 Response::Hello { version, engine } => {
                     ensure!(
-                        version == VERSION,
+                         version == wire_version,
                         "version_mismatch: engine handshake version differs"
                     );
                     if engine == expected {
@@ -226,7 +266,7 @@ impl Client {
                         let current: serde_json::Value =
                             serde_json::from_slice(&std::fs::read(&path)?)?;
                         ensure!(
-                            current["version"].as_u64() == Some(VERSION as u64)
+                             current["version"].as_u64() == Some(wire_version as u64)
                                 && current["engine"] == serde_json::to_value(engine)?
                                 && serde_json::from_value::<PathBuf>(current["cache"].clone())
                                     .ok()
@@ -341,6 +381,10 @@ impl Client {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "client_upgrade_tests.rs"]
+mod upgrade_tests;
 
 /// Shared minimal lifecycle parser, also entered before desktop graphics startup.
 pub fn lifecycle(args: &[String]) -> Result<Option<String>> {

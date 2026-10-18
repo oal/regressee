@@ -188,8 +188,8 @@ impl Shell {
             .evidence
             .latest
             .as_ref()
-            .is_some_and(|r| r.all_captures().next().is_some());
-        self.focus.review_surface = if self.evidence.comparison.is_some() {
+            .is_some_and(|r| r.all_captures().next().is_some() || !r.dom_captures.is_empty());
+        self.focus.review_surface = if self.has_kind_comparison() {
             ReviewSurface::Changes
         } else {
             ReviewSurface::Inspect
@@ -201,6 +201,7 @@ impl Shell {
         // The persistent recorded-evidence heading/return action owns this
         // context; do not add a second banner that consumes inspection height.
         self.notice = None;
+        self.sync_dom_workspace(cx);
         self.reload_viewer(cx);
     }
     pub(super) fn history_active_baseline(&self) -> Option<regressee_core::domain::BaselineId> {
@@ -406,9 +407,8 @@ impl Shell {
                                     }
                                 ),
                                 format!(
-                                    "{} / {} saved{}",
-                                    b.references.len(),
-                                    b.intended_count,
+                                    "{}{}",
+                                    baseline_kind_summary(b),
                                     if b.parent.is_some() {
                                         " · Composite"
                                     } else {
@@ -453,22 +453,18 @@ impl Shell {
                                      if active { "Current baseline" } else { "Saved version" },
                                 )),
                         )
-                        .child(format!(
-                            "{} saved screenshots / {} intended screenshots",
-                            b.references.len(),
-                            b.intended_count,
-                        ))
+                        .child(baseline_kind_summary(b))
                         .when_some(history_capture_span(b), |el, (first, last)| el.child(history_help(
                             if first == last {
-                                format!("Reference screenshots captured {}", history_date(first))
+                                format!("References captured {}", history_date(first))
                             } else {
-                                 format!("Screenshots captured between {} and {}. Show technical details for each screenshot's capture time.", history_date(first), history_date(last))
+                                 format!("References captured between {} and {}. Show technical details for each source's capture time.", history_date(first), history_date(last))
                             },
                         )))
                         .child(div().flex().flex_wrap().gap_2()
                             .when(!active, |el| el.child(self.button(Control::Phase5(42), "Use this baseline…", ActionStyle::Primary, cx)))
                             .child(self.button(Control::Phase6(2), "Review ZIP export…", ActionStyle::Secondary, cx))
-                            .child(self.button(Control::Phase6(4), "Review deletion…", ActionStyle::Danger, cx)))
+                            .child(self.button(Control::Phase6(4), "Delete baseline…", ActionStyle::Danger, cx)))
                         .child(history_help(if active {
                             "Future checks use this version's fixed page list and screen sizes."
                         } else {
@@ -477,7 +473,7 @@ impl Shell {
                 )
                 .when(b.parent.is_some(), |el| el.child(
                     controls::status(
-                        "Some screenshots were updated; the others were kept from the previous baseline. They were not all captured at the same time.",
+                        "Selected check references were updated; other references were kept from the previous baseline. They were not all captured at the same time.",
                         Tone::Warning,
                     )
                     .into_any_element()
@@ -515,7 +511,7 @@ impl Shell {
                     )),
             )
             .child(history_help(
-                "ZIPs contain baseline screenshots and project settings, but no login sessions or cookies. Check screenshots for private information before sharing.",
+                "ZIPs contain baseline captures and project settings, but no login sessions or cookies. Screenshots and DOM text, including hidden content, attributes and URLs, may contain private information. Review before sharing.",
             ));
         if self.history_section == 1 {
             body = body.child(baselines);
@@ -596,12 +592,7 @@ impl Shell {
                                         .unwrap_or_else(|| "Start time not recorded".into()),
                                     history_run_type(&r.run.intent)
                                 ),
-                                format!(
-                                    "{} · {} / {} captured",
-                                    job_label(r.run.state),
-                                    r.all_captures().count(),
-                                    r.run.targets.len()
-                                ),
+                                format!("{} · {}", job_label(r.run.state), run_kind_summary(r)),
                                 index == self.run_history_index,
                                 cx,
                             )
@@ -640,15 +631,10 @@ impl Shell {
                                 history_run_type(&r.run.intent),
                             )),
                     )
-                    .child(format!(
-                        "{} · {} captured screenshots / {} intended screenshots",
-                        job_label(r.run.state),
-                        r.all_captures().count(),
-                        r.run.targets.len(),
-                    ))
+                    .child(format!("{} · {}", job_label(r.run.state), run_kind_summary(r)))
                     .child(div().flex().flex_wrap().gap_2()
-                        .child(self.button(Control::Phase6(19), if matches!(r.run.intent, RunIntent::Check { .. }) { "Open check results" } else { "Open screenshots" }, ActionStyle::Primary, cx))
-                        .child(self.button(Control::Phase6(5), "Review deletion…", ActionStyle::Danger, cx)))
+                        .child(self.button(Control::Phase6(19), if matches!(r.run.intent, RunIntent::Check { .. }) { "Open check results" } else if r.run.capture_plan.mode.dom_snapshots() { "Open captures" } else { "Open screenshots" }, ActionStyle::Primary, cx))
+                        .child(self.button(Control::Phase6(5), "Delete run…", ActionStyle::Danger, cx)))
                     .child(history_help(format!("Source environment: {}", r.run.environment.name)))
                      .child(history_help(format!(
                          "Finished {}",
@@ -818,6 +804,12 @@ impl Shell {
                         b.references.len(),
                     )));
                 }
+                for r in b.dom_references.iter().take(64) {
+                    provenance = provenance.child(history_help(format!("DOM snapshot · page {} / profile {} · source run {} · captured {} · artifact {} · policy {}", r.key.page, r.key.profile, r.run, history_date(r.captured_at), r.artifact.as_str(), r.policy.version)));
+                }
+                if b.dom_references.len() > 64 {
+                    provenance = provenance.child(history_help(format!("Showing first 64 of {} DOM references. Complete sources remain available by opening their recorded run.", b.dom_references.len())));
+                }
             }
             if let Some(r) = selected_run {
                 provenance = provenance
@@ -851,6 +843,22 @@ impl Shell {
                     r.all_captures().count().min(32),
                     r.all_captures().count(),
                 )));
+                for capture in r.dom_captures.iter().take(32) {
+                    let c = &capture.metadata;
+                    provenance = provenance.child(history_help(format!(
+                        "DOM snapshot · {} → {} · {} · {} nodes · {} bytes · {} · artifact {}",
+                        c.requested,
+                        c.final_url,
+                        c.profile.name,
+                        c.node_count,
+                        c.bytes,
+                        if c.stable { "stable" } else { "unstable" },
+                        c.sha256.as_str()
+                    )));
+                }
+                if !r.dom_captures.is_empty() {
+                    provenance = provenance.child(history_help(format!("Showing {} of {} DOM capture records. Open the run to inspect complete verified sources. {} {}", r.dom_captures.len().min(32), r.dom_captures.len(), regressee_core::dom_snapshot::DOM_COVERAGE_NOTICE, regressee_core::dom_snapshot::DOM_PRIVACY_NOTICE)));
+                }
             }
         }
         body = body.child(
@@ -912,6 +920,57 @@ fn history_matches(query: &str, text: &str) -> bool {
     query.split_whitespace().all(|word| text.contains(word))
 }
 
+fn baseline_kind_summary(b: &BaselineVersion) -> String {
+    match b.capture_plan.mode {
+        CaptureMode::ScreenshotsOnly => format!(
+            "{} saved screenshots / {} intended screenshots",
+            b.references.len(),
+            b.intended_count
+        ),
+        CaptureMode::DomSnapshotsOnly => format!(
+            "{} saved DOM snapshots / {} intended DOM snapshots",
+            b.dom_references.len(),
+            b.intended_count
+        ),
+        CaptureMode::ScreenshotsAndDomSnapshots => format!(
+            "{} screenshots · {} DOM snapshots / {} intended per kind",
+            b.references.len(),
+            b.dom_references.len(),
+            b.intended_count
+        ),
+    }
+}
+fn run_kind_summary(r: &RunRecord) -> String {
+    let counts = regressee_app::task::CaptureStatus::from_run(&r.run);
+    let mut parts = Vec::new();
+    for (enabled, label, c) in [
+        (
+            r.run.capture_plan.mode.screenshots(),
+            "screenshots",
+            &counts.screenshots,
+        ),
+        (
+            r.run.capture_plan.mode.dom_snapshots(),
+            "DOM snapshots",
+            &counts.dom_snapshots,
+        ),
+    ] {
+        if enabled {
+            parts.push(format!(
+                "{} / {} {label} captured{}",
+                c.captured,
+                c.requested,
+                if c.baseline_omitted > 0 {
+                    format!(" · {} baseline omissions", c.baseline_omitted)
+                } else {
+                    String::new()
+                }
+            ));
+        }
+    }
+    parts.join(" · ")
+}
+
 #[cfg(test)]
 fn history_short_id(id: String) -> String {
     id.chars().take(8).collect()
@@ -937,7 +996,7 @@ pub(super) fn history_run_type(intent: &RunIntent) -> &'static str {
 
 fn history_baseline_search(baseline: &BaselineVersion, active: bool) -> String {
     format!(
-        "Baseline version {} {} {} {} {} {} / {} saved {}",
+        "Baseline version {} {} {} {} {} {} / {} saved {} {}",
         baseline.id,
         history_date(baseline.created_at),
         if active {
@@ -958,6 +1017,7 @@ fn history_baseline_search(baseline: &BaselineVersion, active: bool) -> String {
         } else {
             "Full coverage"
         },
+        baseline_kind_summary(baseline),
     )
 }
 
@@ -965,7 +1025,8 @@ fn history_capture_span(baseline: &BaselineVersion) -> Option<(i64, i64)> {
     let mut times = baseline
         .references
         .iter()
-        .map(|reference| reference.captured_at);
+        .map(|reference| reference.captured_at)
+        .chain(baseline.dom_references.iter().map(|r| r.captured_at));
     let first = times.next()?;
     Some(times.fold((first, first), |(min, max), time| {
         (min.min(time), max.max(time))
@@ -975,7 +1036,7 @@ fn history_capture_span(baseline: &BaselineVersion) -> Option<(i64, i64)> {
 fn history_run_search(record: &RunRecord, imported: bool) -> String {
     let run = &record.run;
     format!(
-        "{} {} {:?} {} {:?} {} {} {} {} {} {} / {} captured {}",
+        "{} {} {:?} {} {:?} {} {} {} {} {} {} / {} captured {} {}",
         run.id,
         history_run_type(&run.intent),
         run.intent,
@@ -989,6 +1050,7 @@ fn history_run_search(record: &RunRecord, imported: bool) -> String {
         record.all_captures().count(),
         run.targets.len(),
         if imported { "Imported" } else { "Local" },
+        run_kind_summary(record),
     )
 }
 
@@ -1107,6 +1169,10 @@ mod tests {
     fn baseline_fixture() -> BaselineVersion {
         use regressee_core::domain::*;
         BaselineVersion {
+            capture_plan: Default::default(),
+            dom_references: vec![],
+            intended_targets: vec![],
+            source_run: None,
             id: BaselineId::new(),
             project: ProjectId::new(),
             parent: Some(BaselineId::new()),
@@ -1163,7 +1229,9 @@ mod tests {
         use regressee_core::domain::*;
         let project = Project::draft("Search fixture".into(), "https://example.test/").unwrap();
         let record = RunRecord {
+            dom_captures: vec![],
             run: CaptureRun {
+                capture_plan: Default::default(),
                 id: RunId::new(),
                 project: project.id,
                 intent: RunIntent::NewBaseline,

@@ -2,6 +2,7 @@
 use anyhow::{Context, Result, bail, ensure};
 use regressee_app::{
     analysis_engine::{AnalysisRequest, Policy, Preset},
+    engine::dom,
     protocol::Operation,
     terminal::{self, Selection},
 };
@@ -32,11 +33,13 @@ Usage: regressee [GLOBAL OPTIONS] <AREA> <ACTION> [OPTIONS]
   --session UUID                Use a private named agent session credential
 
 Commands:
-  project create --name NAME --url URL | --file PROJECT.json
+  project create --name NAME --url URL [--mode screenshots|both|dom] | --file PROJECT.json
   project list [--page N] | show --project ID
   project update --project ID --expected-revision N --file PROJECT.json [--replacement]
   profiles|environments|scope show --project ID
   profiles|environments|scope set --project ID --expected-revision N --file JSON [--replacement]
+  checks show --project ID
+  checks set --project ID --expected-revision N --mode screenshots|both|dom [--replacement]
   environment status --project ID
   environment select --project ID --environment ID --expected-revision N [--login-settings JSON]
   environment save --file ENVIRONMENT_SAVE.json [--replacement]
@@ -50,17 +53,22 @@ Commands:
   capture resume --project ID --run ID
   jobs list [--offset N --limit N] | show|wait|pause|cancel|ack --job ID
   jobs retry --request-id UUID         Reuse saved COMPLETE original submit
-  results list --project ID [--run ID --analysis ID --page ID --profile ID --outcome CLASS --capture-state STATE --offset N --limit N]
-  results artifacts --project ID --page ID --profile ID [--run ID --analysis ID]
+  results list --project ID [--kind screenshot|dom --run ID --analysis ID --page ID --profile ID --outcome CLASS --capture-state STATE --offset N --limit N]
+  results artifacts --project ID --page ID --profile ID [--kind screenshot|dom --run ID --analysis ID]
+  snapshot source --project ID --page ID --profile ID [--run ID --analysis ID --pane before|after --format plaintext|canonical --offset BYTE --limit BYTES]
+  snapshot diff --project ID --page ID --profile ID [--run ID --analysis ID --context N --offset ROW --limit ROWS]
   analysis show|select --analysis ID | reanalyze --run ID [--preset sensitive|balanced|relaxed | --file POLICY.json]
+  analysis show|select --kind dom --analysis ID | reanalyze --kind dom --run ID [--context N]
   masks save --project ID --file ANALYSIS_REQUEST.json
-  review set --analysis ID --page ID --profile ID --state unreviewed|intentional|needs-fix [--note TEXT | --note-file FILE]
-  review history --analysis ID [--page ID --profile ID --before DECISION_ID --limit N]
-  baseline preview --analysis ID --file SELECTED_KEYS.json
+  review set --analysis ID --page ID --profile ID --state unreviewed|intentional|needs-fix [--kind screenshot|dom --note TEXT | --note-file FILE]
+  review history --analysis ID [--kind screenshot|dom --page ID --profile ID --before DECISION_ID --limit N]
+  baseline preview --analysis ID --file SELECTED_KEYS.json [--kind screenshot|dom]
+  baseline preview-kinds --file EXPLICIT_KIND_SELECTION.json
   baseline save --run ID --expected-revision N [--partial] --prepare
-  baseline accept --file APPROVAL.json --prepare
+  baseline accept --file APPROVAL.json [--kind screenshot|dom] --prepare
+  baseline accept-kinds --file KIND_APPROVAL.json --prepare
   baseline restore --baseline ID --expected-revision N --prepare
-  history list --project ID [--page N] | show --project ID --run ID
+  history list --project ID [--page N] | show --project ID --run ID [--kind screenshot|dom]
   storage usage [--project ID] | delete-preview --project ID (--run ID | --baseline ID)
   storage delete --file PREVIEW.json --prepare
   repair preview | clean|delete-unreferenced --file PREVIEW.json --prepare
@@ -68,7 +76,7 @@ Commands:
   archive export --file PREVIEW.json --destination ZIP --prepare
   archive import-preview --source ZIP
   archive import --file PREVIEW.json --source ZIP --prepare
-  report preview --project ID [--run ID --analysis ID] --file SELECTED_KEYS.json --destination DIR
+  report preview --project ID [--run ID --analysis SCREENSHOT_ID --dom-analysis DOM_ID] --file SELECTED_KEYS.json --destination DIR
   report export --file PREVIEW.json --prepare
   crop preview --project ID --page ID --profile ID [--run ID --analysis ID] --pane before|after|difference --rect X,Y,W,H --space screenshot-pixels --destination PNG
   crop export --file PREVIEW.json --prepare
@@ -80,10 +88,12 @@ Commands:
   engine start|serve|status|stop
   agent start --name NAME [--lease SECONDS] | list | show --id UUID
   agent renew [--lease SECONDS] | end | handoff --message TEXT   (require --session)
-  agent select --project ID [--run ID --analysis ID --page ID --profile ID --view compare|before|after|difference|overlay|split] (requires --session)
+  agent select --project ID [--kind screenshot|dom --run ID --analysis ID --page ID --profile ID --view compare|before|after|difference|overlay|split] (requires --session; DOM has no overlay/split)
   capabilities | --version | --build-info | help [AREA]
 
 Complex JSON accepts --file - for bounded stdin. No interactive prompts or --yes.
+Kind-specific commands default to screenshot; capture/check obey the frozen plan.
+Source offsets are UTF-8 bytes (4–262144 bytes/page); diff pages are 1–1000 rows.
 Read-only commands do not install a browser. Public sites work headlessly; login
 requires a desktop. Ctrl-C detaches waiting, never cancels the engine job.
 Following is GUI-only opt-in. Take control immediately revokes the agent; handoff
@@ -171,6 +181,9 @@ impl Args {
     pub fn file<T: DeserializeOwned>(&mut self) -> Result<T> {
         input(&self.need("--file")?)
     }
+    pub fn strict_file<T: DeserializeOwned + serde::Serialize>(&mut self) -> Result<T> {
+        strict_input(&self.need("--file")?)
+    }
     pub fn done(&self) -> Result<()> {
         ensure!(
             self.options.is_empty(),
@@ -239,6 +252,28 @@ pub fn input<T: DeserializeOwned>(path: &str) -> Result<T> {
         }
     }
     bail!("invalid_input: JSON does not match the command's documented input schema")
+}
+fn strict_input<T: DeserializeOwned + serde::Serialize>(path: &str) -> Result<T> {
+    let value: serde_json::Value =
+        serde_json::from_slice(&bytes(path)?).context("invalid_input: expected JSON")?;
+    for candidate in [
+        Some(&value),
+        value.pointer("/data/value"),
+        value.pointer("/value"),
+        value.pointer("/data/value/value"),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if let Ok(parsed) = serde_json::from_value::<T>(candidate.clone()) {
+            ensure!(
+                serde_json::to_value(&parsed)? == *candidate,
+                "invalid_input: approval preview has unknown/missing/changed versioned fields; regenerate it without editing"
+            );
+            return Ok(parsed);
+        }
+    }
+    bail!("invalid_input: expected the exact returned kind approval preview")
 }
 pub enum Plan {
     Agent(regressee_app::control::Command),
@@ -317,6 +352,18 @@ fn selected(keys: &[TargetKey], limit: usize) -> Result<()> {
 }
 fn validate_operation(op: &Operation) -> Result<()> {
     match op {
+        Operation::Dom(command) => command.validate()?,
+        Operation::SelectAgent(selection) => ensure!(
+            selection.kind != CheckKind::DomSnapshot
+                || matches!(
+                    selection.view,
+                    regressee_app::control::View::Compare
+                        | regressee_app::control::View::Before
+                        | regressee_app::control::View::After
+                        | regressee_app::control::View::Difference
+                ),
+            "DOM text does not support image overlay/split views"
+        ),
         Operation::Save { project, .. } | Operation::SaveReplacement { project, .. } => {
             project.validate()?
         }
@@ -405,6 +452,13 @@ fn selection(a: &mut Args) -> Result<Selection> {
         analysis: a.optional_id("--analysis")?,
     })
 }
+fn dom_selection(selection: Selection) -> dom::Selection {
+    dom::Selection {
+        project: selection.project,
+        run: selection.run,
+        analysis: selection.analysis.map(|id| DomAnalysisId(id.0)),
+    }
+}
 fn key(a: &mut Args) -> Result<TargetKey> {
     Ok(TargetKey {
         page: a.id("--page")?,
@@ -415,6 +469,21 @@ fn revision(a: &mut Args) -> Result<u64> {
     a.need("--expected-revision")?
         .parse()
         .context("invalid_arguments: expected revision must be an integer")
+}
+fn capture_mode(value: &str) -> Result<CaptureMode> {
+    Ok(match value {
+        "screenshots" => CaptureMode::ScreenshotsOnly,
+        "both" => CaptureMode::ScreenshotsAndDomSnapshots,
+        "dom" => CaptureMode::DomSnapshotsOnly,
+        _ => bail!("invalid_arguments: mode screenshots|both|dom"),
+    })
+}
+fn check_kind(a: &mut Args) -> Result<CheckKind> {
+    Ok(match a.take("--kind").as_deref().unwrap_or("screenshot") {
+        "screenshot" => CheckKind::Screenshot,
+        "dom" => CheckKind::DomSnapshot,
+        _ => bail!("invalid_arguments: kind screenshot|dom"),
+    })
 }
 pub fn plan(a: &mut Args) -> Result<Plan> {
     use regressee_app::protocol::Request;
@@ -468,6 +537,7 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
             let selection = regressee_app::control::Selection {
                 project: a.id("--project")?,
                 run: a.optional_id("--run")?,
+                kind: check_kind(a)?,
                 analysis: a.optional_id("--analysis")?,
                 key: page
                     .zip(profile)
@@ -486,11 +556,14 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
         ("engine", "status") => return Ok(Plan::Request(Request::Status)),
         ("engine", "stop") => return Ok(Plan::Request(Request::Stop)),
         ("project", "create") => {
-            let project = if a.options.contains_key("--file") {
+            let mut project = if a.options.contains_key("--file") {
                 a.file::<Project>()?
             } else {
                 Project::draft(a.need("--name")?, &a.need("--url")?)?
             };
+            if let Some(mode) = a.take("--mode") {
+                project.capture_plan = CapturePlan::for_mode(capture_mode(&mode)?);
+            }
             ensure!(
                 project.active_baseline.is_none(),
                 "invalid_input: a new project cannot import an active baseline pointer"
@@ -523,6 +596,17 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
             }
         }
         ("profiles" | "environments" | "scope", "show") => Operation::Load(a.id("--project")?),
+        ("checks", "show") => Operation::Load(a.id("--project")?),
+        ("checks", "set") => {
+            let capture_plan = CapturePlan::for_mode(capture_mode(&a.need("--mode")?)?);
+            return Ok(Plan::Configure {
+                project: a.id("--project")?,
+                revision: revision(a)?,
+                field: "capture_plan".into(),
+                value: serde_json::to_value(capture_plan)?,
+                replacement: a.flag("--replacement"),
+            });
+        }
         ("profiles" | "environments" | "scope", "set") => {
             let field = match area.as_str() {
                 "profiles" => "profiles",
@@ -645,12 +729,14 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
         }
         ("jobs", "retry") => return Ok(Plan::Retry(a.uuid("--request-id")?)),
         ("results", "list") => {
+            let kind = check_kind(a)?;
             let selection = selection(a)?;
             let page = a.optional_id("--page")?;
             let profile = a.optional_id("--profile")?;
-            let classification = a
-                .take("--outcome")
-                .map(|s| match s.as_str() {
+            let requested_outcome = a.take("--outcome");
+            let classification = requested_outcome
+                .as_deref()
+                .map(|s| match s {
                     "changed" => Ok(Classification::Changed),
                     "unchanged" => Ok(Classification::NoSignificantChange),
                     "failed" => Ok(Classification::CouldNotCapture),
@@ -671,25 +757,111 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
                     ),
                 })
                 .transpose()?;
+            let offset = a.number("--offset", 0)?;
+            let limit = a.number("--limit", 50)?;
+            if kind == CheckKind::DomSnapshot {
+                return Ok(Plan::Operation(Operation::Dom(dom::Command::Results {
+                    selection: dom_selection(selection),
+                    page,
+                    profile,
+                    outcome: classification.map(|c| match c {
+                        Classification::Changed => dom::OutcomeFilter::Changed,
+                        Classification::NoSignificantChange => dom::OutcomeFilter::Unchanged,
+                        Classification::CouldNotCapture => dom::OutcomeFilter::Failed,
+                        Classification::NotComparable => dom::OutcomeFilter::NotComparable,
+                    }),
+                    capture_state,
+                    offset,
+                    limit,
+                })));
+            }
             Operation::Terminal(terminal::Command::Results {
                 selection,
                 page,
                 profile,
                 classification,
                 capture_state,
-                offset: a.number("--offset", 0)?,
-                limit: a.number("--limit", 50)?,
+                offset,
+                limit,
             })
         }
-        ("results", "artifacts") => Operation::Terminal(terminal::Command::Artifacts {
-            selection: selection(a)?,
-            key: key(a)?,
-        }),
-        ("analysis", "show") => Operation::Terminal(terminal::Command::Analysis {
-            analysis: a.id("--analysis")?,
-        }),
-        ("analysis", "select") => Operation::LoadAnalysis(a.id("--analysis")?),
+        ("results", "artifacts") => {
+            let kind = check_kind(a)?;
+            let selection = selection(a)?;
+            let key = key(a)?;
+            if kind == CheckKind::DomSnapshot {
+                Operation::Dom(dom::Command::Artifacts {
+                    selection: dom_selection(selection),
+                    key,
+                })
+            } else {
+                Operation::Terminal(terminal::Command::Artifacts { selection, key })
+            }
+        }
+        ("snapshot", "source" | "diff") => {
+            let selection = dom_selection(selection(a)?);
+            let key = key(a)?;
+            if action == "source" {
+                let pane = match a.take("--pane").as_deref().unwrap_or("after") {
+                    "before" => dom::SourcePane::Before,
+                    "after" => dom::SourcePane::After,
+                    _ => bail!("invalid_arguments: source pane before|after"),
+                };
+                let format = match a.take("--format").as_deref().unwrap_or("plaintext") {
+                    "plaintext" => dom::SourceFormat::Plaintext,
+                    "canonical" => dom::SourceFormat::Canonical,
+                    _ => bail!("invalid_arguments: source format plaintext|canonical"),
+                };
+                Operation::Dom(dom::Command::Source {
+                    selection,
+                    key,
+                    pane,
+                    format,
+                    offset: a.number("--offset", 0)?,
+                    limit: a.number("--limit", 65536)?,
+                })
+            } else {
+                let options = regressee_core::dom_snapshot::DomDiffOptions {
+                    context_lines: a.number("--context", 3)?,
+                    ..Default::default()
+                };
+                Operation::Dom(dom::Command::Diff {
+                    selection,
+                    key,
+                    options,
+                    offset: a.number("--offset", 0)?,
+                    limit: a.number("--limit", 200)?,
+                })
+            }
+        }
+        ("analysis", "show" | "select") => {
+            let kind = check_kind(a)?;
+            if kind == CheckKind::DomSnapshot {
+                let analysis = a.id("--analysis")?;
+                Operation::Dom(if action == "select" {
+                    dom::Command::SelectAnalysis { analysis }
+                } else {
+                    dom::Command::Analysis { analysis }
+                })
+            } else if action == "select" {
+                Operation::LoadAnalysis(a.id("--analysis")?)
+            } else {
+                Operation::Terminal(terminal::Command::Analysis {
+                    analysis: a.id("--analysis")?,
+                })
+            }
+        }
         ("analysis", "reanalyze") => {
+            if check_kind(a)? == CheckKind::DomSnapshot {
+                let options = regressee_core::dom_snapshot::DomDiffOptions {
+                    context_lines: a.number("--context", 3)?,
+                    ..Default::default()
+                };
+                return Ok(Plan::Operation(Operation::Dom(dom::Command::Reanalyze {
+                    run: a.id("--run")?,
+                    options,
+                })));
+            }
             let policy = if a.options.contains_key("--file") {
                 a.file::<Policy>()?
             } else {
@@ -706,11 +878,18 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
                 policy,
             }
         }
-        ("masks", "save") => Operation::Mask {
-            project: a.id("--project")?,
-            request: Box::new(a.file::<AnalysisRequest>()?),
-        },
+        ("masks", "save") => {
+            ensure!(
+                check_kind(a)? == CheckKind::Screenshot,
+                "invalid_arguments: ignored rectangles are screenshot-only and never suppress DOM differences"
+            );
+            Operation::Mask {
+                project: a.id("--project")?,
+                request: Box::new(a.file::<AnalysisRequest>()?),
+            }
+        }
         ("review", "set") => {
+            let kind = check_kind(a)?;
             let note = a.take("--note");
             let file = a.take("--note-file");
             ensure!(
@@ -723,7 +902,7 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
                 note.unwrap_or_default()
             };
             validate_review_note(&note).map_err(anyhow::Error::msg)?;
-            Operation::Review(ReviewDecision {
+            let decision = ReviewDecision {
                 analysis: a.id("--analysis")?,
                 key: key(a)?,
                 state: match a.need("--state")?.as_str() {
@@ -736,10 +915,22 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
                 reviewed_at: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)?
                     .as_secs() as i64,
-            })
+            };
+            if kind == CheckKind::DomSnapshot {
+                Operation::Dom(dom::Command::SetReview {
+                    analysis: DomAnalysisId(decision.analysis.0),
+                    key: decision.key,
+                    state: decision.state,
+                    note: decision.note,
+                    reviewed_at: decision.reviewed_at,
+                })
+            } else {
+                Operation::Review(decision)
+            }
         }
         ("review", "history") => {
-            let analysis = a.id("--analysis")?;
+            let kind = check_kind(a)?;
+            let analysis: AnalysisId = a.id("--analysis")?;
             let page = a.optional_id("--page")?;
             let profile = a.optional_id("--profile")?;
             ensure!(
@@ -749,29 +940,66 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
             let key = page
                 .zip(profile)
                 .map(|(page, profile)| TargetKey { page, profile });
-            Operation::Terminal(terminal::Command::ReviewHistory {
-                analysis,
-                key,
-                before: a.take("--before").map(|s| s.parse::<i64>()).transpose()?,
-                limit: a.number("--limit", 50)?,
-            })
+            let before = a.take("--before").map(|s| s.parse::<i64>()).transpose()?;
+            let limit = a.number("--limit", 50)?;
+            if kind == CheckKind::DomSnapshot {
+                Operation::Dom(dom::Command::ReviewHistory {
+                    analysis: DomAnalysisId(analysis.0),
+                    key,
+                    before,
+                    limit,
+                })
+            } else {
+                Operation::Terminal(terminal::Command::ReviewHistory {
+                    analysis,
+                    key,
+                    before,
+                    limit,
+                })
+            }
         }
-        ("baseline", "preview") => Operation::Approval {
-            analysis: a.id("--analysis")?,
-            selected: a.file()?,
-        },
+        ("baseline", "preview") => {
+            let kind = check_kind(a)?;
+            let analysis = a.id::<AnalysisId>("--analysis")?;
+            let selected = a.file()?;
+            if kind == CheckKind::DomSnapshot {
+                Operation::Dom(dom::Command::Approval(dom::KindSelection {
+                    screenshot: None,
+                    dom: Some(dom::KindKeys {
+                        analysis: DomAnalysisId(analysis.0),
+                        selected,
+                    }),
+                }))
+            } else {
+                Operation::Approval { analysis, selected }
+            }
+        }
+        ("baseline", "preview-kinds") => Operation::Dom(dom::Command::Approval(a.file()?)),
         ("baseline", "save") => Operation::Activate {
             run: a.id("--run")?,
             revision: revision(a)?,
             confirm_partial: a.flag("--partial"),
         },
         ("baseline", "accept") => {
+            if check_kind(a)? == CheckKind::DomSnapshot {
+                let p: KindApprovalPreview = a.strict_file()?;
+                ensure!(
+                    p.screenshot.is_none() && p.dom.is_some(),
+                    "invalid_input: --kind dom accepts only explicitly selected DOM slots; use accept-kinds for an explicit multi-kind preview"
+                );
+                return Ok(Plan::Operation(Operation::Dom(dom::Command::Accept(
+                    Box::new(p),
+                ))));
+            }
             let p: ApprovalPreview = a.file()?;
             let context = p.context.clone();
             Operation::Accept {
                 preview: Box::new(p),
                 context,
             }
+        }
+        ("baseline", "accept-kinds") => {
+            Operation::Dom(dom::Command::Accept(Box::new(a.strict_file()?)))
         }
         ("baseline", "restore") => Operation::Restore {
             baseline: a.id("--baseline")?,
@@ -781,10 +1009,16 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
             project: a.id("--project")?,
             page: a.number("--page", 0)?,
         },
-        ("history", "show") => Operation::InspectRun {
-            project: a.id("--project")?,
-            run: a.id("--run")?,
-        },
+        ("history", "show") => {
+            let kind = check_kind(a)?;
+            let project = a.id("--project")?;
+            let run = a.id("--run")?;
+            if kind == CheckKind::DomSnapshot {
+                Operation::Dom(dom::Command::Inspect { project, run })
+            } else {
+                Operation::InspectRun { project, run }
+            }
+        }
         ("storage", "usage") => {
             if let Some(p) = a.take("--project") {
                 Operation::ProjectStorage(id(&p)?)
@@ -822,11 +1056,16 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
         },
         ("report", "preview") => Operation::Terminal(terminal::Command::ReportPreview {
             selection: selection(a)?,
+            dom_analysis: a.optional_id("--dom-analysis")?,
             selected: a.file()?,
             destination: PathBuf::from(a.need("--destination")?),
         }),
         ("report", "export") => Operation::Terminal(terminal::Command::Report(Box::new(a.file()?))),
         ("crop", "preview") => {
+            ensure!(
+                check_kind(a)? == CheckKind::Screenshot,
+                "invalid_arguments: DOM snapshots are text; crop requires --kind screenshot. Use snapshot source or snapshot diff instead"
+            );
             let selection = selection(a)?;
             let key = key(a)?;
             let pane = match a.need("--pane")?.as_str() {
@@ -861,7 +1100,13 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
                 destination: PathBuf::from(a.need("--destination")?),
             })
         }
-        ("crop", "export") => Operation::Terminal(terminal::Command::Crop(Box::new(a.file()?))),
+        ("crop", "export") => {
+            ensure!(
+                check_kind(a)? == CheckKind::Screenshot,
+                "invalid_arguments: DOM snapshots are text and cannot be cropped"
+            );
+            Operation::Terminal(terminal::Command::Crop(Box::new(a.file()?)))
+        }
         ("diagnostics", "preview") => Operation::DiagnosticPreview,
         ("diagnostics", "export") => Operation::DiagnosticExport {
             report: Box::new(a.file()?),
@@ -889,4 +1134,97 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
         _ => bail!("invalid_arguments: unknown command; see --help"),
     };
     Ok(Plan::Operation(operation))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(words: &[&str]) -> Result<Plan> {
+        let mut args = Args::parse(&words.iter().map(|s| (*s).to_owned()).collect::<Vec<_>>())?;
+        let result = plan(&mut args)?;
+        args.done()?;
+        result.validate_local()?;
+        Ok(result)
+    }
+
+    #[test]
+    fn capture_modes_use_the_canonical_project_plan() -> Result<()> {
+        for (mode, expected) in [
+            ("screenshots", CaptureMode::ScreenshotsOnly),
+            ("both", CaptureMode::ScreenshotsAndDomSnapshots),
+            ("dom", CaptureMode::DomSnapshotsOnly),
+        ] {
+            let Plan::Operation(Operation::Save { project, .. }) = parse(&[
+                "project",
+                "create",
+                "--name",
+                "Owned fixture",
+                "--url",
+                "https://fixture.invalid/",
+                "--mode",
+                mode,
+            ])?
+            else {
+                unreachable!()
+            };
+            assert_eq!(project.capture_plan, CapturePlan::for_mode(expected));
+            let Plan::Configure { field, value, .. } = parse(&[
+                "checks",
+                "set",
+                "--project",
+                "11111111-1111-4111-8111-111111111111",
+                "--expected-revision",
+                "1",
+                "--mode",
+                mode,
+            ])?
+            else {
+                unreachable!()
+            };
+            assert_eq!(field, "capture_plan");
+            assert_eq!(
+                serde_json::from_value::<CapturePlan>(value)?,
+                project.capture_plan
+            );
+        }
+        let Plan::Operation(Operation::Save { project, .. }) = parse(&[
+            "project",
+            "create",
+            "--name",
+            "Owned fixture",
+            "--url",
+            "https://fixture.invalid/",
+        ])?
+        else {
+            unreachable!()
+        };
+        assert_eq!(project.capture_plan, CapturePlan::default());
+        assert!(
+            parse(&[
+                "checks",
+                "set",
+                "--project",
+                "11111111-1111-4111-8111-111111111111",
+                "--expected-revision",
+                "1",
+                "--mode",
+                "unknown"
+            ])
+            .is_err()
+        );
+        // A kind flag must never override a capture/check's frozen plan.
+        assert!(
+            parse(&[
+                "capture",
+                "check",
+                "--project",
+                "11111111-1111-4111-8111-111111111111",
+                "--kind",
+                "screenshots"
+            ])
+            .is_err()
+        );
+        Ok(())
+    }
 }

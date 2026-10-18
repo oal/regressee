@@ -84,7 +84,7 @@ fn renderer_capture_typography(cx: &mut TestAppContext) {
                 manifest.push(serde_json::json!({"label":label,"scene":scene,"width":width,"height":height,
                     "rail_status":bounds("rail-baseline-status"),"heading":bounds("screen-heading-title"),
                     "subtitle":bounds("screen-heading-subtitle")}));
-                shell.update(cx, |s, cx| finish_jobs(s, cx));
+                shell.update(cx, finish_jobs);
                 owned.join_after_ui();
                 cx.update(|w, _| w.remove_window());
             }

@@ -101,7 +101,12 @@ pub fn step(
                 .text_size(px(14.))
                 .line_height(px(18.))
                 .child(div().font_weight(FontWeight::MEDIUM).child(label))
-                .child(div().text_size(px(13.)).line_height(px(HELP_LINE_HEIGHT)).child(state.label())),
+                .child(
+                    div()
+                        .text_size(px(13.))
+                        .line_height(px(HELP_LINE_HEIGHT))
+                        .child(state.label()),
+                ),
         )
 }
 

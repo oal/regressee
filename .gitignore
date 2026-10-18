@@ -2,6 +2,7 @@
 /.runtime/
 /artifacts/
 /worker/node_modules/
+/worker/product/node_modules/
 /.impeccable/
 *.partial
 __pycache__/

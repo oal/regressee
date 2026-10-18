@@ -3,10 +3,26 @@
 use super::*;
 use regressee_core::evidence::{RunRecord, identity_hash};
 use std::collections::{BTreeMap, BTreeSet};
+#[path = "project_removal.rs"]
+mod project_removal;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DeleteItem {
     Run(RunId),
     Baseline(BaselineId),
+    Project,
+    Environment(EnvironmentId),
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ScopeDeletion {
+    pub name: String,
+    pub project_name: String,
+    pub address: String,
+    pub source_count: usize,
+    pub runs: usize,
+    pub baselines: usize,
+    pub reviews: usize,
+    pub ignored_areas: usize,
+    pub logins: usize,
 }
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeletionPreview {
@@ -18,6 +34,8 @@ pub struct DeletionPreview {
     pub shared_bytes: u64,
     pub objects: usize,
     pub analyses: usize,
+    #[serde(default)]
+    pub scope: Option<ScopeDeletion>,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProjectStorage {
@@ -50,7 +68,7 @@ pub struct RepairPreview {
     pub temporary_bytes: u64,
 }
 fn project_owners(c: &Connection, project: ProjectId) -> Result<BTreeSet<(String, String)>> {
-    let mut q=c.prepare("SELECT 'Run',id FROM runs WHERE project_id=?1 UNION SELECT 'Baseline',id FROM baselines WHERE project_id=?1 UNION SELECT 'Analysis',a.id FROM analyses a JOIN runs r ON r.id=a.run_id WHERE r.project_id=?1")?;
+    let mut q=c.prepare("SELECT 'Run',id FROM runs WHERE project_id=?1 UNION SELECT 'Baseline',id FROM baselines WHERE project_id=?1 UNION SELECT 'Analysis',a.id FROM analyses a JOIN runs r ON r.id=a.run_id WHERE r.project_id=?1 UNION SELECT 'DomAnalysis',a.id FROM dom_analyses a JOIN runs r ON r.id=a.run_id WHERE r.project_id=?1")?;
     Ok(
         q.query_map([project.to_string()], |r| Ok((r.get(0)?, r.get(1)?)))?
             .collect::<rusqlite::Result<_>>()?,
@@ -79,6 +97,8 @@ fn deletion(
     paths: &AppPaths,
     project: ProjectId,
     item: DeleteItem,
+    baselines: &[BaselineVersion],
+    resolved_revision: u64,
 ) -> Result<DeletionAuthority> {
     let (s, revision): (String, u64) = c.query_row(
         "SELECT config,revision FROM projects WHERE id=?1",
@@ -86,14 +106,22 @@ fn deletion(
         |r| Ok((r.get(0)?, r.get(1)?)),
     )?;
     let p: Project = serde_json::from_str(&s)?;
+    ensure!(
+        revision == resolved_revision,
+        "Baseline history changed during frozen-source resolution; preview again"
+    );
     let mut owners = BTreeSet::new();
     let mut analyses = 0;
-    let mut q = c.prepare("SELECT record FROM baselines WHERE project_id=?1")?;
-    let baselines = q
-        .query_map([project.to_string()], |r| r.get::<_, String>(0))?
-        .map(|r| Ok(serde_json::from_str::<BaselineVersion>(&r?)?))
-        .collect::<Result<Vec<_>>>()?;
+    let scope_state = project_removal::scope_state(c, &p, item)?;
     match item {
+        DeleteItem::Project => {
+            owners = project_owners(c, project)?;
+            analyses = owners
+                .iter()
+                .filter(|(kind, _)| kind == "Analysis" || kind == "DomAnalysis")
+                .count();
+        }
+        DeleteItem::Environment(_) => (),
         DeleteItem::Run(id) => {
             let (owner, state): (String, String) = c.query_row(
                 "SELECT project_id,state FROM runs WHERE id=?1",
@@ -113,15 +141,15 @@ fn deletion(
                 "Current active capture cannot be deleted; stop it first"
             );
             ensure!(
-                !baselines
-                    .iter()
-                    .any(|b| b.references.iter().any(|r| r.run == id)),
+                !baselines.iter().any(|b| b.source_runs().contains(&id)),
                 "Run contains originals referenced by a retained baseline (possibly a composite). Keep it, or delete those inactive baselines first; shared evidence will not be deleted."
             );
             owners.insert(("Run".into(), id.to_string()));
-            let mut q = c.prepare("SELECT id FROM analyses WHERE run_id=?1")?;
-            for id in q.query_map([id.to_string()], |r| r.get::<_, String>(0))? {
-                owners.insert(("Analysis".into(), id?));
+            let mut q = c.prepare("SELECT 'Analysis',id FROM analyses WHERE run_id=?1 UNION ALL SELECT 'DomAnalysis',id FROM dom_analyses WHERE run_id=?1")?;
+            for row in q.query_map([id.to_string()], |r| {
+                Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))
+            })? {
+                owners.insert(row?);
                 analyses += 1;
             }
         }
@@ -139,7 +167,7 @@ fn deletion(
                 "A retained baseline inherits this version. Delete inactive child versions first; history links are protected."
             );
             let dependencies: u64 = c.query_row(
-                "SELECT count(*) FROM analyses WHERE baseline_id=?1",
+                "SELECT (SELECT count(*) FROM analyses WHERE baseline_id=?1)+(SELECT count(*) FROM dom_analyses WHERE baseline_id=?1)",
                 [id.to_string()],
                 |r| r.get(0),
             )?;
@@ -183,7 +211,7 @@ fn deletion(
     }
     // Whole reference graph, immutable records and project revision prevent stale impact authority.
     let graph = {
-        let mut q=c.prepare("SELECT 'Run',id,record FROM runs UNION SELECT 'Baseline',id,record FROM baselines UNION SELECT 'Analysis',id,record FROM analyses ORDER BY 1,2")?;
+        let mut q=c.prepare("SELECT 'Run',id,record FROM runs UNION SELECT 'Baseline',id,record FROM baselines UNION SELECT 'Analysis',id,record FROM analyses UNION SELECT 'DomAnalysis',id,record FROM dom_analyses ORDER BY 1,2")?;
         q.query_map([], |r| {
             Ok((
                 r.get::<_, String>(0)?,
@@ -193,7 +221,16 @@ fn deletion(
         })?
         .collect::<rusqlite::Result<Vec<_>>>()?
     };
-    let fingerprint = identity_hash(&(project, revision, item, &references, graph, files))?;
+    let fingerprint = identity_hash(&(
+        project,
+        revision,
+        item,
+        &references,
+        graph,
+        files,
+        &s,
+        &scope_state,
+    ))?;
     Ok((
         DeletionPreview {
             project,
@@ -204,12 +241,32 @@ fn deletion(
             shared_bytes,
             objects: candidates.len(),
             analyses,
+            scope: scope_state.map(|(details, _)| details),
         },
         owners,
         candidates,
     ))
 }
 impl Store {
+    fn retention_baselines(&self, project: ProjectId) -> Result<(Vec<BaselineVersion>, u64)> {
+        let revision = self.load_project(project)?.revision;
+        let ids: Vec<String> = {
+            let mut q = self
+                .connection
+                .prepare("SELECT id FROM baselines WHERE project_id=?1")?;
+            q.query_map([project.to_string()], |r| r.get(0))?
+                .collect::<rusqlite::Result<_>>()?
+        };
+        let baselines = ids
+            .into_iter()
+            .map(|id| self.load_baseline_metadata(serde_json::from_value(serde_json::json!(id))?))
+            .collect::<Result<Vec<_>>>()?;
+        ensure!(
+            self.load_project(project)?.revision == revision,
+            "Baseline history changed during frozen-source resolution; preview again"
+        );
+        Ok((baselines, revision))
+    }
     pub fn history(&self, project: ProjectId, page: usize) -> Result<HistoryPage> {
         let active_baseline = self.load_project(project)?.project.active_baseline;
         ensure!(page <= 15625, "History page exceeds limit");
@@ -246,6 +303,9 @@ impl Store {
             .collect::<Result<Vec<_>>>()?;
         let more = more || baselines.len() > 64;
         baselines.truncate(64);
+        for baseline in &mut baselines {
+            *baseline = self.load_baseline_metadata(baseline.id)?;
+        }
         Ok(HistoryPage {
             runs,
             baselines,
@@ -290,7 +350,7 @@ impl Store {
                 _ => 0,
             };
             summary.bytes += bytes;
-            if kind == "Screenshot" {
+            if kind == "Screenshot" || kind == "DomSnapshot" {
                 summary.original_bytes += bytes;
             } else {
                 summary.derived_bytes += bytes;
@@ -308,30 +368,77 @@ impl Store {
         project: ProjectId,
         item: DeleteItem,
     ) -> Result<DeletionPreview> {
-        Ok(deletion(&self.connection, &self.paths, project, item)?.0)
+        let (baselines, revision) = self.deletion_sources(project, item)?;
+        Ok(deletion(
+            &self.connection,
+            &self.paths,
+            project,
+            item,
+            &baselines,
+            revision,
+        )?
+        .0)
     }
     pub fn delete_confirmed(&mut self, preview: &DeletionPreview) -> Result<()> {
+        self.delete_confirmed_with_cleanup(preview, |sessions| {
+            ensure!(
+                sessions.is_empty(),
+                "Saved logins must be removed through the application before deleting this scope"
+            );
+            Ok(())
+        })
+        .map(|_| ())
+    }
+    /// Database mutations roll back if private-login cleanup fails. Cleanup runs
+    /// only after validating the frozen impact and all SQL under the write lock.
+    /// External credential deletion is idempotent, but cannot be rolled back.
+    /// Returns true if deletion committed but physical file cleanup is pending.
+    pub fn delete_confirmed_with_cleanup(
+        &mut self,
+        preview: &DeletionPreview,
+        cleanup: impl FnOnce(&[(SessionReference, bool)]) -> Result<()>,
+    ) -> Result<bool> {
+        let (baselines, revision) = self.deletion_sources(preview.project, preview.item)?;
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
-        let (fresh, owners, candidates) =
-            deletion(&tx, &self.paths, preview.project, preview.item)?;
+        let (fresh, owners, candidates) = deletion(
+            &tx,
+            &self.paths,
+            preview.project,
+            preview.item,
+            &baselines,
+            revision,
+        )?;
         ensure!(
             &fresh == preview,
             "Deletion impact/active baseline changed; inspect impact again"
         );
+        let sessions = project_removal::sessions(&tx, preview.project, preview.item)?;
         for (kind, id) in &owners {
             tx.execute(
                 "DELETE FROM artifact_refs WHERE owner_kind=?1 AND owner_id=?2",
                 params![kind, id],
             )?;
-            if kind == "Analysis" {
+            if kind == "Analysis" || kind == "DomAnalysis" {
                 tx.execute("DELETE FROM review_decisions WHERE analysis_id=?1", [id])?;
                 tx.execute("DELETE FROM analysis_display WHERE analysis_id=?1", [id])?;
                 tx.execute("DELETE FROM analyses WHERE id=?1", [id])?;
+                tx.execute(
+                    "DELETE FROM dom_review_decisions WHERE analysis_id=?1",
+                    [id],
+                )?;
+                tx.execute(
+                    "DELETE FROM dom_analysis_display WHERE analysis_id=?1",
+                    [id],
+                )?;
+                tx.execute("DELETE FROM dom_analyses WHERE id=?1", [id])?;
             }
         }
         match preview.item {
+            DeleteItem::Project | DeleteItem::Environment(_) => {
+                project_removal::delete_scope(&tx, preview.project, preview.item)?;
+            }
             DeleteItem::Run(id) => {
                 tx.execute(
                     "DELETE FROM imported_origins WHERE run_id=?1",
@@ -339,6 +446,10 @@ impl Store {
                 )?;
                 tx.execute(
                     "DELETE FROM analysis_display WHERE run_id=?1",
+                    [id.to_string()],
+                )?;
+                tx.execute(
+                    "DELETE FROM dom_analysis_display WHERE run_id=?1",
                     [id.to_string()],
                 )?;
                 // Pair-bound masks are history too: refuse orphaning them, rather than secretly deleting settings.
@@ -359,16 +470,40 @@ impl Store {
                 tx.execute("DELETE FROM baselines WHERE id=?1", [id.to_string()])?;
             }
         }
+        let has_files = !candidates.is_empty();
         for id in candidates {
             tx.execute("INSERT OR IGNORE INTO pending_gc VALUES(?1)", [id.as_str()])?;
         }
-        tx.execute(
-            "UPDATE projects SET revision=revision+1,updated_at=unixepoch() WHERE id=?1",
-            [preview.project.to_string()],
-        )?;
+        if preview.item != DeleteItem::Project {
+            tx.execute(
+                "UPDATE projects SET revision=revision+1,updated_at=unixepoch() WHERE id=?1",
+                [preview.project.to_string()],
+            )?;
+        }
+        cleanup(&sessions)?;
         tx.commit()?;
-        self.complete_confirmed_gc()?;
-        Ok(())
+        // Once the project is removed, never report that it still exists just
+        // because physical unlink failed. The confirmed GC journal survives and
+        // is retried at startup; shared objects are checked again at unlink time.
+        if !has_files {
+            return Ok(false);
+        } else if preview.item == DeleteItem::Project {
+            return Ok(self.complete_confirmed_gc().is_err());
+        } else {
+            self.complete_confirmed_gc()?;
+        }
+        Ok(false)
+    }
+    fn deletion_sources(
+        &self,
+        project: ProjectId,
+        item: DeleteItem,
+    ) -> Result<(Vec<BaselineVersion>, u64)> {
+        if matches!(item, DeleteItem::Project | DeleteItem::Environment(_)) {
+            Ok((Vec::new(), self.load_project(project)?.revision))
+        } else {
+            self.retention_baselines(project)
+        }
     }
     /// Only journals resulting from an explicitly confirmed deletion; never scan-and-GC.
     pub fn complete_confirmed_gc(&mut self) -> Result<()> {

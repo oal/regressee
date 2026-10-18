@@ -64,6 +64,10 @@ pub struct TextInput {
     pub validator: Option<fn(&str) -> Option<&'static str>>,
     pub touched: bool,
     pub correction: Option<String>,
+    /// Form help and the longest known correction share one measured footprint.
+    /// Search and multiline editors deliberately do not use this presentation.
+    pub supporting_text: Option<&'static str>,
+    pub correction_reserve: Option<&'static str>,
     pub debug_name: Option<&'static str>,
     /// Search presentation only; never part of the editable value or IME text.
     pub search_placeholder: Option<&'static str>,
@@ -91,6 +95,8 @@ impl TextInput {
             validator: None,
             touched: false,
             correction: None,
+            supporting_text: None,
+            correction_reserve: None,
             debug_name: None,
             search_placeholder: None,
             blur_observer: None,
@@ -725,7 +731,17 @@ impl Render for TextInput {
                 cx.notify();
             }));
         }
+        let correction = if self.multiline.is_none() && self.touched && !self.composing() {
+            self.validation_error()
+                .map(str::to_owned)
+                .or_else(|| self.correction.clone())
+        } else {
+            None
+        };
         let input = input_base()
+            .when(correction.is_some(), |input| {
+                input.border_color(rgb(palette().error))
+            })
             .id("text-input")
             .debug_selector({
                 let name = self.debug_name.unwrap_or("text-input");
@@ -789,30 +805,73 @@ impl Render for TextInput {
                     .child(EntryElement(cx.entity()))
                     .into_any_element()
             });
-        let correction = if self.multiline.is_none() && self.touched && !self.composing() {
-            self.validation_error()
-                .map(str::to_owned)
-                .or_else(|| self.correction.clone())
-        } else {
-            None
-        };
         div()
             .w_full()
             .flex()
             .flex_col()
             .gap_1()
+            .when(self.supporting_text.is_some(), |field| field.gap_2())
             .child(input)
-            .when_some(correction, |el, message| {
+            .when_some(self.supporting_text, |el, hint| {
+                // All copies occupy the same intrinsic grid cell. Invisible
+                // measurement copies reserve wrapped height at the actual width,
+                // rather than guessing a line count or clipping long errors.
+                let copy = || div().col_start(1).row_start(1).min_w_0();
                 el.child(
                     div()
-                        .id("field-correction")
-                        .debug_selector(|| "field-correction".into())
+                        .debug_selector(|| "field-support".into())
+                        .w_full()
+                        .grid()
+                        .grid_cols(1)
                         .text_size(px(HELP_TEXT_SIZE))
                         .line_height(px(HELP_LINE_HEIGHT))
-                        .text_color(rgb(palette().error))
-                        .child(message),
+                        .text_color(rgb(palette().muted))
+                        .child(copy().invisible().child(hint))
+                        .when_some(self.correction_reserve, |slot, reserve| {
+                            slot.child(copy().invisible().child(reserve))
+                        })
+                        .child(
+                            copy()
+                                .debug_selector(|| "field-support-copy".into())
+                                .when(correction.is_some(), |copy| {
+                                    copy.text_color(rgb(palette().error))
+                                        .debug_selector(|| "field-correction".into())
+                                })
+                                .child(correction.clone().unwrap_or_else(|| hint.to_owned())),
+                        ),
                 )
             })
+            .when_some(
+                correction.filter(|_| self.supporting_text.is_none()),
+                |el, message| {
+                    el.child(
+                        div()
+                            .id("field-correction")
+                            .debug_selector(|| "field-correction".into())
+                            .text_size(px(HELP_TEXT_SIZE))
+                            .line_height(px(HELP_LINE_HEIGHT))
+                            .text_color(rgb(palette().error))
+                            .child(message),
+                    )
+                },
+            )
+    }
+}
+
+/// Configure presentation when a field mounts, without changing editable text,
+/// validation state, focus, selection or subscriptions.
+#[derive(gpui::IntoElement)]
+pub struct SupportedInput {
+    pub input: Entity<TextInput>,
+    pub hint: &'static str,
+}
+
+impl gpui::RenderOnce for SupportedInput {
+    fn render(self, _: &mut Window, cx: &mut App) -> impl IntoElement {
+        self.input.update(cx, |input, _| {
+            input.supporting_text = Some(self.hint);
+        });
+        self.input
     }
 }
 

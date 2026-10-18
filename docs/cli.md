@@ -1,4 +1,4 @@
-# Regressee terminal guide (CLI schema 1 / engine protocol 6)
+# Regressee terminal guide (CLI schema 1 / engine protocol 7)
 
 Build `cargo build --locked -p regressee-cli --bin regressee`, then use
 `./target/debug/regressee` (or put the installed binary on your PATH). No GPUI,
@@ -119,6 +119,93 @@ baseline-bound source/profile/environment definitions requires
 `project update --replacement --prepare`, or the equivalent named settings
 command, then confirming its ticket. This retains historical evidence; separately
 capture and save a new baseline. It does not silently activate replacement pixels.
+
+## What to check
+
+New and legacy projects default to screenshots only. Select the canonical capture
+plan with `project create --mode screenshots|both|dom`, or update saved settings:
+
+```sh
+r checks show --project "$PROJECT"
+r checks set --project "$PROJECT" --expected-revision REVISION --mode both
+```
+
+`checks show` returns the full project record, including `project.capture_plan`.
+Changing the mode of a project with a baseline requires `--replacement --prepare`
+and exact confirmation, then a separate new baseline capture/save. Existing checks
+continue using the baseline's frozen mode and policy, not today's draft. Capture,
+check and resume do not accept a kind override. Screen sizes still affect DOM-only
+captures; image sensitivity and ignored rectangles do not affect DOM comparisons.
+Snapshots can contain private hidden text, ordinary attributes and URLs despite
+the versioned script/event/form exclusions. Treat them as sensitive evidence.
+
+### DOM results, originals and review
+
+Kind-specific operations default to `--kind screenshot`. For DOM use
+`results list/artifacts`, `analysis show/select/reanalyze`, `review set/history`,
+`history show` and `baseline preview/accept` with **`--kind dom`**. A DOM-only run
+does not manufacture image IDs, dimensions or crop panes. Crops and ignored
+rectangles reject DOM. `analysis reanalyze --kind dom --run ID [--context N]`
+uses retained originals, never screenshot sensitivity, masks or a website revisit.
+DOM result pages have both a 200-row ceiling and a 4 MiB encoded-JSON budget;
+escape-heavy warnings/notes can produce fewer rows. Always follow `next_offset`,
+not `offset + requested limit`. An individually oversized row/coverage block
+returns `response_too_large`; use focused target artifacts/source reads. Read
+responses above 16 MiB fail boundedly without draining the engine.
+
+```sh
+DOM_ANALYSIS=$(jq -r '.data.value.dom_comparison.revision.id' check.json)
+r results list --kind dom --project "$PROJECT" --run "$RUN" --analysis "$DOM_ANALYSIS"
+r results artifacts --kind dom --project "$PROJECT" --run "$RUN" --analysis "$DOM_ANALYSIS" --page "$PAGE" --profile "$PROFILE"
+r snapshot source --project "$PROJECT" --run "$RUN" --analysis "$DOM_ANALYSIS" --page "$PAGE" --profile "$PROFILE" --pane after --format plaintext --offset 0 --limit 65536
+r snapshot diff --project "$PROJECT" --run "$RUN" --analysis "$DOM_ANALYSIS" --page "$PAGE" --profile "$PROFILE" --context 3 --offset 0 --limit 200
+r review set --kind dom --analysis "$DOM_ANALYSIS" --page "$PAGE" --profile "$PROFILE" --state intentional --note 'Reviewed this DOM change'
+r baseline preview --kind dom --analysis "$DOM_ANALYSIS" --file selected-keys.json --save dom-approval.json
+r baseline accept --kind dom --file dom-approval.json --prepare --save dom-ticket.json
+```
+
+Source output is `{selection,key,pane,format,source,page}`. `source` binds exact
+run/target/artifact/policy/material/rendering/stability identities; `page` contains
+`text,offset,total_bytes,next_offset`. Offsets are **UTF-8 bytes**, must be valid
+character boundaries, and limits are 4–262144 bytes. Use returned `next_offset`
+without arithmetic guesses and pin the returned run/analysis on subsequent pages.
+`--format canonical` returns exact normalized NDJSON;
+`plaintext` is the readable deterministic record representation. Neither is HTML.
+`--save` for source/diff bodies requires `.txt`, `.json`, `.jsonl` or `.ndjson`;
+HTML/SVG/Markdown filenames are rejected. Recovering a focused read through a job
+receipt retains this safeguard. Saved CLI values are JSON DTOs, not active previews.
+
+Diff output includes both exact sources, comparison outcome, options and `page`
+containing `summary,hunks,offset,total_rows,next_offset`. Limits are 1–1000 emitted rows; offsets index
+the bounded diff, not source lines. Hunk headers/counts describe the full bounded
+diff; each hunk page supplies `row_offset,total_rows` and shared core rows for the
+requested window. `--context` is 0–100. Core work/output limits
+can return coarse/limited detail without changing the exact verdict. Complete
+originals remain available through source pages. Noncomparable sources produce an
+incomplete result, never an unchanged diff. Aggregate capture/workspace/results
+responses retain outcomes and sources, **not hunk text**; focused results/artifacts
+include text-free `diff_summary` counts/limits.
+
+DOM reviews have distinct immutable analysis IDs and exact Before/After source
+bindings. Screenshot reanalysis/masks do not review DOM or clear its notes.
+`review history --kind dom` uses the same bounded keyset pagination as screenshots.
+
+### Explicit approval of multiple kinds
+
+`baseline preview-kinds --file selection.json` accepts this strict shape (use
+`null` for an unselected kind, never an empty list meaning “all”):
+
+```json
+{"screenshot":{"analysis":"SCREENSHOT_ANALYSIS_UUID","selected":[{"page":"PAGE_UUID","profile":"PROFILE_UUID"}]},"dom":{"analysis":"DOM_ANALYSIS_UUID","selected":[{"page":"PAGE_UUID","profile":"PROFILE_UUID"}]}}
+```
+
+Inspect its `KindApprovalPreview`, then `baseline accept-kinds --file preview.json
+--prepare`, inspect the ticket and confirm its exact UUID. The commit is atomic;
+an invalid selected kind rejects everything. An unselected failing sibling is
+neither approved nor silently replaced. Fresh previews support sequential sibling
+approvals from the same check only while selected Before sources still exactly
+match a compatible descendant baseline. Old confirmations never rebase themselves.
+Filling a baseline coverage omission requires a new baseline capture.
 
 ## Existing-project investigation and selected acceptance
 
@@ -249,7 +336,8 @@ Report preview freezes exact selection, resolved identities, storage revision,
 content fingerprint, destination and privacy/content inventory. Confirming a
 different path, target selection or analysis requires a new ticket. Exports
 revalidate the content and revision at execution, after engine consent checks.
-Reports select 1–100 unique target keys, ≤256 MiB image copies and ≤8 MiB metadata.
+Reports select 1–100 unique target keys, ≤256 MiB total original copies (DOM
+canonical plus readable files ≤64 MiB) and ≤8 MiB preview metadata.
 They contain static `index.html`, concise `summary.md` and selected unchanged PNG
 copies: original before/after screenshots and derived differences. The HTML includes the saved `CaptureRun`, its available `queue`
 (`discovery`, capture `project_revision`, `resumed_at`), and separate
@@ -281,6 +369,16 @@ resources or executable page markup. No upload occurs. An output I/O failure can
 leave a partial export directory; it is an explicit failed job, never a report
 success. Inspect it before choosing a **new** destination.
 
+Reports include every enabled kind, independent DOM outcomes/notes and bounded
+escaped unified diffs. DOM-only reports contain no missing screenshot panes.
+`report preview --dom-analysis UUID` pins an older exact DOM analysis separately
+from `--analysis SCREENSHOT_UUID`. The preview freezes both identities, original
+source runs/artifacts/policies/byte counts, diff options, privacy and destination.
+DOM files use generated `.txt` names: original canonical JSON records and derived
+readable plaintext, never captured executable `.html`. Captured URLs are inert
+escaped text, not links. Report DOM diffs are bounded to 500 rows/16 KiB per target;
+HTML is capped at 64 MiB and Markdown at 8 MiB, with explicit display-limit labels.
+
 Baseline ZIP sharing is the **unchanged existing secret-exclusion contract**:
 
 ```sh
@@ -292,7 +390,8 @@ r archive import --file import-preview.json --source /absolute/baseline.zip --pr
 r confirm --file import-ticket.json --confirmation "$(jq -r '.confirmation.id' import-ticket.json)"
 ```
 
-ZIPs contain original images/page addresses, not recipient login sessions. Reports
+ZIPs contain requested original images/normalized DOM evidence and page addresses,
+not recipient login sessions. Reports
 are a separate surface and do not add notes/sessions to the baseline ZIP format.
 See [portable-baseline-archive.md](portable-baseline-archive.md).
 
@@ -418,8 +517,8 @@ failure after the initially valid destination was checked.
 | Exit | Stable code families / meaning |
 | --- | --- |
 | 0 | `ok`, `job_admitted`, `confirmation_prepared`: command succeeded/admitted/prepared, **not** necessarily a completed check. |
-| 1 | `visual_differences`: completed check has changed pixels; operational success (`ok:true`), not confirmed defects. |
-| 2 | `invalid_request`: parser, input/schema/limit/path or domain validation failure. |
+| 1 | `visual_differences` (screenshot-only) / `check_differences` (DOM-enabled): completed comparable check has a change in either requested kind; operational success (`ok:true`), not confirmed defects. |
+| 2 | `invalid_request`, `response_too_large`: parser/input/schema/limit/path/domain failure, or an explicitly bounded read response. Use smaller pages/focused reads. |
 | 3 | `incomplete_capture`, `capture_paused`, `cancelled`: failed/missing/noncomparable coverage, absent check analysis, explicit pause or cancellation. Not unchanged. |
 | 4 | `action_required`, `confirmation_required`, `replacement_required`, `display_required`, `unsupported`, `busy`: structured product requirement, setup/human/runtime/consent requirement, or bounded admission refusal. |
 | 5 | `conflict`: stale revision/preview/authority, changed payload under request ID, consumed confirmation. Reload and deliberately re-prepare as appropriate. |
@@ -432,9 +531,9 @@ precedence over differences. `jobs show/wait` propagate the job outcome's exit
 meaning; queries (`results list`, history, analysis inspection) succeed as reads
 even when the returned evidence contains failures/differences. Consumer code
 should select explicit fields, preserve unknown added fields and check
-`schema_version`/capabilities. Protocol 6 peers are required; old engines must be
+`schema_version`/capabilities. Protocol 7 peers are required; old engines must be
 stopped/rebuilt, not bypassed with a second store owner.
-For an upgrade from protocol 2/3/4/5, stop the old binary's owner, then explicitly start
+For an upgrade from protocol 2/3/4/5/6, stop the old binary's owner, then explicitly start
 the rebuilt `engine serve` once to publish the new descriptor under the ownership
 lock. See [the upgrade/lifetime contract](local-engine.md); do not delete locks.
 Old report previews should be regenerated for the repaired identity/settings/review
@@ -548,6 +647,8 @@ or supply an **exact run** plus optional saved analysis and page/profile pair.
 The engine verifies project/run/original-baseline/analysis/target membership before
 publishing the selection. Omitted analysis resolves once to that run's saved
 analysis, not a later run. Views: compare, before, after, difference, overlay, split.
+`agent select --kind dom` selects the independent DOM analysis namespace and
+supports compare/before/after/difference; image overlay/split are rejected.
 No pixels, baseline, review or saved display pointer change merely by selection.
 The durable selection receipt contains semantic IDs only. Full viewer evidence is
 a separate reclaimable read, so browsing results does not duplicate a whole run in
@@ -643,6 +744,9 @@ Public-site capture still needs supported managed Node/Chromium components, OS
 libraries/fonts, network access and the default sandbox. macOS capture remains
 blocked; Windows/Linux native/browser qualification is not inferred from CLI
 builds. Tests in `crates/cli/tests/workflows.rs` use real subprocess CLI/IPC/product
-services with a signed **synthetic Python worker** producing owned PNGs and
-synthetic link responses, not actual Chromium or external websites. They do not
+services with a signed **protocol-3 synthetic Python worker** producing independent
+PNG and core-golden normalized DOM channels and synthetic link responses, not
+actual Chromium or external websites. Python-only fixture tests cover all modes,
+channel failures, exact goldens/metadata and pixel-independent handshake; this is
+not browser qualification. They do not
 qualify browser rendering, desktop login, a clean server or published packages.

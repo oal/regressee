@@ -15,6 +15,123 @@ fn inside(b: Bounds<Pixels>, clip: Bounds<Pixels>) {
 }
 
 #[gpui::test]
+fn new_public_projects_do_not_reuse_the_previous_projects_access_settings(cx: &mut TestAppContext) {
+    let dir = tempfile::tempdir().unwrap();
+    let paths = AppPaths::isolated(dir.path());
+    let (jobs, events) = Jobs::start_without_runtime(paths.clone());
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    cx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            finish_jobs(s, cx);
+            for name in ["First website", "lindekleiv.com"] {
+                s.create(&CreateProject, window, cx);
+                s.name.update(cx, |f, cx| f.set_value(name, cx));
+                s.address
+                    .update(cx, |f, cx| f.set_value("https://lindekleiv.com/", cx));
+                s.activate_control(Control::Save, window, cx);
+                finish_jobs(s, cx);
+                assert_eq!(s.focus.setup_stage, SetupStage::Access);
+                s.choose(Choice::PublicAccess, cx);
+                s.activate_control(Control::Save, window, cx);
+                finish_jobs(s, cx);
+                assert!(s.error.is_none(), "{name}: {:?}", s.error);
+                assert!(s.task.is_none(), "{name}: access save must succeed");
+                assert_eq!(s.focus.setup_stage, SetupStage::Pages);
+                let saved = s.project.as_ref().unwrap();
+                assert_eq!(s.environment_draft, Some(saved.project.environments[0].id));
+                assert!(!s.unsaved(cx));
+                assert!(
+                    s.evidence.latest.is_none(),
+                    "setup must not visit the website"
+                );
+            }
+        })
+    });
+    owned.join_after_ui();
+    let store = regressee_storage::Store::open(paths).unwrap();
+    assert_eq!(store.list_projects(0).unwrap().items.len(), 2);
+}
+
+#[gpui::test]
+fn new_project_clears_private_access_fields_through_the_production_engine(cx: &mut TestAppContext) {
+    use regressee_app::{
+        engine::{Client, Server},
+        protocol,
+    };
+    let dir = tempfile::tempdir().unwrap();
+    let paths = AppPaths::isolated(dir.path());
+    let mut store = regressee_storage::Store::open(paths.clone()).unwrap();
+    let mut old =
+        Project::draft("Private website".into(), "https://private.example.test/").unwrap();
+    old.environments[0].access = regressee_core::domain::AccessPolicy::InteractiveLogin;
+    store.save_project(&old, None).unwrap();
+    let private_settings = regressee_storage::LocalLoginSettings {
+        login_address: Some("https://private.example.test/login".parse().unwrap()),
+        representative: Some("https://private.example.test/account".parse().unwrap()),
+        identity_origins: vec!["https://identity.example.test/".parse().unwrap()],
+        ephemeral: true,
+    };
+    store
+        .select_environment(old.id, old.environments[0].id, &private_settings)
+        .unwrap();
+    drop(store);
+    let server = Server::without_runtime(paths.clone()).unwrap();
+    let server_thread = std::thread::spawn(move || server.run());
+    let client = Client::existing(paths.clone()).unwrap();
+    let (jobs, events) = Jobs::connect(client.clone());
+    let owned = jobs.clone();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    cx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            finish_jobs(s, cx);
+            s.queue(Work::Load(old.id), cx);
+            finish_jobs(s, cx);
+            s.queue(Work::EnvironmentStatus(old.id), cx);
+            finish_jobs(s, cx);
+            assert_eq!(s.environment_draft, Some(old.environments[0].id));
+            assert_eq!(s.local_login_settings(cx).unwrap(), private_settings);
+            assert!(!s.unsaved(cx));
+
+            s.create(&CreateProject, window, cx);
+            assert!(s.project.is_none());
+            assert!(s.environment.is_none());
+            assert!(s.environment_draft.is_none());
+            assert_eq!(s.local_login_settings(cx).unwrap(), Default::default());
+            s.name.update(cx, |f, cx| f.set_value("Public website", cx));
+            s.address
+                .update(cx, |f, cx| f.set_value("https://public.example.test/", cx));
+            s.activate_control(Control::Save, window, cx);
+            finish_jobs(s, cx);
+            s.choose(Choice::PublicAccess, cx);
+            s.activate_control(Control::Save, window, cx);
+            finish_jobs(s, cx);
+            assert!(s.error.is_none(), "{:?}", s.error);
+            assert!(s.task.is_none());
+            assert_eq!(s.focus.setup_stage, SetupStage::Pages);
+            assert!(!s.unsaved(cx));
+            assert_eq!(s.local_login_settings(cx).unwrap(), Default::default());
+            assert_eq!(
+                s.project.as_ref().unwrap().project.environments[0].access,
+                regressee_core::domain::AccessPolicy::Public
+            );
+        })
+    });
+    owned.join_after_ui();
+    assert!(matches!(
+        client.request(protocol::Request::Stop).unwrap(),
+        protocol::Response::Ok
+    ));
+    server_thread.join().unwrap().unwrap();
+    let store = regressee_storage::Store::open(paths).unwrap();
+    assert_eq!(
+        store.local_login_settings(old.id).unwrap(),
+        private_settings
+    );
+    assert_eq!(store.load_project(old.id).unwrap().revision, 1);
+}
+
+#[gpui::test]
 fn guided_public_save_continues_only_exact_success_and_preserves_newer_drafts(
     cx: &mut TestAppContext,
 ) {

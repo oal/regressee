@@ -114,11 +114,7 @@ impl Shell {
         };
         let destination = match section {
             SettingsSection::Website => Control::Name,
-            SettingsSection::Capture => [1, 2, 3]
-                .into_iter()
-                .map(Control::Guided)
-                .find(|control| self.control_enabled(*control, cx))
-                .unwrap_or(Control::Choice(Choice::FullPage)),
+            SettingsSection::Capture => Control::CaptureMode(self.draft_settings.capture_plan.mode),
             SettingsSection::Access => Control::Choice(Choice::PublicAccess),
         };
         self.settings_scrollbar.cancel_drag();

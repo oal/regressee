@@ -24,6 +24,12 @@ pub type Work = jobs::Command<ViewerWork>;
 pub type Reply = jobs::JobReply<Box<ViewerFrame>>;
 pub type Request = jobs::JobRequest<ViewerWork>;
 pub type Update = jobs::JobUpdate<Box<ViewerFrame>>;
+#[path = "dom_jobs.rs"]
+mod dom;
+pub use dom::{DomPresentation, DomViewerFrame, DomViewerIdentity, DomViewerUpdate};
+#[path = "workspace_jobs.rs"]
+mod workspace;
+pub use workspace::EvidenceReadFailures;
 #[derive(Debug)]
 pub enum ViewerWork {
     ExactViewer(protocol::ViewerSelection),
@@ -115,8 +121,11 @@ impl Appearance {
 pub struct Jobs {
     pub appearance: Appearance,
     backend: Backend,
+    dom_events: Mutex<Receiver<DomViewerUpdate>>,
 }
 struct Remote {
+    evidence_failures: Mutex<BTreeMap<u64, EvidenceReadFailures>>,
+    dom: dom::State,
     client: Client,
     stopped: AtomicBool,
     active: Mutex<BTreeSet<Uuid>>,
@@ -220,7 +229,10 @@ impl Jobs {
             regressee_app::appearance::AppearanceSettings::start_client(client.clone()),
         );
         let (updates, events) = mpsc::sync_channel(UPDATE_CAPACITY);
+        let (dom, dom_events) = dom::State::new();
         let remote = Arc::new(Remote {
+            evidence_failures: Mutex::new(BTreeMap::new()),
+            dom,
             client,
             launcher,
             stopped: AtomicBool::new(false),
@@ -477,10 +489,16 @@ impl Jobs {
             }
         });
         remote.workers.lock().unwrap().push(viewer_thread);
+        remote
+            .workers
+            .lock()
+            .unwrap()
+            .push(dom::start(Arc::downgrade(&remote)));
         (
             Arc::new(Self {
                 appearance,
                 backend: Backend::Remote(remote),
+                dom_events: Mutex::new(dom_events),
             }),
             events,
         )
@@ -490,6 +508,36 @@ impl Jobs {
             Backend::Remote(r) => r.changed.swap(false, Ordering::AcqRel),
             #[cfg(any(test, feature = "test-support"))]
             Backend::Local(_) => false,
+        }
+    }
+    pub fn submit_dom_viewer(
+        &self,
+        id: u64,
+        identity: DomViewerIdentity,
+    ) -> Result<(), &'static str> {
+        match &self.backend {
+            Backend::Remote(remote) if !remote.stopped.load(Ordering::Acquire) => {
+                remote.dom.submit(id, identity);
+                Ok(())
+            }
+            _ => Err("DOM source reads require a connected shared engine."),
+        }
+    }
+    pub fn cancel_dom_viewer(&self) {
+        match &self.backend {
+            Backend::Remote(remote) => remote.dom.cancel(),
+            #[cfg(any(test, feature = "test-support"))]
+            Backend::Local(_) => (),
+        }
+    }
+    pub fn take_dom_viewer(&self) -> Option<DomViewerUpdate> {
+        self.dom_events.lock().unwrap().try_recv().ok()
+    }
+    pub fn take_evidence_failures(&self, id: u64) -> Option<EvidenceReadFailures> {
+        match &self.backend {
+            Backend::Remote(remote) => remote.evidence_failures.lock().unwrap().remove(&id),
+            #[cfg(any(test, feature = "test-support"))]
+            Backend::Local(_) => None,
         }
     }
     /// Passive saved-data refresh has its own identity/reply lane. It must not
@@ -510,8 +558,10 @@ impl Jobs {
         self.passive_read(id, Operation::History { project, page })
     }
     fn passive_read(&self, id: u64, operation: Operation) -> Result<(), &'static str> {
-        let Backend::Remote(remote) = &self.backend else {
-            return Err("Saved data refresh requires the shared engine.");
+        let remote = match &self.backend {
+            Backend::Remote(remote) => remote,
+            #[cfg(any(test, feature = "test-support"))]
+            Backend::Local(_) => return Err("Saved data refresh requires the shared engine."),
         };
         if remote.stopped.load(Ordering::Acquire) {
             return Err("Engine client has disconnected.");
@@ -524,13 +574,22 @@ impl Jobs {
         let worker_remote = remote.clone();
         let worker = thread::spawn(move || {
             let result = (|| -> anyhow::Result<Reply> {
-                let job = worker_remote.query(operation)?;
-                let _ = worker_remote
-                    .client
-                    .request(protocol::Request::Acknowledge { id: job.id });
-                job.outcome
-                    .ok_or_else(|| anyhow::anyhow!("Saved data read has no outcome"))?
-                    .into_reply(|_| anyhow::bail!("Saved data is not a pixel frame"))
+                let outcome = if let Operation::SelectedEvidence(selection) = operation {
+                    worker_remote.recover_workspace(
+                        id,
+                        selection.project,
+                        selection.run,
+                        Some(selection),
+                    )?
+                } else {
+                    let job = worker_remote.query(operation)?;
+                    let _ = worker_remote
+                        .client
+                        .request(protocol::Request::Acknowledge { id: job.id });
+                    job.outcome
+                        .ok_or_else(|| anyhow::anyhow!("Saved data read has no outcome"))?
+                };
+                outcome.into_reply(|_| anyhow::bail!("Saved data is not a pixel frame"))
             })();
             let mut update = Update {
                 id,
@@ -561,17 +620,22 @@ impl Jobs {
         }
     }
     pub fn agent_command(&self, command: regressee_app::control::Command) {
-        if let Backend::Remote(r) = &self.backend {
-            let mut pending = r.agent_command.lock().unwrap();
-            if pending.is_none() || matches!(command, regressee_app::control::Command::Takeover) {
-                let mut a = r.agent.lock().unwrap();
-                *pending = Some((
-                    command,
-                    r.client.credential(),
-                    a.control.as_ref().map(|c| c.epoch),
-                ));
-                a.pending = true;
+        match &self.backend {
+            Backend::Remote(r) => {
+                let mut pending = r.agent_command.lock().unwrap();
+                if pending.is_none() || matches!(command, regressee_app::control::Command::Takeover)
+                {
+                    let mut a = r.agent.lock().unwrap();
+                    *pending = Some((
+                        command,
+                        r.client.credential(),
+                        a.control.as_ref().map(|c| c.epoch),
+                    ));
+                    a.pending = true;
+                }
             }
+            #[cfg(any(test, feature = "test-support"))]
+            Backend::Local(_) => (),
         }
     }
     pub fn saved_project(
@@ -684,10 +748,12 @@ impl Jobs {
         pair: (Arc<crate::local_jobs::Jobs>, Receiver<Update>),
     ) -> (Arc<Self>, Receiver<Update>) {
         let (jobs, events) = pair;
+        let (_, dom_events) = dom::State::new();
         (
             Arc::new(Self {
                 appearance: Appearance::Local(jobs.clone()),
                 backend: Backend::Local(jobs),
+                dom_events: Mutex::new(dom_events),
             }),
             events,
         )
@@ -924,6 +990,11 @@ impl Remote {
     ) {
         let remote = self;
         let id = request.id;
+        let workspace = match &request.work {
+            Work::Evidence(project) => Some((*project, None)),
+            Work::InspectRun { project, run } => Some((*project, Some(*run))),
+            _ => None,
+        };
         let cancel = if let Work::Reanalyze { cancel, .. } = &request.work {
             Some(cancel.clone())
         } else {
@@ -1061,6 +1132,24 @@ impl Remote {
             job.outcome
                 .ok_or_else(|| anyhow::anyhow!("Engine job has no terminal outcome"))
         })();
+        let result = if !result.as_ref().is_ok_and(|outcome| !outcome.failed()) {
+            if let Some((project, exact)) = workspace {
+                remote
+                    .recover_workspace(id, project, exact, None)
+                    .map(|outcome| match (exact, outcome) {
+                        (Some(run), Outcome::Evidence(evidence)) => Outcome::InspectedRun {
+                            project,
+                            run,
+                            evidence,
+                        },
+                        (_, outcome) => outcome,
+                    })
+            } else {
+                result
+            }
+        } else {
+            result
+        };
         let reply = result
             .and_then(|outcome| outcome.into_reply(|f| remote.decode_viewer(f)))
             .unwrap_or_else(|e| Reply::ProductFailure(e.to_string()));

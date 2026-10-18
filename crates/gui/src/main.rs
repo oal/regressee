@@ -12,8 +12,8 @@ use regressee_core::{
     appearance::AppAppearance,
     crawl::{self, DiscoveryPreview},
     domain::{
-        CaptureExtent, CaptureProfile, Classification, DiscoveryMode, JobState, Project, RunIntent,
-        Speed, TargetKey, TargetOutcome,
+        CaptureExtent, CaptureMode, CapturePlan, CaptureProfile, Classification, DiscoveryMode,
+        JobState, Project, RunIntent, Speed, TargetKey, TargetOutcome,
     },
     evidence::ProjectEvidence,
     shell::{
@@ -52,12 +52,16 @@ mod app_settings_ux;
 mod appearance_ux;
 mod capture_diagnostics;
 mod comparison_ux;
+mod dom_approval_ux;
+mod dom_review_ux;
+mod dom_ux;
 mod evidence_workspace;
 mod exit_guard;
 mod form_recovery;
 mod loading_ux;
 mod local_ux;
 mod options_ux;
+mod project_removal_ux;
 mod project_settings_ux;
 mod review_ux;
 mod runtime_ux;
@@ -162,6 +166,7 @@ type SetupPaintBounds = (
 );
 
 struct Shell {
+    dom: dom_ux::DomWorkspace,
     input_gate: regressee_gui::ui::interaction::InputGate,
     agent: regressee_gui::jobs::AgentState,
     agent_handles: [FocusHandle; 3],
@@ -346,6 +351,8 @@ struct Shell {
     working_width: f32,
     viewport_height: f32,
     presentation_focus: Option<Control>,
+    scope_confirmation_due: bool,
+    removal_restore: Option<Control>,
 }
 
 #[derive(IntoElement)]
@@ -384,6 +391,7 @@ impl RenderOnce for ProjectName {
 impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
+            dom: dom_ux::DomWorkspace::new(cx),
             input_gate: Default::default(),
             agent: Default::default(),
             agent_handles: std::array::from_fn(|_| cx.focus_handle().tab_stop(true)),
@@ -404,7 +412,7 @@ impl Shell {
             desktop_dark: desktop_is_dark(cx.window_appearance()),
             appearance_observer: None,
             root_focus: cx.focus_handle(),
-            handles: (0..(653 + regressee_gui::task::MAX_TASK_LINKS))
+            handles: (0..(1727 + regressee_gui::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -600,8 +608,12 @@ impl Shell {
             working_width: 1040.,
             viewport_height: 800.,
             presentation_focus: None,
+            scope_confirmation_due: false,
+            removal_restore: None,
         };
         cx.observe(&shell.timezone, |_, _, cx| cx.notify()).detach();
+        cx.observe(&shell.dom.source, |_, _, cx| cx.notify())
+            .detach();
         cx.subscribe(&shell.zoom_select, |this, _, choice: &ZoomChoice, cx| {
             if this.control_enabled(Control::Guided(46), cx) {
                 this.choose_viewer_zoom(*choice, cx);
@@ -626,12 +638,14 @@ impl Shell {
         shell.options_anchors = (0..9)
             .map(|_| gpui::ScrollAnchor::for_handle(shell.options_scroll.clone()))
             .collect();
-        shell
-            .name
-            .update(cx, |input, _| input.validator = Some(local_ux::name));
-        shell
-            .address
-            .update(cx, |input, _| input.validator = Some(local_ux::addresses));
+        shell.name.update(cx, |input, _| {
+            input.validator = Some(local_ux::name);
+            input.correction_reserve = local_ux::name("");
+        });
+        shell.address.update(cx, |input, _| {
+            input.validator = Some(local_ux::addresses);
+            input.correction_reserve = Some(local_ux::ADDRESS_CORRECTION);
+        });
         cx.observe(&shell.address, |s, _, cx| {
             s.refresh_setup_origins(cx);
             cx.notify();
@@ -639,7 +653,8 @@ impl Shell {
         .detach();
         for (i, input) in shell.crawl_fields.iter().enumerate() {
             input.update(cx, |input, _| {
-                input.validator = local_ux::crawl_validator(i)
+                input.validator = local_ux::crawl_validator(i);
+                input.correction_reserve = local_ux::crawl_correction_reserve(i);
             });
         }
         for (i, input) in shell.analysis_fields.iter().enumerate() {
@@ -713,6 +728,8 @@ impl Shell {
             self.refresh_visible(cx);
         }
         self.sync_appearance(cx);
+        self.sync_dom_workspace(cx);
+        self.poll_dom_viewer(cx);
         self.sync_review_note(cx);
         // Bounded batch: at most the update channel capacity per tick.
         let mut updates = Vec::new();
@@ -1034,12 +1051,16 @@ impl Shell {
                 });
                 self.notice = (!selecting_project).then(|| {
                     if saved_baseline {
+                        if let Some(c) = self.evidence.latest.as_ref().and_then(regressee_gui::task::baseline_consent_coverage)
+                            && self.recorded_mode().dom_snapshots() {
+                            format!("Baseline saved with {} screenshots and {} eligible DOM snapshots. Missing or unstable kinds are omitted, not retried automatically. Earlier captures remain in History.", c.screenshot_captures, c.dom_captures)
+                        } else {
                         if let Some((captured, intended)) = self.evidence.latest.as_ref().and_then(|r| r.baseline_save_counts())
                             && captured < intended {
                             format!("Baseline saved with {}. {} skipped and will not be checked. Captures and earlier versions are kept in History.", workflow::count_label(captured, "screenshot", "screenshots"), workflow::count_label(intended - captured, "missing screenshot was", "missing screenshots were"))
                         } else {
                             "Baseline saved. Future checks will compare against these screenshots using the same page list. Earlier versions are available in History.".into()
-                        }
+                        } }
                     } else { "Settings saved on this computer.".into() }
                 });
                 if saved_baseline {
@@ -1128,7 +1149,13 @@ impl Shell {
                 }
             }
             Reply::ProjectStorage(_) => (), // handled by the independent read generation above
-            Reply::DeletePreview(preview) => self.deletion_preview = Some(*preview),
+            Reply::DeletePreview(preview) => {
+                let scope = preview.scope.is_some();
+                self.deletion_preview = Some(*preview);
+                if scope {
+                    self.scope_confirmation_due = true;
+                }
+            }
             Reply::Deleted => {
                 self.clear_portability_previews();
                 self.history = None;
@@ -1140,6 +1167,14 @@ impl Shell {
                     self.queue(Work::Load(p.project.id), cx);
                 }
                 self.notice=Some("History record deleted. Screenshots used by other records or saved baselines were kept.".into());
+            }
+            Reply::ScopeDeleted {
+                project,
+                item,
+                cleanup_pending,
+            } => {
+                self.receive_scope_deletion(project, item, cleanup_pending, cx);
+                return;
             }
             Reply::RepairPreview(preview) => self.repair_preview = Some(*preview),
             Reply::CleanedTemporaries => {
@@ -1169,7 +1204,12 @@ impl Shell {
                 {
                     self.queue(Work::Evidence(project.project.id), cx);
                 }
-                self.error = Some(error);
+                self.error = Some(
+                    error
+                        .strip_prefix("storage_write_failed: ")
+                        .unwrap_or(&error)
+                        .to_owned(),
+                );
             }
             Reply::ActionRequired(problem) => {
                 if failed_operation
@@ -1372,6 +1412,12 @@ impl Shell {
                     );
                 }
                 self.evidence = *e;
+                self.dom.read_failures = self.jobs.take_evidence_failures(update.id);
+                self.jobs.cancel_dom_viewer();
+                self.dom.identity = None;
+                self.dom.pending = None;
+                self.dom.frame = None;
+                self.dom.failed = false;
                 self.history_index = history_baseline
                     .and_then(|id| self.evidence.baselines.iter().position(|b| b.id == id))
                     .unwrap_or(0);
@@ -1438,11 +1484,10 @@ impl Shell {
                     self.focus.review_surface = ReviewSurface::Changes;
                 }
                 self.focus.viewer = self.evidence.before.is_some()
-                    || self
-                        .evidence
-                        .latest
-                        .as_ref()
-                        .is_some_and(|r| r.all_captures().next().is_some());
+                    || self.evidence.latest.as_ref().is_some_and(|r| {
+                        r.all_captures().next().is_some() || !r.dom_captures.is_empty()
+                    });
+                self.sync_dom_workspace(cx);
                 if self.focus.viewer
                     && self.focus.screen == Screen::Results
                     && let Some(p) = &self.project
@@ -1458,6 +1503,7 @@ impl Shell {
                 run,
                 evidence,
             } => {
+                self.dom.read_failures = self.jobs.take_evidence_failures(update.id);
                 self.receive_history_inspection(project, run, *evidence, cx);
             }
             Reply::Extension(_) => (), // only the independent, identity-bound read path may replace pixels
@@ -1481,6 +1527,7 @@ impl Shell {
                     self.begin_approval_dialog();
                 }
             }
+            Reply::Dom(output) => self.apply_dom_reply(*output, cx),
             Reply::SavedReview(history) => {
                 self.evidence.reviews = history;
                 self.review_save_completed(cx);
@@ -1759,6 +1806,7 @@ impl Shell {
         }
         self.focus.approval_dialog = false;
         self.approval = None;
+        self.dom.approval = None;
         self.approval_epoch += 1;
     }
     fn begin_approval_dialog(&mut self) {
@@ -1779,7 +1827,7 @@ impl Shell {
             && self.project.as_ref().is_some_and(|p| {
                 p.project.id == c.project
                     && p.revision == c.project_revision
-                    && p.project.active_baseline == Some(c.baseline)
+                    && p.project.active_baseline == Some(c.parent)
             })
             && self
                 .evidence
@@ -1928,6 +1976,20 @@ impl Shell {
         }
     }
     fn reload_viewer(&mut self, cx: &mut Context<Self>) {
+        if self.dom_active() {
+            self.reload_dom_viewer(cx);
+            return;
+        }
+        if self
+            .kind_read_error(regressee_core::domain::CheckKind::Screenshot)
+            .is_some()
+        {
+            self.viewer_pending = None;
+            self.focus.view_loading = false;
+            self.clear_viewer();
+            self.viewer_read_failed = true;
+            return;
+        }
         self.screenshot_scroll
             .set_offset(gpui::point(px(0.), px(0.)));
         let Some(identity) = self.viewer_identity() else {
@@ -2008,6 +2070,9 @@ impl Shell {
         })
     }
     fn prefetch_next_viewer(&self) {
+        if self.dom_active() || !self.recorded_mode().screenshots() {
+            return;
+        }
         if self.history_inspection.is_some() {
             return;
         }
@@ -2270,6 +2335,10 @@ impl Shell {
                 }
             }
             20..=22 => {
+                if self.dom_active() {
+                    self.save_dom_review(index, cx);
+                    return;
+                }
                 self.sync_review_note(cx);
                 if !self.review_result_valid() {
                     return;
@@ -2303,6 +2372,10 @@ impl Shell {
                 }
             }
             23 => {
+                if self.recorded_mode().dom_snapshots() {
+                    self.kind_approval_action(index, cx);
+                    return;
+                }
                 if let Some(key) = &self.selected_key {
                     if !self.approval_selection.remove(key) && self.approval_eligible(key) {
                         self.approval_selection.insert(key.clone());
@@ -2311,6 +2384,10 @@ impl Shell {
                 }
             }
             24 => {
+                if self.recorded_mode().dom_snapshots() {
+                    self.kind_approval_action(index, cx);
+                    return;
+                }
                 if self
                     .approval
                     .as_ref()
@@ -2334,6 +2411,10 @@ impl Shell {
                 }
             }
             25 => {
+                if self.recorded_mode().dom_snapshots() {
+                    self.kind_approval_action(index, cx);
+                    return;
+                }
                 if self.focus.approval_dialog
                     && let Some(preview) = &self.approval
                     && self.approval_matches(preview)
@@ -2414,6 +2495,8 @@ impl Shell {
         cx.notify();
     }
     fn clear_portability_previews(&mut self) {
+        self.scope_confirmation_due = false;
+        self.removal_restore = None;
         self.details.remove(&Detail::Portability);
         self.export_preview = None;
         self.import_preview = None;
@@ -2738,6 +2821,9 @@ impl Shell {
         cx.notify();
     }
     fn portability_confirmation(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.scope_deletion_preview() {
+            return div().into_any_element();
+        }
         let mut body = div()
             .debug_selector(|| "portability-preview".into())
             .flex()
@@ -2746,20 +2832,24 @@ impl Shell {
             .max_w(px(680.));
         if let Some(p) = &self.export_preview {
             body=body.child(div().font_weight(FontWeight::SEMIBOLD).child("Share this baseline as a ZIP?"))
-                .child(div().debug_selector(|| "export-privacy-consequences".into()).child("The ZIP contains original screenshots and project settings, but no login sessions or cookies. Ignored areas are still visible in the images. Recipients must log in themselves to check private pages."))
-                .child(format!("{} · {} · {} · {} · {}. Only images used by this baseline are included; unrelated history and the database are not.",workflow::count_label(p.targets,"page and screen-size combination","page and screen-size combinations"),workflow::count_label(p.originals,"original PNG","original PNGs"),human_bytes(p.bytes),workflow::count_label(p.sources,"source capture date","source capture dates"),workflow::count_label(p.masks,"set of ignored areas","sets of ignored areas")))
+                .child(div().debug_selector(|| "export-privacy-consequences".into()).child("The ZIP contains original captures and project settings, but no login sessions or cookies. Ignored screenshot areas remain visible. DOM text, hidden content, attributes and URLs can still contain private information; exclusions are not complete redaction. Recipients must log in themselves to check private pages."))
+                .child(format!("{} · {} · {} · {} · {}. Only originals used by this baseline are included; unrelated history and the database are not.",workflow::count_label(p.targets,"page and screen-size combination","page and screen-size combinations"),workflow::count_label(p.originals,"original capture file","original capture files"),human_bytes(p.bytes),workflow::count_label(p.sources,"source capture date","source capture dates"),workflow::count_label(p.masks,"set of ignored areas","sets of ignored areas")))
                 .child(div().text_color(rgb(palette().warning)).child(p.privacy.clone()))
                 .child(self.button(Control::Phase6(3),"I understand — export ZIP…",ActionStyle::Primary,cx));
         }
         if let Some(p) = &self.import_preview {
             body=body.child(div().font_weight(FontWeight::SEMIBOLD).child(format!("Import “{}” as a new project?",p.name)))
                 .child("Existing projects and baselines stay unchanged. No website is visited. Log in yourself before checking private pages, and check that imported ignored areas fit your screenshots.")
-                .child(format!("{} · {} · {} · {}. If the project name is already used, the import gets a different name.",workflow::count_label(p.targets,"page and screen-size combination","page and screen-size combinations"),workflow::count_label(p.originals,"original PNG","original PNGs"),human_bytes(p.bytes),workflow::count_label(p.masks,"set of ignored areas","sets of ignored areas")))
+                .child(format!("{} · {} · {} · {}. If the project name is already used, the import gets a different name.",workflow::count_label(p.targets,"page and screen-size combination","page and screen-size combinations"),workflow::count_label(p.originals,"original capture file","original capture files"),human_bytes(p.bytes),workflow::count_label(p.masks,"set of ignored areas","sets of ignored areas")))
                 .child(div().text_color(rgb(palette().warning)).child(p.warning.clone()))
                 .child(self.button(Control::Phase6(1),"Import as new project",ActionStyle::Primary,cx));
         }
         if let Some(p) = &self.deletion_preview {
             let identity = match p.item {
+                regressee_storage::DeleteItem::Project
+                | regressee_storage::DeleteItem::Environment(_) => {
+                    "selected project settings".into()
+                }
                 regressee_storage::DeleteItem::Run(id) => self
                     .history
                     .as_ref()
@@ -2878,6 +2968,21 @@ impl Shell {
     }
     fn handle(&self, control: Control, cx: &App) -> FocusHandle {
         let index = match control {
+            Control::CaptureMode(mode) => 653 + regressee_gui::task::MAX_TASK_LINKS + mode as usize,
+            Control::EvidenceKind(kind) => {
+                656 + regressee_gui::task::MAX_TASK_LINKS + kind as usize
+            }
+            Control::DomSource(index) => 658 + regressee_gui::task::MAX_TASK_LINKS + index,
+            Control::DomViewer(index) => {
+                return self
+                    .dom
+                    .source
+                    .read(cx)
+                    .focus_handles(cx)
+                    .get(index)
+                    .cloned()
+                    .unwrap_or_else(|| self.root_focus.clone());
+            }
             Control::Appearance(preference) => {
                 650 + regressee_gui::task::MAX_TASK_LINKS + preference as usize
             }
@@ -2899,6 +3004,10 @@ impl Shell {
             Control::PreviousPage => 10,
             Control::NextPage => 11,
             Control::OpenProject(index) => 12 + index,
+            Control::DeleteProject(index) => 661 + regressee_gui::task::MAX_TASK_LINKS + index,
+            Control::DeleteCurrentProject => 725 + regressee_gui::task::MAX_TASK_LINKS,
+            Control::RemoveEnvironment => 726 + regressee_gui::task::MAX_TASK_LINKS,
+            Control::RemoveMapping(index) => 727 + regressee_gui::task::MAX_TASK_LINKS + index,
             Control::SelectProject(index) => 248 + index,
             Control::ChooseProject => 240,
             Control::CancelProjectChoice => 241,
@@ -3146,6 +3255,12 @@ impl Shell {
         {
             return;
         }
+        if self.dom_input_allowed() {
+            self.dom
+                .source
+                .update(cx, |source, cx| source.focus_search(window, cx));
+            return;
+        }
         if self
             .crawl_fields
             .iter()
@@ -3254,7 +3369,10 @@ impl Shell {
             }
             self.analysis_due = None;
         }
-        if matches!(&work, Work::Approval { .. }) {
+        if matches!(
+            &work,
+            Work::Approval { .. } | Work::Dom(regressee_app::engine::dom::Command::Approval(_))
+        ) {
             self.approval_request_epoch = Some(self.approval_epoch);
         }
         if matches!(
@@ -3291,6 +3409,13 @@ impl Shell {
             None
         };
         let task_spec = regressee_gui::task::Spec::for_work(&work);
+        let deletion_context = match &work {
+            Work::Delete(preview) => preview
+                .scope
+                .as_ref()
+                .map(|scope| (preview.project, preview.item, scope.clone())),
+            _ => None,
+        };
         let incoming_project = match &work {
             Work::Import { preview, .. } => Some(preview.name.clone()),
             _ => None,
@@ -3311,6 +3436,17 @@ impl Shell {
                 self.progress = Some((activity_label.into(), 0, None));
                 if let Some(spec) = task_spec {
                     self.begin_task(spec);
+                    if let Some((project, item, scope)) = deletion_context {
+                        let task = self.task.as_mut().unwrap();
+                        task.project_id = Some(project);
+                        task.project = scope.project_name;
+                        task.website = scope.address;
+                        task.environment = if item == regressee_storage::DeleteItem::Project {
+                            String::new()
+                        } else {
+                            scope.name
+                        };
+                    }
                     if let Some(name) = incoming_project {
                         let task = self.task.as_mut().unwrap();
                         task.project = name;
@@ -3404,6 +3540,16 @@ impl Shell {
             self.address.update(cx, |input, cx| input.set_value("", cx));
             self.draft_settings =
                 Project::draft("New website".into(), "https://example.test").unwrap();
+            // Environment IDs and private login fields belong to the previous
+            // project. A new project's first save creates its own environment.
+            self.environment = None;
+            self.environment_draft = None;
+            self.environment_read_signature = None;
+            self.login_hydration_origin = None;
+            self.login_ephemeral = false;
+            for input in &self.crawl_fields[10..13] {
+                input.update(cx, |input, cx| input.set_value("", cx));
+            }
             self.set_crawl_fields(cx);
             self.preview = None;
             self.origins_confirmed = false;
@@ -3522,6 +3668,7 @@ impl Shell {
             draft.sources = sources;
             draft.discovery = self.draft_settings.discovery.clone();
             draft.profiles = self.draft_settings.profiles.clone();
+            draft.capture_plan = self.draft_settings.capture_plan.clone();
             let text = |i: usize| self.crawl_fields[i].read(cx).content.trim().to_owned();
             if self.project.is_some() {
                 for profile in &mut draft.profiles {
@@ -3587,6 +3734,7 @@ impl Shell {
                     project.sources = draft.sources.clone();
                     project.discovery = draft.discovery.clone();
                     project.profiles = draft.profiles.clone();
+                    project.capture_plan = draft.capture_plan.clone();
                     project.environments = self.draft_settings.environments.clone();
                     // The initial default environment follows an edited source.
                     // Custom mappings and additional sources are never discarded.
@@ -3766,10 +3914,13 @@ impl Shell {
             return;
         }
         if matches!(index, 48 | 49) {
-            let count = self
-                .approval
-                .as_ref()
-                .map_or(0, |p| p.baseline.references.len());
+            let count = if self.recorded_mode().dom_snapshots() {
+                self.kind_approval_rows()
+            } else {
+                self.approval
+                    .as_ref()
+                    .map_or(0, |p| p.baseline.references.len())
+            };
             self.approval_reference_index = if index == 48 {
                 self.approval_reference_index.saturating_sub(1)
             } else {
@@ -4448,11 +4599,7 @@ impl Shell {
     ) -> gpui::Stateful<Div> {
         self.measured_form_field(
             Control::CrawlField(index),
-            controls::field(
-                label,
-                help,
-                self.crawl_fields[index].clone().into_any_element(),
-            ),
+            controls::validated_field(label, help, self.crawl_fields[index].clone()),
         )
         .id(("form-crawl-field", index))
         .anchor_scroll(self.form_anchor(Control::CrawlField(index)))
@@ -4477,11 +4624,11 @@ impl Shell {
             })
         .clamp(1., 680.);
         let mut body=div().w(px(form_width)).flex_shrink_0().flex().flex_col().gap_4()
-            .when(!self.form_errors(cx).is_empty(), |body| body.child(self.form_error_summary(cx)))
             .when(website, |body| body.child(controls::section("Website", "Saving settings does not visit your website.")
                   .when(stage == SetupStage::Settings, |section| self.measured_settings_section(SettingsSection::Website, section))
-                 .child(self.measured_form_field(Control::Name, controls::field("Project name","Choose a recognizable name.",self.name.clone().into_any_element())).id("form-project-name").anchor_scroll(self.form_anchor(Control::Name)))
-                 .child(self.measured_form_field(Control::Address, controls::field("Starting addresses","Use complete addresses starting with https:// or http://, separated by spaces. Only the listed websites are visited; subdomains must be added separately.",self.address.clone().into_any_element())).id("form-starting-addresses").anchor_scroll(self.form_anchor(Control::Address)))
+                  .child(self.measured_form_field(Control::Name, controls::validated_field("Project name","Choose a recognizable name.",self.name.clone())).id("form-project-name").anchor_scroll(self.form_anchor(Control::Name)))
+                  .child(self.measured_form_field(Control::Address, controls::validated_field("Starting addresses","Use complete https:// or http:// addresses, separated by spaces.",self.address.clone())).id("form-starting-addresses").anchor_scroll(self.form_anchor(Control::Address)))
+                  .child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child("Only the listed websites are visited; subdomains must be added separately."))
                 .when(self.setup_origin_count > 1, |section| section
                     .child(self.check_button(Control::Guided(11), "Approve all listed websites", approved, cx))
                     .child(div().text_size(px(13.)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child("Approve these distinct websites before saving. Changing the websites requires approval again.")))));
@@ -4506,7 +4653,7 @@ impl Shell {
         .child(self.crawl_field(
             0,
             "Maximum pages",
-            "1–10,000. A page captured at three screen sizes creates three screenshots.",
+            "1–10,000. Each included page is checked at every selected screen size.",
         ));
         let mut profiles = div().flex().flex_wrap().gap_2();
         for (index, name, dimensions) in [
@@ -4535,15 +4682,18 @@ impl Shell {
             let mut capture=div().w_full().flex_shrink_0().flex().flex_col().gap_4().child(controls::section("Capture plan & screen sizes", "Mobile and tablet simulate websites, not real devices.")
             .child(div().debug_selector(|| "setup-capture-plan".into()).w_full().min_w_0().flex().flex_col().gap_1().text_size(px(13.)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted))
                 .children(self.draft_settings.profiles.iter().map(|p| div().w_full().child(format!("{} · {} × {}", p.name, p.width, p.height))))
-                 .child(div().w_full().child(format!("{} · {}", if full_page { "Full page" } else { "Visible screen" }, if original_images { "original images" } else { "photos replaced" })))
+                  .when(self.draft_settings.capture_plan.mode.screenshots(), |summary| summary.child(div().w_full().child(format!("{} · {}", if full_page { "Full page" } else { "Visible screen" }, if original_images { "original images" } else { "photos replaced" }))))
                 .child(div().w_full().child(format!("{} · up to {} pages · {} speed", if d.mode == DiscoveryMode::OnlyAddresses { "Starting addresses only" } else { "Find linked pages" }, self.crawl_fields[0].read(cx).content, match d.speed { Speed::Gentle => "Gentle", Speed::Balanced => "Balanced", Speed::Fast => "Fast" }))))
+            .child(self.capture_mode_choices(cx))
             .child(profiles)
-            .child(self.choice_button(Control::Choice(Choice::FullPage), "Full page", "Include content below the visible screen, within capture limits.", full_page, cx))
-            .child(self.choice_button(Control::Choice(Choice::VisibleScreen), "Visible screen only", "Capture what fits on the screen without scrolling.", !full_page, cx)))
+            .when(self.draft_settings.capture_plan.mode.dom_snapshots(), |section| section.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child("Screen sizes affect responsive layout in the live DOM. Screenshot extent, image replacement, sensitivity and ignored rectangles do not affect DOM snapshots.")))
+            .when(self.draft_settings.capture_plan.mode.screenshots(), |section| section
+                .child(self.choice_button(Control::Choice(Choice::FullPage), "Full page", "Include content below the visible screen, within capture limits.", full_page, cx))
+                .child(self.choice_button(Control::Choice(Choice::VisibleScreen), "Visible screen only", "Capture what fits on the screen without scrolling.", !full_page, cx))))
             .child(page_boundaries)
-            .child(controls::section("Images", "Choose before capturing a baseline. Later checks keep the baseline's image mode.")
+            .when(self.draft_settings.capture_plan.mode.screenshots(), |capture| capture.child(controls::section("Images", "Choose before capturing a baseline. Later checks keep the baseline's image mode.")
                 .child(self.choice_button(Control::Choice(Choice::OriginalImages), "Keep original images", "Compare the website as it appears.", original_images, cx))
-                    .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace photos", "Use neutral placeholders so changing photos cause fewer differences. Some logos and other images may also be replaced.", !original_images, cx)));
+                    .child(self.choice_button(Control::Choice(Choice::ReplaceImages), "Replace photos", "Use neutral placeholders so changing photos cause fewer differences. Some logos and other images may also be replaced.", !original_images, cx))));
             let mut scope = div().w_full().flex().flex_col().gap_4();
             if self.focus.advanced {
                 scope=scope.child(div().max_w(px(680.)).flex().flex_col().gap_4()
@@ -4590,7 +4740,8 @@ impl Shell {
             body.child(self.setup_runtime_note())
         })
         .when(stage == SetupStage::Settings, |body| {
-            body.child(self.settings_location_sync(cx))
+            body.child(self.project_deletion_section(cx))
+                .child(self.settings_location_sync(cx))
         })
         .into_any_element()
     }
@@ -4624,18 +4775,41 @@ impl Shell {
                 .child(div().font_weight(FontWeight::SEMIBOLD).mt_3().child("Environments"))
                 .children(self.draft_settings.environments.iter().enumerate().map(|(index, environment)| self.choice_button(Control::Environment(index), environment.name.clone(), "Separate saved login and page mapping", Some(environment.id) == self.environment_draft, cx)))
                 .child(self.guided_button(27,"Add staging environment",cx))
+                .when(self.draft_settings.environments.len() > 1, |body| body.child(self.button(Control::RemoveEnvironment, "Remove environment…", ActionStyle::Danger, cx)))
+                .when(self.draft_settings.environments.len() > 1 && self.unsaved(cx) && self.project.as_ref().is_some_and(|p|p.project.environments.iter().any(|e|Some(e.id)==self.environment_draft)), |body| body.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child("Save your changes before removing a saved environment.")))
                 .when(self.environment_unsaved(cx), |el| el.child(controls::status("Unsaved environment edits — Save settings before choosing another environment.", Tone::Information)))
                 .child(div().font_weight(FontWeight::SEMIBOLD).mt_3().child("Page address mapping"))
              .child(self.crawl_field(13,"Original website or section","For example https://production.example/app. Leave out address endings starting with ? or #."))
              .child(self.crawl_field(14,"Matching website or section","For example https://staging.example/preview. The rest of each page address stays unchanged, including anything after ? or #."))
              .child(div().flex().flex_wrap().gap_2().child(self.guided_button(37,"Add / replace address mapping",cx)).child(self.guided_button(38,"Use same website for every mapping",cx))));
         if let Some(env) = draft.filter(|_| advanced) {
-            configuration = configuration.children(env.mappings.iter().take(16).map(|m| {
-                div()
-                    .text_size(px(13.))
-                    .line_height(px(HELP_LINE_HEIGHT))
-                    .child(format!("{} → {}", m.source, m.destination))
-            }));
+            configuration =
+                configuration.children(env.mappings.iter().enumerate().map(|(index, m)| {
+                    div()
+                        .w_full()
+                        .min_w_0()
+                        .flex()
+                        .items_start()
+                        .flex_wrap()
+                        .gap_2()
+                        .text_size(px(13.))
+                        .line_height(px(HELP_LINE_HEIGHT))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w(px(180.))
+                                .child(format!("{} → {}", m.source, m.destination)),
+                        )
+                        .when(env.mappings.len() > 1, |row| {
+                            row.child(self.button(
+                                Control::RemoveMapping(index),
+                                "Remove",
+                                ActionStyle::Secondary,
+                                cx,
+                            ))
+                        })
+                }));
+            configuration = configuration.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child("Keep at least one address mapping. Removing a mapping changes only this draft until you save settings; recorded captures stay unchanged."));
         }
         configuration=configuration.when(advanced, |body| body.child(self.crawl_field(15,"Website language","Use a language code such as en-US for US English or nb-NO for Norwegian Bokmål. Changing this requires a new baseline."))
              .child(self.measured_form_field(Control::CrawlField(16),controls::field("Capture timezone", "Choose a timezone or search by region or city. Changes apply to future baseline captures.", self.timezone.clone().into_any_element())))
@@ -4818,6 +4992,12 @@ impl Shell {
             &self.search,
             self.result_filter,
             self.group_profiles,
+            [
+                self.kind_read_error(regressee_core::domain::CheckKind::Screenshot)
+                    .is_some(),
+                self.kind_read_error(regressee_core::domain::CheckKind::DomSnapshot)
+                    .is_some(),
+            ],
         )
     }
     fn reveal_selected_result(&self) {
@@ -4942,7 +5122,7 @@ impl Shell {
                             } else {
                                 format!(
                                     "{} · {}",
-                                    if self.evidence.comparison.is_some() {
+                                    if self.has_kind_comparison() {
                                         "Results"
                                     } else {
                                         "Capture results"
@@ -5369,7 +5549,7 @@ impl Shell {
                                 let key = t.key.clone();
                                 let profile =
                                     r.run.profiles.iter().find(|p| p.id == key.profile).unwrap();
-                                let classification = this
+                                let classification = if this.recorded_mode().dom_snapshots() { this.result_kind_label(&key) } else { this
                                     .evidence
                                     .comparison
                                     .as_ref()
@@ -5388,7 +5568,8 @@ impl Shell {
                                             format!("Skipped: {reason}")
                                         }
                                         TargetOutcome::Cancelled => "Cancelled".into(),
-                                    });
+                                        TargetOutcome::NotRequested => "Not requested".into(),
+                                    }) };
                                 let attempt_word = if t.attempts == 1 { "attempt" } else { "attempts" };
                                 controls::result_row(
                                     SharedString::from(format!("target-{index}")),
@@ -5478,6 +5659,32 @@ impl Shell {
             return;
         }
         match control {
+            Control::CaptureMode(mode) => {
+                self.draft_settings.capture_plan = CapturePlan::for_mode(mode);
+                window.focus(&self.handle(control, cx));
+                cx.notify();
+            }
+            Control::EvidenceKind(kind) => {
+                self.choose_evidence_kind(kind, cx);
+                window.focus(&self.handle(control, cx));
+            }
+            Control::DomSource(index) => {
+                self.dom.presentation = [
+                    regressee_gui::jobs::DomPresentation::Diff,
+                    regressee_gui::jobs::DomPresentation::Before,
+                    regressee_gui::jobs::DomPresentation::After,
+                ][index];
+                self.capture_details_open = false;
+                self.review_note_open = false;
+                self.review_tools = false;
+                self.reload_dom_viewer(cx);
+                if self.dom_source_available(1) && self.dom_source_available(2) {
+                    window.focus(&self.handle(control, cx));
+                } else {
+                    self.presentation_focus = Some(Control::DomViewer(0));
+                }
+            }
+            Control::DomViewer(_) => (),
             Control::ShowAllResults => {
                 self.choose(Choice::AllResults, cx);
                 self.reveal_selected_result();
@@ -5537,6 +5744,10 @@ impl Shell {
                 cx.notify();
             }
             Control::NewProject => self.create(&CreateProject, window, cx),
+            Control::DeleteProject(_)
+            | Control::DeleteCurrentProject
+            | Control::RemoveEnvironment
+            | Control::RemoveMapping(_) => self.request_removal(control, window, cx),
             Control::Save => self.save(&SaveProject, window, cx),
             Control::ChooseProject => {
                 self.focus.choosing_project = true;
@@ -5782,12 +5993,18 @@ impl Shell {
             }
             Control::SaveBaseline => {
                 if let (Some(p), Some(r)) = (&self.project, &self.evidence.latest) {
-                    let Some((captured, intended)) = r.baseline_save_counts() else {
+                    let Some(coverage) = regressee_gui::task::baseline_consent_coverage(r) else {
                         return;
                     };
+                    if coverage.captured_targets == 0 {
+                        return;
+                    }
+                    let (captured, intended) =
+                        (coverage.captured_targets, coverage.intended_targets);
                     let run = r.run.id;
                     let revision = p.revision;
-                    let confirm_partial = captured < intended;
+                    let confirm_partial = coverage.dom_captures < coverage.dom_intended
+                        || coverage.screenshot_captures < coverage.screenshot_intended;
                     let (title, message, action) =
                         self.baseline_save_confirmation(captured, intended);
                     self.native_prompt = true;
@@ -6222,7 +6439,8 @@ impl Shell {
         if matches!(control, Control::Phase5(14..=19)) && !self.viewer_current() {
             return false;
         }
-        if self.viewer.is_none()
+        if !self.dom_active()
+            && self.viewer.is_none()
             && matches!(
                 control,
                 Control::Phase5(20..=25 | 32..=35 | 37) | Control::ReviewDetails
@@ -6233,7 +6451,31 @@ impl Shell {
             return false;
         }
         match control {
+            Control::DeleteProject(_)
+            | Control::DeleteCurrentProject
+            | Control::RemoveEnvironment
+            | Control::RemoveMapping(_) => self.removal_enabled(control, cx),
             Control::Guided(44 | 54..=57) | Control::Phase5(6..=9) => self.viewer.is_some(),
+            Control::EvidenceKind(_) => true,
+            Control::DomSource(index) => self.dom_source_available(index),
+            Control::DomViewer(index) => {
+                self.dom_input_allowed()
+                    && self
+                        .dom
+                        .source
+                        .read(cx)
+                        .focus_handles(cx)
+                        .get(index)
+                        .is_some()
+            }
+            Control::AnalysisField(9) if self.dom_active() => {
+                self.dom_review_valid()
+                    && self.review_note_open
+                    && self.dom_note_template().is_some()
+            }
+            Control::Phase5(32) if self.dom_active() => {
+                self.dom_review_valid() && self.dom_note_template().is_some()
+            }
             Control::Appearance(_) => self.appearance.loaded,
             Control::Guided(46) | Control::ImageControls => self.viewer_has_pixels(),
             Control::SplitView => self.split_view_available(),
@@ -6241,6 +6483,12 @@ impl Shell {
             Control::ValidationNext => !self.form_errors(cx).is_empty(),
             Control::DiscardPageList => self.preview.is_some(),
             Control::CaptureBaseline => self.preview.is_none() || self.discovery_plan_current(),
+            Control::SaveBaseline => self
+                .evidence
+                .latest
+                .as_ref()
+                .and_then(regressee_gui::task::baseline_consent_coverage)
+                .is_some_and(|c| c.captured_targets > 0),
             Control::Phase6(19) => {
                 self.history_run_indices().contains(&self.run_history_index)
                     && !self.unsaved(cx)
@@ -6260,6 +6508,9 @@ impl Shell {
             Control::Guided(41) => self.network_status.is_some(),
             Control::Guided(42) => true,
             Control::Guided(48) => self.approval_reference_index > 0,
+            Control::Guided(49) if self.recorded_mode().dom_snapshots() => {
+                self.approval_reference_index + 1 < self.kind_approval_rows()
+            }
             Control::Guided(49) => self
                 .approval
                 .as_ref()
@@ -6447,19 +6698,21 @@ impl Shell {
                         .is_some_and(|i| i < self.mask_rectangles.len())
             }
             Control::Phase5(23) => self.selected_key.as_ref().is_some_and(|key| {
-                self.approval_selection.contains(key) || self.approval_eligible(key)
+                if self.dom_active() {
+                    self.dom.selected.contains_key(key)
+                        || (self.dom_review_comparable()
+                            && self.dom_approval_candidate(key).is_some())
+                } else {
+                    self.approval_selection.contains(key) || self.approval_eligible(key)
+                }
             }),
             Control::Phase5(24) => {
-                !self.approval_selection.is_empty()
-                    && !self.mask_dirty
+                !self.mask_dirty
                     && self.approval_selection_eligible()
                     && self.analysis_due.is_none()
                     && self.analysis_pending.is_none()
             }
-            Control::Phase5(25) => self
-                .approval
-                .as_ref()
-                .is_some_and(|preview| self.approval_matches(preview)),
+            Control::Phase5(25) => self.approval_preview_current(),
             Control::Phase5(26) => self.evidence.analyses.len() > 1,
             Control::Phase5(27 | 28) => self.analysis_advanced,
             Control::Phase5(29 | 31) => false,
@@ -6534,13 +6787,16 @@ impl Shell {
         }
         use Control::*;
         let screen = self.focus.screen;
+        if (self.dom_active() || !self.recorded_mode().screenshots())
+            && matches!(control, ZoomIn | ZoomOut | PanLeft | PanRight | PanUp | PanDown | Viewer | SplitView | SplitDivider | ImageControls
+            | Guided(44 | 46 | 54..=57) | Phase5(0..=19 | 26..=28 | 34..=35) | AnalysisField(0..=8 | 10..=13) | Details(Detail::Analysis | Detail::IgnoredAreas))
+        {
+            return false;
+        }
         if self.focus.approval_dialog {
             return match control {
                 Guided(47..=49 | 52) => true,
-                Phase5(25) => self
-                    .approval
-                    .as_ref()
-                    .is_some_and(|p| self.approval_matches(p)),
+                Phase5(25) => self.approval_preview_current(),
                 _ => false,
             };
         }
@@ -6608,6 +6864,9 @@ impl Shell {
                 OpenProject(index) => {
                     screen == Screen::Projects && index < self.projects.items.len()
                 }
+                DeleteProject(index) => {
+                    screen == Screen::Projects && index < self.projects.items.len()
+                }
                 PreviousPage => self.projects.page > 0,
                 NextPage => self.projects.more,
                 Phase6(0..=15) if screen == Screen::Projects => match control {
@@ -6632,7 +6891,10 @@ impl Shell {
         let setup = screen == Screen::Setup;
         let history = screen == Screen::History && project;
         let settings = screen == Screen::Settings;
-        let portability = screen == Screen::Projects || history || settings;
+        let portability = screen == Screen::Projects
+            || history
+            || settings
+            || (setup && self.scope_deletion_preview());
         let inventory = results && (self.preview.is_some() || self.evidence.latest.is_some());
         let analysis = results
             && self.viewer.is_some()
@@ -6646,12 +6908,60 @@ impl Shell {
         // Keep presentation separate from image-dependent activation. Replacing
         // pixels must not unmount/reflow the toolbar between selected results.
         let viewer_chrome = viewer || (results && self.inspection_chrome_mounted());
-        let comparison_chrome =
-            viewer_chrome && self.evidence.comparison.is_some() && !self.page_list_workspace();
+        let comparison_chrome = viewer_chrome
+            && !self.page_list_workspace()
+            && if self.dom_active() {
+                self.evidence.dom_comparison.is_some()
+            } else {
+                self.evidence.comparison.is_some()
+            };
         let navigation_chrome =
             viewer_chrome && (self.viewer_has_pixels() || self.viewer_pending.is_some());
         match control {
+            DeleteProject(index) => screen == Screen::Projects && index < self.projects.items.len(),
+            DeleteCurrentProject => self.project_settings_open() && project,
+            RemoveEnvironment => {
+                setup
+                    && project
+                    && self.draft_settings.environments.len() > 1
+                    && (self.setup_environment_open
+                        || self.focus.setup_stage == regressee_core::shell::SetupStage::Settings)
+            }
+            RemoveMapping(index) => {
+                setup
+                    && project
+                    && (self.setup_environment_open
+                        || self.focus.setup_stage == regressee_core::shell::SetupStage::Settings)
+                    && self
+                        .draft_settings
+                        .environments
+                        .iter()
+                        .find(|e| Some(e.id) == self.environment_draft)
+                        .is_some_and(|e| e.mappings.len() > 1 && index < e.mappings.len())
+            }
             TaskDetails | TaskContinue | TaskLink(_) => false,
+            CaptureMode(_) => setup,
+            EvidenceKind(_) => {
+                results
+                    && !self.page_list_workspace()
+                    && self.recorded_mode() == self::CaptureMode::ScreenshotsAndDomSnapshots
+                    && self.selected_key.is_some()
+            }
+            DomSource(index) => {
+                results
+                    && self.dom_active()
+                    && index < 3
+                    && self.dom_source_available(index)
+                    && (if self.capture_details_open {
+                        index > 0
+                    } else {
+                        !self.viewer_inspector_open()
+                            && self.dom_source_available(1)
+                            && self.dom_source_available(2)
+                    })
+                    && !self.options_panel_open()
+            }
+            DomViewer(index) => results && self.dom_input_allowed() && index < 10,
             DiscardPageList => results && self.preview.is_some() && self.options_panel_open(),
             CloseOptions => results && self.result_filters_open,
             DiscoveryDetails => results && self.preview.is_some() && self.result_filters_open,
@@ -6838,7 +7148,10 @@ impl Shell {
             Phase5(20..=22) => comparison_chrome && self.review_result_changed(),
             Phase5(33) => comparison_chrome && self.next_unreviewed_key().is_some(),
             ReviewDetails => comparison_chrome && !self.review_result_comparable(),
-            Phase5(32) => analysis && self.review_note_open,
+            Phase5(32) | AnalysisField(9) => {
+                (analysis || (results && self.dom_active() && self.dom_note_template().is_some()))
+                    && self.review_note_open
+            }
             Phase5(36) => {
                 results
                     && self.evidence.latest.is_some()
@@ -6854,14 +7167,30 @@ impl Shell {
                     && self.selected_key.is_some()
             }
             Phase5(39) => results && self.viewer_inspector_open(),
-            Phase5(37) => comparison_chrome && self.review_result_comparable(),
-            Phase5(23) => {
+            Phase5(37) => {
                 comparison_chrome
+                    && self.review_result_comparable()
+                    && (!self.dom_active() || self.dom_note_template().is_some())
+            }
+            Phase5(23) => {
+                viewer_chrome
                     && self.selected_key.as_ref().is_some_and(|key| {
-                        self.approval_selection.contains(key) || self.approval_eligible(key)
+                        if self.dom_active() {
+                            self.dom.selected.contains_key(key)
+                                || (comparison_chrome
+                                    && self.dom_review_comparable()
+                                    && self.dom_approval_candidate(key).is_some())
+                        } else {
+                            self.approval_selection.contains(key)
+                                || (comparison_chrome && self.approval_eligible(key))
+                        }
                     })
             }
-            Phase5(24) => comparison_chrome && !self.approval_selection.is_empty(),
+            Phase5(24) => {
+                viewer_chrome
+                    && self.has_kind_comparison()
+                    && (!self.approval_selection.is_empty() || !self.dom.selected.is_empty())
+            }
             Phase5(6..=9) => comparison_chrome && self.viewer_mode_open,
             Phase5(10 | 11) => viewer && self.viewer_mode == 2,
             Phase5(12 | 13) => {
@@ -6892,7 +7221,13 @@ impl Shell {
             Phase5(27 | 28) => {
                 analysis && self.analysis_advanced && self.review_tools && !self.mask_draw
             }
-            Phase5(30) => results && self.preview.is_some(),
+            Phase5(30) => {
+                results
+                    && self
+                        .preview
+                        .as_ref()
+                        .is_some_and(|p| p.settings.capture_plan.mode.screenshots())
+            }
             Phase5(40 | 41) => {
                 history
                     && self.history_section == 1
@@ -6917,7 +7252,6 @@ impl Shell {
             AnalysisField(0..=8) => {
                 analysis && self.analysis_advanced && self.review_tools && !self.mask_draw
             }
-            AnalysisField(9) => analysis && self.review_note_open,
             AnalysisField(10..=13) => {
                 analysis
                     && self.review_tools
@@ -6969,6 +7303,16 @@ impl Shell {
             }
             Phase7(_) => false,
             Choice(choice) => {
+                if matches!(
+                    choice,
+                    self::Choice::FullPage
+                        | self::Choice::VisibleScreen
+                        | self::Choice::OriginalImages
+                        | self::Choice::ReplaceImages
+                ) && !self.draft_settings.capture_plan.mode.screenshots()
+                {
+                    return false;
+                }
                 if regressee_core::shell::Choice::SETUP.contains(&choice) {
                     setup
                 } else if regressee_core::shell::Choice::ENVIRONMENT.contains(&choice) {
@@ -7150,6 +7494,12 @@ impl Shell {
                                     Control::OpenProject(index),
                                     "Edit settings",
                                     ActionStyle::Secondary,
+                                    cx,
+                                ))
+                                .child(self.button(
+                                    Control::DeleteProject(index),
+                                    "Delete project…",
+                                    ActionStyle::Danger,
                                     cx,
                                 ))
                             }),
@@ -7411,6 +7761,14 @@ impl Shell {
         body.child(div().text_size(px(13.)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).max_w(px(680.)).child("Sensitivity and ignored areas change comparison results, not the original screenshots. A measured difference is not necessarily a bug. Sensitivity presets have been tested with sample images, not a user study.")).into_any_element()
     }
     fn viewer_section(&self, cx: &mut Context<Self>) -> AnyElement {
+        if self.dom_active() {
+            return self.dom_stage(cx);
+        }
+        if let Some(error) = self.kind_read_error(regressee_core::domain::CheckKind::Screenshot) {
+            return scrollbar::vertical("screenshot-kind-read-scrollbar", &self.review_issue_scroll,
+                div().id("screenshot-kind-read-error").debug_selector(|| "screenshot-kind-read-error".into()).flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.review_issue_scroll)
+                    .child(controls::error(format!("Screenshot evidence could not be read. {error} Refresh after repairing the saved files. The DOM snapshot is independent; no website was visited.")))).into_any_element();
+        }
         let Some(view) = self
             .viewer
             .as_ref()
@@ -8411,6 +8769,7 @@ impl Shell {
                             .collect::<Vec<_>>()
                             .join(" ")
                     || self.draft_settings.discovery != record.project.discovery
+                    || self.draft_settings.capture_plan != record.project.capture_plan
                     || self.draft_settings.profiles != record.project.profiles
                     || self.draft_settings.environments != record.project.environments
                     || self
@@ -8441,7 +8800,9 @@ impl Shell {
                         })
             }
             None => {
-                !self.name.read(cx).content.is_empty() || !self.address.read(cx).content.is_empty()
+                !self.name.read(cx).content.is_empty()
+                    || !self.address.read(cx).content.is_empty()
+                    || !self.draft_settings.capture_plan.is_default()
             }
         }
     }
@@ -8589,13 +8950,32 @@ impl Drop for Shell {
 }
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if self.scope_confirmation_due
+            && !self.native_prompt
+            && self.task.is_none()
+            && !self.agent_locked()
+        {
+            self.scope_confirmation_due = false;
+            self.request_destructive_control(Control::Phase6(6), window, cx);
+        }
         self.remember_agent_session();
         self.input_gate.set_allowed(!self.agent_locked());
         self.input_gate.bind(window, cx);
         self.observe_appearance(window, cx);
+        self.sync_dom_workspace(cx);
+        let dom_enabled = self.dom_input_allowed();
+        self.dom
+            .source
+            .update(cx, |source, cx| source.set_enabled(dom_enabled, cx));
         self.tool_hint_input
             .get_or_insert_with(|| toolbar::HintInput::new(window, cx));
         self.focus.history_baselines = self.evidence.baselines.len();
+        self.focus.mappings = self
+            .draft_settings
+            .environments
+            .iter()
+            .find(|e| Some(e.id) == self.environment_draft)
+            .map_or(0, |e| e.mappings.len());
         self.focus.history_runs = self.history.as_ref().map_or(0, |h| h.runs.len());
         let render_started = std::time::Instant::now();
         self.configure_review_geometry(f32::from(window.viewport_size().width));
@@ -8605,12 +8985,7 @@ impl Render for Shell {
         }
         let bounded_review =
             self.focus.screen == Screen::Results && !self.focus.shows_project_picker();
-        if self.focus.approval_dialog
-            && self
-                .approval
-                .as_ref()
-                .is_none_or(|p| !self.approval_matches(p))
-        {
+        if self.focus.approval_dialog && !self.approval_preview_current() {
             self.invalidate_approval();
         }
         let navigation = self.navigation_started.take();
@@ -8721,7 +9096,11 @@ impl Render for Shell {
                 }
                 progress = progress.child(self.button(
                     Control::CancelCapture,
-                    "Stop — keep completed screenshots",
+                    if self.recorded_mode().dom_snapshots() {
+                        "Stop — keep completed captures"
+                    } else {
+                        "Stop — keep completed screenshots"
+                    },
                     ActionStyle::Secondary,
                     cx,
                 ));
@@ -8889,7 +9268,7 @@ impl Render for Shell {
             && !self.focus.shows_project_picker()
             && !self.page_list_workspace()
             && self.history_inspection.is_none()
-            && self.evidence.comparison.is_some()
+            && self.has_kind_comparison()
             && !self.viewer_inspector_open()
             && !self.options_panel_open()
             && self.baseline_update_mounted()
@@ -9239,6 +9618,8 @@ mod disclosure_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod discovery_handoff_tests;
 #[cfg(all(test, feature = "ui-tests"))]
+mod dom_workflow_tests;
+#[cfg(all(test, feature = "ui-tests"))]
 mod engine_refresh_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod image_controls_tests;
@@ -9266,6 +9647,8 @@ mod phase5_repair_tests;
 mod phase5_setup_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod phase5_state_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod project_removal_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod project_settings_tests;
 #[cfg(all(test, feature = "ui-tests"))]
@@ -12299,7 +12682,9 @@ mod tests {
             assert_eq!(update.id, conflict_id);
             assert!(matches!(
                 update.reply,
-                Reply::Failure(regressee_gui::jobs::StorageFailure::ConflictOrWrite)
+                Reply::ProductFailure(ref error)
+                    if error.starts_with("storage_write_failed:")
+                        && error.contains("this project changed in another window")
             ));
             shell.apply_update(update, cx);
             assert_eq!(shell.focus.screen, Screen::Setup);

@@ -39,21 +39,17 @@ impl ViewerCache {
             return Ok(session.evidence.clone());
         }
         *self = Self::default();
-        let evidence = if let Some(run) = selection.run {
-            let mut evidence = store.project_evidence_for_run(selection.project, run)?;
-            if let Some(analysis) = selection.analysis {
-                let a = store.load_analysis(analysis)?;
-                ensure!(
-                    a.revision.run == run
-                        && evidence
-                            .baseline
-                            .as_ref()
-                            .is_some_and(|b| b.id == a.revision.baseline),
-                    "invalid_request: exact viewer analysis/run/reference mismatch"
-                );
-                evidence.comparison = Some(a);
-            }
+        let evidence = if let Some(analysis) = selection.analysis {
+            let evidence = store.viewer_evidence(selection.project, Some(analysis))?;
+            ensure!(
+                selection
+                    .run
+                    .is_none_or(|run| evidence.latest.as_ref().is_some_and(|r| r.run.id == run)),
+                "invalid_request: exact viewer analysis/run mismatch"
+            );
             evidence
+        } else if let Some(run) = selection.run {
+            store.screenshot_evidence_for_run(selection.project, run)?
         } else {
             store.viewer_evidence(selection.project, selection.analysis)?
         };
@@ -80,7 +76,7 @@ impl ViewerCache {
             self.sources.push_back(entry);
             return Ok(record);
         }
-        let record = Arc::new(store.load_run(id)?);
+        let record = Arc::new(store.load_screenshot_run(id)?);
         let bytes = serde_json::to_vec(&*record)?.len();
         if bytes <= 32 * 1024 * 1024 {
             while !self.sources.is_empty()
@@ -102,6 +98,10 @@ impl ViewerCache {
         let checkpoint = store.viewer_revision()?;
         let evidence = self.evidence(store, &selection)?;
         let run = evidence.latest.as_ref().context("No captured run")?;
+        ensure!(
+            run.run.capture_plan.mode.screenshots(),
+            "invalid_request: this run requested DOM snapshots only; use the focused DOM source/diff viewer, not image panes"
+        );
         let key = selection
             .key
             .or_else(|| run.run.targets.first().map(|t| t.key.clone()))

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Public subprocess grammar over a real IPC engine and product services.
-//! Signed synthetic worker produces owned PNGs; NOT a browser qualification.
+//! Signed synthetic worker produces owned PNG/DOM channels; NOT a browser qualification.
 #![cfg(target_os = "linux")]
 use anyhow::{Context, Result};
 use ed25519_dalek::{Signer, SigningKey};
@@ -52,20 +52,28 @@ impl Fixture {
             ("node/python".to_string(), python),
             ("worker/main.py".into(), script),
             (
+                "worker/dom-v1.ndjson".into(),
+                include_bytes!("../../core/tests/fixtures/dom-v1.ndjson").to_vec(),
+            ),
+            (
+                "worker/dom-v1-html-names.ndjson".into(),
+                include_bytes!("../../core/tests/fixtures/dom-v1-html-names.ndjson").to_vec(),
+            ),
+            (
                 "browsers/synthetic".into(),
                 b"No browser in this synthetic fixture".to_vec(),
             ),
         ]);
         let manifest = Manifest {
             version: 2,
-            id: "cli-synthetic-v1".into(),
+            id: "cli-synthetic-dom-v3".into(),
             os: std::env::consts::OS.into(),
             arch: std::env::consts::ARCH.into(),
             scope: Scope::DevelopmentLoopback,
             support_until: None,
             identity: RuntimeIdentity::Pinned {
                 node: "synthetic-python".into(),
-                worker: "5.0.1".into(),
+                worker: "6.0.0".into(),
                 playwright: "synthetic".into(),
                 browser: "synthetic".into(),
             },
@@ -210,6 +218,24 @@ impl Fixture {
 }
 impl Drop for Fixture {
     fn drop(&mut self) {
+        if let Ok(Response::Control(control)) =
+            self.client.control(regressee_app::control::Command::List)
+            && let Some(id) = control.controller
+            && let Ok(bytes) = fs::read(
+                self.client
+                    .paths
+                    .data
+                    .join("agent-sessions")
+                    .join(format!("{id}.json")),
+            )
+            && let Ok(credential) =
+                serde_json::from_slice::<regressee_app::control::Credential>(&bytes)
+        {
+            let _ = self
+                .client
+                .with_credential(credential)
+                .control(regressee_app::control::Command::End);
+        }
         // These are exclusively owned synthetic fixtures. On a failed assertion,
         // clean up their admitted work explicitly before joining the owner.
         let deadline = Instant::now() + Duration::from_secs(10);
@@ -242,6 +268,8 @@ fn run(v: &Value) -> &str {
     value(v)["latest"]["run"]["id"].as_str().unwrap()
 }
 
+#[path = "support/dom_protocol.rs"]
+mod dom_protocol;
 #[path = "support/phase3_repairs.rs"]
 mod phase3_repairs;
 #[path = "support/phase4_control.rs"]

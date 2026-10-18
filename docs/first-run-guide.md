@@ -21,7 +21,9 @@ for the separate platform/clean-machine qualification limits.
    available without dominating the first access screen.
 3. **Continue to pages & sizes**. Choose **Only the starting addresses** or
    **Find linked pages**, website/section boundaries, exclusions and page limit.
-   Choose screen sizes, full-page or visible-screen capture, image mode and speed.
+    Choose screen sizes and **What to check**: screenshots (the default), DOM
+    snapshots, or both. Image mode and full-page/visible-screen choices affect
+    screenshots only; screen size also affects responsive DOM. Choose capture speed.
    Gentle reduces site load; Fast can run four pages at once. Phone/tablet are
    Chromium emulation, not actual Safari/iOS hardware. Advanced controls remain
    available. **Save settings** before finding pages.
@@ -34,15 +36,15 @@ for the separate platform/clean-machine qualification limits.
     settings and find pages again rather than overriding website boundaries here.
 5. Capture the reviewed pages, inspect coverage and warnings, then explicitly
    **Save baseline**.
-    A baseline is the approved reference screenshots. Failed or missing targets
+     A baseline is the approved reference captures. Failed or missing checks
     cannot be called unchanged or silently approved.
-    Saved capture screenshots are not automatically a baseline. If a finished
-    capture has some failures, choose **Save baseline** to save the successful
-    screenshots. A confirmation names how many screenshots will be saved and
-    skipped. Skipped page/screen-size pairs are not included in future checks;
-    their failure records remain in History. **Review failures** filters the
-    results without changing the screenshot being inspected. To include missing
-    screenshots later, use **Pages & baseline** → **Use recorded pages** (or
+     Saved captures are not automatically a baseline. If a finished capture has
+     some failures, **Save baseline** offers the eligible captures with explicit
+     partial-coverage consent. Confirmation distinguishes screenshot and DOM
+     coverage. Future checks request only saved reference slots; a successful
+     sibling does not approve the missing kind. Omission/failure records remain in
+     History. **Review failures** filters results without changing the evidence
+     being inspected. To fill missing coverage later, use **Pages & baseline** → **Use recorded pages** (or
     **Find pages** for a new list), capture again, and save a replacement baseline.
     No-success, unfinished and preview-only captures cannot be saved as baselines.
 6. **Review changes** → **Run check** revisits only the fixed baseline
@@ -53,7 +55,17 @@ for the separate platform/clean-machine qualification limits.
    screenshots, inspect the approval consequences, then explicitly confirm the
    new baseline version. Other references are inherited, and old versions remain
    until deliberate manual deletion. **History** distinguishes baseline versions
-   from the capture/check runs that supplied their evidence.
+    from the capture/check runs that supplied their evidence.
+
+For both-mode captures, **Screenshots / DOM snapshot** switches the selected
+evidence without changing its independent outcome, notes or reference selection.
+The native DOM viewer shows inert normalized source with search, change navigation,
+collapsed context and copy. Select and approve screenshots, DOM snapshots or both
+explicitly. Sensitivity and ignored rectangles apply only to screenshots. An
+unstable or missing DOM snapshot is never treated as identical or silently approved.
+Changing **What to check** needs a new baseline capture; existing checks retain
+their saved plan. See [DOM snapshot checks](dom-snapshots.md), including exclusions,
+coverage limits and the warning that stored DOM is not fully redacted.
 
 ## Comparing screenshots with the split slider
 
@@ -79,6 +91,36 @@ Use **Change project** to switch from either screen. If nothing is selected,
 Results and History show the saved projects to choose from, not an empty review.
 Switching projects does not change saved settings or start a capture; unsaved
 edits require confirmation before switching to a different project.
+
+## Removing a project or unused settings
+
+In **Projects**, choose **Delete project…** beside the project. The same action
+is at the bottom of **Project settings**. Review its name, website and local-data
+impact, then choose **Delete project** to confirm, or **Cancel** to keep it.
+Deletion removes that project's settings, saved captures (screenshots and DOM),
+baselines, review history, ignored areas and saved logins. It cannot be undone in
+Regressee. Other projects, files they still use, the installed browser and exported
+ZIPs are kept. To keep a baseline copy, cancel and export it from History first.
+
+After deletion, you return to Projects and can create a new project with the same
+name and URL. This is not a secure disk-wiping operation and does not remove
+external backups or ZIP copies. If secure login storage is locked, unlock it
+before trying deletion again; Regressee does not silently leave credentials
+behind. If the project was deleted but file cleanup could not finish, the message
+states that separately. **App settings → On this computer** shows pending cleanup;
+check folder permissions and restart to retry. Other projects remain available.
+
+Under **Access & environments**, select an unused environment and choose
+**Remove environment…**. Saved removal needs confirmation and forgets only that
+environment's login; recorded captures and baselines stay in History. Unsaved
+environment additions can be removed without saving them. Keep at least one
+environment. Each address-mapping row has **Remove** when another mapping remains;
+this changes only the draft until **Save settings**. Existing baseline settings
+and recorded captures are not rewritten.
+
+Use **History → Runs → Delete run…** or **Baselines → Delete baseline…** to
+remove an individual record instead. Existing reference protections still apply;
+whole-project deletion does not require deleting records individually first.
 
 ## When something goes wrong
 

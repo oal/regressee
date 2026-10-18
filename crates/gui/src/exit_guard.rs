@@ -35,6 +35,7 @@ enum Phase {
 enum SaveKind {
     Mask,
     Note,
+    DomNote,
     Project,
     Network,
 }
@@ -56,6 +57,8 @@ pub(super) struct ExitGuard {
     mask_saved: bool,
     notes: VecDeque<regressee_core::domain::ReviewDecision>,
     pending_note: Option<regressee_core::domain::ReviewDecision>,
+    dom_notes: VecDeque<regressee_core::dom_snapshot::DomReviewDecision>,
+    pending_dom_note: Option<regressee_core::dom_snapshot::DomReviewDecision>,
 }
 impl Default for ExitGuard {
     fn default() -> Self {
@@ -70,6 +73,8 @@ impl Default for ExitGuard {
             mask_saved: false,
             notes: VecDeque::new(),
             pending_note: None,
+            dom_notes: VecDeque::new(),
+            pending_dom_note: None,
         }
     }
 }
@@ -120,6 +125,9 @@ impl Shell {
     fn exit_note_dirty(&self, cx: &App) -> bool {
         self.pending_review_notes(cx)
             .map_or(true, |notes| !notes.is_empty())
+            || self
+                .pending_dom_notes(cx)
+                .map_or(true, |notes| !notes.is_empty())
     }
     // In-progress "Add screen size" and origin-mapping forms are not yet project
     // settings. Do not silently apply them (or silently drop them) on exit.
@@ -172,6 +180,7 @@ impl Shell {
                     !self.name.read(cx).content.is_empty()
                         || !self.address.read(cx).content.is_empty()
                         || self.draft_settings.discovery != defaults.discovery
+                        || self.draft_settings.capture_plan != defaults.capture_plan
                         || self.draft_settings.profiles != defaults.profiles
                         || self.draft_settings.environments != defaults.environments
                         || self
@@ -191,6 +200,7 @@ impl Shell {
                                 .collect::<Vec<_>>()
                                 .join(" ")
                         || self.draft_settings.discovery != p.project.discovery
+                        || self.draft_settings.capture_plan != p.project.capture_plan
                         || self.draft_settings.profiles != p.project.profiles
                         || self.draft_settings.environments != p.project.environments
                         || p.project.profiles.first().is_some_and(|profile| {
@@ -230,7 +240,7 @@ impl Shell {
                 },
             )
     }
-    fn exit_signature(&self, cx: &App) -> String {
+    pub(super) fn exit_signature(&self, cx: &App) -> String {
         format!(
             "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{}",
             self.name.read(cx).content,
@@ -395,12 +405,23 @@ impl Shell {
                 return;
             }
         };
+        let dom_notes = match self.pending_dom_notes(cx) {
+            Ok(notes) => notes,
+            Err(message) => {
+                self.exit_save_failed(message, cx);
+                return;
+            }
+        };
         if self.mask_dirty {
             self.exit_guard.remaining.push_back(SaveKind::Mask);
         }
         for note in notes {
             self.exit_guard.notes.push_back(note);
             self.exit_guard.remaining.push_back(SaveKind::Note);
+        }
+        for note in dom_notes {
+            self.exit_guard.dom_notes.push_back(note);
+            self.exit_guard.remaining.push_back(SaveKind::DomNote);
         }
         if self.exit_project_dirty(cx) {
             self.exit_guard.remaining.push_back(SaveKind::Project);
@@ -495,6 +516,21 @@ impl Shell {
                     self.exit_guard.pending_note = Some(note.clone());
                     Work::Review(note)
                 }
+                SaveKind::DomNote => {
+                    let mut note = self.exit_guard.dom_notes.pop_front().ok_or_else(|| {
+                        anyhow::anyhow!("The queued DOM note is missing. Nothing was discarded.")
+                    })?;
+                    anyhow::ensure!(
+                        self.pending_dom_notes(cx)
+                            .map_err(anyhow::Error::msg)?
+                            .iter()
+                            .any(|current| current == &note),
+                        "A DOM note changed while quitting. Save the current draft before trying again."
+                    );
+                    note.reviewed_at = regressee_runtime::distribution::now();
+                    self.exit_guard.pending_dom_note = Some(note.clone());
+                    Work::Dom(regressee_app::engine::dom::Command::Review(Box::new(note)))
+                }
                 SaveKind::Project => {
                     anyhow::ensure!(
                         self.environment.is_some()
@@ -582,6 +618,12 @@ impl Shell {
         {
             self.reconcile_exit_review_reply(history);
         }
+        if self.exit_guard.pending.is_none()
+            && let Reply::Dom(output) = &update.reply
+            && let regressee_app::engine::dom::Output::Review(decision) = output.as_ref()
+        {
+            self.reconcile_dom_review(decision.clone());
+        }
     }
     pub(super) fn continue_exit_save(
         &mut self,
@@ -623,6 +665,17 @@ impl Shell {
                 self.reconcile_exit_review_reply(&history);
                 self.evidence.reviews = history;
                 confirmed
+            }
+            (SaveKind::DomNote, Reply::Dom(output)) => {
+                if let regressee_app::engine::dom::Output::Review(decision) = output.as_ref()
+                    && self.exit_guard.pending_dom_note.as_ref() == Some(decision)
+                {
+                    self.reconcile_dom_review(decision.clone());
+                    self.exit_guard.pending_dom_note = None;
+                    true
+                } else {
+                    false
+                }
             }
             (SaveKind::Project, Reply::Project(record)) => {
                 // Record the committed revision even if a newer draft arrived.

@@ -47,14 +47,14 @@ fn verify_reference_sources(
 impl Store {
     pub fn inspect_run(&self, project: ProjectId, run: RunId) -> Result<ProjectEvidence> {
         self.load_project(project)?;
-        let record = self.load_run(run)?;
+        let record = self.load_screenshot_run(run)?;
         ensure!(
             record.run.project == project,
             "Recorded run belongs to another project"
         );
         let baseline = match record.run.intent {
             RunIntent::Check { baseline } => {
-                let baseline = self.load_baseline(baseline)
+                let baseline = self.load_screenshot_baseline(baseline)
                     .context("The check's original baseline is missing or damaged; results cannot be reopened")?;
                 ensure!(
                     baseline.project == project,
@@ -89,7 +89,7 @@ impl Store {
             verify_reference_sources(baseline, project, |run| {
                 // load_run verifies every original, thumbnail and tile against CAS.
                 // Summaries exist only after that authoritative validation succeeds.
-                let source = self.load_run(run)?;
+                let source = self.load_screenshot_run(run)?;
                 Ok(ReferenceSource {
                     project: source.run.project,
                     inventory: source.run.inventory.id,
@@ -112,6 +112,7 @@ impl Store {
             review_history_truncated: self.review_history_truncated(run)?,
             comparison,
             baselines: vec![],
+            ..Default::default()
         })
     }
 }
@@ -146,6 +147,10 @@ mod tests {
             intended_count: references.len() as u32,
             explicitly_partial: false,
             references,
+            dom_references: vec![],
+            capture_plan: CapturePlan::default(),
+            source_run: None,
+            intended_targets: vec![],
         };
         let originals: BTreeMap<_, _> = baseline
             .references

@@ -56,7 +56,19 @@ impl Shell {
         let selection = Selection {
             project,
             run: Some(run),
-            analysis: self.evidence.comparison.as_ref().map(|a| a.revision.id),
+            kind: if self.dom_active() {
+                regressee_core::domain::CheckKind::DomSnapshot
+            } else {
+                regressee_core::domain::CheckKind::Screenshot
+            },
+            analysis: if self.dom_active() {
+                self.evidence
+                    .dom_comparison
+                    .as_ref()
+                    .map(|a| regressee_core::domain::AnalysisId(a.revision.id.0))
+            } else {
+                self.evidence.comparison.as_ref().map(|a| a.revision.id)
+            },
             key: None,
             view: View::Compare,
         };
@@ -80,12 +92,20 @@ impl Shell {
             return false;
         }
         let (_, selection, generation) = self.passive_evidence_pending.take().unwrap();
+        let read_failures = self.jobs.take_evidence_failures(update.id);
         let current = self
             .project
             .as_ref()
             .is_some_and(|p| p.project.id == selection.project)
             && self.evidence.latest.as_ref().map(|r| r.run.id) == selection.run
-            && self.evidence.comparison.as_ref().map(|a| a.revision.id) == selection.analysis;
+            && (if selection.kind == regressee_core::domain::CheckKind::DomSnapshot {
+                self.evidence
+                    .dom_comparison
+                    .as_ref()
+                    .map(|a| regressee_core::domain::AnalysisId(a.revision.id.0))
+            } else {
+                self.evidence.comparison.as_ref().map(|a| a.revision.id)
+            }) == selection.analysis;
         if !current
             || generation != self.data_refresh_generation
             || self.agent_locked()
@@ -107,7 +127,19 @@ impl Shell {
         };
         if evidence.latest.as_ref().map(|r| r.run.id) != selection.run
             || (selection.analysis.is_some()
-                && evidence.comparison.as_ref().map(|a| a.revision.id) != selection.analysis)
+                && !read_failures.as_ref().is_some_and(|failures| {
+                    failures.project == selection.project
+                        && Some(failures.run) == selection.run
+                        && failures.by_kind.contains_key(&selection.kind)
+                })
+                && (if selection.kind == regressee_core::domain::CheckKind::DomSnapshot {
+                    evidence
+                        .dom_comparison
+                        .as_ref()
+                        .map(|a| regressee_core::domain::AnalysisId(a.revision.id.0))
+                } else {
+                    evidence.comparison.as_ref().map(|a| a.revision.id)
+                }) != selection.analysis)
         {
             return true;
         }
@@ -128,6 +160,7 @@ impl Shell {
         let before = self.evidence.before.clone();
         let baselines = self.history.as_ref().map(|h| h.baselines.clone());
         self.evidence = (**evidence).clone();
+        self.dom.read_failures = read_failures;
         // History owns a separately paged list, not the exact run read's list.
         if let Some(baselines) = baselines {
             self.evidence.baselines = baselines;
@@ -166,6 +199,9 @@ impl Shell {
         // clean. Rehydrate saved note changes even when its identity is unchanged,
         // rather than turning the old saved text into a synthetic local draft.
         self.review_drafts = Default::default();
+        self.dom.active_note = None;
+        self.dom.notes.clear();
+        self.dom.identity = None;
         self.sync_review_note(cx);
         cx.notify();
         true

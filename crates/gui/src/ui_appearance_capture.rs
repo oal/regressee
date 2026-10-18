@@ -103,7 +103,7 @@ fn renderer_capture_appearance(cx: &mut TestAppContext) {
                 capture(cx, &root, &label).unwrap();
                 let pane = cx.debug_bounds("phase5-before");
                 manifest.push(serde_json::json!({"label":label,"width":width,"height":height,"scene":scene,"appearance":preference,"pane":pane.map(|b| [f32::from(b.left()),f32::from(b.top()),f32::from(b.size.width),f32::from(b.size.height)])}));
-                shell.update(cx, |s, cx| finish_jobs(s, cx));
+                shell.update(cx, finish_jobs);
                 owned.join_after_ui();
                 cx.update(|window, _| window.remove_window());
             }

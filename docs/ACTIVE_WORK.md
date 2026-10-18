@@ -1,6 +1,34 @@
 # Active delegated work — restart recovery
 
-Updated: 2026-10-11
+Updated: 2026-10-17
+
+## Current — DOM snapshots, final verification
+
+- User-confirmed standalone contract and every implementation handoff:
+  `docs/dom-snapshot-plan.md`; current scored evidence:
+  `docs/research/dom-snapshot-verification-20261017.md`.
+- Implementation is integrated across core, worker/bundled catalogs, storage,
+  app, CLI/engine and native GUI. Do not overwrite shared changes or rerun retired
+  agents' work. Core C1–C3, worker W1–W5 and storage S1–S3 independently resolved.
+- **Cargo slot: coordinator**, bounded final workspace gates via scratch
+  `final-gates.py`. Native author delivered47 passing tests/Clippy/build; visual
+  confirmation stops at missing recorded-History DOM-source bounds. Sources frozen.
+- `ses_eb46b2cf8ffeP087u4Q8OTocx3`: complete; independent public CLI consumer
+  passes 224 invocations at signed synthetic-worker scope. Actual report security/
+  status/preflight independently pass too. No product blockers from this review.
+- `ses_eb44b8395ffeYgXfMepIm5hzEV`: complete; actual anonymous Product/Worker
+  checkpoint→death→fresh resume passed 12 groups, later B3/ephemeral replay passes.
+- `ses_eb421e937ffeRfnvRvQdW0EzAG`: independent native source/interaction review,
+  rescoring N1 real-typing repair and diagnosing History render failure using
+  existing bound tests/pixels only; no Cargo/new captures/edits.
+- Planned visual correction/confirmation budget exhausted. No further UI edit/
+  capture cycle without new authorization; retain incomplete matrices, do not drop
+  failing source-bound assertions. Native handoff:
+  `gui-final-20261017/confirmation/HANDOFF.md` under approved scratch.
+  No whole-feature/native/OS-accessibility/release pass yet. Retained private
+  evidence root: `regressee-dom-snapshot-20261017/` under approved scratch.
+
+Older continuations below are historical, not active work or current binary IDs.
 
 ## Latest continuation — official first-use setup and overlap correction
 

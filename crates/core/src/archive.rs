@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Versioned selected-baseline interchange. No local session or execution fields.
 use crate::domain::*;
-use crate::evidence::CaptureMetadata;
+use crate::evidence::{CaptureMetadata, DomCaptureMetadata};
 use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 use url::Url;
 
 pub const ARCHIVE_VERSION: u32 = 1;
+/// Version 1 remains the exact legacy screenshot contract. DOM manifests must
+/// explicitly use version 2; importers may accept both, never unknown versions.
+pub const DOM_ARCHIVE_VERSION: u32 = 2;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PortableProject {
@@ -15,6 +18,8 @@ pub struct PortableProject {
     pub discovery: DiscoverySettings,
     pub environments: Vec<PortableEnvironment>,
     pub profiles: Vec<CaptureProfile>,
+    #[serde(default, skip_serializing_if = "CapturePlan::is_default")]
+    pub capture_plan: CapturePlan,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -39,6 +44,7 @@ impl From<&Project> for PortableProject {
                 })
                 .collect(),
             profiles: project.profiles.clone(),
+            capture_plan: project.capture_plan.clone(),
         }
     }
 }
@@ -53,6 +59,44 @@ pub struct ArchiveManifest {
     pub provenance: Vec<CaptureProvenance>,
     pub masks: Vec<PortableMask>,
 }
+impl ArchiveManifest {
+    pub fn version_for_baseline(baseline: &BaselineVersion) -> u32 {
+        if baseline.capture_plan.mode.dom_snapshots() {
+            DOM_ARCHIVE_VERSION
+        } else {
+            ARCHIVE_VERSION
+        }
+    }
+    /// Artifact bytes/provenance still require storage verification before import.
+    pub fn validate_version(&self) -> Result<()> {
+        ensure!(
+            matches!(self.version, ARCHIVE_VERSION | DOM_ARCHIVE_VERSION),
+            "unsupported archive version"
+        );
+        self.project.capture_plan.validate()?;
+        self.baseline.validate()?;
+        for source in &self.provenance {
+            source.capture_plan.validate()?;
+        }
+        if self.version == ARCHIVE_VERSION {
+            ensure!(
+                self.project.capture_plan.is_default()
+                    && self.baseline.capture_plan.is_default()
+                    && self.baseline.dom_references.is_empty()
+                    && self
+                        .artifacts
+                        .iter()
+                        .all(|a| a.kind != ArtifactKind::DomSnapshot)
+                    && self
+                        .provenance
+                        .iter()
+                        .all(|p| p.capture_plan.is_default() && p.dom_captures.is_empty()),
+                "DOM evidence requires archive version 2"
+            );
+        }
+        Ok(())
+    }
+}
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CaptureProvenance {
@@ -63,6 +107,10 @@ pub struct CaptureProvenance {
     pub started_at: i64,
     pub finished_at: i64,
     pub captures: Vec<CaptureMetadata>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dom_captures: Vec<DomCaptureMetadata>,
+    #[serde(default, skip_serializing_if = "CapturePlan::is_default")]
+    pub capture_plan: CapturePlan,
     pub discovery: DiscoverySettings,
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -27,6 +27,12 @@ pub struct TargetCheckpoint<'a> {
     pub target: &'a CaptureTarget,
     pub capture: Option<&'a CaptureEvidence>,
 }
+pub struct KindTargetCheckpoint<'a> {
+    pub index: usize,
+    pub target: &'a CaptureTarget,
+    pub capture: Option<&'a CaptureEvidence>,
+    pub dom_capture: Option<&'a DomCaptureEvidence>,
+}
 pub(crate) fn encode(value: &impl Serialize) -> Result<String> {
     let s = serde_json::to_string(value)?;
     ensure!(s.len() <= RECORD_LIMIT, "evidence record exceeds budget");
@@ -92,6 +98,32 @@ impl Store {
         updates: &[TargetCheckpoint<'_>],
     ) -> Result<()> {
         ensure!(
+            updates.iter().all(|update| claim
+                .run
+                .targets
+                .get(update.index)
+                .is_some_and(|old| matches!(old.outcome, TargetOutcome::Pending))),
+            "settled target/evidence is immutable"
+        );
+        let updates: Vec<_> = updates
+            .iter()
+            .map(|u| KindTargetCheckpoint {
+                index: u.index,
+                target: u.target,
+                capture: u.capture,
+                dom_capture: None,
+            })
+            .collect();
+        self.append_run_kind_targets(claim, &updates)
+    }
+    /// Publish either successful slot immediately, without waiting for a sibling.
+    /// Each slot is immutable once captured, including across partial updates.
+    pub fn append_run_kind_targets(
+        &mut self,
+        claim: &mut RunAppender,
+        updates: &[KindTargetCheckpoint<'_>],
+    ) -> Result<()> {
+        ensure!(
             claim.store == self.instance,
             "append claim belongs to another Store owner"
         );
@@ -109,6 +141,7 @@ impl Store {
                 .get(update.index)
                 .context("target delta index out of range")?;
             let target = update.target;
+            target.dom_outcome.validate()?;
             ensure!(
                 indices.insert(update.index)
                     && old.key == target.key
@@ -124,8 +157,29 @@ impl Store {
                 "nonmonotonic or oversized target delta"
             );
             ensure!(
-                matches!(old.outcome, TargetOutcome::Pending),
+                matches!(old.outcome, TargetOutcome::Pending) || old.outcome == target.outcome,
+                "settled screenshot slot is immutable"
+            );
+            ensure!(
+                matches!(old.outcome, TargetOutcome::Pending)
+                    || matches!(old.dom_outcome, DomTargetOutcome::Pending)
+                    || (old == target && update.capture.is_none() && update.dom_capture.is_none()),
                 "settled target/evidence is immutable"
+            );
+            ensure!(
+                matches!(old.dom_outcome, DomTargetOutcome::Pending)
+                    || old.dom_outcome == target.dom_outcome,
+                "settled DOM slot is immutable"
+            );
+            ensure!(
+                matches!(old.outcome, TargetOutcome::NotRequested)
+                    == matches!(target.outcome, TargetOutcome::NotRequested)
+                    && old.dom_outcome.is_not_requested() == target.dom_outcome.is_not_requested(),
+                "requested slots are immutable"
+            );
+            ensure!(
+                !old.any_kind_captured() || old.final_url == target.final_url,
+                "successful source URL is immutable"
             );
             if let Some(final_url) = &target.final_url {
                 validate_address(final_url)?;
@@ -140,17 +194,40 @@ impl Store {
                 validate_evidence(&claim.run, target, capture)?;
                 ensure!(target.attempts > 0, "successful delta was never attempted");
             }
+            let new_dom = matches!(target.dom_outcome, DomTargetOutcome::Captured { .. })
+                && matches!(old.dom_outcome, DomTargetOutcome::Pending);
+            ensure!(
+                new_dom == update.dom_capture.is_some(),
+                "DOM delta outcome and evidence disagree"
+            );
+            if let Some(capture) = update.dom_capture {
+                ensure!(
+                    target.attempts > 0,
+                    "successful DOM delta was never attempted"
+                );
+                let mut run = claim.run.clone();
+                run.targets[update.index] = target.clone();
+                capture.metadata.validate_for_run(&run)?;
+                self.verify_dom_capture(capture)?;
+            }
             let target_json = encode(target)?;
             let capture_json = update.capture.map(encode).transpose()?;
+            let dom_json = update.dom_capture.map(encode).transpose()?;
             work.target_validations += 1;
-            work.evidence_serializations += u64::from(capture_json.is_some());
-            work.written_bytes +=
-                (target_json.len() + capture_json.as_ref().map_or(0, String::len)) as u64;
+            work.evidence_serializations +=
+                u64::from(capture_json.is_some()) + u64::from(dom_json.is_some());
+            work.written_bytes += (target_json.len()
+                + capture_json.as_ref().map_or(0, String::len)
+                + dom_json.as_ref().map_or(0, String::len))
+                as u64;
             ensure!(
-                target_json.len() + capture_json.as_ref().map_or(0, String::len) <= 1024 * 1024,
+                target_json.len()
+                    + capture_json.as_ref().map_or(0, String::len)
+                    + dom_json.as_ref().map_or(0, String::len)
+                    <= 1024 * 1024,
                 "target delta exceeds budget"
             );
-            encoded.push((update, target_json, capture_json));
+            encoded.push((update, target_json, capture_json, dom_json));
         }
         let next = claim
             .revision
@@ -161,7 +238,7 @@ impl Store {
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
         ensure!(tx.execute("UPDATE run_checkpoint_heads SET revision=?1 WHERE run_id=?2 AND revision=?3 AND EXISTS(SELECT 1 FROM runs WHERE id=?2 AND state='\"Running\"' AND owner_pid=?4)", params![next,claim.run.id.to_string(),claim.revision,std::process::id()])? == 1, "stale queue append claim");
-        for (position, (update, target, capture)) in encoded.into_iter().enumerate() {
+        for (position, (update, target, capture, dom_capture)) in encoded.into_iter().enumerate() {
             if let Some(evidence) = update.capture {
                 for artifact in evidence.image.artifacts() {
                     pin(
@@ -173,12 +250,21 @@ impl Store {
                     work.artifact_pins += 1;
                 }
             }
+            if let Some(evidence) = update.dom_capture {
+                pin(
+                    &tx,
+                    &self.paths,
+                    &ArtifactOwner::Run(claim.run.id),
+                    &evidence.metadata.sha256,
+                )?;
+                work.artifact_pins += 1;
+            }
             let sequence = next
                 .checked_mul(MAX_TARGETS as u64)
                 .and_then(|value| value.checked_add(position as u64))
                 .filter(|value| *value <= i64::MAX as u64)
                 .context("target sequence overflow")?;
-            tx.execute("INSERT INTO run_target_deltas VALUES(?1,?2,?3,?4,?5) ON CONFLICT(run_id,target_index) DO UPDATE SET sequence=excluded.sequence,target=excluded.target,capture=COALESCE(run_target_deltas.capture,excluded.capture)", params![claim.run.id.to_string(),update.index,sequence,target,capture])?;
+            tx.execute("INSERT INTO run_target_deltas(run_id,target_index,sequence,target,capture,dom_capture) VALUES(?1,?2,?3,?4,?5,?6) ON CONFLICT(run_id,target_index) DO UPDATE SET sequence=excluded.sequence,target=excluded.target,capture=COALESCE(run_target_deltas.capture,excluded.capture),dom_capture=COALESCE(run_target_deltas.dom_capture,excluded.dom_capture)", params![claim.run.id.to_string(),update.index,sequence,target,capture,dom_capture])?;
         }
         tx.commit()?;
         for update in updates {
@@ -204,19 +290,52 @@ impl Store {
         Ok(())
     }
     pub fn load_inventory(&self, id: InventoryId) -> Result<InventoryRevision> {
-        let json: String = self.connection.query_row(
-            "SELECT record FROM inventories WHERE id=?1",
-            [id.to_string()],
-            |row| row.get(0),
-        )?;
+        self.load_inventory_row(id)?
+            .context("Saved inventory row is missing")
+    }
+    fn load_inventory_row(&self, id: InventoryId) -> Result<Option<InventoryRevision>> {
+        let row: Option<(String, String)> = self
+            .connection
+            .query_row(
+                "SELECT record,project_id FROM inventories WHERE id=?1",
+                [id.to_string()],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?;
+        let Some((json, project)) = row else {
+            return Ok(None);
+        };
         ensure!(
             json.len() <= RECORD_LIMIT,
             "inventory record exceeds budget"
         );
         let inventory: InventoryRevision = serde_json::from_str(&json)?;
         inventory.validate()?;
-        ensure!(inventory.id == id, "inventory identity mismatch");
-        Ok(inventory)
+        ensure!(
+            inventory.id == id && inventory.project.to_string() == project,
+            "inventory identity/project mismatch"
+        );
+        Ok(Some(inventory))
+    }
+    /// The immutable original run is the only fallback authority when shipped
+    /// single-page captures have no inventory SQL row. Existing rows, including
+    /// corrupt or conflicting rows, must never be bypassed or silently repaired.
+    pub(crate) fn verified_baseline_inventory(
+        &self,
+        baseline: &BaselineVersion,
+        source: &CaptureRun,
+    ) -> Result<InventoryRevision> {
+        baseline.intended_target_keys(source)?;
+        match self.load_inventory_row(baseline.inventory)? {
+            Some(inventory) => {
+                ensure!(
+                    inventory == source.inventory,
+                    "Saved inventory conflicts with frozen original capture"
+                );
+                Ok(inventory)
+            }
+            None => Ok(source.inventory.clone()),
+        }
     }
     pub fn artifact_path(&self, id: &ArtifactId) -> Result<PathBuf> {
         self.verify_artifact(id)?;
@@ -238,7 +357,7 @@ impl Store {
             "new run must be running without evidence"
         );
         ensure!(
-            record.captures.is_empty(),
+            record.captures.is_empty() && record.dom_captures.is_empty(),
             "new queue must not contain evidence"
         );
         self.connection.execute(
@@ -256,21 +375,48 @@ impl Store {
     fn validate_check_coverage(&self, run: &CaptureRun) -> Result<()> {
         if let RunIntent::Check { baseline } = run.intent {
             let baseline = self.load_baseline(baseline)?;
+            baseline.validate_check_slots(run)?;
+            let frozen = self.load_run_snapshot(
+                baseline
+                    .frozen_source_run()
+                    .context("Frozen baseline source missing")?,
+            )?;
+            ensure!(
+                run.profiles == frozen.run.profiles
+                    && run.inventory == self.verified_baseline_inventory(&baseline, &frozen.run)?,
+                "Check must retain the baseline's fixed profiles and page addresses"
+            );
             ensure!(
                 baseline.project == run.project
                     && baseline.inventory == run.inventory.id
+                    && run.capture_plan == baseline.capture_plan
                     && run
                         .targets
                         .iter()
-                        .map(|t| &t.key)
+                        .map(|t| t.key.clone())
                         .collect::<std::collections::BTreeSet<_>>()
-                        == baseline.references.iter().map(|r| &r.key).collect(),
-                "check must use exactly the saved baseline screenshots"
+                        == baseline.target_keys()
+                    && run
+                        .targets
+                        .iter()
+                        .flat_map(CaptureTarget::requested_units)
+                        .collect::<std::collections::BTreeSet<_>>()
+                        == baseline.saved_units(),
+                "check must use exactly the saved baseline slots"
             );
         }
         Ok(())
     }
     pub fn load_run(&self, id: RunId) -> Result<RunRecord> {
+        let record = self.load_screenshot_run(id)?;
+        for capture in &record.dom_captures {
+            self.verify_dom_capture(capture)?;
+        }
+        Ok(record)
+    }
+    /// Verify only screenshot originals and derivatives. A damaged unrelated DOM
+    /// slot must not prevent image inspection or explicit image-only approval.
+    pub fn load_screenshot_run(&self, id: RunId) -> Result<RunRecord> {
         let record = self.load_run_snapshot(id)?;
         let mut verified = std::collections::BTreeSet::new();
         for c in record.all_captures() {
@@ -284,24 +430,32 @@ impl Store {
     }
     pub(super) fn load_run_snapshot(&self, id: RunId) -> Result<RunRecord> {
         let revision = self.checkpoint_revision(id)?;
-        let s: String = self.connection.query_row(
-            "SELECT record FROM runs WHERE id=?1 AND length(CAST(record AS BLOB))<=?2",
+        let (s,project,saved_state): (String,String,String) = self.connection.query_row(
+            "SELECT record,project_id,state FROM runs WHERE id=?1 AND length(CAST(record AS BLOB))<=?2",
             params![id.to_string(), RECORD_LIMIT],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?)),
         )?;
         let mut record: RunRecord = serde_json::from_str(&s)?;
-        let mut deltas = self.connection.prepare("SELECT target_index,target,capture FROM run_target_deltas WHERE run_id=?1 ORDER BY sequence,target_index")?;
+        ensure!(
+            record.run.project.to_string() == project && state(record.run.state)? == saved_state,
+            "Stored run project/state binding mismatch"
+        );
+        let mut deltas = self.connection.prepare("SELECT target_index,target,capture,dom_capture FROM run_target_deltas WHERE run_id=?1 ORDER BY sequence,target_index")?;
         let rows = deltas.query_map([id.to_string()], |row| {
             Ok((
                 row.get::<_, usize>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
             ))
         })?;
         for row in rows {
-            let (index, target, capture) = row?;
+            let (index, target, capture, dom_capture) = row?;
             ensure!(
-                target.len() + capture.as_ref().map_or(0, String::len) <= 1024 * 1024,
+                target.len()
+                    + capture.as_ref().map_or(0, String::len)
+                    + dom_capture.as_ref().map_or(0, String::len)
+                    <= 1024 * 1024,
                 "stored target delta exceeds budget"
             );
             let next: CaptureTarget = serde_json::from_str(&target)?;
@@ -317,6 +471,9 @@ impl Store {
             *old = next;
             if let Some(capture) = capture {
                 record.captures.push(serde_json::from_str(&capture)?);
+            }
+            if let Some(capture) = dom_capture {
+                record.dom_captures.push(serde_json::from_str(&capture)?);
             }
         }
         record.run.validate()?;
@@ -366,6 +523,7 @@ impl Store {
             (!previous.run.state.terminal() || previous.run.state == JobState::Interrupted)
                 && previous.run.inventory == record.run.inventory
                 && previous.run.profiles == record.run.profiles
+                && previous.run.capture_plan == record.run.capture_plan
                 && previous.run.project == record.run.project
                 && previous.run.intent == record.run.intent
                 && previous.run.environment == record.run.environment
@@ -389,7 +547,17 @@ impl Store {
         for (old, new) in previous.run.targets.iter().zip(&record.run.targets) {
             ensure!(
                 new.attempts >= old.attempts
-                    && (!matches!(old.outcome, TargetOutcome::Captured { .. }) || old == new),
+                    && (previous.run.capture_plan.mode.dom_snapshots()
+                        || !matches!(old.outcome, TargetOutcome::Captured { .. })
+                        || old == new)
+                    && (!matches!(old.outcome, TargetOutcome::Captured { .. })
+                        || old.outcome == new.outcome)
+                    && (!matches!(old.dom_outcome, DomTargetOutcome::Captured { .. })
+                        || old.dom_outcome == new.dom_outcome)
+                    && (!old.any_kind_captured() || old.final_url == new.final_url)
+                    && (matches!(old.outcome, TargetOutcome::NotRequested)
+                        == matches!(new.outcome, TargetOutcome::NotRequested))
+                    && old.dom_outcome.is_not_requested() == new.dom_outcome.is_not_requested(),
                 "successful targets and attempt accounting are immutable"
             );
         }
@@ -403,6 +571,12 @@ impl Store {
             .collect();
         for c in previous.all_captures() {
             ensure!(new_captures.get(&c.metadata.key).is_some_and(|next| serde_json::to_vec(next).ok() == serde_json::to_vec(c).ok()), "previous successful evidence cannot change on resume");
+        }
+        for c in &previous.dom_captures {
+            ensure!(record.dom_evidence(&c.metadata.key).is_some_and(|next| serde_json::to_vec(next).ok() == serde_json::to_vec(c).ok()), "previous successful DOM evidence cannot change on resume");
+        }
+        for c in &record.dom_captures {
+            self.verify_dom_capture(c)?;
         }
         if let Some(old) = &previous.queue {
             let new = record
@@ -441,6 +615,14 @@ impl Store {
                 pin(&tx, &self.paths, &ArtifactOwner::Run(record.run.id), &a)?;
             }
         }
+        for c in &record.dom_captures {
+            pin(
+                &tx,
+                &self.paths,
+                &ArtifactOwner::Run(record.run.id),
+                &c.metadata.sha256,
+            )?;
+        }
         ensure!(
             tx.execute(
                 "UPDATE runs SET state=?1,record=?2,owner_pid=?5 WHERE id=?3 AND state=?4 AND record=?6",
@@ -468,6 +650,32 @@ impl Store {
     ) -> Result<ProjectRecord> {
         self.activate_baseline_with_partial_confirmation(run, expected_revision, false)
     }
+    /// Eligible save coverage, unlike raw capture receipts. An unstable complete
+    /// DOM original remains retained evidence but is an explicit omitted slot.
+    pub fn baseline_eligible_coverage(&self, run: RunId) -> Result<BaselineSaveCoverage> {
+        let record = self.load_run(run)?;
+        let mut coverage = record
+            .baseline_save_coverage()
+            .context("Run is not a finished baseline candidate")?;
+        let eligible: std::collections::BTreeSet<_> = record
+            .all_captures()
+            .map(|c| c.metadata.key.clone())
+            .chain(
+                record
+                    .dom_captures
+                    .iter()
+                    .filter(|c| c.metadata.baseline_ready())
+                    .map(|c| c.metadata.key.clone()),
+            )
+            .collect();
+        coverage.captured_targets = eligible.len();
+        coverage.dom_captures = record
+            .dom_captures
+            .iter()
+            .filter(|c| c.metadata.baseline_ready())
+            .count();
+        Ok(coverage)
+    }
 
     /// `confirm_partial` must come from explicit consent to skip unsuccessful
     /// targets. The original intended coverage and failures remain immutable.
@@ -482,9 +690,25 @@ impl Store {
             !self.is_imported_run(run)?,
             "Imported origins are portable provenance, not a new independently captured baseline. Set the imported version active or make a fresh capture."
         );
-        let (captured, intended) = record
+        record
             .baseline_save_counts()
-            .context("only a finished baseline capture with successful screenshots can be saved")?;
+            .context("only a finished baseline capture with successful evidence can be saved")?;
+        let captured = record.all_captures().count()
+            + record
+                .dom_captures
+                .iter()
+                .filter(|c| c.metadata.baseline_ready())
+                .count();
+        let intended = record
+            .run
+            .targets
+            .iter()
+            .flat_map(CaptureTarget::requested_units)
+            .count();
+        ensure!(
+            captured > 0 && captured <= intended,
+            "no eligible captured reference slots"
+        );
         let partial = captured < intended;
         ensure!(
             !partial || confirm_partial,
@@ -506,6 +730,13 @@ impl Store {
                     "Original screenshot PNG dimensions conflict"
                 );
             }
+        }
+        for capture in record
+            .dom_captures
+            .iter()
+            .filter(|c| c.metadata.baseline_ready())
+        {
+            self.verify_dom_capture(capture)?;
         }
         let mut project = self.load_project(record.run.project)?;
         ensure!(
@@ -533,10 +764,26 @@ impl Store {
                     captured_at: record.run.finished_at.unwrap(),
                 })
                 .collect(),
+            dom_references: record
+                .dom_captures
+                .iter()
+                .filter(|c| c.metadata.baseline_ready())
+                .map(|c| DomBaselineReference {
+                    key: c.metadata.key.clone(),
+                    run,
+                    artifact: c.metadata.sha256.clone(),
+                    captured_at: record.run.finished_at.unwrap(),
+                    policy: c.metadata.policy,
+                })
+                .collect(),
+            capture_plan: record.run.capture_plan.clone(),
+            source_run: Some(run),
+            intended_targets: record.run.targets.iter().map(|t| t.key.clone()).collect(),
             intended_count: record.run.targets.len() as u32,
             explicitly_partial: partial,
         };
         baseline.validate()?;
+        self.verified_baseline_inventory(&baseline, &record.run)?;
         let tx = self
             .connection
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -562,8 +809,17 @@ impl Store {
                 pin(&tx, &self.paths, &ArtifactOwner::Baseline(baseline.id), &a)?;
             }
         }
+        for reference in &baseline.dom_references {
+            pin(
+                &tx,
+                &self.paths,
+                &ArtifactOwner::Baseline(baseline.id),
+                &reference.artifact,
+            )?;
+        }
         project.project.active_baseline = Some(baseline.id);
         project.project.profiles = record.run.profiles.clone();
+        project.project.capture_plan = record.run.capture_plan.clone();
         project.revision += 1;
         tx.execute(
             "UPDATE projects SET config=?1,revision=?2,updated_at=unixepoch() WHERE id=?3",
@@ -577,23 +833,73 @@ impl Store {
         Ok(project)
     }
     pub fn load_baseline(&self, id: BaselineId) -> Result<BaselineVersion> {
-        let s: String = self.connection.query_row(
-            "SELECT record FROM baselines WHERE id=?1",
+        self.load_screenshot_baseline(id)?;
+        self.load_dom_baseline(id)
+    }
+    /// Resolve frozen capture configuration, including shipped legacy ancestry.
+    /// This validates retained metadata/provenance, not unrelated image tiles.
+    /// Display/comparison/approval must still use the kind-scoped CAS readers.
+    pub fn frozen_baseline_source(&self, id: BaselineId) -> Result<(BaselineVersion, RunRecord)> {
+        let baseline = self.load_baseline_metadata(id)?;
+        let source = self.load_run_snapshot(
+            baseline
+                .frozen_source_run()
+                .context("Frozen baseline source missing")?,
+        )?;
+        self.verified_baseline_inventory(&baseline, &source.run)?;
+        Ok((baseline, source))
+    }
+    pub(crate) fn load_baseline_metadata(&self, id: BaselineId) -> Result<BaselineVersion> {
+        let b = self.read_baseline_metadata(id)?;
+        if b.source_run.is_none() || b.intended_targets.is_empty() {
+            return self.recover_legacy_baseline(&b);
+        }
+        let frozen = self.load_run_snapshot(
+            b.frozen_source_run()
+                .context("Frozen baseline source missing")?,
+        )?;
+        self.verified_baseline_inventory(&b, &frozen.run)?;
+        Ok(b)
+    }
+    pub(crate) fn read_baseline_metadata(&self, id: BaselineId) -> Result<BaselineVersion> {
+        let (s, source_run, project): (String, String, String) = self.connection.query_row(
+            "SELECT record,source_run,project_id FROM baselines WHERE id=?1",
             [id.to_string()],
-            |r| r.get(0),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )?;
         ensure!(s.len() <= RECORD_LIMIT, "baseline too large");
         let b: BaselineVersion = serde_json::from_str(&s)?;
         b.validate()?;
-        ensure!(b.id == id, "baseline ID mismatch");
+        ensure!(
+            b.id == id && b.project.to_string() == project,
+            "baseline ID/project mismatch"
+        );
+        ensure!(
+            if let Some(source) = b.source_run {
+                source.to_string() == source_run
+            } else {
+                // The shipped SQL column identifies a reference owner, NOT
+                // frozen configuration for a legacy composite.
+                b.capture_plan.is_default()
+                    && b.references.iter().any(|r| r.run.to_string() == source_run)
+            },
+            "Baseline frozen source binding mismatch"
+        );
+        Ok(b)
+    }
+    /// Kind-scoped integrity authority, retaining exact source bindings without
+    /// requiring unrelated evidence kinds to be readable.
+    pub fn load_screenshot_baseline(&self, id: BaselineId) -> Result<BaselineVersion> {
+        let b = self.load_baseline_metadata(id)?;
         let mut runs = std::collections::BTreeMap::new();
         for r in &b.references {
             if let std::collections::btree_map::Entry::Vacant(e) = runs.entry(r.run) {
-                e.insert(self.load_run(r.run)?);
+                e.insert(self.load_screenshot_run(r.run)?);
             }
             let run = &runs[&r.run];
             ensure!(
                 run.run.project == b.project
+                    && run.run.capture_plan == b.capture_plan
                     && r.captured_at
                         == run
                             .run
@@ -621,8 +927,8 @@ impl Store {
         for result in &a.revision.results {
             result.validate()?;
         }
-        let run = self.load_run(a.revision.run)?;
-        let baseline = self.load_baseline(a.revision.baseline)?;
+        let run = self.load_screenshot_run(a.revision.run)?;
+        let baseline = self.load_screenshot_baseline(a.revision.baseline)?;
         if let Some(p) = &a.perceptual {
             use regressee_core::analysis_engine as engine;
             ensure!(
@@ -650,7 +956,7 @@ impl Store {
                     .iter()
                     .find(|r| &r.key == key)
                     .context("report source missing")?;
-                let before = self.load_run(source.run)?;
+                let before = self.load_screenshot_run(source.run)?;
                 ensure!(
                     report.request.before
                         == descriptor(&before, before.evidence(key).context("before missing")?)?
@@ -756,13 +1062,13 @@ impl Store {
                     baseline: baseline.id
                 }
                 && run.run.state.terminal()
-                && a.revision.results.len() == run.run.targets.len()
+                && a.revision.results.len() == baseline.references.len()
                 && a.revision
                     .results
                     .iter()
                     .map(|r| &r.key)
                     .collect::<std::collections::BTreeSet<_>>()
-                    == run.run.targets.iter().map(|r| &r.key).collect(),
+                    == baseline.references.iter().map(|r| &r.key).collect(),
             "analysis run/baseline mismatch"
         );
         let tx = self
@@ -849,6 +1155,78 @@ impl Store {
         );
         self.evidence_snapshot(saved, Some(record), true)
     }
+    /// Exact-run screenshot receipt, including captured/failed/paused runs with
+    /// no pixel analysis yet. `comparison: None` means not analyzed, never an
+    /// unchanged verdict. Unrelated DOM files/history are not read or approved.
+    pub fn screenshot_evidence_for_run(
+        &self,
+        project: ProjectId,
+        run: RunId,
+    ) -> Result<ProjectEvidence> {
+        self.load_project(project)?;
+        let record = self.load_screenshot_run(run)?;
+        ensure!(
+            record.run.project == project,
+            "Screenshot run belongs to another project"
+        );
+        let baseline = match record.run.intent {
+            RunIntent::Check { baseline } => Some(self.load_screenshot_baseline(baseline)?),
+            _ => None,
+        };
+        ensure!(
+            baseline.as_ref().is_none_or(|b| b.project == project),
+            "Screenshot baseline belongs to another project"
+        );
+        let analysis:Option<String>=self.connection.query_row("SELECT COALESCE((SELECT analysis_id FROM analysis_display WHERE run_id=?1),(SELECT id FROM analyses WHERE run_id=?1 ORDER BY rowid DESC LIMIT 1))",[run.to_string()],|r|r.get(0))?;
+        let comparison = analysis
+            .map(|id| self.load_analysis(serde_json::from_value(serde_json::json!(id))?))
+            .transpose()?;
+        ensure!(
+            comparison.as_ref().is_none_or(|a| a.revision.run == run
+                && baseline
+                    .as_ref()
+                    .is_some_and(|b| a.revision.baseline == b.id)),
+            "Screenshot analysis does not match exact run/checked baseline"
+        );
+        let before = baseline
+            .as_ref()
+            .and_then(|b| b.references.first())
+            .map(|r| {
+                self.load_screenshot_run(r.run)
+                    .map(|source| source.evidence(&r.key).cloned())
+            })
+            .transpose()?
+            .flatten();
+        let analyses = {
+            let mut q = self
+                .connection
+                .prepare("SELECT id FROM analyses WHERE run_id=?1 ORDER BY rowid DESC LIMIT 128")?;
+            q.query_map([run.to_string()], |r| r.get::<_, String>(0))?
+                .map(|r| Ok(serde_json::from_value(serde_json::json!(r?))?))
+                .collect::<Result<Vec<_>>>()?
+        };
+        Ok(ProjectEvidence {
+            latest: Some(record),
+            baseline,
+            before,
+            comparison,
+            analyses,
+            reviews: self.review_history(run)?,
+            review_history_truncated: self.review_history_truncated(run)?,
+            ..Default::default()
+        })
+    }
+    pub fn project_evidence_for_run_kind(
+        &self,
+        project: ProjectId,
+        run: RunId,
+        kind: CheckKind,
+    ) -> Result<ProjectEvidence> {
+        match kind {
+            CheckKind::Screenshot => self.screenshot_evidence_for_run(project, run),
+            CheckKind::DomSnapshot => self.dom_evidence_for_run(project, run),
+        }
+    }
     fn evidence_snapshot(
         &self,
         project: ProjectRecord,
@@ -880,9 +1258,10 @@ impl Store {
         );
         let before = baseline
             .as_ref()
-            .map(|b| {
-                self.load_run(b.references[0].run)
-                    .map(|r| r.evidence(&b.references[0].key).cloned())
+            .and_then(|b| b.references.first())
+            .map(|reference| {
+                self.load_screenshot_run(reference.run)
+                    .map(|r| r.evidence(&reference.key).cloned())
             })
             .transpose()?
             .flatten();
@@ -923,6 +1302,26 @@ impl Store {
         } else {
             None
         };
+        let dom_comparison = latest
+            .as_ref()
+            .map(|r| self.displayed_dom_analysis(r.run.id))
+            .transpose()?
+            .flatten();
+        let dom_before = baseline
+            .as_ref()
+            .and_then(|b| b.dom_references.first())
+            .map(|r| self.read_dom_snapshot(r.run, &r.key).map(|(c, _)| c))
+            .transpose()?;
+        let dom_analyses = latest
+            .as_ref()
+            .map(|r| self.dom_analysis_history(r.run.id))
+            .transpose()?
+            .unwrap_or_default();
+        let dom_reviews = latest
+            .as_ref()
+            .map(|r| self.dom_review_history(r.run.id))
+            .transpose()?
+            .unwrap_or_default();
         Ok(ProjectEvidence {
             analyses: if let Some(r) = &latest {
                 let mut q = self.connection.prepare(
@@ -949,6 +1348,10 @@ impl Store {
             baseline,
             before,
             comparison,
+            dom_comparison,
+            dom_before,
+            dom_analyses,
+            dom_reviews,
         })
     }
     /// Verified, focused viewer session boundary. Unlike the full workspace
@@ -984,7 +1387,7 @@ impl Store {
             id.map(|id| serde_json::from_value(serde_json::json!(id)))
                 .transpose()?
         };
-        let latest = run.map(|id| self.load_run(id)).transpose()?;
+        let latest = run.map(|id| self.load_screenshot_run(id)).transpose()?;
         ensure!(
             latest.as_ref().is_none_or(|r| r.run.project == project),
             "viewer analysis belongs to another project"
@@ -1004,7 +1407,7 @@ impl Store {
             .map(|a| a.revision.baseline)
             .or(reference)
             .or(saved.project.active_baseline)
-            .map(|id| self.load_baseline(id))
+            .map(|id| self.load_screenshot_baseline(id))
             .transpose()?;
         ensure!(
             baseline.as_ref().is_none_or(|b| b.project == project),
@@ -1019,6 +1422,7 @@ impl Store {
             reviews: vec![],
             review_history_truncated: false,
             baselines: vec![],
+            ..Default::default()
         })
     }
     /// Called by the exclusive application storage owner on startup; never GC.
@@ -1108,6 +1512,18 @@ pub(crate) fn validate_capture(r: &RunRecord) -> Result<()> {
             _ => (),
         }
     }
+    let mut dom = std::collections::BTreeSet::new();
+    for c in &r.dom_captures {
+        ensure!(dom.insert(&c.metadata.key), "duplicate DOM evidence");
+        c.metadata.validate_for_run(&r.run)?;
+    }
+    for target in &r.run.targets {
+        ensure!(
+            matches!(target.dom_outcome, DomTargetOutcome::Captured { .. })
+                == dom.contains(&target.key),
+            "DOM outcome and evidence disagree"
+        );
+    }
     Ok(())
 }
 fn validate_evidence(run: &CaptureRun, target: &CaptureTarget, c: &CaptureEvidence) -> Result<()> {
@@ -1186,6 +1602,7 @@ mod tests {
                 final_url: None,
                 attempts: 0,
                 outcome: TargetOutcome::Pending,
+                dom_outcome: DomTargetOutcome::NotRequested,
                 warnings: vec![],
             })
             .collect();
@@ -1239,6 +1656,7 @@ mod tests {
                     coverage: DiscoveryCoverage::Complete,
                 },
                 profiles: vec![profile],
+                capture_plan: CapturePlan::default(),
                 environment: project.environments[0].clone(),
                 rendering: RenderingEnvironment {
                     os: "fixture".into(),
@@ -1255,6 +1673,7 @@ mod tests {
             },
             capture: None,
             captures: vec![],
+            dom_captures: vec![],
             queue: Some(QueueSettings {
                 discovery: project.discovery,
                 project_revision: 1,
@@ -1758,6 +2177,7 @@ mod tests {
                     coverage: DiscoveryCoverage::Complete,
                 },
                 profiles: vec![profile.clone()],
+                capture_plan: CapturePlan::default(),
                 environment: project.environments[0].clone(),
                 rendering: RenderingEnvironment {
                     os: "fixture".into(),
@@ -1779,6 +2199,7 @@ mod tests {
                     final_url: None,
                     attempts: 0,
                     outcome: TargetOutcome::Pending,
+                    dom_outcome: DomTargetOutcome::NotRequested,
                     warnings: vec![],
                 }],
             },
@@ -1789,6 +2210,7 @@ mod tests {
                 project_revision: 1,
                 resumed_at: vec![],
             }),
+            dom_captures: vec![],
         };
         first.freeze_inventory(&record.run.inventory).unwrap();
         assert!(first.freeze_inventory(&record.run.inventory).is_err());

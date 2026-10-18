@@ -99,6 +99,7 @@ impl Shell {
             || self.mask_dirty
             || self.mask_drag.is_some()
             || !self.approval_selection.is_empty()
+            || !self.dom.selected.is_empty()
             || self.mask_geometry_dirty(cx)
             || self.analysis_policy_draft(cx)
             || self
@@ -297,6 +298,9 @@ impl Shell {
         cx.notify();
     }
     fn disable_agent_inputs(&self, cx: &mut Context<Self>) {
+        self.dom
+            .source
+            .update(cx, |source, cx| source.set_enabled(false, cx));
         self.input_gate.set_allowed(false);
         self.settings_scrollbar.cancel_drag();
         for input in std::iter::once(&self.name)
@@ -323,6 +327,7 @@ impl Shell {
         self.clear_viewer();
         self.invalidate_approval();
         self.approval_selection.clear();
+        self.dom.selected.clear();
         self.history = None;
         self.project_storage = None;
         self.environment = None;
@@ -399,6 +404,13 @@ impl Shell {
         };
         self.focus.setup_stage = SetupStage::Settings;
         self.focus.review_surface = ReviewSurface::Changes;
+        self.sync_dom_workspace(cx);
+        self.dom.kind = location.selection.kind;
+        self.dom.presentation = match location.selection.view {
+            View::Before => regressee_gui::jobs::DomPresentation::Before,
+            View::After => regressee_gui::jobs::DomPresentation::After,
+            _ => regressee_gui::jobs::DomPresentation::Diff,
+        };
         self.focus.preview = false;
         self.focus.viewer = self.evidence.latest.is_some();
         self.focus.baseline = self.evidence.baseline.is_some();
@@ -419,16 +431,20 @@ impl Shell {
         self.pan_x = 0.;
         self.viewer_fit = true;
         self.agent_exact =
-            location
-                .selection
-                .run
-                .map(|run| regressee_app::protocol::ViewerSelection {
-                    project: location.selection.project,
-                    run: Some(run),
-                    analysis: location.selection.analysis,
-                    key: self.selected_key.clone(),
-                    tile: 0,
-                });
+            if location.selection.kind == regressee_core::domain::CheckKind::DomSnapshot {
+                None
+            } else {
+                location
+                    .selection
+                    .run
+                    .map(|run| regressee_app::protocol::ViewerSelection {
+                        project: location.selection.project,
+                        run: Some(run),
+                        analysis: location.selection.analysis,
+                        key: self.selected_key.clone(),
+                        tile: 0,
+                    })
+            };
         self.reload_viewer(cx);
         cx.notify();
     }

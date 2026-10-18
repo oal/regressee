@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Cheap local queue indexing. Rebuild metadata only when evidence changes.
+use regressee_core::dom_snapshot::DomComparisonOutcome;
 use regressee_core::{domain::*, evidence::ProjectEvidence};
 
 type SearchablePages = (InventoryId, usize, Vec<(PageId, String)>);
@@ -13,7 +14,11 @@ pub(super) fn result_filter_scope(evidence: &ProjectEvidence) -> Option<(RunId, 
             evidence
                 .comparison
                 .as_ref()
-                .is_some_and(|a| a.revision.run == run.run.id),
+                .is_some_and(|a| a.revision.run == run.run.id)
+                || evidence
+                    .dom_comparison
+                    .as_ref()
+                    .is_some_and(|a| a.revision.run == run.run.id),
         )
     })
 }
@@ -30,11 +35,42 @@ pub(super) struct HistoryFilterCache {
 #[derive(Default)]
 pub(super) struct QueueIndex {
     pub preview: Option<SearchablePages>,
-    revision: Option<(RunId, Option<AnalysisId>, usize, usize)>,
+    revision: Option<QueueRevision>,
     searchable: Vec<String>,
-    kinds: Vec<usize>,
+    kinds: Vec<u8>,
     order: Vec<usize>,
     grouped: Vec<usize>,
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct QueueRevision {
+    run: RunId,
+    screenshot: Option<AnalysisId>,
+    dom: Option<DomAnalysisId>,
+    targets: usize,
+    target_pointer: usize,
+    dom_pointer: usize,
+    unreadable: [bool; 2],
+}
+
+// Changed and missing are independent flags: a changed screenshot + failed DOM
+// belongs in both filters. Unchanged means every requested kind is unchanged.
+fn aggregate_status(statuses: &[u8]) -> u8 {
+    let flags = statuses.iter().copied().fold(0, |a, b| a | b);
+    (flags & 3)
+        | if !statuses.is_empty() && statuses.iter().all(|&s| s == 4) {
+            4
+        } else {
+            flags & 8
+        }
+}
+fn status_matches(flags: u8, filter: usize) -> bool {
+    match filter {
+        0 => true,
+        1 => flags & 1 != 0,
+        2 => flags & 2 != 0,
+        3 => flags == 4,
+        _ => false,
+    }
 }
 impl QueueIndex {
     pub fn results(
@@ -43,6 +79,7 @@ impl QueueIndex {
         query: &str,
         kind: usize,
         grouped: bool,
+        unreadable: [bool; 2],
     ) -> Vec<usize> {
         let Some(run) = &evidence.latest else {
             return vec![];
@@ -51,16 +88,32 @@ impl QueueIndex {
             .comparison
             .as_ref()
             .filter(|a| a.revision.run == run.run.id);
-        let revision = (
-            run.run.id,
-            analysis.map(|a| a.revision.id),
-            run.run.targets.len(),
-            run.run.targets.as_ptr() as usize,
-        );
+        let dom = evidence
+            .dom_comparison
+            .as_ref()
+            .filter(|a| a.revision.run == run.run.id);
+        let revision = QueueRevision {
+            run: run.run.id,
+            screenshot: analysis.map(|a| a.revision.id),
+            dom: dom.map(|a| a.revision.id),
+            targets: run.run.targets.len(),
+            target_pointer: run.run.targets.as_ptr() as usize,
+            dom_pointer: run.dom_captures.as_ptr() as usize,
+            unreadable,
+        };
         if self.revision != Some(revision) {
             let classifications: std::collections::BTreeMap<_, _> = analysis
                 .map(|a| a.review_classifications())
                 .unwrap_or_default();
+            let dom_outcomes: std::collections::BTreeMap<_, _> = dom
+                .into_iter()
+                .flat_map(|d| d.revision.results.iter())
+                .map(|r| (&r.key, &r.outcome))
+                .collect();
+            let screenshots: std::collections::BTreeSet<_> =
+                run.all_captures().map(|c| &c.metadata.key).collect();
+            let dom_captures: std::collections::BTreeSet<_> =
+                run.dom_captures.iter().map(|c| &c.metadata.key).collect();
             self.searchable = run
                 .run
                 .targets
@@ -72,22 +125,61 @@ impl QueueIndex {
                 .targets
                 .iter()
                 .map(|t| {
-                    if !matches!(t.outcome, TargetOutcome::Captured { .. }) {
-                        return 2;
+                    let mut statuses = Vec::with_capacity(2);
+                    if run.run.capture_plan.mode.screenshots() {
+                        statuses.push(
+                            if unreadable[0]
+                                || !matches!(t.outcome, TargetOutcome::Captured { .. })
+                                || !screenshots.contains(&t.key)
+                            {
+                                2
+                            } else {
+                                match classifications.get(&t.key) {
+                                    Some(Classification::Changed) => 1,
+                                    Some(
+                                        Classification::NotComparable
+                                        | Classification::CouldNotCapture,
+                                    ) => 2,
+                                    Some(Classification::NoSignificantChange) => 4,
+                                    _ => 8,
+                                }
+                            },
+                        );
                     }
-                    match classifications.get(&t.key) {
-                        Some(Classification::Changed) => 1,
-                        Some(Classification::NotComparable | Classification::CouldNotCapture) => 2,
-                        Some(Classification::NoSignificantChange) => 3,
-                        _ => 0,
+                    if run.run.capture_plan.mode.dom_snapshots() {
+                        statuses.push(
+                            if unreadable[1]
+                                || !matches!(t.dom_outcome, DomTargetOutcome::Captured { .. })
+                                || !dom_captures.contains(&t.key)
+                            {
+                                2
+                            } else {
+                                match dom_outcomes.get(&t.key) {
+                                    Some(DomComparisonOutcome::Changed) => 1,
+                                    Some(DomComparisonOutcome::Unchanged) => 4,
+                                    Some(
+                                        DomComparisonOutcome::NotComparable { .. }
+                                        | DomComparisonOutcome::CouldNotCapture { .. }
+                                        | DomComparisonOutcome::NotRequested,
+                                    ) => 2,
+                                    None => 8,
+                                }
+                            },
+                        );
                     }
+                    aggregate_status(&statuses)
                 })
                 .collect();
-            let rank = |i: usize| match self.kinds[i] {
-                1 => 0,
-                2 => 1,
-                3 => 3,
-                _ => 2,
+            let rank = |i: usize| {
+                if self.kinds[i] & 1 != 0 {
+                    0
+                } else if self.kinds[i] & 2 != 0 {
+                    1
+                } else if self.kinds[i] == 4 {
+                    3
+                } else {
+                    2
+                }
             };
             self.order = (0..run.run.targets.len()).collect();
             self.order.sort_by(|a, b| {
@@ -113,9 +205,7 @@ impl QueueIndex {
         order
             .iter()
             .copied()
-            .filter(|i| {
-                (kind == 0 || self.kinds[*i] == kind) && self.searchable[*i].contains(query)
-            })
+            .filter(|i| status_matches(self.kinds[*i], kind) && self.searchable[*i].contains(query))
             .collect()
     }
 }
@@ -149,8 +239,14 @@ pub(super) fn name(value: &str) -> Option<&'static str> {
         .map(|_| "Enter a name of 1–120 characters.")
 }
 pub(super) fn addresses(value: &str) -> Option<&'static str> {
-    regressee_core::crawl::sources(value.trim()).err().map(|_| "Use complete http:// or https:// addresses separated by spaces, without embedded passwords.")
+    regressee_core::crawl::sources(value.trim())
+        .err()
+        .map(|_| ADDRESS_CORRECTION)
 }
+pub(super) const ADDRESS_CORRECTION: &str =
+    "Use full http:// or https:// addresses, separated by spaces, without passwords.";
+const MAPPING_CORRECTION: &str = "Use a complete website or section address, such as https://example.com/app. Leave out endings starting with ? or #.";
+const PROXY_CORRECTION: &str = "Use the proxy's server address, such as http://proxy.example:3128. Leave out page paths, endings starting with ? or #, and login details.";
 pub(super) fn optional_addresses(value: &str) -> Option<&'static str> {
     if value.trim().is_empty() {
         None
@@ -178,7 +274,7 @@ pub(super) fn mapping_base(value: &str) -> Option<&'static str> {
     url::Url::parse(value.trim())
         .ok()
         .is_none_or(|u| u.query().is_some() || u.fragment().is_some())
-        .then_some("Use a complete website or section address, such as https://example.com/app. Leave out endings starting with ? or #.")
+        .then_some(MAPPING_CORRECTION)
 }
 pub(super) fn proxy_origin(value: &str) -> Option<&'static str> {
     if value.trim().is_empty() {
@@ -187,7 +283,21 @@ pub(super) fn proxy_origin(value: &str) -> Option<&'static str> {
     if let Some(error) = optional_address(value) {
         return Some(error);
     }
-    url::Url::parse(value.trim()).ok().is_none_or(|u| u.path() != "/" || u.query().is_some() || u.fragment().is_some()).then_some("Use the proxy's server address, such as http://proxy.example:3128. Leave out page paths, endings starting with ? or #, and login details.")
+    url::Url::parse(value.trim())
+        .ok()
+        .is_none_or(|u| u.path() != "/" || u.query().is_some() || u.fragment().is_some())
+        .then_some(PROXY_CORRECTION)
+}
+/// Known longest correction for each form control, including optional fields
+/// whose empty value is valid and therefore cannot supply reservation text.
+pub(super) fn crawl_correction_reserve(index: usize) -> Option<&'static str> {
+    match index {
+        10 | 11 => optional_address("invalid"),
+        12 => Some(ADDRESS_CORRECTION),
+        13 | 14 => Some(MAPPING_CORRECTION),
+        17 => Some(PROXY_CORRECTION),
+        _ => crawl_validator(index).and_then(|validate| validate("invalid")),
+    }
 }
 pub(super) fn crawl_validator(index: usize) -> Option<fn(&str) -> Option<&'static str>> {
     Some(match index {
@@ -251,6 +361,17 @@ pub(super) fn analysis_validator(index: usize) -> Option<fn(&str) -> Option<&'st
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn independent_kind_filters_do_not_hide_changes_or_failures() {
+        let mixed = aggregate_status(&[1, 2]);
+        assert!(status_matches(mixed, 1));
+        assert!(status_matches(mixed, 2));
+        assert!(!status_matches(mixed, 3));
+        assert_eq!(aggregate_status(&[4, 1]), 1);
+        assert_eq!(aggregate_status(&[4, 4]), 4);
+        assert!(!status_matches(aggregate_status(&[4, 8]), 3));
+        assert!(!status_matches(aggregate_status(&[]), 3));
+    }
     #[test]
     fn hidden_selection_enters_visible_queue_without_skipping_first_match() {
         let rows: Vec<_> = (0..3000).collect();

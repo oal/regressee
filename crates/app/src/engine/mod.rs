@@ -2,9 +2,11 @@
 //! Local engine: a live broker plus one blocking product/storage owner.
 mod authority;
 mod client;
+pub mod dom;
 mod executor;
 mod ipc;
 pub mod ownership;
+pub mod text;
 mod viewer;
 use crate::{product::Product, protocol::*};
 use anyhow::{Context, Result, ensure};
@@ -131,7 +133,13 @@ impl Shared {
         }
     }
     fn finish(&self, id: Uuid, mut outcome: Outcome, interrupted: bool) {
+        outcome.without_dom_bodies();
         let mut state = self.state.lock().unwrap();
+        let pure_read = !state.jobs[&id].submitted.operation.mutates()
+            && !matches!(state.jobs[&id].submitted.operation, Operation::Prepare(_));
+        if pure_read && text::json_size_within(&outcome, MAX_READ_RESULT_BYTES).is_none() {
+            outcome = Outcome::ProductFailure("response_too_large: read response exceeds 16 MiB of encoded JSON; request bounded results/source/diff pages or focused target artifacts".into());
+        }
         let changed = state.jobs[&id].submitted.operation.mutates()
             && !matches!(
                 state.jobs[&id].submitted.operation,
@@ -567,7 +575,10 @@ impl Server {
                 let product = configure(&paths);
                 let mut store = Store::open(paths)?;
                 store.recover_runs()?;
-                store.complete_confirmed_gc()?;
+                // Confirmed metadata deletion must not make unrelated projects
+                // unavailable when physical file cleanup needs repair. Retain
+                // its journal and expose the pending count in storage status.
+                let _ = store.complete_confirmed_gc();
                 worker_shared.state.lock().unwrap().revisions = read_revisions(&store)?;
                 Ok((store, product))
             })();
@@ -991,11 +1002,7 @@ fn run_job(
         }
     }
     match result {
-        Ok(result) => shared.finish(
-            id,
-            result.unwrap_or_else(|e| Outcome::ProductFailure(e.to_string())),
-            false,
-        ),
+        Ok(result) => shared.finish(id, normalized_outcome(result), false),
         Err(_) => {
             shared.state.lock().unwrap().failed = true;
             shared.finish(
@@ -1010,6 +1017,13 @@ fn run_job(
     }
 }
 
+fn normalized_outcome(result: Result<Outcome>) -> Outcome {
+    match result {
+        Ok(outcome) => outcome,
+        Err(error) if crate::jobs::typed_cancellation(&error) => Outcome::Cancelled,
+        Err(error) => Outcome::ProductFailure(error.to_string()),
+    }
+}
 fn expire_authority(state: &mut State) {
     state
         .authority
@@ -1082,8 +1096,9 @@ fn validate_intent(store: &Store, operation: &Operation) -> Result<()> {
                 ensure!(
                     saved.project.sources == project.sources
                         && saved.project.profiles == project.profiles
-                        && saved.project.environments == project.environments,
-                    "replacement_required: active-baseline-bound sources, profiles or environments require explicit replacement preparation"
+                        && saved.project.environments == project.environments
+                        && saved.project.capture_plan == project.capture_plan,
+                    "replacement_required: active-baseline-bound sources, profiles, environments or check modes require explicit replacement preparation"
                 );
             }
         } else {
@@ -1094,6 +1109,12 @@ fn validate_intent(store: &Store, operation: &Operation) -> Result<()> {
         }
     }
     match operation {
+        Operation::Dom(command) => {
+            command.validate()?;
+            if let dom::Command::Accept(preview) = command {
+                dom::validate_accept(store, preview)?;
+            }
+        }
         Operation::Accept { preview, context } => {
             let fresh = store
                 .approval_preview(preview.analysis, &preview.selected)
@@ -1143,12 +1164,20 @@ fn validate_intent(store: &Store, operation: &Operation) -> Result<()> {
                         .is_none_or(|q| q.project_revision == *revision),
                 "revision_conflict: project changed since this baseline capture"
             );
-            let (captured, total) = record
+            record
                 .baseline_save_counts()
                 .context("invalid_request: this run is not a finished baseline candidate")?;
+            let coverage = store.baseline_eligible_coverage(*run)?;
             ensure!(
-                captured == total || *confirm_partial,
-                "confirmation_required: partial baseline omits failed captures; inspect coverage and explicitly include --partial when preparing"
+                coverage.screenshot_captures + coverage.dom_captures > 0,
+                "invalid_request: this candidate has no eligible reference slots; unstable DOM evidence cannot become a baseline"
+            );
+            ensure!(
+                (coverage.captured_targets == coverage.intended_targets
+                    && coverage.screenshot_captures == coverage.screenshot_intended
+                    && coverage.dom_captures == coverage.dom_intended)
+                    || *confirm_partial,
+                "confirmation_required: partial baseline omits requested screenshot/DOM captures; inspect per-kind coverage and explicitly include --partial when preparing"
             );
         }
         Operation::CaptureInventory {
@@ -1172,14 +1201,39 @@ fn validate_intent(store: &Store, operation: &Operation) -> Result<()> {
 
 fn confirmation_preview(store: &Store, operation: &Operation) -> Result<Option<serde_json::Value>> {
     Ok(match operation {
+        Operation::Dom(dom::Command::Accept(preview)) => {
+            let canonical = dom::canonical_accept(store, preview)?;
+            Some(
+                serde_json::json!({"action":"accept_explicit_kinds","preview":canonical,"warning":"Only explicitly selected screenshot/DOM reference slots change. Sibling kinds and retained history are inherited without implicit approval."}),
+            )
+        }
         Operation::Activate {
             run,
             revision,
             confirm_partial,
         } => {
+            use regressee_core::domain::{CheckKind, ReviewUnitKey};
             let r = store.load_run(*run)?;
+            let coverage = store.baseline_eligible_coverage(*run)?;
+            let mut omitted = Vec::new();
+            for target in &r.run.targets {
+                for kind in r.run.capture_plan.kinds() {
+                    let eligible = match kind {
+                        CheckKind::Screenshot => r.evidence(&target.key).is_some(),
+                        CheckKind::DomSnapshot => r
+                            .dom_evidence(&target.key)
+                            .is_some_and(|c| c.metadata.baseline_ready()),
+                    };
+                    if !eligible {
+                        omitted.push(ReviewUnitKey {
+                            key: target.key.clone(),
+                            kind,
+                        });
+                    }
+                }
+            }
             Some(
-                serde_json::json!({"action":"save_baseline","run":r.run,"settings_revision":revision,"captured_and_intended":r.baseline_save_counts(),"partial_confirmation":confirm_partial,"warning":"Saving changes future checks; failed/missing targets are never successful empty images. Original baseline history is retained."}),
+                serde_json::json!({"action":"save_baseline","run":r.run,"settings_revision":revision,"captured_and_intended":(coverage.captured_targets,coverage.intended_targets),"per_kind_coverage":coverage,"captured_coverage":r.baseline_save_coverage(),"omitted_slots":omitted,"partial_confirmation":confirm_partial,"warning":"Saving changes future checks; failed, missing or unstable DOM slots are ineligible, never unchanged evidence. Explicitly omitted reference slots remain omissions. Original baseline history is retained."}),
             )
         }
         Operation::Restore { baseline, revision } => Some(
@@ -1216,6 +1270,111 @@ fn read_revisions(store: &Store) -> Result<BTreeMap<regressee_core::domain::Proj
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn typed_report_cancellation_normalizes_without_rewriting_committed_success() {
+        let cancelled = anyhow::Error::new(crate::analysis_engine::Cancelled)
+            .context("Rendering saved DOM report");
+        assert!(matches!(
+            normalized_outcome(Err(cancelled)),
+            Outcome::Cancelled
+        ));
+        let worker = anyhow::Error::new(regressee_runtime::supervisor::WorkerFailure(
+            regressee_runtime::protocol::FailureCode::Cancelled,
+        ))
+        .context("Capture checkpoint");
+        assert!(matches!(
+            normalized_outcome(Err(worker)),
+            Outcome::Cancelled
+        ));
+        assert!(matches!(
+            normalized_outcome(Err(anyhow::anyhow!("DOM analysis cancelled"))),
+            Outcome::ProductFailure(_)
+        ));
+        let late_cancel = AtomicBool::new(true);
+        let committed = Outcome::Terminal(Box::new(crate::terminal::Output::Reported {
+            html: "owned/index.html".into(),
+            markdown: "owned/summary.md".into(),
+        }));
+        assert!(late_cancel.load(Ordering::Acquire));
+        assert!(matches!(
+            normalized_outcome(Ok(committed)),
+            Outcome::Terminal(_)
+        ));
+    }
+
+    #[test]
+    fn oversized_read_fails_bounded_without_draining_or_poisoning_the_engine() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let mut server = Server::configured(AppPaths::isolated(root.path()), |_| {
+            Err(anyhow::anyhow!("No runtime needed"))
+        })?;
+        let (queue, _receiver) = mpsc::sync_channel(MAX_QUEUE);
+        let snapshot = Shared::snapshot(&server.shared.state.lock().unwrap());
+        let results = dom::maximal_warning_results(169);
+        let submitted = Submit {
+            request: Uuid::new_v4(),
+            engine: snapshot.engine,
+            epoch: snapshot.epoch,
+            operation: Operation::Dom(dom::Command::Results {
+                selection: results.selection.clone(),
+                offset: 0,
+                limit: 200,
+                page: None,
+                profile: None,
+                outcome: None,
+                capture_state: None,
+            }),
+            confirmation: None,
+            expected_revision: None,
+        };
+        server.shared.handle(
+            Request::Submit(Box::new(submitted.clone())),
+            &queue,
+            &server.shutdown,
+        )?;
+        server.shared.finish(
+            submitted.request,
+            Outcome::Dom(Box::new(dom::Output::Results(results))),
+            false,
+        );
+        {
+            let state = server.shared.state.lock().unwrap();
+            let job = &state.jobs[&submitted.request];
+            assert_eq!(job.state, JobState::Failed);
+            assert!(
+                matches!(&job.outcome, Some(Outcome::ProductFailure(message)) if message.starts_with("response_too_large:"))
+            );
+            assert!(!state.failed && !state.draining);
+        }
+        let next = Submit {
+            request: Uuid::new_v4(),
+            operation: Operation::List { page: 0 },
+            ..submitted
+        };
+        assert!(matches!(
+            server.shared.handle(
+                Request::Submit(Box::new(next.clone())),
+                &queue,
+                &server.shutdown
+            )?,
+            Response::Job(_)
+        ));
+        server.shared.finish(
+            next.request,
+            Outcome::Runtime("Healthy owned read".into()),
+            false,
+        );
+        assert!(
+            matches!(server.shared.handle(Request::Status, &queue, &server.shutdown)?, Response::Status(status) if !status.draining)
+        );
+        assert_eq!(
+            server.shared.state.lock().unwrap().jobs[&next.request].state,
+            JobState::Succeeded
+        );
+        drop(server.queue);
+        server.worker.take().unwrap().join().unwrap();
+        Ok(())
+    }
     #[test]
     fn unavailable_worker_returns_the_durable_terminal_job_not_a_false_rejection() -> Result<()> {
         let root = tempfile::tempdir()?;

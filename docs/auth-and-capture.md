@@ -75,8 +75,18 @@ for checks of an existing baseline, not automatic alternate-site rediscovery.
 
 ## Capture limits and caution
 
+**What to check** selects screenshots (the default), normalized live DOM, or both.
+The baseline freezes that mode; checks never borrow a newly edited draft mode.
+DOM includes the main document, templates and open shadow roots—not iframe
+documents or closed roots. Its own stability/resource limits and privacy
+exclusions are described in [DOM snapshot checks](dom-snapshots.md).
+DOM-only does not use the image geometry, replacement or pixel-sampling limits
+below. In both mode, successful sibling evidence survives an independent failure.
+
 - Frozen locale, timezone, theme, reduced motion, disabled CSS animations and
   transitions, hidden caret and pointer-away capture reduce incidental variation.
+  Screenshot-only DOM transformations follow snapshot collection; snapshots do
+  not retain Regressee's image replacements or injected stabilization markup.
 - Defaults: 30 seconds navigation and 15 seconds readiness. Profiles persist their
   exact budgets. DOM completion, font readiness, image decoding and screenshot
   sampling are bounded, not an assurance that every asynchronous app has settled.
@@ -100,7 +110,7 @@ for checks of an existing baseline, not automatic alternate-site rediscovery.
 Read-only accounts are strongly recommended. Discovery does not click buttons or
 submit forms, but **GET visits and page scripts can still change server data**.
 Action/logout/download links are excluded by default; overriding that policy is
-an explicit authorization. Screenshots can contain private website content even
+an explicit authorization. Screenshots and DOM snapshots can contain private website content even
 though session material is excluded from project/evidence metadata and exports.
 
 ## Existing network, proxy and custom CA

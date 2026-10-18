@@ -490,6 +490,10 @@ fn phase6_legacy_hash_consistent_malformed_original_cannot_activate_restore_or_e
                 })
                 .collect(),
             intended_count: 2,
+            dom_references: vec![],
+            capture_plan: CapturePlan::default(),
+            source_run: None,
+            intended_targets: vec![],
             explicitly_partial: false,
         };
         s.connection.execute(

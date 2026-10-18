@@ -534,6 +534,7 @@ mod tests {
         let mut environment = project.environments[0].clone();
         environment.name = "Production evidence".into();
         let template = CaptureRun {
+            capture_plan: Default::default(),
             id: RunId::new(),
             project: project.id,
             intent: RunIntent::NewBaseline,
@@ -821,6 +822,7 @@ mod tests {
             .pages
             .iter()
             .map(|p| CaptureTarget {
+                dom_outcome: Default::default(),
                 key: TargetKey {
                     page: p.id,
                     profile: run.profiles[0].id,
@@ -833,6 +835,7 @@ mod tests {
             })
             .collect();
         let mut record = RunRecord {
+            dom_captures: vec![],
             run,
             capture: None,
             captures: vec![],

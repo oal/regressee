@@ -101,7 +101,7 @@ fn renderer_capture_icon_spacing(cx: &mut TestAppContext) {
             let label = format!("icon-spacing-{width:.0}x{height:.0}-{scene}");
             capture(cx, &root, &label).unwrap();
             manifest.push(label);
-            shell.update(cx, |s, cx| finish_jobs(s, cx));
+            shell.update(cx, finish_jobs);
             owned.join_after_ui();
         }
     }

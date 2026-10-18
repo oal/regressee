@@ -46,6 +46,7 @@ fn incomplete_capture(path: &std::path::Path) -> (regressee_storage::Store, Proj
     store.freeze_inventory(&inventory).unwrap();
     let mut run = regressee_core::evidence::RunRecord {
         run: CaptureRun {
+            capture_plan: Default::default(),
             id: RunId::new(),
             project: project.id,
             intent: RunIntent::NewBaseline,
@@ -63,6 +64,7 @@ fn incomplete_capture(path: &std::path::Path) -> (regressee_storage::Store, Proj
             started_at: Some(100),
             finished_at: None,
             targets: vec![CaptureTarget {
+                dom_outcome: Default::default(),
                 key: TargetKey {
                     page: inventory.pages[0].id,
                     profile: project.profiles[0].id,
@@ -76,6 +78,7 @@ fn incomplete_capture(path: &std::path::Path) -> (regressee_storage::Store, Proj
             inventory,
         },
         capture: None,
+        dom_captures: vec![],
         captures: vec![],
         queue: None,
     };
@@ -377,6 +380,7 @@ fn destructive_storage_actions_require_popup_consent_and_reject_stale_previews(
             shared_bytes: 84,
             objects: 1,
             analyses: 2,
+            scope: None,
         });
     });
     for (control, confirm, consequence) in [

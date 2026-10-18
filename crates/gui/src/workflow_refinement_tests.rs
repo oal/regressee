@@ -237,9 +237,11 @@ fn screenshot_switch_keeps_inspection_header_and_layout_during_image_reads(
                 ]
                 .into_iter()
                 .filter_map(|(control, selector)| {
-                    shell
-                        .read_with(cx, |s, _| s.control_mounted(control))
-                        .then(|| (control, selector, cx.debug_bounds(selector).unwrap()))
+                    if shell.read_with(cx, |s, _| s.control_mounted(control)) {
+                        Some((control, selector, cx.debug_bounds(selector).unwrap()))
+                    } else {
+                        None
+                    }
                 })
                 .collect();
                 for (control, expected_path) in [

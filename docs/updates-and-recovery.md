@@ -6,6 +6,20 @@ pins and complete file inventories; no separate runtime endpoint/key is required
 Optional signed-pack overrides retain their separate owner-managed endpoint/key.
 App signing, vulnerability response, support expiry and migration remain gates.
 
+## App engine upgrades
+
+If startup reports `version_mismatch`, the background engine may still be the old
+version even after closing the desktop. For upgrades from engine protocol 6/7,
+close old desktop windows, finish jobs and close login browsers, then run the new
+`regressee engine stop` and reopen `regressee-desktop`. Use the same explicit
+`--data-dir` / `--cache-dir` if you normally set them. Stop refuses active work or
+agent sessions; finish/end those using the matching old application first.
+Other incompatible versions need their matching executable to stop. Do not
+delete project data, endpoint files or lock files. A stopped older engine's
+descriptor is replaced at startup only after verifying exclusive ownership.
+
+## Browser updates and retained evidence
+
 Runtime repair installs a **new generation** after embedded official pins (or the
 configured pack signature), inventory/hash,
 space and sandboxed smoke checks. Failure retains the existing generation.

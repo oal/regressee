@@ -1,10 +1,10 @@
 {
   "as_of": "2026-10-10",
   "browser_verification": "Official Google HTTPS URL, cross-checked with Chrome for Testing metadata and Playwright browsers.json; computed SHA-256 pinned in app catalog, no independent publisher checksum/signature supplied",
-  "bundled_sha256": "1ec9cc638579d0c47cde02c1f4be17777a186aa8949a05702c5a658fe66f0ce7",
+  "bundled_sha256": "b5f900ff611bb8a7a28b5b19100675341774abadd3ada8b44ad912c8630f56a8",
   "catalogs": [
     {
-      "catalog_sha256": "b26ae1c52f3d6f02f5b1fadc7dfa8fb63ac25bdffcd288d5a021c9e508cbe06e",
+      "catalog_sha256": "9ae7caf95b3eed096b3ee28b54e7cb805d99202c32dc83acfc59a8ce984feff0",
       "components": [
         {
           "bytes": 58088022,
@@ -28,7 +28,7 @@
       "platform": "linux-x86_64"
     },
     {
-      "catalog_sha256": "bfc5875b0b6a097d4c803cd2d22ed664d97c862cc712ae347504e19375b8d82d",
+      "catalog_sha256": "040593edf6156a554c5b9f9b0460b33b405725e909e5003b73265d10db5cf913",
       "components": [
         {
           "bytes": 37618919,
@@ -52,7 +52,7 @@
       "platform": "windows-x86_64"
     },
     {
-      "catalog_sha256": "82e3d2395de25438ade902a006e94bb90d1df375851be91c4e96bc40c02f523c",
+      "catalog_sha256": "9cb8ba382f201e656a92de22bdf4422cc61569dcae02e814685acd18e32b1a9b",
       "components": [
         {
           "bytes": 52909993,
@@ -76,7 +76,7 @@
       "platform": "macos-aarch64"
     },
     {
-      "catalog_sha256": "ac327afc83be371a14599d500b0b6c0329a8835e41a1829dd5bd964e07bda7e6",
+      "catalog_sha256": "40e3ef78a7442735fda73c0c78c3240721443237d7fd5384b2f63d23b26b7f31",
       "components": [
         {
           "bytes": 54203979,
@@ -445,9 +445,11 @@
   },
   "playwright": "1.64.0",
   "schema": 1,
-  "worker": "5.0.1",
+  "worker": "6.0.0",
   "worker_source_refresh": {
-    "previous_bundled_sha256": "32ebfc82f68539671dee6d63611fac20a1beb0c151e5b0f376971587da386b3f",
-    "verification": "Pinned dependency bytes and vendor component inventories retained; only local worker sources refreshed"
+    "as_of": "2026-10-17",
+    "previous_bundled_sha256": "e516f33271b9e1e21dfa21af010dc60948a695596f5cd63ea1bbb621fe8a0c72",
+    "verification": "Pinned dependency bytes and vendor component inventories retained; only local worker sources refreshed",
+    "worker_protocol": 3
   }
 }

@@ -2,6 +2,10 @@
 //! Bounded product worker adapter. Linux ownership includes detached Chromium.
 use crate::protocol::{Event, Request};
 use anyhow::Result;
+use regressee_core::{
+    domain::*,
+    evidence::{CaptureMetadata, DomCaptureMetadata},
+};
 use std::{
     path::PathBuf,
     sync::{Arc, atomic::AtomicBool},
@@ -149,7 +153,255 @@ impl std::fmt::Display for WorkerFailure {
     }
 }
 impl std::error::Error for WorkerFailure {}
+
+/// Validated successful output detached into the caller's private staging area.
+/// The caller owns its lifetime; worker timeout/Drop never deletes these paths.
+#[derive(Debug)]
+pub struct DetachedCapture {
+    pub key: TargetKey,
+    pub capture: protocol::CapturedChannel,
+    pub artifact_path: PathBuf,
+    pub metadata_path: PathBuf,
+    pub metadata: DetachedMetadata,
+}
+#[derive(Debug)]
+pub enum DetachedMetadata {
+    Screenshot(CaptureMetadata),
+    DomSnapshot(DomCaptureMetadata),
+}
+
+fn capture_paths(root: &std::path::Path, token: uuid::Uuid, kind: CheckKind) -> (PathBuf, PathBuf) {
+    match kind {
+        CheckKind::Screenshot => (
+            root.join(format!("{token}.png")),
+            root.join(format!("{token}.json")),
+        ),
+        CheckKind::DomSnapshot => (
+            root.join(format!("{token}.dom.jsonl")),
+            root.join(format!("{token}.dom.json")),
+        ),
+    }
+}
+fn bounded_private_file(path: &std::path::Path, limit: u64) -> Result<Vec<u8>> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK | libc::O_CLOEXEC);
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::OpenOptionsExt;
+        options.custom_flags(0x0020_0000); // FILE_FLAG_OPEN_REPARSE_POINT
+    }
+    let file = options.open(path)?;
+    let meta = file.metadata()?;
+    ensure!(
+        meta.is_file() && regressee_core::platform::ordinary(&meta) && meta.len() <= limit,
+        "unsafe captured output file"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        ensure!(
+            meta.uid() == unsafe { libc::geteuid() }
+                && meta.mode() & 0o7777 == 0o600
+                && meta.nlink() == 1,
+            "captured file is not private and unique"
+        );
+    }
+    let mut bytes = Vec::new();
+    file.take(limit + 1).read_to_end(&mut bytes)?;
+    ensure!(
+        bytes.len() as u64 == meta.len() && bytes.len() as u64 <= limit,
+        "captured output changed or exceeded limits"
+    );
+    Ok(bytes)
+}
+fn write_detached(path: &std::path::Path, bytes: &[u8]) -> Result<()> {
+    let mut options = std::fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.mode(0o600);
+    }
+    let mut file = options.open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()?;
+    Ok(())
+}
+fn detach_capture(
+    scratch: &std::path::Path,
+    staging: &std::path::Path,
+    request: &Request,
+    key: &TargetKey,
+    capture: &protocol::CapturedChannel,
+    warnings: &[protocol::WarningCode],
+) -> Result<DetachedCapture> {
+    use sha2::{Digest, Sha256};
+    capture.validate()?;
+    crate::distribution::safe_directory(staging)?;
+    let stage_meta = std::fs::symlink_metadata(staging)?;
+    ensure!(
+        staging.is_absolute()
+            && stage_meta.is_dir()
+            && regressee_core::platform::ordinary(&stage_meta),
+        "capture staging must be an existing physical directory"
+    );
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        ensure!(
+            stage_meta.uid() == unsafe { libc::geteuid() } && stage_meta.mode() & 0o7777 == 0o700,
+            "capture staging must be owner-only"
+        );
+    }
+    ensure!(
+        !staging.canonicalize()?.starts_with(scratch.canonicalize()?),
+        "capture staging must be outside worker scratch"
+    );
+    let WireCommand::CaptureTarget {
+        key: expected_key,
+        address,
+        profile,
+        plan,
+        ..
+    } = &request.command
+    else {
+        anyhow::bail!("not a capture request");
+    };
+    ensure!(
+        key == expected_key && plan.kinds().any(|kind| kind == capture.kind()),
+        "foreign detached capture channel"
+    );
+    let (source, metadata_source) = capture_paths(scratch, capture.output_token(), capture.kind());
+    let bytes = bounded_private_file(&source, capture.artifact().bytes)?;
+    ensure!(
+        bytes.len() as u64 == capture.artifact().bytes
+            && hex::encode(Sha256::digest(&bytes)) == capture.artifact().id.as_str(),
+        "captured artifact identity mismatch"
+    );
+    let raw_metadata = bounded_private_file(&metadata_source, 1024 * 1024)?;
+    let expected_warnings = warnings
+        .iter()
+        .map(|code| format!("{code:?}"))
+        .collect::<Vec<_>>();
+    let (metadata, normalized) = match capture {
+        protocol::CapturedChannel::Screenshot { width, height, .. } => {
+            let metadata: CaptureMetadata = serde_json::from_slice(&raw_metadata)
+                .map_err(|_| anyhow::anyhow!("invalid screenshot metadata"))?;
+            ensure!(
+                metadata.version == 1
+                    && &metadata.key == key
+                    && metadata.requested == *address
+                    && metadata.final_url == *address
+                    && metadata.profile == **profile
+                    && metadata.runtime == profile.runtime
+                    && metadata.sha256 == capture.artifact().id
+                    && metadata.bytes == capture.artifact().bytes
+                    && metadata.width == *width
+                    && metadata.height == *height
+                    && metadata.warnings == expected_warnings
+                    && metadata.stable == !warnings.contains(&protocol::WarningCode::Unstable)
+                    && metadata.duration_ms <= 600_000,
+                "screenshot metadata binding mismatch"
+            );
+            ensure!(
+                bytes.len() >= 33
+                    && bytes[..8] == [137, 80, 78, 71, 13, 10, 26, 10]
+                    && &bytes[12..16] == b"IHDR"
+                    && u32::from_be_bytes(bytes[16..20].try_into()?) == *width
+                    && u32::from_be_bytes(bytes[20..24].try_into()?) == *height,
+                "invalid captured PNG header"
+            );
+            let normalized = serde_json::to_vec(&metadata)?;
+            (DetachedMetadata::Screenshot(metadata), normalized)
+        }
+        protocol::CapturedChannel::DomSnapshot { policy, .. } => {
+            let metadata: DomCaptureMetadata = serde_json::from_slice(&raw_metadata)
+                .map_err(|_| anyhow::anyhow!("invalid DOM metadata"))?;
+            ensure!(
+                metadata.run == request.job
+                    && &metadata.key == key
+                    && metadata.requested == *address
+                    && metadata.final_url == *address
+                    && metadata.profile == **profile
+                    && metadata.runtime == profile.runtime
+                    && metadata.policy == *policy
+                    && Some(*policy) == plan.dom_policy
+                    && metadata.sha256 == capture.artifact().id
+                    && metadata.bytes == capture.artifact().bytes
+                    && metadata.warnings == expected_warnings
+                    && metadata.stable == !warnings.contains(&protocol::WarningCode::Unstable),
+                "DOM metadata binding mismatch"
+            );
+            metadata
+                .verify_snapshot(&bytes)
+                .map_err(|_| anyhow::anyhow!("invalid or excluded DOM evidence"))?;
+            let normalized = serde_json::to_vec(&metadata)?;
+            (DetachedMetadata::DomSnapshot(metadata), normalized)
+        }
+    };
+    let (artifact_path, metadata_path) =
+        capture_paths(staging, uuid::Uuid::new_v4(), capture.kind());
+    write_detached(&artifact_path, &bytes)?;
+    if let Err(error) = write_detached(&metadata_path, &normalized) {
+        let _ = std::fs::remove_file(&artifact_path);
+        return Err(error);
+    }
+    #[cfg(unix)]
+    std::fs::File::open(staging)?.sync_all()?;
+    Ok(DetachedCapture {
+        key: key.clone(),
+        capture: capture.clone(),
+        artifact_path,
+        metadata_path,
+        metadata,
+    })
+}
 impl Worker {
+    /// Publishes each verified detached success before requesting more worker
+    /// events. The callback should persist its slot checkpoint synchronously.
+    pub fn request_detached(
+        &mut self,
+        request: Request,
+        deadline: Instant,
+        cancelled: Arc<AtomicBool>,
+        staging: &std::path::Path,
+        events: &mut dyn FnMut(Event, Option<DetachedCapture>) -> Result<()>,
+    ) -> Result<()> {
+        ensure!(
+            matches!(request.command, WireCommand::CaptureTarget { .. }),
+            "detached request must capture a target"
+        );
+        let expected = request.clone();
+        let scratch = self.scratch.path().to_owned();
+        let mut warnings =
+            std::collections::BTreeMap::<CheckKind, Vec<protocol::WarningCode>>::new();
+        self.request(request, deadline, cancelled, &mut |event| {
+            let detached = match &event.event {
+                EventKind::ChannelWarning { kind, code, .. } => {
+                    warnings.entry(*kind).or_default().push(*code);
+                    None
+                }
+                EventKind::ChannelCaptured { key, capture } => Some(detach_capture(
+                    &scratch,
+                    staging,
+                    &expected,
+                    key,
+                    capture,
+                    warnings
+                        .get(&capture.kind())
+                        .map(Vec::as_slice)
+                        .unwrap_or(&[]),
+                )?),
+                _ => None,
+            };
+            events(event, detached)
+        })
+    }
     /// `Installed` must come from the signed resolver/installer, not project data.
     pub fn spawn(installed: &Installed) -> Result<Self> {
         Self::spawn_network(installed, &crate::network::NetworkSettings::default())
@@ -429,6 +681,12 @@ impl Worker {
     pub fn output_path(&self, token: uuid::Uuid) -> PathBuf {
         self.scratch.path().join(format!("{token}.png"))
     }
+    pub fn output_path_for(&self, token: uuid::Uuid, kind: CheckKind) -> PathBuf {
+        capture_paths(self.scratch.path(), token, kind).0
+    }
+    pub fn metadata_path_for(&self, token: uuid::Uuid, kind: CheckKind) -> PathBuf {
+        capture_paths(self.scratch.path(), token, kind).1
+    }
     pub fn metadata_path(&self, token: uuid::Uuid) -> PathBuf {
         self.scratch.path().join(format!("{token}.json"))
     }
@@ -543,7 +801,7 @@ impl Worker {
         let mut identity = None;
         self.request(
             Request {
-                version: 2,
+                version: protocol::PROTOCOL_VERSION,
                 request_id: 1,
                 job,
                 command: WireCommand::Handshake,
@@ -615,10 +873,19 @@ impl ProcessSupervisor for Worker {
         }
         let mut tracker = RequestTracker::new(&request);
         loop {
-            if cancelled.load(Ordering::Acquire) {
+            if cancelled.load(Ordering::Acquire) || Instant::now() >= deadline {
+                let failure = if cancelled.load(Ordering::Acquire) {
+                    protocol::FailureCode::Cancelled
+                } else {
+                    protocol::FailureCode::Timeout
+                };
                 let cancel = Request {
-                    version: 2,
-                    request_id: request.request_id + 1,
+                    version: protocol::PROTOCOL_VERSION,
+                    request_id: if request.request_id == protocol::MAX_REQUEST_ID {
+                        request.request_id - 1
+                    } else {
+                        request.request_id + 1
+                    },
                     job: request.job,
                     command: WireCommand::Cancel,
                 };
@@ -629,32 +896,66 @@ impl ProcessSupervisor for Worker {
                 );
                 let end = Instant::now() + Duration::from_secs(2);
                 let mut t = RequestTracker::new(&cancel);
+                let mut publication_error = None;
                 while Instant::now() < end {
-                    if let Ok(Ok(e)) = self.output.recv_timeout(Duration::from_millis(50))
-                        && e.request_id == cancel.request_id
-                        && t.accept(&e).is_ok()
-                        && t.terminal()
-                    {
-                        break;
+                    if let Ok(Ok(e)) = self.output.recv_timeout(Duration::from_millis(50)) {
+                        if e.request_id == cancel.request_id {
+                            if let Err(error) = t.accept(&e) {
+                                publication_error = Some(error);
+                                break;
+                            }
+                            if t.terminal() {
+                                break;
+                            }
+                        } else if e.request_id == request.request_id {
+                            // Preserve publications that preceded cancellation in
+                            // stdout order. Detachment/checkpoint callback runs
+                            // before scratch/process-tree cleanup, never after.
+                            if let Err(error) = tracker.accept(&e).and_then(|()| events(e)) {
+                                publication_error = Some(error);
+                                break;
+                            }
+                        } else {
+                            publication_error = Some(anyhow::anyhow!(
+                                "event correlation mismatch during cancellation"
+                            ));
+                            break;
+                        }
                     }
                 }
                 self.kill_tree();
-                return Err(WorkerFailure(protocol::FailureCode::Cancelled).into());
-            }
-            if Instant::now() >= deadline {
-                self.kill_tree();
-                return Err(WorkerFailure(protocol::FailureCode::Timeout).into());
+                if let Some(error) = publication_error {
+                    return Err(error);
+                }
+                return Err(WorkerFailure(failure).into());
             }
             let e = match self.output.recv_timeout(Duration::from_millis(50)) {
-                Ok(e) => e?,
+                Ok(Ok(e)) => e,
+                Ok(Err(error)) => {
+                    self.kill_tree();
+                    return Err(error);
+                }
                 Err(mpsc::RecvTimeoutError::Timeout) => continue,
-                Err(_) => return Err(WorkerFailure(protocol::FailureCode::WorkerStopped).into()),
+                Err(_) => {
+                    self.kill_tree();
+                    return Err(WorkerFailure(protocol::FailureCode::WorkerStopped).into());
+                }
             };
-            tracker.accept(&e)?;
+            if let Err(error) = tracker.accept(&e) {
+                self.kill_tree();
+                return Err(error);
+            }
             if let EventKind::Failure { code, .. } = e.event {
                 return Err(WorkerFailure(code).into());
             }
-            events(e)?;
+            let was_cancelled = matches!(e.event, EventKind::Cancelled);
+            if let Err(error) = events(e) {
+                self.kill_tree();
+                return Err(error);
+            }
+            if was_cancelled {
+                return Err(WorkerFailure(protocol::FailureCode::Cancelled).into());
+            }
             if tracker.terminal() {
                 return Ok(());
             }
@@ -671,7 +972,7 @@ impl ProcessSupervisor for Worker {
         }
         let r = self.request(
             Request {
-                version: 2,
+                version: protocol::PROTOCOL_VERSION,
                 request_id: 9000,
                 job: regressee_core::domain::RunId::new(),
                 command: WireCommand::Shutdown,
@@ -720,6 +1021,311 @@ fn write_bounded(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod detached_tests {
+    use super::*;
+    use regressee_core::dom_snapshot::{DomSnapshot, dom_artifact_id};
+
+    fn fixture() -> Result<(
+        tempfile::TempDir,
+        tempfile::TempDir,
+        Request,
+        protocol::CapturedChannel,
+        DomCaptureMetadata,
+    )> {
+        let scratch = tempfile::tempdir()?;
+        let staging = tempfile::tempdir()?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            for path in [scratch.path(), staging.path()] {
+                std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))?;
+            }
+        }
+        let mut request: Request = serde_json::from_str(
+            include_str!("../../../worker/product/test/fixtures/session-requests.ndjson")
+                .lines()
+                .nth(1)
+                .unwrap(),
+        )?;
+        let WireCommand::CaptureTarget {
+            key,
+            profile,
+            address,
+            plan,
+            ..
+        } = &mut request.command
+        else {
+            unreachable!()
+        };
+        *plan = CapturePlan::for_mode(CaptureMode::DomSnapshotsOnly);
+        let bytes = include_bytes!("../../core/tests/fixtures/dom-v1.ndjson");
+        let stats = DomSnapshot::from_canonical(bytes)?.validate()?;
+        let artifact = Artifact {
+            id: dom_artifact_id(bytes),
+            bytes: bytes.len() as u64,
+            kind: ArtifactKind::DomSnapshot,
+        };
+        let capture = protocol::CapturedChannel::DomSnapshot {
+            output_token: uuid::Uuid::new_v4(),
+            artifact: artifact.clone(),
+            policy: Default::default(),
+        };
+        let metadata = DomCaptureMetadata {
+            version: 1,
+            run: request.job,
+            key: key.clone(),
+            requested: address.clone(),
+            final_url: address.clone(),
+            runtime: profile.runtime.clone(),
+            profile: (**profile).clone(),
+            policy: Default::default(),
+            sha256: artifact.id,
+            bytes: artifact.bytes,
+            node_count: stats.node_count,
+            visited_nodes: stats.node_count + 4,
+            max_depth: stats.max_depth,
+            coverage: stats.coverage,
+            warnings: vec![],
+            stable: true,
+            duration_ms: 1,
+            readiness: regressee_core::evidence::Readiness {
+                font_failures: 0,
+                image_failures: 0,
+                resource_failures: 0,
+            },
+        };
+        let (source, sidecar) =
+            capture_paths(scratch.path(), capture.output_token(), capture.kind());
+        write_detached(&source, bytes)?;
+        write_detached(&sidecar, &serde_json::to_vec(&metadata)?)?;
+        Ok((scratch, staging, request, capture, metadata))
+    }
+    #[test]
+    fn verified_detachment_survives_worker_scratch_cleanup_and_is_kind_typed() -> Result<()> {
+        let (scratch, staging, request, capture, metadata) = fixture()?;
+        let detached = detach_capture(
+            scratch.path(),
+            staging.path(),
+            &request,
+            &metadata.key,
+            &capture,
+            &[],
+        )?;
+        assert!(detached.artifact_path.starts_with(staging.path()));
+        assert!(matches!(
+            detached.metadata,
+            DetachedMetadata::DomSnapshot(_)
+        ));
+        let source = scratch.path().to_owned();
+        scratch.close()?; // Simulates the later sibling's bounded scratch cleanup.
+        assert!(!source.exists());
+        let bytes = std::fs::read(&detached.artifact_path)?;
+        metadata.verify_snapshot(&bytes)?;
+        assert!(detached.metadata_path.is_file());
+        Ok(())
+    }
+    #[test]
+    fn correctly_hashed_excluded_dom_is_rejected_before_any_staged_publication() -> Result<()> {
+        let (scratch, staging, request, mut capture, mut metadata) = fixture()?;
+        let bytes = b"[\"regressee-dom\",1]\n[\"document\",0]\n[\"element\",1,\"http://www.w3.org/1999/xhtml\",\"script\",[]]\n[\"text\",2,\"DO_NOT_ECHO_PRIVATE\"]\n";
+        metadata.sha256 = dom_artifact_id(bytes);
+        metadata.bytes = bytes.len() as u64;
+        if let protocol::CapturedChannel::DomSnapshot { artifact, .. } = &mut capture {
+            artifact.id = metadata.sha256.clone();
+            artifact.bytes = metadata.bytes;
+        }
+        let (source, sidecar) =
+            capture_paths(scratch.path(), capture.output_token(), capture.kind());
+        std::fs::remove_file(&source)?;
+        std::fs::remove_file(&sidecar)?;
+        write_detached(&source, bytes)?;
+        write_detached(&sidecar, &serde_json::to_vec(&metadata)?)?;
+        let error = detach_capture(
+            scratch.path(),
+            staging.path(),
+            &request,
+            &metadata.key,
+            &capture,
+            &[],
+        )
+        .unwrap_err();
+        assert!(!format!("{error:#}").contains("DO_NOT_ECHO_PRIVATE"));
+        assert_eq!(std::fs::read_dir(staging.path())?.count(), 0);
+        Ok(())
+    }
+    #[test]
+    fn correctly_hashed_invalid_utf8_future_and_noncanonical_formats_are_refused() -> Result<()> {
+        for bytes in [
+            b"[\"regressee-dom\",1]\n[\"document\",0]\n[\"text\",1,\"\xff\"]\n".as_slice(),
+            b"[\"regressee-dom\",2]\n[\"document\",0]\n".as_slice(),
+            b"[\"regressee-dom\",1]\n[\"document\", 0]\n".as_slice(),
+        ] {
+            let (scratch, staging, request, mut capture, mut metadata) = fixture()?;
+            metadata.sha256 = dom_artifact_id(bytes);
+            metadata.bytes = bytes.len() as u64;
+            if let protocol::CapturedChannel::DomSnapshot { artifact, .. } = &mut capture {
+                artifact.id = metadata.sha256.clone();
+                artifact.bytes = metadata.bytes;
+            }
+            let (source, sidecar) =
+                capture_paths(scratch.path(), capture.output_token(), capture.kind());
+            std::fs::remove_file(&source)?;
+            std::fs::remove_file(&sidecar)?;
+            write_detached(&source, bytes)?;
+            write_detached(&sidecar, &serde_json::to_vec(&metadata)?)?;
+            assert!(
+                detach_capture(
+                    scratch.path(),
+                    staging.path(),
+                    &request,
+                    &metadata.key,
+                    &capture,
+                    &[]
+                )
+                .is_err()
+            );
+            assert_eq!(std::fs::read_dir(staging.path())?.count(), 0);
+        }
+        Ok(())
+    }
+    #[test]
+    fn detachment_rejects_source_binding_warnings_and_scratch_local_destinations() -> Result<()> {
+        let (scratch, staging, mut request, capture, metadata) = fixture()?;
+        assert!(
+            detach_capture(
+                scratch.path(),
+                scratch.path(),
+                &request,
+                &metadata.key,
+                &capture,
+                &[]
+            )
+            .is_err()
+        );
+        assert!(
+            detach_capture(
+                scratch.path(),
+                staging.path(),
+                &request,
+                &metadata.key,
+                &capture,
+                &[protocol::WarningCode::Unstable]
+            )
+            .is_err()
+        );
+        request.job = RunId::new();
+        assert!(
+            detach_capture(
+                scratch.path(),
+                staging.path(),
+                &request,
+                &metadata.key,
+                &capture,
+                &[]
+            )
+            .is_err()
+        );
+        assert_eq!(std::fs::read_dir(staging.path())?.count(), 0);
+        Ok(())
+    }
+    #[test]
+    fn detachment_rejects_hash_size_policy_target_and_diagnostics_mismatches() -> Result<()> {
+        for mutation in [
+            "hash", "bytes", "run", "target", "profile", "policy", "visited", "stats", "missing",
+        ] {
+            let (scratch, staging, request, mut capture, mut metadata) = fixture()?;
+            let (source, sidecar) =
+                capture_paths(scratch.path(), capture.output_token(), capture.kind());
+            match mutation {
+                "hash" => {
+                    if let protocol::CapturedChannel::DomSnapshot { artifact, .. } = &mut capture {
+                        artifact.id = "b".repeat(64).try_into()?;
+                    }
+                }
+                "bytes" => {
+                    if let protocol::CapturedChannel::DomSnapshot { artifact, .. } = &mut capture {
+                        artifact.bytes -= 1;
+                    }
+                }
+                "run" => metadata.run = RunId::new(),
+                "target" => metadata.key.page = PageId::new(),
+                "profile" => metadata.profile.user_agent.push_str(" different"),
+                "policy" => metadata.policy.version = 2,
+                "visited" => {
+                    metadata.visited_nodes = regressee_core::dom_snapshot::MAX_DOM_NODES as u32 + 1
+                }
+                "stats" => metadata.node_count += 1,
+                "missing" => std::fs::remove_file(&source)?,
+                _ => unreachable!(),
+            }
+            std::fs::remove_file(&sidecar)?;
+            write_detached(&sidecar, &serde_json::to_vec(&metadata)?)?;
+            let expected_key = match &request.command {
+                WireCommand::CaptureTarget { key, .. } => key,
+                _ => unreachable!(),
+            };
+            assert!(
+                detach_capture(
+                    scratch.path(),
+                    staging.path(),
+                    &request,
+                    expected_key,
+                    &capture,
+                    &[]
+                )
+                .is_err(),
+                "{mutation}"
+            );
+            assert_eq!(
+                std::fs::read_dir(staging.path())?.count(),
+                0,
+                "{mutation} published unverified files"
+            );
+        }
+        Ok(())
+    }
+    #[cfg(unix)]
+    #[test]
+    fn worker_symlinks_and_oversized_files_never_cross_detachment() -> Result<()> {
+        let (scratch, staging, request, capture, metadata) = fixture()?;
+        let (source, _) = capture_paths(scratch.path(), capture.output_token(), capture.kind());
+        let outside = staging.path().join("owned-fixture");
+        write_detached(&outside, b"retained")?;
+        std::fs::remove_file(&source)?;
+        std::os::unix::fs::symlink(&outside, &source)?;
+        assert!(
+            detach_capture(
+                scratch.path(),
+                staging.path(),
+                &request,
+                &metadata.key,
+                &capture,
+                &[]
+            )
+            .is_err()
+        );
+        assert_eq!(std::fs::read(&outside)?, b"retained");
+        std::fs::remove_file(&source)?;
+        write_detached(
+            &source,
+            &vec![0; regressee_core::dom_snapshot::MAX_DOM_BYTES + 1],
+        )?;
+        assert!(
+            detach_capture(
+                scratch.path(),
+                staging.path(),
+                &request,
+                &metadata.key,
+                &capture,
+                &[]
+            )
+            .is_err()
+        );
+        Ok(())
+    }
 }
 
 #[cfg(test)]

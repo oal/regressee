@@ -34,6 +34,9 @@ impl Shell {
     }
 
     pub(super) fn inspection_chrome_mounted(&self) -> bool {
+        if self.dom_active() {
+            return self.selected_key.is_some() && self.evidence.latest.is_some();
+        }
         // Selection metadata is already available while its pixels are read.
         // Keep the same heading and toolbar instead of briefly showing the
         // workspace title. Only the current request may hold this chrome open.
@@ -80,7 +83,7 @@ impl Shell {
             before,
             after,
             profile_icon,
-            comparison: self.evidence.comparison.is_some(),
+            comparison: self.has_kind_comparison(),
             compact: self.working_width < 720.,
         }
         .into_any_element()
@@ -94,7 +97,7 @@ impl Shell {
         let after = self.pane_caption(1).1;
         let before_environment = before.lines().next().unwrap_or("environment not loaded");
         let after_environment = after.lines().next().unwrap_or("environment not loaded");
-        let comparison = self.evidence.comparison.is_some();
+        let comparison = self.has_kind_comparison();
         let describe = |role: &str, environment: &str, show_environment: bool| {
             if role == "Source not loaded" {
                 role.to_owned()
@@ -412,7 +415,7 @@ impl Shell {
                 tools = tools.child(sides);
             }
         }
-        if self.viewer_has_pixels() || self.viewer_pending.is_some() {
+        if !self.dom_active() && (self.viewer_has_pixels() || self.viewer_pending.is_some()) {
             // Retain its place during loading; the control stays disabled until
             // the selected image has pixels to navigate.
             tools = tools.child(self.zoom_select.clone());
@@ -441,7 +444,7 @@ impl Shell {
                 self.capture_details_open,
                 cx,
             ));
-            if self.evidence.comparison.is_some() && self.preview.is_none() {
+            if !self.dom_active() && self.evidence.comparison.is_some() && self.preview.is_none() {
                 tools = tools.child(self.tool_control(
                     Control::Guided(44),
                     ToolIcon::Adjustments,

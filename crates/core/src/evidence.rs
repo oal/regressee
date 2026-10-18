@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Phase 2 persisted evidence, not worker-owned filesystem paths.
+use crate::dom_snapshot::*;
 use crate::domain::*;
+use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -78,6 +80,8 @@ pub struct RunRecord {
     pub capture: Option<CaptureEvidence>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub captures: Vec<CaptureEvidence>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dom_captures: Vec<DomCaptureEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub queue: Option<QueueSettings>,
 }
@@ -94,7 +98,12 @@ impl RunRecord {
         {
             return None;
         }
-        let captured = self.all_captures().count();
+        let captured = self
+            .all_captures()
+            .map(|c| &c.metadata.key)
+            .chain(self.dom_captures.iter().map(|c| &c.metadata.key))
+            .collect::<std::collections::BTreeSet<_>>()
+            .len();
         (captured > 0 && captured <= self.run.targets.len())
             .then_some((captured, self.run.targets.len()))
     }
@@ -108,6 +117,218 @@ impl RunRecord {
     pub fn all_captures(&self) -> impl Iterator<Item = &CaptureEvidence> {
         self.captures.iter().chain(self.capture.iter())
     }
+    pub fn dom_evidence(&self, key: &TargetKey) -> Option<&DomCaptureEvidence> {
+        self.dom_captures.iter().find(|c| &c.metadata.key == key)
+    }
+    /// Metadata/outcome validation only. Storage must additionally call
+    /// `verify_snapshot` on each complete artifact before publishing/using it.
+    pub fn validate_dom_evidence(&self) -> Result<()> {
+        self.run.validate()?;
+        let mut keys = std::collections::BTreeSet::new();
+        for capture in &self.dom_captures {
+            ensure!(
+                keys.insert(&capture.metadata.key),
+                "duplicate DOM capture evidence"
+            );
+            capture.metadata.validate_for_run(&self.run)?;
+        }
+        for target in &self.run.targets {
+            if matches!(target.dom_outcome, DomTargetOutcome::Captured { .. }) {
+                ensure!(
+                    keys.contains(&target.key),
+                    "missing successful DOM capture evidence"
+                );
+            }
+        }
+        Ok(())
+    }
+    pub fn baseline_save_coverage(&self) -> Option<BaselineSaveCoverage> {
+        let (captured_targets, intended_targets) = self.baseline_save_counts()?;
+        Some(BaselineSaveCoverage {
+            captured_targets,
+            intended_targets,
+            screenshot_captures: self
+                .all_captures()
+                .map(|c| &c.metadata.key)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            dom_captures: self
+                .dom_captures
+                .iter()
+                .map(|c| &c.metadata.key)
+                .collect::<std::collections::BTreeSet<_>>()
+                .len(),
+            screenshot_intended: if self.run.capture_plan.mode.screenshots() {
+                intended_targets
+            } else {
+                0
+            },
+            dom_intended: if self.run.capture_plan.mode.dom_snapshots() {
+                intended_targets
+            } else {
+                0
+            },
+        })
+    }
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BaselineSaveCoverage {
+    pub captured_targets: usize,
+    pub intended_targets: usize,
+    pub screenshot_captures: usize,
+    pub dom_captures: usize,
+    pub screenshot_intended: usize,
+    pub dom_intended: usize,
+}
+
+/// Independent evidence: no image, dimensions, tiles, thumbnail or pixel metrics.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DomCaptureEvidence {
+    pub metadata: DomCaptureMetadata,
+}
+impl DomCaptureEvidence {
+    pub fn artifacts(&self) -> Vec<ArtifactId> {
+        vec![self.metadata.sha256.clone()]
+    }
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DomCaptureMetadata {
+    pub version: u32,
+    pub run: RunId,
+    pub key: TargetKey,
+    pub requested: String,
+    pub final_url: String,
+    pub runtime: RuntimeIdentity,
+    pub profile: CaptureProfile,
+    pub policy: DomSnapshotPolicy,
+    pub sha256: ArtifactId,
+    pub bytes: u64,
+    pub node_count: u32,
+    /// Includes excluded nodes/comments and explicit shadow/template boundaries.
+    pub visited_nodes: u32,
+    pub max_depth: u16,
+    pub coverage: DomCoverage,
+    pub warnings: Vec<String>,
+    pub stable: bool,
+    pub duration_ms: u64,
+    pub readiness: Readiness,
+}
+impl DomCaptureMetadata {
+    pub fn validate(&self) -> Result<()> {
+        self.policy.validate()?;
+        self.profile.validate()?;
+        ensure!(
+            self.version == 1
+                && !self.run.0.is_nil()
+                && !self.key.page.0.is_nil()
+                && self.key.profile == self.profile.id,
+            "invalid DOM source identity"
+        );
+        ensure!(
+            self.profile.ready_for_capture() && self.runtime == self.profile.runtime,
+            "DOM runtime/profile mismatch"
+        );
+        for value in [&self.requested, &self.final_url] {
+            let url =
+                url::Url::parse(value).map_err(|_| anyhow::anyhow!("invalid DOM source URL"))?;
+            validate_address(&url)?;
+            ensure!(url.as_str() == value, "noncanonical DOM source URL");
+        }
+        ensure!(
+            self.bytes > DOM_CANONICAL_HEADER.len() as u64
+                && self.bytes <= MAX_DOM_BYTES as u64
+                && self.node_count > 0
+                && self.node_count <= self.visited_nodes
+                && self.visited_nodes <= MAX_DOM_NODES as u32
+                && self.max_depth <= MAX_DOM_DEPTH,
+            "DOM evidence exceeds limits"
+        );
+        ensure!(
+            self.coverage.iframe_hosts <= self.node_count
+                && self.coverage.open_shadow_roots <= self.node_count
+                && self.coverage.template_contents <= self.node_count,
+            "invalid DOM coverage counts"
+        );
+        ensure!(
+            self.warnings.len() <= 64
+                && self.warnings.iter().all(|w| w.len() <= 1024)
+                && self.duration_ms <= 600_000,
+            "DOM diagnostics exceed limits"
+        );
+        Ok(())
+    }
+    pub fn baseline_ready(&self) -> bool {
+        self.validate().is_ok()
+            && self.stable
+            && self.warnings.iter().all(|w| {
+                loading_warning(w)
+                    || matches!(
+                        w.as_str(),
+                        "IframeDocumentsExcluded"
+                            | "ClosedShadowRootsExcluded"
+                            | "NearbySamplesNotAtomic"
+                    )
+            })
+    }
+    pub fn verify_snapshot(&self, bytes: &[u8]) -> Result<DomSnapshot> {
+        self.validate()?;
+        ensure!(
+            bytes.len() as u64 == self.bytes && dom_artifact_id(bytes) == self.sha256,
+            "DOM artifact identity mismatch"
+        );
+        let snapshot = DomSnapshot::from_canonical(bytes)?;
+        let stats = snapshot.validate()?;
+        ensure!(
+            stats.node_count == self.node_count
+                && stats.max_depth == self.max_depth
+                && stats.coverage == self.coverage,
+            "DOM artifact diagnostics mismatch"
+        );
+        Ok(snapshot)
+    }
+    pub fn validate_for_run(&self, run: &CaptureRun) -> Result<()> {
+        self.validate()?;
+        ensure!(
+            self.run == run.id
+                && Some(self.policy) == run.capture_plan.dom_policy
+                && run.profiles.iter().any(|p| p == &self.profile),
+            "DOM evidence/frozen run mismatch"
+        );
+        let target = run
+            .targets
+            .iter()
+            .find(|t| t.key == self.key)
+            .ok_or_else(|| anyhow::anyhow!("foreign DOM target"))?;
+        // The target owns logical inventory identity; metadata records the exact
+        // approved URL sent to the browser, which can be a staging destination.
+        let requested = crate::environment::map_url(&target.requested, &run.environment)?;
+        ensure!(
+            requested.as_str() == self.requested
+                && target
+                    .final_url
+                    .as_ref()
+                    .is_some_and(|u| u.as_str() == self.final_url)
+                && matches!(&target.dom_outcome, DomTargetOutcome::Captured { artifact } if artifact == &self.sha256),
+            "DOM evidence/outcome mismatch"
+        );
+        Ok(())
+    }
+}
+
+pub fn dom_source(run: &CaptureRun, capture: &DomCaptureEvidence) -> Result<DomSourceIdentity> {
+    capture.metadata.validate_for_run(run)?;
+    Ok(DomSourceIdentity {
+        run: run.id,
+        key: capture.metadata.key.clone(),
+        artifact: capture.metadata.sha256.clone(),
+        policy: capture.metadata.policy,
+        material_profile: identity_hash(&capture.metadata.profile)?.try_into()?,
+        rendering_environment: identity_hash(&run.rendering)?.try_into()?,
+        stable: capture.metadata.stable,
+    })
 }
 pub fn identity_hash(value: &impl Serialize) -> anyhow::Result<String> {
     use sha2::{Digest, Sha256};
@@ -267,4 +488,26 @@ pub struct ProjectEvidence {
     pub review_history_truncated: bool,
     #[serde(default)]
     pub baselines: Vec<BaselineVersion>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dom_before: Option<DomCaptureEvidence>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dom_comparison: Option<DomComparisonEvidence>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dom_analyses: Vec<DomAnalysisId>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dom_reviews: Vec<DomReviewDecision>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DomComparisonEvidence {
+    pub revision: DomAnalysisRevision,
+    pub created_at: i64,
+    pub options: DomDiffOptions,
+}
+impl DomComparisonEvidence {
+    pub fn validate(&self) -> Result<()> {
+        self.revision.validate()?;
+        self.options.validate()
+    }
 }

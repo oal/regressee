@@ -36,12 +36,14 @@ ROOT_FILES = frozenset({"Cargo.toml", "Cargo.lock", "rust-toolchain.toml",
 REQUIRED = ROOT_FILES - {".gitignore", ".gitattributes"}
 TREES = frozenset({"crates", "worker", "scripts", "tests", "third-party"})
 USER_DOCS = frozenset({"auth-and-capture.md", "portable-baseline-archive.md",
+                       "dom-snapshots.md",
                        "runtime-distribution.md", "first-run-guide.md", "support-matrix.md",
                         "release-building.md", "updates-and-recovery.md",
                           "preview-release-notes.md", "local-engine.md", "cli.md", "agent-skill.md", "cli-consumer-exercise.md"})
 SKILL_FILES = frozenset({"skills/regressee/SKILL.md", "skills/regressee/references/commands.md",
                          "skills/regressee/references/workflows.md", "skills/regressee/references/safety-and-evidence.md"})
 INTERNAL_DOCS = frozenset({"ACTIVE_WORK.md", "IMPLEMENTATION_STATUS.md",
+                            "dom-snapshot-plan.md",
                               "agent-cli-plan.md", "agent-cli-status.md", "agent-cli-phase1-review.md", "agent-cli-phase2-review.md", "agent-cli-phase3-review.md", "agent-cli-phase4-review.md", "agent-cli-phase5-review.md", "agent-cli-skill-exercise.md",
                            "phase0-design.md", "spike-surface.md", "foundation-surface.md",
                            "crawling-surface.md", "auth-and-capture-surface.md",

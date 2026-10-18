@@ -3,6 +3,7 @@ pub mod brand;
 pub mod controls;
 pub mod depth;
 pub mod dialog;
+pub mod dom_diff;
 pub mod gpu_diagnostics;
 pub mod interaction;
 pub mod performance;

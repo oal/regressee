@@ -5,7 +5,7 @@ use regressee_core::{domain::*, evidence::*};
 use regressee_runtime::{
     distribution::{self, Distribution, InstallProgress, Installed, Scope},
     official,
-    protocol::{Command, EventKind, FailureCode, Request},
+    protocol::{Command, FailureCode, Request},
     supervisor::{ProcessSupervisor, Worker, WorkerFailure},
 };
 use regressee_storage::{ProjectRecord, Store};
@@ -374,20 +374,36 @@ impl Product {
         let result = (|| {
             distribution::check_cancel(&cancel)?;
             let network = self.network().context("Browser network settings could not be validated. Setup is blocked; existing evidence is unchanged.")?;
-            // Handshake performs the owned headless screenshot smoke in memory.
+            // Pixel smoke is an explicit installer operation. Ordinary capture
+            // handshake never takes a screenshot, especially for DOM-only runs.
             // Both trust paths use the same supervisor and bounded shutdown.
             let mut smoke = |runtime: &Installed| {
                 let mut worker = self
                     .spawn_worker(runtime)
                     .context("Starting the private Node worker")?;
-                let ready = worker.handshake(RunId::new(), cancel.clone());
+                let job = RunId::new();
+                let ready = worker
+                    .handshake(job, cancel.clone())
+                    .and_then(|(version, browser)| {
+                        ensure!(
+                            version == worker_version(runtime)?
+                                && browser == browser_version(runtime)?,
+                            "Browser setup smoke runtime identity mismatch"
+                        );
+                        worker.request(
+                            Request {
+                                version: regressee_runtime::protocol::PROTOCOL_VERSION,
+                                request_id: 2,
+                                job,
+                                command: Command::InstallSmoke,
+                            },
+                            Instant::now() + Duration::from_secs(15),
+                            cancel.clone(),
+                            &mut |_| Ok(()),
+                        )
+                    });
                 let stopped = worker.stop(Instant::now() + Duration::from_secs(5));
-                let (worker, browser) =
-                    ready.context("Launching Chromium and taking its test screenshot")?;
-                ensure!(
-                    worker == worker_version(runtime)? && browser == browser_version(runtime)?,
-                    "Browser setup smoke runtime identity mismatch"
-                );
+                ready.context("Launching Chromium and taking its installer test screenshot")?;
                 stopped.context("Stopping the private browser test")
             };
             let mut observed_progress = |phase| {
@@ -457,6 +473,14 @@ impl Product {
         regressee_storage::require_space(&store.paths().data, 384 * 1024 * 1024)?;
         regressee_storage::require_space(&store.paths().cache, 384 * 1024 * 1024)?;
         let project = store.load_project(id)?.project;
+        // This compatibility API promises one screenshot. Do not silently drop
+        // DOM checks or replace the saved plan with the current project draft.
+        if !check {
+            ensure!(
+                project.capture_plan == CapturePlan::default(),
+                "This legacy single-page API captures screenshots only. Use inventory capture for DOM snapshots."
+            );
+        }
         ensure!(
             project.sources.len() == 1
                 && project.profiles.len() == 1
@@ -475,13 +499,26 @@ impl Product {
                     .all(|m| m.source == m.destination),
             "A saved login or changed mapping requires guided inventory capture; anonymous fallback is not allowed"
         );
+        ensure!(
+            worker_version(&installed)? == regressee_runtime::protocol::WORKER_VERSION,
+            "The installed browser components cannot capture with this app. Saved evidence is kept. Checks require the baseline's original compatible browser; otherwise capture a new baseline."
+        );
         let (inventory, profile, intent, rendering) = if check {
-            let baseline = store.load_baseline(
+            let (baseline, before) = store.frozen_baseline_source(
                 project
                     .active_baseline
                     .context("Save a successful baseline before checking for changes")?,
             )?;
-            let before = store.load_run(baseline.references[0].run)?;
+            ensure!(
+                baseline.capture_plan == CapturePlan::default(),
+                "This legacy single-page API checks screenshot-only baselines. Use inventory capture to check this baseline's saved DOM plan."
+            );
+            ensure!(
+                baseline.references.len() == 1
+                    && before.run.profiles.len() == 1
+                    && before.run.inventory.pages.len() == 1,
+                "This legacy single-page API requires a one-page screenshot baseline. Use inventory capture for its saved page and size coverage."
+            );
             ensure!(
                 before.run.profiles[0].runtime == installed.manifest.identity,
                 "The installed browser differs from this baseline. Repair the matching runtime or capture a new baseline; existing evidence is preserved."
@@ -534,6 +571,7 @@ impl Product {
                 intent,
                 inventory,
                 profiles: vec![profile.clone()],
+                capture_plan: CapturePlan::default(),
                 environment: project.environments[0].clone(),
                 rendering,
                 state: JobState::Running,
@@ -545,16 +583,21 @@ impl Product {
                     final_url: None,
                     attempts: 1,
                     outcome: TargetOutcome::Pending,
+                    dom_outcome: DomTargetOutcome::NotRequested,
                     warnings: vec![],
                 }],
             },
             capture: None,
             captures: vec![],
+            dom_captures: vec![],
             queue: None,
         };
+        if matches!(record.run.intent, RunIntent::NewBaseline) {
+            store.freeze_inventory(&record.run.inventory)?;
+        }
         store.begin_run(&record)?;
         progress("Starting the private browser…", 0, Some(1));
-        let captured = (|| -> Result<CaptureEvidence> {
+        let captured = (|| -> Result<()> {
             let mut worker = self.spawn_worker(&installed)?;
             let (version, browser) = worker.handshake(record.run.id, cancel.clone())?;
             ensure!(
@@ -562,99 +605,61 @@ impl Product {
                     && browser == record.run.rendering.browser,
                 "worker runtime identity mismatch"
             );
-            let mut result = None;
-            worker.request(
-                Request {
-                    version: 2,
-                    request_id: 2,
-                    job: record.run.id,
-                    command: Command::CaptureTarget {
-                        key: key.clone(),
-                        address: address.to_string(),
-                        profile: Box::new(profile.clone()),
-                        session: None,
-                    },
-                },
-                Instant::now()
-                    + Duration::from_millis(
-                        u64::from(profile.stabilization.navigation_ms)
-                            + u64::from(profile.stabilization.readiness_ms)
-                            + 10000,
-                    ),
+            let stage = crate::capture_evidence::private_staging(&store.paths().cache)?;
+            let stage_path = stage.path().canonicalize()?;
+            let target = record.run.targets[0].clone();
+            progress("Capturing the fixed page…", 0, Some(1));
+            crate::crawling::capture_one(
+                &mut worker,
+                record.run.id,
+                2,
+                &target,
+                &profile,
+                &installed,
                 cancel.clone(),
-                &mut |e| {
-                    match e.event {
-                        EventKind::Progress { completed, total } => {
-                            progress("Capturing the fixed page…", completed, total)
-                        }
-                        EventKind::TargetCaptured {
-                            key,
-                            output_token,
+                &address,
+                None,
+                &CapturePlan::default(),
+                &stage_path,
+                &mut |kind, publication| {
+                    ensure!(
+                        kind == CheckKind::Screenshot,
+                        "unexpected DOM publication in the screenshot-only API"
+                    );
+                    match publication? {
+                        crate::capture_evidence::PublishedChannel::Screenshot {
+                            metadata,
                             artifact,
-                            width,
-                            height,
+                            path,
                         } => {
-                            ensure!(result.is_none(), "duplicate captured artifact");
-                            result = Some((key, output_token, artifact, width, height));
+                            progress("Saving originals and viewer tiles…", 1, Some(1));
+                            crate::capture_evidence::retain_screenshot(
+                                store,
+                                &mut record,
+                                0,
+                                metadata,
+                                &artifact,
+                                &path,
+                            )?;
+                            record.capture = record.captures.pop();
                         }
-                        EventKind::Warning { code } => {
-                            record.run.targets[0].warnings.push(format!("{code:?}"))
+                        crate::capture_evidence::PublishedChannel::ScreenshotFailed {
+                            code,
+                            ..
+                        } => {
+                            record.run.targets[0].outcome = if code == CaptureError::Cancelled {
+                                TargetOutcome::Cancelled
+                            } else {
+                                TargetOutcome::Failed { code }
+                            };
                         }
-                        _ => (),
+                        _ => anyhow::bail!("unexpected capture kind in the screenshot-only API"),
                     }
-                    Ok(())
+                    // Preserve successful evidence before request timeout/tree
+                    // cleanup, exactly as the inventory publication stream does.
+                    store.checkpoint_run(&record)
                 },
             )?;
-            let (received, token, artifact, width, height) =
-                result.context("worker completed without screenshot evidence")?;
-            ensure!(
-                received == key && artifact.kind == ArtifactKind::Screenshot,
-                "foreign/unsafe worker artifact"
-            );
-            crate::images::budget(width, height)?;
-            let path = worker.output_path(token);
-            let mp = worker.metadata_path(token);
-            let meta = fs::symlink_metadata(&mp)?;
-            ensure!(
-                meta.is_file()
-                    && regressee_core::platform::ordinary(&meta)
-                    && meta.len() <= 256 * 1024,
-                "unsafe worker metadata"
-            );
-            let metadata: CaptureMetadata = serde_json::from_reader(File::open(mp)?)?;
-            ensure!(
-                metadata.version == 1
-                    && metadata.key == key
-                    && metadata.profile == profile
-                    && metadata.runtime == installed.manifest.identity
-                    && metadata.requested == address.as_str()
-                    && metadata.final_url == address.as_str()
-                    && metadata.sha256 == artifact.id
-                    && metadata.bytes == artifact.bytes
-                    && metadata.width == width
-                    && metadata.height == height
-                    && metadata.capture_mode == "chromium-new-headless"
-                    && metadata.warnings == record.run.targets[0].warnings
-                    && metadata.duration_ms <= 300000,
-                "worker metadata mismatch"
-            );
-            let image_meta = fs::symlink_metadata(&path)?;
-            ensure!(
-                image_meta.is_file()
-                    && regressee_core::platform::ordinary(&image_meta)
-                    && image_meta.len() == artifact.bytes,
-                "unsafe worker output"
-            );
-            ensure!(
-                distribution::hash(File::open(&path)?, &cancel)? == artifact.id.as_str(),
-                "worker screenshot hash mismatch"
-            );
-            progress("Saving originals and viewer tiles…", 1, Some(1));
-            let image = crate::images::ingest(store, &path, ArtifactKind::Screenshot, &cancel)?;
-            ensure!(
-                image.original == artifact.id && image.width == width && image.height == height,
-                "decoded screenshot dimensions/hash disagree"
-            );
             // Shutdown failure is diagnostic; valid completed evidence is retained.
             if worker
                 .stop(Instant::now() + Duration::from_secs(5))
@@ -664,34 +669,27 @@ impl Product {
                     .warnings
                     .push("WorkerShutdownRequiredCleanup".into());
             }
-            Ok(CaptureEvidence { metadata, image })
+            Ok(())
         })();
-        match captured {
-            Ok(c) => {
-                record.run.targets[0].final_url = Some(url::Url::parse(&c.metadata.final_url)?);
-                record.run.targets[0].outcome = TargetOutcome::Captured {
-                    artifact: c.image.original.clone(),
-                    width: c.image.width,
-                    height: c.image.height,
-                };
-                record.capture = Some(c);
-                record.run.state = if cancel.load(Ordering::Acquire) {
-                    JobState::Cancelled
+        let failure = captured.as_ref().err().map(map_failure);
+        if matches!(record.run.targets[0].outcome, TargetOutcome::Pending) {
+            record.run.targets[0].outcome =
+                if cancel.load(Ordering::Acquire) || failure == Some(CaptureError::Cancelled) {
+                    TargetOutcome::Cancelled
                 } else {
-                    JobState::Completed
+                    TargetOutcome::Failed {
+                        code: failure.unwrap_or(CaptureError::CaptureFailed),
+                    }
                 };
-            }
-            Err(e) => {
-                let code = map_failure(&e);
-                if cancel.load(Ordering::Acquire) || code == CaptureError::Cancelled {
-                    record.run.state = JobState::Cancelled;
-                    record.run.targets[0].outcome = TargetOutcome::Cancelled;
-                } else {
-                    record.run.state = JobState::CompletedWithErrors;
-                    record.run.targets[0].outcome = TargetOutcome::Failed { code };
-                }
-            }
         }
+        record.run.state =
+            if cancel.load(Ordering::Acquire) || failure == Some(CaptureError::Cancelled) {
+                JobState::Cancelled
+            } else if record.run.targets[0].requested_kinds_captured() {
+                JobState::Completed
+            } else {
+                JobState::CompletedWithErrors
+            };
         record.run.finished_at = Some(distribution::now());
         store.finish_run(&record)?;
         if let RunIntent::Check { .. } = record.run.intent {
@@ -708,6 +706,11 @@ impl Product {
         Ok(record)
     }
     pub fn activate(&self, store: &mut Store, run: RunId, revision: u64) -> Result<ProjectRecord> {
+        let coverage = store.baseline_eligible_coverage(run)?;
+        ensure!(
+            coverage.captured_targets > 0,
+            "No eligible reference evidence was captured. Unstable DOM snapshots are retained but cannot become a baseline."
+        );
         store.activate_baseline(run, revision)
     }
 }
@@ -726,14 +729,23 @@ pub(crate) fn worker_version(i: &Installed) -> Result<String> {
     }
 }
 pub(crate) fn configure_profile(p: &mut CaptureProfile, i: &Installed) -> Result<()> {
+    configure_profile_for_plan(p, i, &CapturePlan::default())
+}
+pub(crate) fn configure_profile_for_plan(
+    p: &mut CaptureProfile,
+    i: &Installed,
+    plan: &CapturePlan,
+) -> Result<()> {
+    plan.validate()?;
     ensure!(
-        p.width <= 4096
-            && p.dpr == 1.
-            && (p.image_mode == ImageMode::Normal
-                || p.image_mode
-                    == ImageMode::ReplaceRaster {
-                        algorithm: "neutral-raster-v2".into()
-                    }),
+        !plan.mode.screenshots()
+            || (p.width <= 4096
+                && p.dpr == 1.
+                && (p.image_mode == ImageMode::Normal
+                    || p.image_mode
+                        == ImageMode::ReplaceRaster {
+                            algorithm: "neutral-raster-v2".into()
+                        })),
         "Unsupported capture profile: use DPR 1, normal images or neutral-raster-v2 and width up to 4096"
     );
     p.runtime = i.manifest.identity.clone();
@@ -747,7 +759,9 @@ pub(crate) fn configure_profile(p: &mut CaptureProfile, i: &Installed) -> Result
             browser_version(i)?
         );
     }
-    p.stabilization.max_height = p.stabilization.max_height.min(32768);
+    if plan.mode.screenshots() {
+        p.stabilization.max_height = p.stabilization.max_height.min(32768);
+    }
     p.validate()
 }
 pub(crate) fn rendering_environment(i: &Installed) -> Result<RenderingEnvironment> {
@@ -1211,6 +1225,66 @@ mod automatic_runtime_tests {
                 .runtime_for_capture(Some(installed), &cancel)
                 .unwrap_err();
             assert_eq!(error.to_string(), "operation cancelled");
+            Ok(())
+        }
+
+        #[test]
+        fn dom_only_profile_configuration_does_not_apply_screenshot_geometry_or_replacement_gates()
+        -> Result<()> {
+            let root = tempfile::tempdir()?;
+            let (product, pack, _) = fixture(root.path(), Scope::DevelopmentLoopback)?;
+            let cancel = AtomicBool::new(false);
+            install_inert(&product, &pack, &cancel)?;
+            let installed = product.resolve_runtime(&cancel)?;
+            let mut profile = CaptureProfile::desktop();
+            profile.width = 8192;
+            profile.dpr = 4.;
+            profile.image_mode = ImageMode::ReplaceRaster {
+                algorithm: "unsupported-image-only-policy".into(),
+            };
+            configure_profile_for_plan(
+                &mut profile,
+                &installed,
+                &CapturePlan::for_mode(CaptureMode::DomSnapshotsOnly),
+            )?;
+            assert_eq!(profile.stabilization.max_height, 100_000);
+            assert_eq!(profile.width, 8192);
+            assert_eq!(profile.dpr, 4.);
+            assert!(configure_profile(&mut profile, &installed).is_err());
+            Ok(())
+        }
+
+        #[test]
+        fn legacy_single_page_capture_refuses_to_silently_drop_requested_dom() -> Result<()> {
+            let root = tempfile::tempdir()?;
+            let (product, pack, _) = fixture(root.path(), Scope::DevelopmentLoopback)?;
+            let cancel = Arc::new(AtomicBool::new(false));
+            install_inert(&product, &pack, &cancel)?;
+            let installed = product.resolve_runtime(&cancel)?;
+            let mut store = Store::open(regressee_storage::AppPaths::isolated(
+                &root.path().join("store"),
+            ))?;
+            for mode in [
+                CaptureMode::ScreenshotsAndDomSnapshots,
+                CaptureMode::DomSnapshotsOnly,
+            ] {
+                let mut project =
+                    Project::draft("Legacy DOM guard".into(), "http://127.0.0.1:9/inert")?;
+                project.capture_plan = CapturePlan::for_mode(mode);
+                store.save_project(&project, None)?;
+                let error = product
+                    .capture_with_runtime(
+                        &mut store,
+                        Some(installed.clone()),
+                        project.id,
+                        false,
+                        cancel.clone(),
+                        &mut |_, _, _| {},
+                    )
+                    .unwrap_err();
+                assert!(error.to_string().contains("captures screenshots only"));
+                assert!(store.project_evidence(project.id)?.latest.is_none());
+            }
             Ok(())
         }
 

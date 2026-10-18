@@ -58,7 +58,7 @@ impl Shell {
             {
                 ToolIcon::Close
             }
-            Phase5(23 | 24 | 25) => ToolIcon::Baselines,
+            Phase5(23..=25) => ToolIcon::Baselines,
             Phase5(14) => ToolIcon::Draw,
             Phase5(39) | DismissFeedback | Phase6(7) => ToolIcon::Close,
             Phase5(30) => ToolIcon::Image,
@@ -67,7 +67,10 @@ impl Shell {
             Guided(42) | RefreshEvidence | HistoryRefresh | Phase5(4) => ToolIcon::Refresh,
             Phase6(0 | 1) => ToolIcon::Upload,
             Phase6(2 | 3) => ToolIcon::Download,
-            Phase6(4 | 5 | 6) => ToolIcon::Trash,
+            Phase6(4..=6) => ToolIcon::Trash,
+            DeleteProject(_) | DeleteCurrentProject | RemoveEnvironment | RemoveMapping(_) => {
+                ToolIcon::Trash
+            }
             Phase6(19) => ToolIcon::Image,
             Phase6(13) => ToolIcon::Storage,
             CopyCaptureDiagnostics => ToolIcon::Copy,

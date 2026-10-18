@@ -87,6 +87,7 @@ fn capture_with_renderer_and_warnings(
             intent,
             inventory: inventory.clone(),
             profiles: project.profiles.clone(),
+            capture_plan: CapturePlan::default(),
             environment,
             rendering,
             state: JobState::Running,
@@ -104,12 +105,14 @@ fn capture_with_renderer_and_warnings(
                     final_url: None,
                     attempts: 1,
                     outcome: TargetOutcome::Pending,
+                    dom_outcome: DomTargetOutcome::NotRequested,
                     warnings: vec![],
                 })
                 .collect(),
         },
         capture: None,
         captures: vec![],
+        dom_captures: vec![],
         queue: None,
     };
     store.begin_run(&r)?;
@@ -1300,31 +1303,45 @@ fn approval_refuses_material_rendering_missing_artifact_and_preview_mixing() -> 
     replacement.profiles[0].image_mode = ImageMode::ReplaceRaster {
         algorithm: "neutral-raster-v2".into(),
     };
-    let changed = capture(
+    // Check admission now rejects changed frozen profiles before any capture is
+    // persisted. Keep the pixel-engine mismatch gate covered independently too.
+    let rejected = capture(
         &mut s,
         &replacement,
         &inventory,
         RunIntent::Check { baseline: b.id },
         &[Some("unchanged-after.png")],
         false,
-    )?;
-    let analysis = review::analyze_run(
-        &mut s,
-        changed.run.id,
-        review::preset(e::Preset::Balanced),
+    )
+    .expect_err("a check cannot replace the baseline's frozen image mode");
+    assert!(
+        format!("{rejected:#}")
+            .contains("Check must retain the baseline's fixed profiles and page addresses")
+    );
+    assert_eq!(s.load_project(p.id)?.project.active_baseline, Some(b.id));
+    assert_eq!(s.load_baseline(b.id)?.references, b.references);
+    let key = old.run.targets[0].key.clone();
+    let before = descriptor(&old, &old.captures[0])?;
+    let mut after = before.clone();
+    after.capture_id = "incompatible-profile-fixture".into();
+    after.material_profile_id = identity_hash(&replacement.profiles[0])?;
+    let report = e::analyze_pngs(
+        std::fs::File::open(corpus().join("images/unchanged-before.png"))?,
+        std::fs::File::open(corpus().join("images/unchanged-after.png"))?,
+        &e::AnalysisRequest {
+            before,
+            after,
+            policy: review::preset(e::Preset::Balanced),
+            mask: None,
+        },
         &AtomicBool::new(false),
     )?;
-    let key = changed.run.targets[0].key.clone();
     assert!(
-        analysis.perceptual.as_ref().unwrap().reports[0]
-            .1
+        report
             .gates
             .contains(&e::GateReason::MaterialProfileMismatch)
     );
-    assert!(
-        s.approval_preview(analysis.revision.id, std::slice::from_ref(&key))
-            .is_err()
-    );
+    assert_eq!(report.classification, e::Classification::NotComparable);
     let mut renderer = old.run.rendering.clone();
     renderer.fonts_fingerprint = Some("different-fonts".into());
     let changed = capture_with_renderer(

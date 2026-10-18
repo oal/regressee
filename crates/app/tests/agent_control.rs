@@ -6,7 +6,7 @@ use regressee_app::{
     engine::{Client, Server},
     protocol::{self, JobState, Operation, Outcome, Request, Response, Submit},
 };
-use regressee_core::domain::{Project, TargetKey};
+use regressee_core::domain::{CheckKind, Project, TargetKey};
 use regressee_storage::AppPaths;
 use std::{
     thread,
@@ -344,6 +344,7 @@ fn semantic_selection_is_exact_validated_and_headless_and_confirmation_is_fronte
     let a = h.agent("Headless inspection")?;
     let selection = Selection {
         project,
+        kind: CheckKind::Screenshot,
         run: Some(run),
         analysis: Some(analysis),
         key: Some(key),

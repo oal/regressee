@@ -129,12 +129,15 @@ pub struct ApprovalContext {
     pub project_revision: u64,
     pub run: RunId,
     pub baseline: BaselineId,
+    /// Current compatible descendant; `baseline` remains the analyzed Before.
+    pub parent: BaselineId,
     pub analysis: AnalysisId,
     pub display_revision: u64,
     pub selected: Vec<TargetKey>,
+    pub sources_hash: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ApprovalPreview {
     pub context: ApprovalContext,
     pub baseline: BaselineVersion,
@@ -162,6 +165,57 @@ pub struct ReviewHistoryPage {
     pub next_before: Option<i64>,
 }
 impl Store {
+    pub(crate) fn frozen_approval_baseline(
+        &self,
+        baseline: &BaselineVersion,
+    ) -> Result<BaselineVersion> {
+        let mut frozen = baseline.clone();
+        let source = self.load_run_snapshot(
+            frozen
+                .frozen_source_run()
+                .context("Frozen baseline source missing")?,
+        )?;
+        frozen.freeze_source(&source.run)?;
+        Ok(frozen)
+    }
+    pub(crate) fn approval_parent(&self, checked: &BaselineVersion) -> Result<BaselineVersion> {
+        let checked = self.frozen_approval_baseline(checked)?;
+        let project = self.load_project(checked.project)?;
+        let current = self.load_baseline_metadata(
+            project
+                .project
+                .active_baseline
+                .context("No active baseline")?,
+        )?;
+        let current = self.frozen_approval_baseline(&current)?;
+        let mut ancestor = current.clone();
+        let mut visited = BTreeSet::new();
+        loop {
+            ensure!(
+                visited.insert(ancestor.id) && visited.len() <= 30_000,
+                "Invalid baseline ancestry"
+            );
+            ensure!(
+                ancestor.project == checked.project
+                    && ancestor.inventory == checked.inventory
+                    && ancestor.capture_plan == checked.capture_plan
+                    && ancestor.intended_count == checked.intended_count
+                    && ancestor.intended_targets == checked.intended_targets
+                    && ancestor.frozen_source_run() == checked.frozen_source_run(),
+                "Active baseline is not a compatible descendant; compare again"
+            );
+            if ancestor.id == checked.id {
+                break;
+            }
+            ancestor = self.load_baseline_metadata(
+                ancestor
+                    .parent
+                    .context("Active baseline changed; compare again")?,
+            )?;
+            ancestor = self.frozen_approval_baseline(&ancestor)?;
+        }
+        Ok(current)
+    }
     pub fn display_analysis(&mut self, id: AnalysisId) -> Result<()> {
         let a = self.load_analysis(id)?;
         self.connection.execute("INSERT INTO analysis_display(run_id,analysis_id) VALUES(?1,?2) ON CONFLICT(run_id) DO UPDATE SET analysis_id=excluded.analysis_id,revision=analysis_display.revision+1",params![a.revision.run.to_string(),id.to_string()])?;
@@ -182,8 +236,8 @@ impl Store {
                 "stored algorithm mismatch"
             );
             p.policy.validate()?;
-            let run = self.load_run(a.revision.run)?;
-            let baseline = self.load_baseline(a.revision.baseline)?;
+            let run = self.load_screenshot_run(a.revision.run)?;
+            let baseline = self.load_screenshot_baseline(a.revision.baseline)?;
             ensure!(
                 run.run.intent
                     == RunIntent::Check {
@@ -233,7 +287,7 @@ impl Store {
                 let before = read_source_once(&mut sources, reference.run, || {
                     // Verify every original and derivative before indexing. A
                     // corrupt later capture must fail even if this report is earlier.
-                    capture_descriptors(&self.load_run(reference.run)?)
+                    capture_descriptors(&self.load_screenshot_run(reference.run)?)
                 })?
                 .get(key)
                 .context("stored before missing")?;
@@ -317,7 +371,7 @@ impl Store {
                 .split_once(':')
                 .context("capture identity missing run")?
                 .0;
-            let run = self.load_run(serde_json::from_value(serde_json::json!(id))?)?;
+            let run = self.load_screenshot_run(serde_json::from_value(serde_json::json!(id))?)?;
             ensure!(
                 run.run.project == project
                     && run
@@ -478,8 +532,10 @@ impl Store {
         selected: &[TargetKey],
     ) -> Result<ApprovalPreview> {
         let a = self.load_analysis(analysis)?;
-        let run = self.load_run(a.revision.run)?;
-        let parent = self.load_baseline(a.revision.baseline)?;
+        let run = self.load_screenshot_run(a.revision.run)?;
+        let checked =
+            self.frozen_approval_baseline(&self.load_screenshot_baseline(a.revision.baseline)?)?;
+        let parent = self.approval_parent(&checked)?;
         let project = self.load_project(parent.project)?;
         ensure!(
             run.run.project == parent.project,
@@ -495,10 +551,6 @@ impl Store {
             "Displayed analysis changed; preview again"
         );
         ensure!(
-            project.project.active_baseline == Some(parent.id),
-            "Active baseline changed; check the new baseline before accepting"
-        );
-        ensure!(
             !selected.is_empty() && selected.len() <= parent.references.len(),
             "Select successful compatible targets"
         );
@@ -512,6 +564,11 @@ impl Store {
         let mut source: Option<regressee_core::evidence::RunRecord> = None;
         for key in selected {
             ensure!(
+                checked.references.iter().find(|r| &r.key == key)
+                    == parent.references.iter().find(|r| &r.key == key),
+                "Selected Before reference changed; compare again"
+            );
+            ensure!(
                 a.review_classification(key)
                     .is_some_and(|classification| matches!(
                         classification,
@@ -524,7 +581,7 @@ impl Store {
                 .find(|r| &r.key == key)
                 .context("selected target not in baseline")?;
             if source.as_ref().is_none_or(|s| s.run.id != reference.run) {
-                source = Some(self.load_run(reference.run)?);
+                source = Some(self.load_screenshot_run(reference.run)?);
             }
             let old = source.as_ref().unwrap();
             let before = old.evidence(key).context("inherited evidence missing")?;
@@ -570,16 +627,11 @@ impl Store {
                 captured_at: run.run.finished_at.context("capture date missing")?,
             };
         }
-        let baseline = BaselineVersion {
-            id: BaselineId::new(),
-            project: parent.project,
-            parent: Some(parent.id),
-            inventory: parent.inventory,
-            created_at: crate::capture::now(),
-            references,
-            intended_count: parent.intended_count,
-            explicitly_partial: parent.explicitly_partial,
-        };
+        let mut baseline = parent.clone();
+        baseline.id = BaselineId::new();
+        baseline.parent = Some(parent.id);
+        baseline.created_at = crate::capture::now();
+        baseline.references = references;
         baseline.validate()?;
         let mut provenance = Vec::new();
         let mut source_environments = Vec::new();
@@ -590,7 +642,7 @@ impl Store {
                 &run
             } else {
                 if source.as_ref().is_none_or(|s| s.run.id != reference.run) {
-                    source = Some(self.load_run(reference.run)?);
+                    source = Some(self.load_screenshot_run(reference.run)?);
                 }
                 source.as_ref().unwrap()
             };
@@ -609,10 +661,12 @@ impl Store {
                 project: parent.project,
                 project_revision: project.revision,
                 run: run.run.id,
-                baseline: parent.id,
+                baseline: checked.id,
+                parent: parent.id,
                 analysis,
                 display_revision,
                 selected: selected.to_vec(),
+                sources_hash: identity_hash(&(&a, &checked, &parent, &baseline.references))?,
             },
             inherited: baseline.references.len() - selected.len(),
             baseline,
@@ -641,10 +695,16 @@ impl Store {
             "Approval context changed; preview again"
         );
         let expected_revision = expected.project_revision;
-        let fresh = self.approval_preview(preview.analysis, &preview.selected)?;
+        let mut fresh = self.approval_preview(preview.analysis, &preview.selected)?;
+        fresh.baseline.id = preview.baseline.id;
+        fresh.baseline.created_at = preview.baseline.created_at;
         ensure!(
             fresh.context == *expected
+                && fresh == *preview
+                && !preview.baseline.id.0.is_nil()
+                && preview.baseline.created_at > 0
                 && fresh.baseline.references == preview.baseline.references
+                && fresh.baseline.dom_references == preview.baseline.dom_references
                 && fresh.baseline.parent == preview.baseline.parent
                 && fresh.baseline.project == preview.baseline.project
                 && fresh.provenance == preview.provenance
@@ -669,7 +729,7 @@ impl Store {
         let mut originals = std::collections::BTreeSet::new();
         for r in &baseline.references {
             let capture = self
-                .load_run(r.run)?
+                .load_screenshot_run(r.run)?
                 .evidence(&r.key)
                 .context("source missing")?
                 .clone();
@@ -706,7 +766,7 @@ impl Store {
         )?;
         let current: Project = serde_json::from_str(&config)?;
         ensure!(
-            current.active_baseline == Some(expected.baseline)
+            current.active_baseline == Some(expected.parent)
                 && displayed == expected.analysis.to_string()
                 && display_revision == expected.display_revision,
             "Baseline or displayed analysis changed during acceptance"
@@ -716,7 +776,10 @@ impl Store {
             params![
                 baseline.id.to_string(),
                 baseline.project.to_string(),
-                baseline.references[0].run.to_string(),
+                baseline
+                    .frozen_source_run()
+                    .context("Frozen baseline source missing")?
+                    .to_string(),
                 encode(baseline)?
             ],
         )?;
@@ -724,6 +787,14 @@ impl Store {
             for id in c.image.artifacts() {
                 pin(&tx, &self.paths, &ArtifactOwner::Baseline(baseline.id), &id)?;
             }
+        }
+        // Unselected DOM slots inherit their existing pin authority. Do not read
+        // or approve their bytes while committing an image-only selection.
+        for reference in &baseline.dom_references {
+            tx.execute(
+                "INSERT OR IGNORE INTO artifact_refs VALUES('Baseline',?1,?2)",
+                params![baseline.id.to_string(), reference.artifact.as_str()],
+            )?;
         }
         project.project.active_baseline = Some(baseline.id);
         project.revision += 1;
@@ -761,9 +832,14 @@ impl Store {
             project.revision == expected_revision,
             "project changed before restore"
         );
-        let source = self.load_run(baseline.references[0].run)?;
+        let source = self.load_run(
+            baseline
+                .frozen_source_run()
+                .context("Frozen baseline configuration missing")?,
+        )?;
         project.project.active_baseline = Some(id);
         project.project.profiles = source.run.profiles;
+        project.project.capture_plan = source.run.capture_plan;
         project.project.validate()?;
         project.revision += 1;
         ensure!(self.connection.execute("UPDATE projects SET config=?1,revision=?2,updated_at=unixepoch() WHERE id=?3 AND revision=?4",params![encode(&project.project)?,project.revision,project.project.id.to_string(),expected_revision])? == 1,"project changed during restore");

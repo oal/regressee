@@ -407,7 +407,8 @@ fn repair_v5_save_continuation_races_keep_selected_draft_and_never_visit(cx: &mu
                     let screen = s.focus.screen;
                     let reply = terminal(s, request, cx);
                     if race == "failure" {
-                        assert!(matches!(reply.reply, Reply::Failure(_)));
+                        assert!(matches!(reply.reply, Reply::ProductFailure(ref error)
+                            if error.starts_with("storage_write_failed:")));
                     } else {
                         assert!(matches!(reply.reply, Reply::Project(_)));
                     }

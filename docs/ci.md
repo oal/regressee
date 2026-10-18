@@ -68,3 +68,19 @@ them or claim their qualification.
 Local all-feature checks need the documented native build prerequisites. The
 Linux linker-name helper in `scripts/build-ui.sh` is for the existing development
 host, not a replacement for installing runner prerequisites.
+
+## DOM snapshot checks
+
+Focused suites include core `dom_contract`, app `dom_saved_originals` /
+`dom_analysis_review`, CLI `dom_workflows` / `engine_counterexamples`, and native
+`dom_workflow_tests` plus the read-only source component. Worker source tests use
+`worker/product`; install its locked dependencies locally before running Node tests.
+Browser suites need their explicit owned runtime/evidence prerequisites; plain
+`node --test worker/product/test/*.test.mjs` is not an implicit live-test setup.
+
+Product worker wire 3 / worker 6.0.0 and engine wire 8 are separate versioned
+boundaries. Source worker changes must refresh the embedded ZIP/catalogs, not just
+pass source tests. No disabled sandbox, real user profile or live external crawl
+is authorized by a test command. Current scoped checks, source bindings, known
+pre-existing failures and remaining native/platform gates are recorded in
+[DOM verification](research/dom-snapshot-verification-20261017.md).

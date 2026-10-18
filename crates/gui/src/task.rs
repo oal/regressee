@@ -9,8 +9,35 @@ pub const MAX_TASK_GAPS: usize = 20;
 /// Context address, then requested/final addresses for each bounded gap row.
 pub const MAX_TASK_LINKS: usize = 1 + 2 * MAX_TASK_GAPS;
 
+/// Display-only count from engine-verified metadata. The engine repeats complete
+/// artifact/eligibility checks at save; unstable DOM is retained but not offered.
+pub fn baseline_consent_coverage(
+    record: &regressee_core::evidence::RunRecord,
+) -> Option<regressee_core::evidence::BaselineSaveCoverage> {
+    let mut coverage = record.baseline_save_coverage()?;
+    let eligible: std::collections::BTreeSet<_> = record
+        .all_captures()
+        .map(|c| &c.metadata.key)
+        .chain(
+            record
+                .dom_captures
+                .iter()
+                .filter(|c| c.metadata.baseline_ready())
+                .map(|c| &c.metadata.key),
+        )
+        .collect();
+    coverage.captured_targets = eligible.len();
+    coverage.dom_captures = record
+        .dom_captures
+        .iter()
+        .filter(|c| c.metadata.baseline_ready())
+        .count();
+    Some(coverage)
+}
+
 #[derive(Debug, Clone)]
 pub struct CaptureGap {
+    pub kind: CheckKind,
     pub page: String,
     pub final_url: Option<String>,
     pub profile: String,
@@ -33,18 +60,29 @@ pub struct CaptureDetails {
 impl CaptureDetails {
     pub fn from_run(run: &CaptureRun) -> Self {
         let setup = CaptureStatus::from_run(run);
-        let gap_count = setup.counts.failed
-            + setup.counts.skipped
-            + setup.counts.pending
-            + setup.counts.cancelled;
+        let gap_count = [&setup.screenshots, &setup.dom_snapshots]
+            .into_iter()
+            .map(|c| c.failed + c.skipped + c.pending + c.cancelled + c.baseline_omitted)
+            .sum();
         // Failures lead, so pending targets in a paused run cannot hide them.
         let mut gaps = Vec::new();
         for failed in [true, false] {
             for target in &run.targets {
-                if gaps.len() == MAX_TASK_GAPS {
-                    break;
+                for kind in run.capture_plan.kinds() {
+                    if gaps.len() == MAX_TASK_GAPS {
+                        break;
+                    }
+                    let (reason, failure, skipped) = if kind == CheckKind::DomSnapshot {
+                        match &target.dom_outcome {
+                    DomTargetOutcome::Failed { code } if failed => (code.label().into(), if let DomCaptureError::Capture { code } = code { Some(*code) } else { None }, false),
+                    DomTargetOutcome::Skipped { reason } if !failed => (reason.clone(), None, true),
+                    DomTargetOutcome::Pending if !failed => ("Not captured yet".into(), None, false),
+                    DomTargetOutcome::Cancelled if !failed => ("Not captured before stopping".into(), None, false),
+                    DomTargetOutcome::NotRequested if !failed => ("Omitted from this saved baseline. Capture a new baseline to add coverage.".into(), None, true),
+                    _ => continue,
                 }
-                let (reason, failure, skipped) = match &target.outcome {
+                    } else {
+                        match &target.outcome {
                     TargetOutcome::Failed { code } if failed => {
                         (code.label().to_owned(), Some(*code), false)
                     }
@@ -53,30 +91,34 @@ impl CaptureDetails {
                     TargetOutcome::Cancelled if !failed => {
                         ("Not captured before stopping".into(), None, false)
                     }
+                    TargetOutcome::NotRequested if !failed => ("Omitted from this saved baseline. Capture a new baseline to add coverage.".into(), None, true),
                     _ => continue,
-                };
-                let profile = run
-                    .profiles
-                    .iter()
-                    .find(|p| p.id == target.key.profile)
-                    .map_or_else(
-                        || "Screen size not recorded".into(),
-                        |p| format!("{} · {} × {}", p.name, p.width, p.height),
-                    );
-                gaps.push(CaptureGap {
-                    page: target.requested.to_string(),
-                    final_url: target
-                        .final_url
-                        .as_ref()
-                        .filter(|url| **url != target.requested)
-                        .map(ToString::to_string),
-                    profile,
-                    reason,
-                    failure,
-                    skipped,
-                    attempts: target.attempts,
-                    warnings: target.warnings.clone(),
-                });
+                }
+                    };
+                    let profile = run
+                        .profiles
+                        .iter()
+                        .find(|p| p.id == target.key.profile)
+                        .map_or_else(
+                            || "Screen size not recorded".into(),
+                            |p| format!("{} · {} × {}", p.name, p.width, p.height),
+                        );
+                    gaps.push(CaptureGap {
+                        kind,
+                        page: target.requested.to_string(),
+                        final_url: target
+                            .final_url
+                            .as_ref()
+                            .filter(|url| **url != target.requested)
+                            .map(ToString::to_string),
+                        profile,
+                        reason,
+                        failure,
+                        skipped,
+                        attempts: target.attempts,
+                        warnings: target.warnings.clone(),
+                    });
+                }
             }
         }
         Self {
@@ -156,7 +198,7 @@ pub fn failure_recovery(kind: Kind) -> &'static str {
             "Review website access in Project settings. If login is needed, open the login browser and finish with Confirm login before retrying."
         }
         Kind::Save => {
-            "Your draft is kept. Check the form and available disk space before saving again; do not reopen the project and discard your edits."
+            "Your draft is kept. Resolve the reported problem before saving again. Keep your edits before reopening the project."
         }
         Kind::Baseline => {
             "Return to the workspace and choose Refresh to check which baseline is current before trying this change again."
@@ -320,7 +362,7 @@ impl Spec {
             Work::DeletePreview { .. } => (
                 Storage,
                 Dialog,
-                "Preparing deletion preview",
+                work.activity_label().trim_end_matches('…'),
                 None,
                 false,
                 false,
@@ -333,6 +375,22 @@ impl Spec {
                 false,
                 false,
             ),
+            Work::Dom(regressee_app::engine::dom::Command::Accept(_)) => {
+                (Baseline, Dialog, "Saving baseline", None, false, false)
+            }
+            Work::Dom(
+                regressee_app::engine::dom::Command::Review(_)
+                | regressee_app::engine::dom::Command::SetReview { .. }
+                | regressee_app::engine::dom::Command::Approval(_),
+            ) => (
+                Save,
+                Dialog,
+                work.activity_label().trim_end_matches('…'),
+                None,
+                false,
+                false,
+            ),
+            Work::Dom(_) => return None,
             Work::Delete(_) | Work::CleanupTemporaries(_) | Work::DeleteUnreferenced(_) => (
                 Delete,
                 Dialog,
@@ -474,6 +532,7 @@ mod tests {
             .iter()
             .flat_map(|page| {
                 profiles.iter().map(move |profile| CaptureTarget {
+                    dom_outcome: Default::default(),
                     key: TargetKey {
                         page: page.id,
                         profile: profile.id,
@@ -487,6 +546,7 @@ mod tests {
             })
             .collect();
         CaptureRun {
+            capture_plan: Default::default(),
             id: RunId::new(),
             project: project.id,
             intent: RunIntent::NewBaseline,

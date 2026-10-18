@@ -127,6 +127,153 @@ fn replacement_settings_cannot_bypass_confirmation_through_save_environment() ->
 }
 
 #[test]
+fn project_removal_over_ipc_requires_exact_consent_and_preserves_other_projects() -> Result<()> {
+    use regressee_storage::DeleteItem;
+    let root = tempfile::tempdir()?;
+    let (store, project, _, _, _) = fixture::fixture(root.path());
+    drop(store);
+    let (store, other, _, _, _) = fixture::fixture(root.path());
+    let kept = serde_json::to_value(store.project_evidence(other)?)?;
+    drop(store);
+    let h = Harness::from_root(root)?;
+    let preview = match h
+        .client
+        .execute(
+            Operation::DeletePreview {
+                project,
+                item: DeleteItem::Project,
+            },
+            None,
+        )?
+        .outcome
+    {
+        Some(Outcome::DeletePreview(p)) => p,
+        other => panic!("{other:?}"),
+    };
+    assert!(preview.shared_bytes > 0);
+    assert!(h.submit(Operation::Delete(preview.clone())).is_err());
+    let ticket = h.client.prepare(Operation::Delete(preview.clone()))?;
+    let mut saved = match h.client.execute(Operation::Load(project), None)?.outcome {
+        Some(Outcome::Project(p)) => p,
+        other => panic!("{other:?}"),
+    };
+    saved.project.name = "Changed after preview".into();
+    assert_eq!(
+        h.client
+            .execute(
+                Operation::Save {
+                    project: Box::new(saved.project),
+                    expected_revision: Some(saved.revision)
+                },
+                None
+            )?
+            .state,
+        JobState::Succeeded
+    );
+    let stale = h
+        .client
+        .execute(Operation::Delete(preview), Some(ticket.id));
+    assert!(stale.is_err() || stale.is_ok_and(|j| j.state == JobState::Failed));
+    let preview = match h
+        .client
+        .execute(
+            Operation::DeletePreview {
+                project,
+                item: DeleteItem::Project,
+            },
+            None,
+        )?
+        .outcome
+    {
+        Some(Outcome::DeletePreview(p)) => p,
+        other => panic!("{other:?}"),
+    };
+    let action = Operation::Delete(preview);
+    let ticket = h.client.prepare(action.clone())?;
+    let deleted = h.client.execute(action.clone(), Some(ticket.id))?;
+    assert_eq!(deleted.state, JobState::Succeeded);
+    assert!(
+        matches!(deleted.outcome,Some(Outcome::ScopeDeleted {project:id,item:DeleteItem::Project,cleanup_pending:false}) if id==project)
+    );
+    let replay = h.client.execute(action, Some(ticket.id));
+    assert!(replay.is_err() || replay.is_ok_and(|job| job.state == JobState::Failed));
+    assert!(matches!(
+        h.client.execute(Operation::Load(project), None)?.outcome,
+        Some(Outcome::Failure(_))
+    ));
+    match h.client.execute(Operation::Evidence(other), None)?.outcome {
+        Some(Outcome::Evidence(e)) => assert_eq!(serde_json::to_value(e)?, kept),
+        other => panic!("{other:?}"),
+    };
+    Ok(())
+}
+
+#[test]
+fn environment_removal_preserves_frozen_baselines_and_runs() -> Result<()> {
+    use regressee_storage::DeleteItem;
+    let root = tempfile::tempdir()?;
+    let (mut store, project, run, _, _) = fixture::fixture(root.path());
+    let mut saved = store.load_project(project)?;
+    let baseline = saved.project.active_baseline.unwrap();
+    let frozen = serde_json::to_value(store.load_baseline(baseline)?)?;
+    let recorded = serde_json::to_value(store.load_run(run)?)?;
+    let removed = saved.project.environments[0].id;
+    let mut environment = saved.project.environments[0].clone();
+    environment.id = regressee_core::domain::EnvironmentId::new();
+    environment.name = "Retained staging".into();
+    saved.project.environments.push(environment.clone());
+    store.save_replacement_project(&saved.project, saved.revision)?;
+    let preview = store.deletion_preview(project, DeleteItem::Environment(removed))?;
+    store.delete_confirmed(&preview)?;
+    let saved = store.load_project(project)?;
+    assert_eq!(saved.project.active_baseline, Some(baseline));
+    assert_eq!(
+        store.selected_environment(&saved.project)?.id,
+        environment.id
+    );
+    assert_eq!(
+        serde_json::to_value(store.load_baseline(baseline)?)?,
+        frozen
+    );
+    assert_eq!(serde_json::to_value(store.load_run(run)?)?, recorded);
+    Ok(())
+}
+
+#[test]
+fn pending_project_cleanup_does_not_block_engine_restart_or_project_browsing() -> Result<()> {
+    use regressee_storage::DeleteItem;
+    let root = tempfile::tempdir()?;
+    let (mut store, project, run, _, _) = fixture::fixture(root.path());
+    let other = regressee_core::domain::Project::draft(
+        "Retained project".into(),
+        "https://retained.example.test/",
+    )?;
+    store.save_project(&other, None)?;
+    let record = store.load_run(run)?;
+    let artifact = record.captures[0].image.original.clone();
+    let path = store.paths().artifacts().join(artifact.as_str());
+    let stash = root.path().join("owned-artifact-stash");
+    let preview = store.deletion_preview(project, DeleteItem::Project)?;
+    assert!(store.delete_confirmed_with_cleanup(&preview, |_| {
+        std::fs::rename(&path, &stash)?;
+        std::fs::create_dir(&path)?;
+        Ok(())
+    })?);
+    assert!(store.summary()?.pending_cleanup > 0);
+    drop(store);
+    let h = Harness::from_root(root)?;
+    assert!(
+        matches!(h.client.execute(Operation::List {page:0},None)?.outcome,Some(Outcome::Projects(page)) if page.items.len()==1 && page.items[0].id==other.id)
+    );
+    assert!(
+        matches!(h.client.execute(Operation::InspectStorage,None)?.outcome,Some(Outcome::Storage(summary)) if summary.pending_cleanup>0)
+    );
+    std::fs::remove_dir(path.clone())?;
+    std::fs::rename(stash, path)?;
+    Ok(())
+}
+
+#[test]
 fn safe_environment_saves_and_confirmed_replacements_keep_distinct_atomic_intent() -> Result<()> {
     use regressee_storage::LocalLoginSettings;
     let root = tempfile::tempdir()?;

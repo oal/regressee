@@ -146,7 +146,7 @@ fn renderer_capture_scrollbars(cx: &mut TestAppContext) {
             &format!("scrollbars-{width:.0}x{height:.0}-settings"),
         )
         .unwrap();
-        shell.update(cx, |s, cx| finish_jobs(s, cx));
+        shell.update(cx, finish_jobs);
         owned.join_after_ui();
     }
     assert_eq!(

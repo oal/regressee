@@ -22,6 +22,8 @@ mod ui_brand_capture;
 mod ui_copy_capture;
 #[path = "ui_dialog_capture.rs"]
 mod ui_dialog_capture;
+#[path = "ui_dom_capture.rs"]
+mod ui_dom_capture;
 #[path = "ui_icon_spacing_capture.rs"]
 mod ui_icon_spacing_capture;
 #[path = "ui_image_controls_capture.rs"]
@@ -50,10 +52,10 @@ mod ui_review_footer_capture;
 mod ui_review_matrix;
 #[path = "ui_row_hints_capture.rs"]
 mod ui_row_hints_capture;
-#[path = "ui_search_fields_capture.rs"]
-mod ui_search_fields_capture;
 #[path = "ui_scrollbar_capture.rs"]
 mod ui_scrollbar_capture;
+#[path = "ui_search_fields_capture.rs"]
+mod ui_search_fields_capture;
 #[path = "ui_sidebar_capture.rs"]
 mod ui_sidebar_capture;
 #[path = "ui_split_view_capture.rs"]
@@ -255,6 +257,16 @@ fn write_frame(
             ("history_source_sha256", include_bytes!("workspace_history.rs").as_slice()),
             ("phase4_hierarchy_source_sha256", include_bytes!("phase4_hierarchy_tests.rs").as_slice()),
             ("phase4_harness_source_sha256", include_bytes!("ui_phase4_capture.rs").as_slice()),
+            ("dom_harness_source_sha256", include_bytes!("ui_dom_capture.rs").as_slice()),
+            ("dom_workflow_tests_source_sha256", include_bytes!("dom_workflow_tests.rs").as_slice()),
+            ("dom_diff_source_sha256", include_bytes!("ui/dom_diff.rs").as_slice()),
+            ("dom_diff_tests_source_sha256", include_bytes!("ui/dom_diff_tests.rs").as_slice()),
+            ("dom_source_adapter_sha256", include_bytes!("dom_source.rs").as_slice()),
+            ("dom_jobs_source_sha256", include_bytes!("dom_jobs.rs").as_slice()),
+            ("dom_ux_source_sha256", include_bytes!("dom_ux.rs").as_slice()),
+            ("dom_review_source_sha256", include_bytes!("dom_review_ux.rs").as_slice()),
+            ("dom_approval_source_sha256", include_bytes!("dom_approval_ux.rs").as_slice()),
+            ("workspace_jobs_source_sha256", include_bytes!("workspace_jobs.rs").as_slice()),
         ] {
             metadata[key] = hex::encode(Sha256::digest(source)).into();
         }
@@ -732,6 +744,7 @@ fn task_capture_evidence(
         .iter()
         .flat_map(|page| {
             run.profiles.iter().map(move |profile| CaptureTarget {
+                dom_outcome: Default::default(),
                 key: TargetKey {
                     page: page.id,
                     profile: profile.id,

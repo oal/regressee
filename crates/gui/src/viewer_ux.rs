@@ -85,7 +85,8 @@ impl Shell {
     }
 
     pub(super) fn viewer_input_allowed(&self) -> bool {
-        !self.agent_locked()
+        !self.dom_active()
+            && !self.agent_locked()
             && self.focus.screen == Screen::Results
             && !self.focus.busy
             && !self.focus.dialog
@@ -264,6 +265,27 @@ impl Shell {
                     )),
             );
         } else if details {
+            if self.dom_active() {
+                let mut originals = div()
+                    .debug_selector(|| "dom-original-access".into())
+                    .flex()
+                    .flex_wrap()
+                    .gap_2();
+                for (index, label) in [
+                    (1, "Open complete Before source"),
+                    (2, "Open complete After source"),
+                ] {
+                    if self.dom_source_available(index) {
+                        originals = originals.child(self.button(
+                            Control::DomSource(index),
+                            label,
+                            ActionStyle::Secondary,
+                            cx,
+                        ));
+                    }
+                }
+                body = body.child(originals);
+            }
             for (label, value) in self.capture_summary() {
                 body = body.child(
                     div()
@@ -536,6 +558,12 @@ impl Shell {
 
     /// Useful facts only. Exact IDs, descriptors and debug structs are opt-in.
     pub(super) fn capture_summary(&self) -> Vec<(String, String)> {
+        if self.dom_active() {
+            return self.dom_capture_summary();
+        }
+        if let Some(error) = self.kind_read_error(regressee_core::domain::CheckKind::Screenshot) {
+            return vec![("Check kind".into(), "Screenshot".into()), ("Evidence read failed".into(), error.into()), ("Recovery".into(), "Repair the saved files and refresh. The DOM snapshot remains independent; no website is revisited by Refresh.".into())];
+        }
         use regressee_core::domain::CaptureError;
         let mut rows = Vec::new();
         let Some(key) = &self.selected_key else {

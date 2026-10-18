@@ -47,6 +47,7 @@ pub fn fixture(path: &Path, pages: usize) -> (Store, ProjectId, RunId, AnalysisI
                 }),
                 inventory: inventory.clone(),
                 profiles: project.profiles.clone(),
+                capture_plan: CapturePlan::default(),
                 environment: project.environments[0].clone(),
                 rendering: RenderingEnvironment {
                     os: "synthetic-linux".into(),
@@ -71,12 +72,14 @@ pub fn fixture(path: &Path, pages: usize) -> (Store, ProjectId, RunId, AnalysisI
                         final_url: None,
                         attempts: 1,
                         outcome: TargetOutcome::Pending,
+                        dom_outcome: DomTargetOutcome::NotRequested,
                         warnings: vec![],
                     })
                     .collect(),
             },
             capture: None,
             captures: vec![],
+            dom_captures: vec![],
             queue: None,
         };
         store.begin_run(&record).unwrap();
