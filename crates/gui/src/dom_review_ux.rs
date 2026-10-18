@@ -222,6 +222,8 @@ impl Shell {
                 self.dom.selected.clear();
                 self.approval_selection.clear();
                 self.invalidate_approval();
+                self.baseline_update_open = false;
+                self.presentation_focus = Some(Control::BaselineUpdate);
                 self.evidence_dirty = true;
                 self.dom.identity = None;
                 self.refresh_visible(cx);
@@ -271,7 +273,8 @@ impl Shell {
         label
     }
     pub(super) fn dom_review_bar(&self, cx: &mut Context<Self>) -> AnyElement {
-        if self.viewer_inspector_open() || self.options_panel_open() {
+        if (self.viewer_inspector_open() && !self.baseline_update_open) || self.options_panel_open()
+        {
             return div()
                 .text_size(px(HELP_TEXT_SIZE))
                 .line_height(px(HELP_LINE_HEIGHT))
@@ -387,14 +390,19 @@ impl Shell {
                                 ))
                             })
                             .child(div().flex_1())
-                            .when(self.control_mounted(Control::Phase5(33)), |row| {
-                                row.child(self.button(
-                                    Control::Phase5(33),
-                                    "Next unreviewed",
-                                    ActionStyle::Primary,
-                                    cx,
-                                ))
-                            }),
+                            .when(
+                                self.control_mounted(Control::Phase5(33))
+                                    || (self.baseline_update_open
+                                        && self.next_unreviewed_key().is_some()),
+                                |row| {
+                                    row.child(self.button(
+                                        Control::Phase5(33),
+                                        "Next unreviewed",
+                                        ActionStyle::Primary,
+                                        cx,
+                                    ))
+                                },
+                            ),
                     ),
             )
             .into_any_element()

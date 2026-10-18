@@ -16,6 +16,7 @@ impl Shell {
             return;
         }
         self.image_controls_open = true;
+        self.baseline_update_open = false;
         self.capture_details_open = false;
         self.review_note_open = false;
         self.review_tools = false;
@@ -79,6 +80,7 @@ impl Shell {
 
     pub(super) fn viewer_inspector_open(&self) -> bool {
         self.image_controls_open
+            || self.baseline_update_open
             || self.review_note_open
             || self.capture_details_open
             || (self.review_tools && !self.mask_draw)
@@ -217,7 +219,12 @@ impl Shell {
 
     /// A flyout over the viewer, never a replacement for the queue or a bottom strip.
     pub(super) fn viewer_inspector(&self, cx: &mut Context<Self>) -> AnyElement {
-        let available = (self.working_width - self.review_queue_width() - 12.).max(1.);
+        let available = if self.baseline_update_open {
+            self.working_width
+        } else {
+            self.working_width - self.review_queue_width() - 12.
+        }
+        .max(1.);
         let details = self.capture_details_open;
         let diagnostics = details && self.capture_diagnostics_open;
         let fields = self.analysis_fields[..14].to_vec();
@@ -243,7 +250,9 @@ impl Shell {
             .flex()
             .flex_col()
             .gap_4();
-        if self.image_controls_open {
+        if self.baseline_update_open {
+            body = body.child(self.approval_bar(cx));
+        } else if self.image_controls_open {
             body = body.child(evidence_workspace::image_controls_help(
                 self.effective_viewer_mode() == 5,
             ));
@@ -363,7 +372,9 @@ impl Shell {
                     .border_b_1()
                     .border_color(rgb(palette().line))
                     .child(div().font_weight(FontWeight::SEMIBOLD).child(
-                        if self.image_controls_open {
+                        if self.baseline_update_open {
+                            "Update baseline"
+                        } else if self.image_controls_open {
                             "Image controls"
                         } else if self.review_note_open {
                             "Review note"
@@ -475,6 +486,19 @@ impl Shell {
                 .h(px(0.))
                 .w_full(),
             )
+            .when(self.baseline_update_open, |panel| {
+                panel.child(
+                    div().debug_selector(|| "baseline-panel-actions".into())
+                        .flex_shrink_0().p_3().border_t_1().border_color(rgb(palette().line))
+                        .flex().flex_col().gap_2()
+                        .when(self.control_mounted(Control::Phase5(24)), |footer| {
+                            footer.child(self.button(Control::Phase5(24), "Review update…", ActionStyle::Primary, cx))
+                        })
+                        .child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT))
+                            .text_color(rgb(palette().muted))
+                            .child("Nothing is saved until you confirm the update. Closing keeps your selection.")),
+                )
+            })
             .when(self.review_note_open, |panel| {
                 let (status, invalid) = self.note_status(cx);
                 panel.child(

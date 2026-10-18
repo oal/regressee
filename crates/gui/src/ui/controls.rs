@@ -1246,7 +1246,7 @@ fn image_placeholder_frame(scroll: &ScrollHandle, message: Div) -> Div {
         .flex_col()
         .overflow_hidden()
         .border_1()
-        .border_color(rgb(palette().line))
+        .border_color(rgb(palette().control_line))
         .bg(rgb(palette().surface))
         .child(super::scrollbar::vertical(
             "placeholder-scrollbar",
@@ -1520,9 +1520,16 @@ fn target_row(
     let row_selector = id.clone();
     let address_selector = id.clone();
     let details_selector = id.clone();
+    let marker_selector = id.clone();
+    let selected_background = if result {
+        palette().result_selected
+    } else {
+        palette().selected
+    };
     div()
         .id(id)
         .debug_selector(move || format!("page-row-{row_selector}"))
+        .relative()
         .w_full()
         .min_w_0()
         .h(px(if result { 84. } else { PAGE_ROW_HEIGHT }))
@@ -1531,7 +1538,7 @@ fn target_row(
         .border_b_1()
         .border_color(rgb(palette().line))
         .bg(rgb(if selected {
-            palette().selected
+            selected_background
         } else {
             palette().surface
         }))
@@ -1542,11 +1549,25 @@ fn target_row(
         .when(enabled, |el| {
             el.cursor_pointer().hover(move |style| {
                 style.bg(rgb(if selected {
-                    palette().selected
+                    selected_background
                 } else {
                     palette().ground
                 }))
             })
+        })
+        // Structural selection cue, not keyboard focus. Absolute paint keeps
+        // every row's text inset, virtual height and hit target unchanged.
+        .when(result && selected, |row| {
+            row.child(
+                div()
+                    .debug_selector(move || format!("result-selection-{marker_selector}"))
+                    .absolute()
+                    .left_0()
+                    .top_0()
+                    .bottom_0()
+                    .w(px(1.))
+                    .bg(rgb(palette().accent)),
+            )
         })
         .child(
             div()
@@ -1555,7 +1576,11 @@ fn target_row(
                 .min_w_0()
                 .text_size(px(14.))
                 .line_height(px(20.))
-                .font_weight(FontWeight::MEDIUM)
+                .font_weight(if result && selected {
+                    FontWeight::SEMIBOLD
+                } else {
+                    FontWeight::MEDIUM
+                })
                 .text_color(rgb(palette().ink))
                 .text_ellipsis()
                 .child(if result { path } else { address.to_string() }),
@@ -2450,6 +2475,76 @@ mod ui_tests {
         kind: RowKind,
         address: SharedString,
         enabled: bool,
+    }
+
+    struct ResultSelectionView {
+        selected: bool,
+        enabled: bool,
+        dark: bool,
+    }
+
+    impl Render for ResultSelectionView {
+        fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+            set_dark(self.dark);
+            div()
+                .w(px(272.))
+                .child(result_row(
+                    "selected-result",
+                    "https://example.test/a-long-page-name?query=retained#section",
+                    "Desktop · Changed · 1 attempt",
+                    self.selected,
+                    self.enabled,
+                ))
+                .child(page_row(
+                    "ordinary-page",
+                    "https://example.test/",
+                    "Desktop · Captured",
+                    true,
+                    self.enabled,
+                ))
+        }
+    }
+
+    #[gpui::test]
+    fn result_selection_adds_a_marker_without_moving_or_resizing_text(cx: &mut TestAppContext) {
+        for dark in [false, true] {
+            for enabled in [false, true] {
+                let mut resting = None;
+                for selected in [false, true] {
+                    let (_, cx) = cx.add_window_view(|_, _| ResultSelectionView {
+                        selected,
+                        enabled,
+                        dark,
+                    });
+                    cx.update(|window, cx| {
+                        let _ = window.draw(cx);
+                    });
+                    let row = cx.debug_bounds("page-row-selected-result").unwrap();
+                    let address = cx.debug_bounds("page-address-selected-result").unwrap();
+                    let details = cx.debug_bounds("page-details-selected-result").unwrap();
+                    assert_eq!(row.size, size(px(272.), px(84.)));
+                    assert_eq!(address.left(), row.left() + px(16.));
+                    assert_eq!(address.right(), row.right() - px(16.));
+                    if let Some(resting) = resting {
+                        assert_eq!((row, address, details), resting);
+                    } else {
+                        resting = Some((row, address, details));
+                    }
+                    let marker = cx.debug_bounds("result-selection-selected-result");
+                    if selected {
+                        let marker = marker.unwrap();
+                        assert_eq!(marker.size.width, px(1.));
+                        assert_eq!(marker.left(), row.left());
+                        assert!(marker.size.height >= px(80.));
+                        assert!(marker.right() < address.left());
+                    } else {
+                        assert!(marker.is_none());
+                    }
+                    assert!(cx.debug_bounds("result-selection-ordinary-page").is_none());
+                }
+            }
+        }
+        set_dark(false);
     }
 
     impl Render for RowHintView {

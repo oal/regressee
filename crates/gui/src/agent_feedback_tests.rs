@@ -116,9 +116,12 @@ fn agent_retained_feedback_must_not_collapse_handoff_evidence(cx: &mut TestAppCo
         let root = tempfile::tempdir().unwrap();
         let (store, project, _, _, _) = crate::approval_fixture::fixture(root.path());
         drop(store);
-        regressee_storage::AppPreferences { appearance, ..Default::default() }
-            .save(&AppPaths::isolated(root.path()))
-            .unwrap();
+        regressee_storage::AppPreferences {
+            appearance,
+            ..Default::default()
+        }
+        .save(&AppPaths::isolated(root.path()))
+        .unwrap();
         let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(root.path()));
         let owner = jobs.clone();
         owner.appearance.wait_loaded();
@@ -166,9 +169,12 @@ fn agent_success_error_feedback_share_banner_budget_and_remain_readable(cx: &mut
                 let root = tempfile::tempdir().unwrap();
                 let (store, project, _, _, _) = crate::approval_fixture::fixture(root.path());
                 drop(store);
-                regressee_storage::AppPreferences { appearance, ..Default::default() }
-                    .save(&AppPaths::isolated(root.path()))
-                    .unwrap();
+                regressee_storage::AppPreferences {
+                    appearance,
+                    ..Default::default()
+                }
+                .save(&AppPaths::isolated(root.path()))
+                .unwrap();
                 let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(root.path()));
                 let owner = jobs.clone();
                 owner.appearance.wait_loaded();

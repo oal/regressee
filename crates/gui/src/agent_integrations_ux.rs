@@ -536,7 +536,7 @@ mod tests {
                     cx.debug_bounds("agent-setup-feedback").unwrap(),
                     cx.debug_bounds("screen-scroll").unwrap(),
                 );
-                cx.update(|_, cx| shell.update(cx, |s, cx| finish_setup(s, cx)));
+                cx.update(|_, cx| shell.update(cx, finish_setup));
                 draw(cx);
                 cx.update(|window, cx| {
                     shell.read_with(cx, |s, cx| assert_eq!(s.focused(window, cx), Some(next)))

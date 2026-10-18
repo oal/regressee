@@ -278,6 +278,7 @@ fn write_frame(
             ("dom_ux_source_sha256", include_bytes!("dom_ux.rs").as_slice()),
             ("dom_review_source_sha256", include_bytes!("dom_review_ux.rs").as_slice()),
             ("dom_approval_source_sha256", include_bytes!("dom_approval_ux.rs").as_slice()),
+            ("review_workspace_tests_source_sha256", include_bytes!("review_workspace_tests.rs").as_slice()),
             ("workspace_jobs_source_sha256", include_bytes!("workspace_jobs.rs").as_slice()),
             ("motion_source_sha256", include_bytes!("ui/motion.rs").as_slice()),
             ("motion_harness_source_sha256", include_bytes!("ui_motion_capture.rs").as_slice()),

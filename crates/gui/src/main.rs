@@ -289,6 +289,7 @@ struct Shell {
     capture_details_open: bool,
     capture_details_trigger: Control,
     image_controls_open: bool,
+    baseline_update_open: bool,
     capture_diagnostics_open: bool,
     copied_capture_diagnostics: Option<String>,
     review_note_open: bool,
@@ -419,7 +420,7 @@ impl Shell {
             desktop_dark: desktop_is_dark(cx.window_appearance()),
             appearance_observer: None,
             root_focus: cx.focus_handle(),
-            handles: (0..(1739 + regressee_gui::task::MAX_TASK_LINKS))
+            handles: (0..(1740 + regressee_gui::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -549,6 +550,7 @@ impl Shell {
             capture_details_open: false,
             capture_details_trigger: Control::Phase5(36),
             image_controls_open: false,
+            baseline_update_open: false,
             capture_diagnostics_open: false,
             copied_capture_diagnostics: None,
             review_note_open: false,
@@ -1043,6 +1045,10 @@ impl Shell {
                 self.history = None;
                 self.project_storage = None;
                 self.invalidate_approval();
+                if self.baseline_update_open {
+                    self.baseline_update_open = false;
+                    self.presentation_focus = Some(Control::BaselineUpdate);
+                }
                 self.name
                     .update(cx, |input, cx| input.set_value(&record.project.name, cx));
                 self.address.update(cx, |input, cx| {
@@ -1720,6 +1726,7 @@ impl Shell {
         }
     }
     fn clear_viewer(&mut self) {
+        self.baseline_update_open = false;
         self.review_issue_scroll
             .set_offset(gpui::point(px(0.), px(0.)));
         self.image_controls_open = false;
@@ -3084,6 +3091,7 @@ impl Shell {
             Control::CloseMappingPreview => 620,
             Control::DiscardPageList => 634 + regressee_gui::task::MAX_TASK_LINKS,
             Control::ImageControls => 635 + regressee_gui::task::MAX_TASK_LINKS,
+            Control::BaselineUpdate => 1739 + regressee_gui::task::MAX_TASK_LINKS,
             Control::CopyCaptureDiagnostics => 643 + regressee_gui::task::MAX_TASK_LINKS,
             Control::TaskLink(index) => 626 + index,
         };
@@ -3510,6 +3518,7 @@ impl Shell {
             self.screen_scroll.set_offset(gpui::point(px(0.), px(0.)));
         }
         self.focus.screen = screen;
+        self.baseline_update_open = false;
         self.image_controls_open = false;
         self.presentation_focus = None;
         if screen == Screen::Setup {
@@ -3901,6 +3910,7 @@ impl Shell {
                     self.presentation_focus = Some(Control::Guided(53));
                 }
                 54 => {
+                    self.baseline_update_open = false;
                     self.viewer_mode_open = !self.viewer_mode_open;
                     self.presentation_focus = Some(if self.viewer_mode_open {
                         match self.effective_viewer_mode() {
@@ -3969,6 +3979,7 @@ impl Shell {
             self.result_filters_open = !self.result_filters_open;
             self.options_scroll.set_offset(gpui::point(px(0.), px(0.)));
             if self.result_filters_open {
+                self.baseline_update_open = false;
                 self.image_controls_open = false;
                 self.capture_details_open = false;
                 self.review_note_open = false;
@@ -3983,6 +3994,7 @@ impl Shell {
         if index == 44 {
             self.review_tools = !self.review_tools;
             if self.review_tools {
+                self.baseline_update_open = false;
                 self.image_controls_open = false;
                 self.review_details_scroll
                     .set_offset(gpui::point(px(0.), px(0.)));
@@ -5688,6 +5700,7 @@ impl Shell {
                 window.focus(&self.handle(control, cx));
             }
             Control::DomSource(index) => {
+                self.baseline_update_open = false;
                 self.dom.presentation = [
                     regressee_gui::jobs::DomPresentation::Diff,
                     regressee_gui::jobs::DomPresentation::Before,
@@ -5721,7 +5734,10 @@ impl Shell {
                 self.sync_appearance(cx);
                 window.focus(&self.handle(control, cx));
             }
-            Control::AgentInstall(_) | Control::AgentRemove(_) | Control::AgentRetry(_) | Control::AgentRefresh => {
+            Control::AgentInstall(_)
+            | Control::AgentRemove(_)
+            | Control::AgentRetry(_)
+            | Control::AgentRefresh => {
                 self.start_integrations(control, cx);
                 window.focus(&self.handle(control, cx));
                 self.reveal_form_control(control, true, window, cx);
@@ -5907,6 +5923,26 @@ impl Shell {
                 } else {
                     self.open_image_controls(cx);
                 }
+            }
+            Control::BaselineUpdate => {
+                if self.baseline_update_open {
+                    self.phase5_action(39, cx);
+                } else {
+                    self.baseline_update_open = true;
+                    self.image_controls_open = false;
+                    self.capture_details_open = false;
+                    self.review_note_open = false;
+                    self.review_tools = false;
+                    self.viewer_mode_open = false;
+                    self.result_filters_open = false;
+                    self.mask_draw = false;
+                    self.mask_drag = None;
+                    self.pan_drag = None;
+                    self.review_details_scroll
+                        .set_offset(gpui::point(px(0.), px(0.)));
+                    self.presentation_focus = Some(Control::Phase5(39));
+                }
+                cx.notify();
             }
             Control::CopyCaptureDiagnostics => {
                 let text = self.capture_diagnostics().text();
@@ -6238,8 +6274,14 @@ impl Shell {
             cx.notify();
         } else if self.image_controls_open {
             self.close_image_controls(true, window, cx);
-        } else if self.capture_details_open || self.review_tools || self.review_note_open {
-            let control = if self.capture_details_open {
+        } else if self.capture_details_open
+            || self.review_tools
+            || self.review_note_open
+            || self.baseline_update_open
+        {
+            let control = if self.baseline_update_open {
+                Control::BaselineUpdate
+            } else if self.capture_details_open {
                 self.capture_details_trigger
             } else if self.review_note_open {
                 Control::Phase5(37)
@@ -6247,6 +6289,7 @@ impl Shell {
                 Control::Guided(44)
             };
             self.capture_details_open = false;
+            self.baseline_update_open = false;
             self.review_tools = false;
             self.review_note_open = false;
             self.mask_draw = false;
@@ -6453,6 +6496,27 @@ impl Shell {
         if self.agent_locked() {
             return false;
         }
+        // The baseline flyout spans the workspace height. Covered heading and
+        // viewing commands must not remain invisible Tab/shortcut destinations.
+        // Project navigation and the result queue remain available outside it.
+        if self.baseline_update_open
+            && !self.focus.approval_dialog
+            && matches!(
+                control,
+                Control::CheckChanges
+                    | Control::CaptureBaseline
+                    | Control::SaveBaseline
+                    | Control::RefreshEvidence
+                    | Control::BaselineUpdate
+                    | Control::EvidenceKind(_)
+                    | Control::DomSource(_)
+                    | Control::ImageControls
+                    | Control::Guided(44 | 46 | 50 | 54..=57)
+                    | Control::Phase5(30 | 36)
+            )
+        {
+            return false;
+        }
         if self.zoom_select.read(cx).is_open()
             && matches!(
                 control,
@@ -6531,9 +6595,10 @@ impl Shell {
             }
             Control::Appearance(_) => self.appearance.loaded,
             Control::ReducedMotion(_) => self.appearance.loaded && !self.forced_reduced_motion,
-            Control::AgentInstall(_) | Control::AgentRemove(_) | Control::AgentRetry(_) | Control::AgentRefresh => {
-                self.integration_enabled(control)
-            }
+            Control::AgentInstall(_)
+            | Control::AgentRemove(_)
+            | Control::AgentRetry(_)
+            | Control::AgentRefresh => self.integration_enabled(control),
             Control::Guided(46) | Control::ImageControls => self.viewer_has_pixels(),
             Control::SplitView => self.split_view_available(),
             Control::SplitDivider => self.split_input_allowed(),
@@ -6870,7 +6935,8 @@ impl Shell {
                 return false;
             }
             if (self.viewer_inspector_open() || self.options_panel_open() || self.viewer_mode_open)
-                && matches!(control, Phase5(20..=25 | 33 | 37) | ReviewDetails)
+                && (matches!(control, Phase5(20..=22 | 25 | 33 | 37) | ReviewDetails)
+                    || (matches!(control, Phase5(23 | 24)) && !self.baseline_update_open))
             {
                 return false;
             }
@@ -7099,6 +7165,13 @@ impl Shell {
             SplitView => comparison_chrome && self.viewer_mode_open,
             SplitDivider => viewer && self.effective_viewer_mode() == 5 && !self.mask_draw,
             ImageControls => navigation_chrome && !self.narrow_workspace && !self.mask_draw,
+            BaselineUpdate => {
+                results
+                    && !self.page_list_workspace()
+                    && self.history_inspection.is_none()
+                    && self.has_kind_comparison()
+                    && !self.mask_draw
+            }
             Guided(11) => setup && self.setup_origin_count > 1,
             Guided(1..=3 | 6 | 7) => setup,
             Guided(44) => comparison_chrome && self.preview.is_none() && !self.mask_draw,
@@ -7233,7 +7306,8 @@ impl Shell {
                     && (!self.dom_active() || self.dom_note_template().is_some())
             }
             Phase5(23) => {
-                viewer_chrome
+                self.baseline_update_open
+                    && viewer_chrome
                     && self.selected_key.as_ref().is_some_and(|key| {
                         if self.dom_active() {
                             self.dom.selected.contains_key(key)
@@ -7247,7 +7321,8 @@ impl Shell {
                     })
             }
             Phase5(24) => {
-                viewer_chrome
+                self.baseline_update_open
+                    && viewer_chrome
                     && self.has_kind_comparison()
                     && (!self.approval_selection.is_empty() || !self.dom.selected.is_empty())
             }
@@ -7866,9 +7941,10 @@ impl Shell {
                         ))
                     },
                 )
-                .when(self.viewer_inspector_open(), |body| {
-                    body.child(self.viewer_inspector(cx))
-                })
+                .when(
+                    self.viewer_inspector_open() && !self.baseline_update_open,
+                    |body| body.child(self.viewer_inspector(cx)),
+                )
                 .when(
                     self.evidence.latest.is_some() && !self.inspection_chrome_mounted(),
                     |body| {
@@ -7948,9 +8024,10 @@ impl Shell {
             );
         }
         section
-            .when(self.viewer_inspector_open(), |section| {
-                section.child(self.viewer_inspector(cx))
-            })
+            .when(
+                self.viewer_inspector_open() && !self.baseline_update_open,
+                |section| section.child(self.viewer_inspector(cx)),
+            )
             .into_any_element()
     }
     fn phase5_panel(&self, cx: &mut Context<Self>) -> AnyElement {
@@ -8381,7 +8458,7 @@ impl Shell {
                 .when(!bounded, |pane| pane.h(px(280.)))
                 .overflow_hidden()
                 .border_1()
-                .border_color(rgb(palette().line))
+                .border_color(rgb(palette().control_line))
                 .bg(rgb(palette().surface))
                 .when(bounded, |pane| {
                     pane.on_scroll_wheel(cx.listener(
@@ -9320,7 +9397,10 @@ impl Render for Shell {
                                 body.overflow_y_scroll().track_scroll(&self.screen_scroll)
                             })
                             .when(bounded_review, |body| {
-                                body.overflow_hidden().flex().flex_col()
+                                body.overflow_hidden()
+                                    .flex()
+                                    .flex_col()
+                                    .bg(rgb(palette().review_ground))
                             })
                             .px_6()
                             .py(px(if bounded_review { 8. } else { 16. }))
@@ -9340,17 +9420,6 @@ impl Render for Shell {
         }
         if self.focus.screen == Screen::Setup && !self.focus.shows_project_picker() {
             content = content.child(self.setup_footer(cx));
-        }
-        if self.focus.screen == Screen::Results
-            && !self.focus.shows_project_picker()
-            && !self.page_list_workspace()
-            && self.history_inspection.is_none()
-            && self.has_kind_comparison()
-            && !self.viewer_inspector_open()
-            && !self.options_panel_open()
-            && self.baseline_update_mounted()
-        {
-            content = content.child(self.approval_bar(cx));
         }
         let shell = div()
             .id("regressee-shell")
@@ -9735,6 +9804,8 @@ mod recovery_ux_tests;
 mod result_navigation_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod review_footer_tests;
+#[cfg(all(test, feature = "ui-tests"))]
+mod review_workspace_tests;
 #[cfg(all(test, feature = "ui-tests"))]
 mod safety_ux_tests;
 #[cfg(all(test, feature = "ui-tests"))]

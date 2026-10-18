@@ -6,6 +6,8 @@ use std::cell::Cell;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Palette {
     pub ground: u32,
+    /// Bounded review workspace only; other screens retain their existing ground.
+    pub review_ground: u32,
     pub surface: u32,
     pub rail: u32,
     pub rail_ink: u32,
@@ -22,6 +24,8 @@ pub struct Palette {
     pub accent_hover: u32,
     pub on_accent: u32,
     pub selected: u32,
+    /// Result selection is stronger than a toggled toolbar/navigation surface.
+    pub result_selected: u32,
     pub error: u32,
     pub error_surface: u32,
     pub warning: u32,
@@ -31,6 +35,7 @@ pub struct Palette {
 
 pub const LIGHT: Palette = Palette {
     ground: 0xf4f4f4,
+    review_ground: 0xededed,
     surface: 0xffffff,
     rail: 0xeaeaea,
     rail_ink: 0x242424,
@@ -48,6 +53,7 @@ pub const LIGHT: Palette = Palette {
     accent_hover: 0x00685f,
     on_accent: 0xffffff,
     selected: 0xe2f5f0,
+    result_selected: 0xccebe3,
     error: 0x9c3038,
     error_surface: 0xfff2f2,
     warning: 0x775311,
@@ -57,6 +63,7 @@ pub const LIGHT: Palette = Palette {
 
 pub const DARK: Palette = Palette {
     ground: 0x1b1b1b,
+    review_ground: 0x111111,
     surface: 0x232323,
     rail: 0x202020,
     rail_ink: 0xededed,
@@ -73,6 +80,7 @@ pub const DARK: Palette = Palette {
     accent_hover: 0x85e7d1,
     on_accent: 0x072c29,
     selected: 0x203e38,
+    result_selected: 0x244c43,
     error: 0xffacb2,
     error_surface: 0x40282f,
     warning: 0xf1ca7d,
@@ -223,6 +231,7 @@ mod tests {
         for p in [LIGHT, DARK] {
             for color in [
                 p.ground,
+                p.review_ground,
                 p.surface,
                 p.rail,
                 p.rail_hover,
@@ -287,6 +296,22 @@ mod tests {
             assert!(contrast(p.accent, p.action_surface) >= 3.);
             assert!(contrast(p.accent, p.selected) >= 3.);
             assert!(contrast(p.accent, p.action_hover) >= 3.);
+        }
+    }
+
+    #[test]
+    fn review_hierarchy_preserves_readability_and_strengthens_selection() {
+        for p in [LIGHT, DARK] {
+            assert!(contrast(p.surface, p.review_ground) > contrast(p.surface, p.ground));
+            assert!(contrast(p.result_selected, p.surface) > contrast(p.selected, p.surface));
+            for ink in [p.ink, p.muted, p.accent, p.accent_hover] {
+                assert!(contrast(ink, p.review_ground) >= 4.5);
+            }
+            for ink in [p.ink, p.muted, p.accent_hover] {
+                assert!(contrast(ink, p.result_selected) >= 4.5);
+            }
+            assert!(contrast(p.accent, p.result_selected) >= 3.);
+            assert!(contrast(p.control_line, p.review_ground) >= 3.);
         }
     }
 }

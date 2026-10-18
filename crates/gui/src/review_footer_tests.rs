@@ -45,7 +45,8 @@ pub(super) fn exercise(
                 window,
             );
         }
-        if let Some(footer) = cx.debug_bounds("approval-next-action") {
+        if shell.read_with(cx, |s, _| s.baseline_update_open) {
+            let footer = cx.debug_bounds("viewer-inspector").unwrap();
             inside(
                 cx.debug_bounds("baseline-update-explanation").unwrap(),
                 footer,
@@ -62,10 +63,9 @@ pub(super) fn exercise(
         cx,
         &[
             "ordinary-review-decisions",
-            "approval-next-action",
+            "action-BaselineUpdate",
             "action-Phase5(20)",
             "action-Phase5(37)",
-            "action-Phase5(23)",
         ],
     );
     assert!(cx.debug_bounds("action-Phase5(24)").is_none());
@@ -86,6 +86,7 @@ pub(super) fn exercise(
         s.analysis_fields[9].update(cx, |f, cx| f.set_value("", cx))
     });
 
+    click(shell, cx, Control::BaselineUpdate);
     click(shell, cx, Control::Phase5(23));
     check(
         cx,
@@ -128,6 +129,7 @@ pub(super) fn exercise(
     });
     click(shell, cx, Control::Phase5(23));
 
+    click(shell, cx, Control::Phase5(39));
     shell.update(cx, |s, cx| {
         let result = s
             .evidence
@@ -179,7 +181,7 @@ pub(super) fn exercise(
     });
     check(cx, &["review-unavailable", "action-ReviewDetails"]);
     shell.read_with(cx, |s, _| assert!(!s.control_mounted(Control::Phase5(33))));
-    assert!(cx.debug_bounds("queue-beside-viewer").unwrap().size.height > ready_height);
+    assert!(cx.debug_bounds("queue-beside-viewer").unwrap().size.height >= ready_height);
     inspect("unavailable-all", cx);
 
     shell.update(cx, |s, cx| {
@@ -211,6 +213,7 @@ pub(super) fn exercise(
         result.eligible_pixels = 0;
         cx.notify();
     });
+    click(shell, cx, Control::BaselineUpdate);
     check(
         cx,
         &[
@@ -226,6 +229,7 @@ pub(super) fn exercise(
     inspect("stale-selection", cx);
     click(shell, cx, Control::Phase5(23));
     shell.read_with(cx, |s, _| assert!(!s.baseline_update_mounted()));
+    click(shell, cx, Control::Phase5(39));
     shell.update(cx, |s, cx| {
         s.evidence = original;
         cx.notify();
@@ -263,6 +267,7 @@ fn baseline_update_preview_keeps_multiple_screen_selections_without_saving(
             assert_eq!(s.approval_selection.len(), 2);
             cx.notify();
         });
+        click(&shell, cx, Control::BaselineUpdate);
         click(&shell, cx, Control::Phase5(24));
         shell.update(cx, crate::workflow_refinement_tests::finish_jobs);
         draw(cx);

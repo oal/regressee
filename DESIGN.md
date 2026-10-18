@@ -3,6 +3,7 @@ name: Regressee — Clear wayfinding
 description: User-approved direction, source-derived native Rust/GPUI system; native and release qualification pending
 colors:
   ground: "#f4f4f4"
+  review-ground: "#ededed"
   surface: "#ffffff"
   rail: "#eaeaea"
   rail-ink: "#242424"
@@ -19,12 +20,14 @@ colors:
   accent-hover: "#00685f"
   on-accent: "#ffffff"
   selected: "#e2f5f0"
+  result-selected: "#ccebe3"
   error: "#9c3038"
   error-surface: "#fff2f2"
   warning: "#775311"
   warning-surface: "#fff7df"
   shadow: "#181818"
   dark-ground: "#1b1b1b"
+  dark-review-ground: "#111111"
   dark-surface: "#232323"
   dark-rail: "#202020"
   dark-rail-ink: "#ededed"
@@ -41,6 +44,7 @@ colors:
   dark-accent-hover: "#85e7d1"
   dark-on-accent: "#072c29"
   dark-selected: "#203e38"
+  dark-result-selected: "#244c43"
   dark-error: "#ffacb2"
   dark-error-surface: "#40282f"
   dark-warning: "#f1ca7d"
@@ -407,6 +411,19 @@ selection tints. `line` is a separator, not an interactive boundary;
 `control-line` outlines controls. Source contrast requirements remain (3:1)
 against field and secondary-action surfaces, not native certification.
 
+**Review contrast — 2026-10-18.** The bounded review workspace uses local
+`review-ground` rather than changing other screens, rail or global chrome.
+Result rows use the stronger `result-selected` mint, a 1px leading teal marker
+and semibold selected path within the existing 84px row and 16px text insets.
+Navigation and ordinary page/History rows retain their current selection.
+Evidence frames (screenshots, DOM, loading and missing-image states) use the
+existing `control-line`; internal decorative rules retain `line`. Original
+screenshots and DOM text/syntax are unchanged. In paired-kind review the active
+outcome uses primary semibold ink while its sibling stays supporting text;
+whole-check zeros stay muted. No new status meaning, action, font, asset or motion.
+Scoped verification and native-platform limits:
+`docs/research/review-contrast-20261018.md`.
+
 Unprefixed frontmatter colors are the exact `ui/theme.rs::LIGHT` palette;
 `dark-` siblings are the exact `DARK` palette. Component references name the
 light roles; `.impeccable/design.json` `extensions.nativeAppearance.roleMapping`
@@ -448,7 +465,9 @@ own regular help metrics. Preserve intentional compact inspection treatments,
 Font families, palette, copy and operations are unchanged. Scoped evidence and
 qualification limits: `docs/research/typography-leading-20261017.md`.
 
-**The Stable State Rule.** Focus, hover, press and selection change paint, never text metrics or control geometry.
+**The Stable State Rule.** Focus, hover and press change paint, never text metrics
+or control geometry. Selected result titles use semibold within unchanged line
+boxes and row geometry; selection never shifts text insets or hit targets.
 
 Screenshot switches keep the selected path/profile heading and inspection toolbar
 mounted during the matching image read; zoom stays disabled until pixels arrive.
@@ -533,7 +552,7 @@ Queue and image panes are independently bounded. Details and comparison
 adjustments use a bounded, scrollable flyout over the viewer; neither replaces
 the queue nor consumes image height below the evidence. Review does not
 use the ordinary full-screen scrolling form. Project context, coverage and the
-conditional approval bar remain attached to the task.
+on-demand baseline-update action remain attached to the task.
 Without a comparison, show one untinted capture pane, not an empty before/after
 pair. Distinguish incomplete captures, captures ready for explicit baseline save,
 and saved baseline screenshots. Capture coverage reports captured/not captured/
@@ -962,16 +981,15 @@ Source-bound three-size development evidence and reported tests are recorded in
 `docs/research/compact-toolbars-20261016.md`; independent final visual review is
 separate, and no OS-input, screen-reader or release approval is implied.
 
-**Grouped inspection context — 2026-10-16.** One compact heading (40px) places
-path/profile in a two-line identity stack beside a Before/After source stack,
-separated by the group gap (16px), not equal-width columns or decorative cards.
-Capture-only evidence names Capture instead of inventing a Before source.
-`InspectionHeading` is a native `RenderOnce` component: shaped text determines
-preferred group widths, capped at (440px) for identity and (320px) for sources,
-with the source cap reduced to (180px) below actual working width (720px). These
-are caps, not fixed widths to reserve for short content. Source context does not
-shrink; original dimensions have a nonshrinking slot and the profile name yields
-first. Long path/name/source text may ellipsize in this compact metadata; complete
+**Grouped inspection context — updated 2026-10-18.** The inspected path leads at
+(20px/24px) above a profile row (13px/20px), within a stable (44px) identity heading.
+`InspectionHeading` remains a native `RenderOnce` component. The profile name has
+a finite measured allocation and native single-line ellipsis; adjacent original
+dimensions do not shrink. Neither a short name nor a long name may wrap into the
+path or paint through the dimensions. Paired Before/After sources occupy a
+separate row, followed by grouped, labelled totals for each recorded check kind,
+not one compressed metadata paragraph or decorative KPI cards. Capture-only
+evidence names its actual source instead of inventing a Before source. Complete
 keyboard-accessible metadata lives in existing Details, never a hover overlay.
 Details includes full Before/After environment names and origins, or the Capture
 environment for capture-only inspection, alongside the full page and screen size.
@@ -1267,14 +1285,22 @@ recorded-environment heading and compact toolbar persist with Results hidden.
 Hiding Results does not reduce evidence height; full-width Before/After preserves
 the inspection identity and source scale. One highest-priority reason explains
 blocked review/Next actions: dirty note/areas, pending analysis, noncomparable
-evidence or no next matching target. The baseline footer appears only for an
-eligible current screenshot or an existing selection. Its heading is **Update
-baseline**, with the attached explanation **Use After as the reference for future
-checks. Review before saving.** **Select After screenshot** and **Deselect After
-screenshot** name the actual original being selected. Nonempty selection names
-selected references ready for update, and mounts **Review update…**; an empty
-selection has no confirmation action. Below 900px working width, explanation and
-actions stack instead of squeezing or overflowing. Eligibility is unchanged.
+evidence or no next matching target. **Update baseline…** sits beside **Run check**,
+with the total selected screenshot and DOM reference count when nonzero. It stays
+discoverable for a current comparison even when the current result is ineligible;
+the panel explains eligibility rather than hiding the workflow. This replaces the
+persistent baseline footer. Opening it reveals a nonmodal right inspector
+(360px wide, capped by available width) over the workspace's full content height,
+without reflowing the queue or evidence. It contains the selected count, inspected
+target, eligibility guidance and **Use After as the reference for future checks.
+Review before saving.** The **Include After screenshot** / **Include After DOM
+snapshot** checkbox selects that kind's reference independently of review decisions.
+**Review update…** is pinned only with a selection; an empty selection has no
+confirmation action. Close/Escape restores the trigger and retains selections.
+Covered viewing, review and capture actions are disabled for keyboard/shortcut
+dispatch while open; queue and navigation remain available. Saving the update or
+changing projects closes the pane. Opening, including or closing never saves.
+Eligibility, per-kind authority and current-revision preview guards are unchanged.
 The protected approval dialog has a bounded height (520px) and widths (740px)
 at narrow desktop sizes or (760px) otherwise, capped by its available viewport.
 It asks “Use this After screenshot for future checks?” (or “these After screenshots”), names
@@ -1295,7 +1321,7 @@ be approved; replacing the whole baseline remains a separate workflow.
 
 Ordinary review exposes revision-bound decisions, explicit note saving, progress
 and Next unreviewed without opening Analysis. Classification is not approval:
-**Select After screenshot** names reference selection explicitly. Discovery
+**Include After screenshot** names reference selection explicitly. Discovery
 owns the current inventory and optionally a matching representative screenshot,
 never an earlier comparison. Narrow review compacts chrome, prioritizes original
 dimensions in two-line captions and can collapse the queue. Details and Analysis
@@ -1417,8 +1443,9 @@ Optional **Technical details** opens the existing inspector with supporting
 records expanded, focuses Close and restores its trigger on Close/Escape.
 Next unreviewed mounts only when another matching reviewable result exists.
 Baseline selection remains in its
-separate conditional footer; **Review update…** mounts only after
-selection. Stale selections stay removable, with confirmation disabled.
+separate on-demand inspector described above (superseding the conditional footer
+on 2026-10-18); **Review update…** mounts only after selection. Stale selections
+stay removable, with confirmation disabled.
 Explicit consent, draft and revision-binding guards remain. Notes use the owned
 temporary editor rather than a permanent evidence-height row. Details, notes and
 filters remove or disable review/baseline decisions while evidence is occluded;
@@ -1558,13 +1585,33 @@ between Filter, Compare, Results and the inspectors. Do not sort focus candidate
 by control type. The rail follows its painted destinations; review follows the
 project header and task actions, then the full-width toolbar left to right
 (Results, View, optional Before/After, Zoom, Image controls, Details, Analysis),
-queue search/filter/navigation, evidence, review choices/note/next and the baseline
-footer. Inspectors follow Close, content, pinned save/copy actions. Page previews
+queue search/filter/navigation, evidence and review choices/note/next. The
+2026-10-18 baseline disclosure replaces the last baseline-footer stop with
+**Update baseline…** beside the task actions. Inspectors follow Close, content,
+pinned save/copy/review actions. Page previews
 and unavailable captures retain their evidence-column controls after the queue;
 Done follows its drawing-toolbar position. Hidden and disabled controls leave
 traversal. Tab exits View/Zoom from their trigger, with Shift-Tab reversing the
 same order. Preserve appearance, drafts and all operation/consent guards.
 Scoped verification and limits: `docs/research/focus-order-20261016.md`.
+
+**Review workspace chrome finish — 2026-10-18.** This ordinary Operate extension
+preserves the incumbent tokens, unified-neutral/teal palette, system type and
+consent workflow; no dependency, asset or motion system is added. The real-IPC
+workspace matrix and native GPU text-ink containment checks pass, with reported
+passes for 15 core shell, 2 review-footer, 9 DOM workflow, 5 toolbar, 21 workflow-
+refinement and 3 unchanged-review tests, plus the production `ui` build. The final
+packet contains 60 source-bound Linux GPUI offscreen PNG/JSON pairs: 48 matrix
+states and 12 true long-profile states, screenshots/DOM and light/dark at
+1280×800 with sidebar shown and 820×600 with sidebar shown/hidden. The final
+reviewer's independent source checks found zero mismatches. Initial review found
+F1 profile fitting; the first focused verdict remained FIX, and the second
+resolved it. **Final SHIP covers only F1 and fix-induced regressions, not the
+whole surface or release.** These synthetic isolated fixtures do not establish
+OS-input, accessibility, cross-platform or whole-app qualification. No web
+detector ran for this Rust-native work and no new shipping raster needs
+provenance. Evidence, review sequence and documentation scope:
+`.impeccable/review/review-workspace-20261018/documentation.md`.
 
 The user-requested carry-through confirms the previously incomplete History,
 Tools, empty-message/help and capture-only corrections in fresh source-bound

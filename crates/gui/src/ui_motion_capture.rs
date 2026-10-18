@@ -132,8 +132,10 @@ fn changed_pixels(a: &Sample, b: &Sample) -> usize {
     );
     a.frame
         .rgba
-        .chunks_exact(4)
-        .zip(b.frame.rgba.chunks_exact(4))
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .zip(b.frame.rgba.as_chunks::<4>().0.iter())
         .filter(|(a, b)| a != b)
         .count()
 }
@@ -240,7 +242,7 @@ fn renderer_capture_native_motion(cx: &mut TestAppContext) {
     );
     cx.enable_offscreen_renderer().unwrap();
     crate::image_controls_tests::bind(cx);
-    cx.update(|cx| regressee_gui::ui::dialog::install(cx));
+    cx.update(regressee_gui::ui::dialog::install);
     let dir = tempfile::Builder::new()
         .prefix("motion-synthetic-")
         .tempdir_in(&root)

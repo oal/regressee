@@ -323,7 +323,7 @@ fn toolbar_loading_matrix(cx: &mut TestAppContext, render: bool) {
                 (Control::Phase5(36), "action-Phase5(36)"),
                 (Control::Guided(44), "action-Guided(44)"),
                 (Control::Phase5(37), "action-Phase5(37)"),
-                (Control::Phase5(23), "action-Phase5(23)"),
+                (Control::BaselineUpdate, "action-BaselineUpdate"),
             ];
             if width >= 1100. {
                 controls.push((Control::ImageControls, "action-ImageControls"));
@@ -344,7 +344,10 @@ fn toolbar_loading_matrix(cx: &mut TestAppContext, render: bool) {
                     assert!(s.viewer_pending.is_some() && s.viewer.is_none());
                     for (control, _) in &controls {
                         assert!(s.control_mounted(*control), "{control:?}: mode {mode}");
-                        if !matches!(control, Control::Guided(50) | Control::Phase5(36)) {
+                        if !matches!(
+                            control,
+                            Control::Guided(50) | Control::Phase5(36) | Control::BaselineUpdate
+                        ) {
                             assert!(
                                 !s.control_enabled(*control, cx),
                                 "image-dependent action {control:?} during loading"

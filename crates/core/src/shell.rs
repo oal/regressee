@@ -252,6 +252,7 @@ pub enum Control {
     CloseMappingPreview,
     DiscardPageList,
     ImageControls,
+    BaselineUpdate,
     CopyCaptureDiagnostics,
 }
 #[derive(Debug, Clone)]
@@ -564,6 +565,7 @@ impl FocusState {
                         Control::CaptureBaseline,
                         Control::Guided(16),
                         Control::Phase5(30),
+                        Control::BaselineUpdate,
                         Control::RefreshEvidence,
                         Control::Guided(51),
                     ]);

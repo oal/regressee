@@ -112,10 +112,10 @@ impl Shell {
             "Reading app preferences…"
         } else if self.appearance.saving {
             "Saving app preferences…"
-        } else if let Some(error) = self.appearance.error {
-            error
         } else {
-            "Applied immediately and remembered on this computer."
+            self.appearance
+                .error
+                .unwrap_or("Applied immediately and remembered on this computer.")
         };
         controls::section("Reduce motion", "Reduce movement and keep activity indicators still. Progress and status updates remain visible.")
             .debug_selector(|| "settings-motion".into())

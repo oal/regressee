@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MPL-2.0
 #[cfg(test)]
 extern crate self as regressee_app;
-pub mod analysis_engine;
 pub mod agent_integrations;
+pub mod analysis_engine;
 pub mod appearance;
 #[cfg(test)]
 #[path = "../tests/support/approval_fixture.rs"]

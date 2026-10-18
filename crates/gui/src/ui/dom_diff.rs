@@ -2118,7 +2118,7 @@ impl Render for DomDiff {
             .flex_col()
             .bg(rgb(palette().surface))
             .border_1()
-            .border_color(rgb(palette().line))
+            .border_color(rgb(palette().control_line))
             .font_family(FONT)
             .text_size(px(CONTROL_TEXT_SIZE))
             .line_height(px(CONTROL_LINE_HEIGHT))

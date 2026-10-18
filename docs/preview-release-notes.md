@@ -1,14 +1,23 @@
-# Agent integrations and clearer native controls — preview.9
+# Clearer review workspace and baseline updates — preview.10
 
-This preview adds one-click personal agent skill setup and clearer native controls,
-alongside independent DOM snapshot comparisons, project management, and the existing
-desktop and CLI workflows.
+This preview clarifies the review workspace and moves baseline selection into an
+on-demand panel, alongside personal agent integrations, independent DOM snapshot
+comparisons, project management, and the existing desktop and CLI workflows.
 It remains an **unsigned experimental prerelease**, not a supported
 release. The release's source commit and each archive's `build-info.json` identify
 the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
 
+- Review keeps the inspected path and screen-size profile together, with recorded
+  Before/After environments on their own line. A stronger selected-result
+  treatment and clearer evidence boundaries improve light/dark hierarchy without
+  changing captured pixels, DOM source or comparison outcomes.
+- **Update baseline…** opens a panel without resizing the evidence workspace.
+  Screenshot and DOM inclusion remain explicit, selected counts stay visible on
+  the trigger, and saving still requires the existing review and confirmation.
+  Closing the panel preserves selections and restores keyboard focus; covered
+  controls are not hidden keyboard destinations.
 - **App settings → Agent integrations** installs the bundled Regressee skill for
   Claude Code, Codex or GitHub Copilot across your local projects. Update/remove
   controls preserve edited or unrelated files. Setup binds the exact local CLI,

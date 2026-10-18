@@ -787,7 +787,12 @@ impl Shell {
                                     })
                         })
                     }));
-        let mut actions = div().flex().flex_wrap().items_center().gap_2();
+        let mut actions = div()
+            .debug_selector(|| "review-heading-actions".into())
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap_2();
         if self.focus.candidate {
             actions = actions.child(self.button(
                 Control::SaveBaseline,
@@ -847,6 +852,14 @@ impl Shell {
                 cx,
             ));
         }
+        if self.control_mounted(Control::BaselineUpdate) {
+            actions = actions.child(self.button(
+                Control::BaselineUpdate,
+                self.baseline_update_label(),
+                ActionStyle::Secondary,
+                cx,
+            ));
+        }
         actions = actions.child(
             self.tool_control(
                 Control::RefreshEvidence,
@@ -868,6 +881,7 @@ impl Shell {
         }
         div()
             .debug_selector(|| "bounded-review".into())
+            .relative()
             .size_full()
             .min_h_0()
             .flex()
@@ -879,7 +893,7 @@ impl Shell {
                     .flex_shrink_0()
                     .flex()
                     .flex_col()
-                    .gap_1()
+                    .gap_2()
                     .child(
                         div()
                             .flex()
@@ -896,6 +910,9 @@ impl Shell {
                             })
                             .child(actions),
                     )
+                    .when(self.inspection_chrome_mounted(), |header| {
+                        header.child(self.inspection_source_context())
+                    })
                     .when_some(self.preview.as_ref(), |header, preview| {
                         header.child(div().debug_selector(|| "discovery-capture-plan".into()).w_full().text_size(px(13.)).line_height(px(18.)).text_color(rgb(palette().muted)).child(format!("{} included × {} = {}. {} {}", count_label(preview.included(), "page", "pages"), count_label(preview.settings.profiles.len(), "screen size", "screen sizes"), planned_capture_count(preview), preview.inventory.coverage.label(), if preview.included() == 0 { "Include at least one eligible page before capturing." } else if !self.discovery_plan_current() { "Settings changed. In Project settings, choose Find pages again before capturing." } else { "Adjust settings and find pages again to expand this list." })))
                     })
@@ -995,6 +1012,9 @@ impl Shell {
             )
             .when(!pages && self.has_kind_comparison(), |workspace| {
                 workspace.child(self.ordinary_review_bar(cx))
+            })
+            .when(self.baseline_update_open, |workspace| {
+                workspace.child(self.viewer_inspector(cx))
             })
             .into_any_element()
     }
@@ -1619,6 +1639,9 @@ impl Shell {
         parts.join(" · ")
     }
 
+    /// Legacy eligibility predicate retained for guard regressions. The new
+    /// disclosure stays discoverable even when its current result is ineligible.
+    #[cfg(all(test, feature = "ui-tests"))]
     pub(super) fn baseline_update_mounted(&self) -> bool {
         if self.recorded_mode().dom_snapshots() {
             return !self.approval_selection.is_empty()
@@ -1652,37 +1675,26 @@ impl Shell {
             .selected_key
             .as_ref()
             .is_some_and(|key| self.approval_selection.contains(key));
-        let stacked = self.working_width < 900.;
         div()
             .debug_selector(|| "approval-next-action".into())
-            .shadow(regressee_gui::ui::depth::Elevation::Footer.shadows())
             .flex_shrink_0()
             .flex()
-            .items_center()
-            .when(stacked, |bar| bar.flex_col().items_start())
-            .when(!stacked, |bar| bar.flex_wrap())
+            .flex_col()
             .gap_3()
-            .px_6()
-            .py_2()
-            .bg(rgb(palette().surface))
-            .border_t_1()
-            .border_color(rgb(palette().line))
             .child(
                 div()
-                    .when(stacked, |copy| copy.w_full().flex_shrink_0())
-                    .when(!stacked, |copy| copy.flex_1())
-                    .min_w(px(200.))
+                    .w_full()
+                    .min_w_0()
                     .flex()
                     .flex_col()
                     .gap_1()
                     .child(
                         div().flex().flex_wrap().items_baseline().gap_2()
-                            .child(div().font_weight(FontWeight::SEMIBOLD).child("Update baseline"))
-                            .when(!self.approval_selection.is_empty(), |heading| heading.child(
+                            .child(
                                 div().debug_selector(|| "baseline-selection-label".into())
-                                    .text_size(px(13.)).line_height(px(18.)).text_color(rgb(palette().muted))
+                                    .font_weight(FontWeight::SEMIBOLD)
                                     .child(crate::evidence_workspace::baseline_selection_label(self.approval_selection.len(), eligible)),
-                            )),
+                            ),
                     )
                     .child(
                         div().debug_selector(|| "baseline-update-explanation".into())
@@ -1690,6 +1702,13 @@ impl Shell {
                             .child("Use After as the reference for future checks. Review before saving."),
                     ),
             )
+            .child(self.baseline_target_context())
+            .when(!self.control_mounted(Control::Phase5(23)), |body| {
+                body.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT))
+                    .text_color(rgb(palette().muted))
+                    .child(self.approval_unavailable_reason(self.selected_key.as_ref())
+                        .unwrap_or("This screenshot is not available for baseline updating. Open Details to learn more.")))
+            })
             .child(
                 div().flex().flex_shrink_0().flex_wrap().gap_2()
                      .when(self.control_mounted(Control::Phase5(23)), |actions| actions.child(self.toggle_control(
@@ -1697,18 +1716,44 @@ impl Shell {
                           "Include After screenshot",
                           selected,
                          cx,
-                    )))
-                    .when(self.control_mounted(Control::Phase5(24)), |actions| actions.child(self.button(
-                         Control::Phase5(24),
-                          "Review update…",
-                         ActionStyle::Primary,
-                         cx,
-                    ))),
+                     ))),
             )
             .when(!self.approval_selection.is_empty() && !self.approval_selection_eligible(), |bar| {
                 let reason = selected.then(|| self.approval_unavailable_reason(self.selected_key.as_ref())).flatten();
                 bar.child(div().w_full().text_size(px(13.)).line_height(px(18.)).text_color(rgb(palette().warning)).child(reason.unwrap_or("A selected screenshot can no longer update the baseline. Remove it from the selection or refresh results before confirming.")))
             })
+            .into_any_element()
+    }
+
+    pub(super) fn baseline_update_label(&self) -> String {
+        let count = self.approval_selection.len() + self.dom.selected.len();
+        if count == 0 {
+            "Update baseline…".into()
+        } else {
+            format!("Update baseline… ({count})")
+        }
+    }
+
+    pub(super) fn baseline_target_context(&self) -> AnyElement {
+        let (path, _) = self.inspection_identity();
+        div()
+            .debug_selector(|| "baseline-panel-target".into())
+            .w_full()
+            .min_w_0()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .pt_3()
+            .border_t_1()
+            .border_color(rgb(palette().line))
+            .child(div().font_weight(FontWeight::SEMIBOLD).child(path))
+            .child(
+                div()
+                    .text_size(px(HELP_TEXT_SIZE))
+                    .line_height(px(HELP_LINE_HEIGHT))
+                    .text_color(rgb(palette().muted))
+                    .child(self.pane_caption(1).2),
+            )
             .into_any_element()
     }
 

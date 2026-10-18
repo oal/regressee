@@ -21,9 +21,12 @@ fn renderer_capture_agent_retained_feedback(cx: &mut TestAppContext) {
                 let frozen =
                     serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
                 drop(store);
-                regressee_storage::AppPreferences { appearance, ..Default::default() }
-                    .save(&AppPaths::isolated(dir.path()))
-                    .unwrap();
+                regressee_storage::AppPreferences {
+                    appearance,
+                    ..Default::default()
+                }
+                .save(&AppPaths::isolated(dir.path()))
+                .unwrap();
                 let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
                 let owner = jobs.clone();
                 owner.appearance.wait_loaded();
@@ -110,9 +113,12 @@ fn renderer_capture_agent_control_repairs(cx: &mut TestAppContext) {
                 "disconnected",
                 "taken-over",
             ] {
-                regressee_storage::AppPreferences { appearance, ..Default::default() }
-                    .save(&AppPaths::isolated(dir.path()))
-                    .unwrap();
+                regressee_storage::AppPreferences {
+                    appearance,
+                    ..Default::default()
+                }
+                .save(&AppPaths::isolated(dir.path()))
+                .unwrap();
                 let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
                 let owner = jobs.clone();
                 owner.appearance.wait_loaded();
@@ -194,9 +200,12 @@ fn renderer_capture_agent_control(cx: &mut TestAppContext) {
                 regressee_app::control::Status::Active,
                 regressee_app::control::Status::Human,
             ] {
-                regressee_storage::AppPreferences { appearance, ..Default::default() }
-                    .save(&AppPaths::isolated(dir.path()))
-                    .unwrap();
+                regressee_storage::AppPreferences {
+                    appearance,
+                    ..Default::default()
+                }
+                .save(&AppPaths::isolated(dir.path()))
+                .unwrap();
                 let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
                 let owner = jobs.clone();
                 owner.appearance.wait_loaded();

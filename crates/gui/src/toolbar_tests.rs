@@ -131,6 +131,7 @@ fn review_reading_order() -> Vec<Control> {
         Control::Guided(53),
         Control::ChooseProject,
         Control::CheckChanges,
+        Control::BaselineUpdate,
         Control::RefreshEvidence,
         Control::Guided(50),
         Control::Guided(54),
@@ -440,12 +441,13 @@ fn compact_toolbars_fit_all_modes_without_changing_evidence_or_drafts(cx: &mut T
                     .debug_bounds("inspected-target-profile-environments")
                     .unwrap();
                 inside(identity, heading);
-                inside(sources, heading);
+                inside(sources, cx.debug_bounds("bounded-review").unwrap());
+                assert!(sources.top() >= heading.bottom());
                 inside(
                     cx.debug_bounds("inspection-profile-dimensions").unwrap(),
                     identity,
                 );
-                assert_eq!(sources.left() - identity.right(), px(16.));
+                assert_eq!(sources.left(), identity.left());
                 assert!(
                     cx.debug_bounds("inspection-before-environment-value")
                         .unwrap()

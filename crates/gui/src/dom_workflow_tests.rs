@@ -704,6 +704,7 @@ fn dom_note_real_typing_save_reopen_and_input_guards_do_not_depend_on_screenshot
         view.update(|window, cx| {
             shell.update(cx, |s, cx| {
                 s.activate_control(Control::Phase5(39), window, cx);
+                s.activate_control(Control::BaselineUpdate, window, cx);
                 s.activate_control(Control::Phase5(23), window, cx);
                 s.activate_control(Control::Phase5(24), window, cx);
                 crate::workflow_refinement_tests::finish_jobs(s, cx);
@@ -1131,11 +1132,14 @@ fn gui_same_check_independent_descendant_approvals_and_both_kind_atomic_consent(
                 let dom_analysis = s.evidence.dom_comparison.as_ref().unwrap().revision.id;
                 s.activate_control(Control::EvidenceKind(CheckKind::Screenshot), window, cx);
                 crate::workflow_refinement_tests::finish_jobs(s, cx);
+                s.activate_control(Control::BaselineUpdate, window, cx);
                 assert!(s.control_enabled(Control::Phase5(23), cx));
                 s.activate_control(Control::Phase5(23), window, cx);
                 if together {
+                    s.activate_control(Control::Phase5(39), window, cx);
                     s.activate_control(Control::EvidenceKind(CheckKind::DomSnapshot), window, cx);
                     finish_source(s, cx);
+                    s.activate_control(Control::BaselineUpdate, window, cx);
                     s.activate_control(Control::Phase5(23), window, cx);
                 }
                 s.activate_control(Control::Phase5(24), window, cx);
@@ -1161,6 +1165,7 @@ fn gui_same_check_independent_descendant_approvals_and_both_kind_atomic_consent(
                 if !together {
                     s.activate_control(Control::EvidenceKind(CheckKind::DomSnapshot), window, cx);
                     finish_source(s, cx);
+                    s.activate_control(Control::BaselineUpdate, window, cx);
                     assert!(
                         s.control_mounted(Control::Phase5(23)),
                         "A→B screenshot approval must not hide DOM selection"

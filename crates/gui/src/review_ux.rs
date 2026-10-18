@@ -720,6 +720,7 @@ impl Shell {
                 self.capture_diagnostics_open = false;
                 self.copied_capture_diagnostics = None;
                 if self.capture_details_open {
+                    self.baseline_update_open = false;
                     self.review_details_scroll
                         .set_offset(gpui::point(px(0.), px(0.)));
                     self.image_controls_open = false;
@@ -733,7 +734,9 @@ impl Shell {
                 self.copied_capture_diagnostics = None;
             }
             39 => {
-                self.presentation_focus = Some(if self.image_controls_open {
+                self.presentation_focus = Some(if self.baseline_update_open {
+                    Control::BaselineUpdate
+                } else if self.image_controls_open {
                     self.image_controls_trigger()
                 } else if self.capture_details_open {
                     self.capture_details_trigger
@@ -743,6 +746,7 @@ impl Shell {
                     Control::Guided(44)
                 });
                 self.capture_details_open = false;
+                self.baseline_update_open = false;
                 self.image_controls_open = false;
                 self.review_note_open = false;
                 self.review_tools = false;
@@ -752,6 +756,7 @@ impl Shell {
             37 => {
                 self.review_note_open = !self.review_note_open;
                 if self.review_note_open {
+                    self.baseline_update_open = false;
                     self.image_controls_open = false;
                     self.review_focus_reveal.set(2);
                     self.presentation_focus = Some(Control::AnalysisField(9));
@@ -777,7 +782,8 @@ impl Shell {
                 .child("Close Image controls to return to review decisions.")
                 .into_any_element();
         }
-        if self.viewer_inspector_open() || self.options_panel_open() {
+        if (self.viewer_inspector_open() && !self.baseline_update_open) || self.options_panel_open()
+        {
             return div()
                 .text_size(px(13.))
                 .line_height(px(HELP_LINE_HEIGHT))
@@ -920,14 +926,19 @@ impl Shell {
                                 cx,
                             ))
                             .child(div().flex_1())
-                            .when(self.control_mounted(Control::Phase5(33)), |actions| {
-                                actions.child(self.button(
-                                    Control::Phase5(33),
-                                    "Next unreviewed",
-                                    ActionStyle::Primary,
-                                    cx,
-                                ))
-                            }),
+                            .when(
+                                self.control_mounted(Control::Phase5(33))
+                                    || (self.baseline_update_open
+                                        && self.next_unreviewed_key().is_some()),
+                                |actions| {
+                                    actions.child(self.button(
+                                        Control::Phase5(33),
+                                        "Next unreviewed",
+                                        ActionStyle::Primary,
+                                        cx,
+                                    ))
+                                },
+                            ),
                     ),
             )
             .when(

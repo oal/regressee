@@ -12,6 +12,7 @@ impl Shell {
             Navigate(Screen::History) => ToolIcon::Runs,
             Navigate(Screen::Setup | Screen::Settings) | OpenProject(_) => ToolIcon::Adjustments,
             PagesBaseline => ToolIcon::Baselines,
+            BaselineUpdate => ToolIcon::Baselines,
             SettingsSection(self::SettingsSection::Website) => ToolIcon::Globe,
             SettingsSection(self::SettingsSection::Capture) => ToolIcon::Camera,
             SettingsSection(self::SettingsSection::Access) => ToolIcon::Lock,

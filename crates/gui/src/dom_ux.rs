@@ -122,6 +122,30 @@ impl Shell {
         {
             return div().into_any_element();
         }
+        let outcome = |kind, label: &'static str| {
+            let active = (kind == CheckKind::DomSnapshot) == self.dom_active();
+            div()
+                .debug_selector(move || format!("inspected-outcome-{kind:?}"))
+                .flex()
+                .flex_wrap()
+                .gap_1()
+                .child(label)
+                .child(
+                    div()
+                        .debug_selector(move || format!("inspected-outcome-value-{kind:?}"))
+                        .font_weight(if active {
+                            FontWeight::SEMIBOLD
+                        } else {
+                            FontWeight::NORMAL
+                        })
+                        .text_color(rgb(if active {
+                            palette().ink
+                        } else {
+                            palette().muted
+                        }))
+                        .child(self.kind_status(kind, key)),
+                )
+        };
         div()
             .debug_selector(|| "evidence-kind-tabs".into())
             .flex_shrink_0()
@@ -155,7 +179,13 @@ impl Shell {
                     .text_size(px(HELP_TEXT_SIZE))
                     .line_height(px(HELP_LINE_HEIGHT))
                     .text_color(rgb(palette().muted))
-                    .child(self.result_kind_label(key)),
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap_x_1()
+                    .child(outcome(CheckKind::Screenshot, "Screenshot:"))
+                    .child("·")
+                    .child(outcome(CheckKind::DomSnapshot, "DOM:")),
             )
             .into_any_element()
     }
@@ -228,15 +258,21 @@ impl Shell {
         let mut parts = Vec::new();
         for kind in run.run.capture_plan.kinds() {
             if self.kind_read_error(kind).is_some() {
-                parts.push(div().text_color(rgb(palette().warning)).child(format!(
-                    "{}: evidence could not be read · {} not verified",
-                    if kind == CheckKind::Screenshot {
-                        "Screenshots"
-                    } else {
-                        "DOM snapshots"
-                    },
-                    run.run.targets.len()
-                )));
+                parts.push(
+                    div()
+                        .flex_1()
+                        .min_w(px(240.))
+                        .text_color(rgb(palette().warning))
+                        .child(format!(
+                            "{}: evidence could not be read · {} not verified",
+                            if kind == CheckKind::Screenshot {
+                                "Screenshots"
+                            } else {
+                                "DOM snapshots"
+                            },
+                            run.run.targets.len()
+                        )),
+                );
                 continue;
             }
             let mut counts = [0usize; 5]; // changed, unchanged, missing, pending, captured
@@ -292,34 +328,67 @@ impl Shell {
             } else {
                 "DOM snapshots"
             };
-            let details = if self.has_kind_comparison() {
-                format!(
-                    "{} changed · {} unchanged · {} not compared",
-                    counts[0], counts[1], counts[2]
-                )
+            let mut metrics = if self.has_kind_comparison() {
+                vec![
+                    (counts[0].to_string(), "changed", false),
+                    (counts[1].to_string(), "unchanged", false),
+                    (counts[2].to_string(), "not compared", counts[2] > 0),
+                ]
             } else {
-                format!(
-                    "{} / {} captured · {} not captured",
-                    counts[4],
-                    run.run.targets.len(),
-                    counts[2]
-                )
+                vec![
+                    (
+                        format!("{} / {}", counts[4], run.run.targets.len()),
+                        "captured",
+                        false,
+                    ),
+                    (counts[2].to_string(), "not captured", counts[2] > 0),
+                ]
             };
-            let tail = if counts[3] > 0 {
-                format!(" · {} pending", counts[3])
+            if counts[3] > 0 {
+                metrics.push((counts[3].to_string(), "pending", false));
             } else if self.has_kind_comparison() && counts[4] > 0 {
-                format!(" · {} awaiting analysis", counts[4])
-            } else {
-                String::new()
-            };
+                metrics.push((counts[4].to_string(), "awaiting analysis", false));
+            }
             parts.push(
                 div()
-                    .text_color(rgb(if counts[2] > 0 {
-                        palette().warning
-                    } else {
-                        palette().ink
-                    }))
-                    .child(format!("{name}: {details}{tail}")),
+                    .debug_selector(move || format!("coverage-{kind:?}"))
+                    .flex_1()
+                    .min_w(px(240.))
+                    .flex()
+                    .flex_col()
+                    .gap_1()
+                    .child(div().font_weight(FontWeight::SEMIBOLD).child(name))
+                    .child(div().flex().flex_wrap().gap_x_4().gap_y_1().children(
+                        metrics.into_iter().map(|(value, label, warning)| {
+                            let nonzero = value != "0";
+                            div()
+                                .flex()
+                                .items_baseline()
+                                .gap_1()
+                                .text_color(rgb(if warning {
+                                    palette().warning
+                                } else {
+                                    palette().muted
+                                }))
+                                .child(
+                                    div()
+                                        .font_weight(if nonzero {
+                                            FontWeight::SEMIBOLD
+                                        } else {
+                                            FontWeight::NORMAL
+                                        })
+                                        .text_color(rgb(if warning {
+                                            palette().warning
+                                        } else if nonzero {
+                                            palette().ink
+                                        } else {
+                                            palette().muted
+                                        }))
+                                        .child(value),
+                                )
+                                .child(label)
+                        }),
+                    )),
             );
         }
         div()
@@ -327,8 +396,10 @@ impl Shell {
             .flex_shrink_0()
             .flex()
             .flex_wrap()
-            .gap_3()
-            .py_1()
+            .gap_x_6()
+            .gap_y_2()
+            .py_2()
+            .border_t_1()
             .border_b_1()
             .border_color(rgb(palette().line))
             .text_size(px(HELP_TEXT_SIZE))
@@ -570,6 +641,7 @@ impl Shell {
         }
     }
     pub(super) fn choose_evidence_kind(&mut self, kind: CheckKind, cx: &mut Context<Self>) {
+        self.baseline_update_open = false;
         if self.dom.kind == kind {
             return;
         }
@@ -695,9 +767,10 @@ impl Shell {
             .gap_1();
         stage
             .child(div().flex_1().min_h_0().child(self.dom.source.clone()))
-            .when(self.viewer_inspector_open(), |stage| {
-                stage.child(self.viewer_inspector(cx))
-            })
+            .when(
+                self.viewer_inspector_open() && !self.baseline_update_open,
+                |stage| stage.child(self.viewer_inspector(cx)),
+            )
             .into_any_element()
     }
 

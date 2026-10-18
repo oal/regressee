@@ -53,16 +53,12 @@ impl Shell {
 
     pub(super) fn inspection_heading(&self) -> AnyElement {
         let (path, _) = self.inspection_identity();
-        let displayed_path = format!(
-            "{} · {path}",
-            if self.history_inspection.is_some() {
-                self.review_title()
-            } else {
-                "Inspect"
-            }
-        );
+        let displayed_path = if self.history_inspection.is_some() {
+            format!("{} · {path}", self.review_title())
+        } else {
+            path
+        };
         let (_, _, profile) = self.pane_caption(1);
-        let (before, after) = self.inspection_sources();
         let profile_icon = if self
             .displayed_run()
             .and_then(|r| {
@@ -80,13 +76,61 @@ impl Shell {
         InspectionHeading {
             displayed_path,
             profile,
-            before,
-            after,
             profile_icon,
-            comparison: self.has_kind_comparison(),
-            compact: self.working_width < 720.,
         }
         .into_any_element()
+    }
+
+    pub(super) fn inspection_source_context(&self) -> AnyElement {
+        let (before, after) = self.inspection_sources();
+        let source = |id: &'static str, role: &'static str, value: String| {
+            div()
+                .id(id)
+                .debug_selector(move || id.into())
+                .flex_1()
+                .min_w(px(180.))
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(
+                    div()
+                        .flex_shrink_0()
+                        .text_color(rgb(palette().muted))
+                        .child(role),
+                )
+                .child(
+                    div()
+                        .debug_selector(move || format!("{id}-value"))
+                        .min_w_0()
+                        .flex_1()
+                        .text_ellipsis()
+                        .child(value),
+                )
+        };
+        div()
+            .debug_selector(|| "inspected-target-profile-environments".into())
+            .w_full()
+            .min_w_0()
+            .flex_shrink_0()
+            .flex()
+            .flex_wrap()
+            .gap_x_6()
+            .gap_y_1()
+            .text_size(px(HELP_TEXT_SIZE))
+            .line_height(px(HELP_LINE_HEIGHT))
+            .when(self.has_kind_comparison(), |row| {
+                row.child(source("inspection-before-environment", "Before", before))
+            })
+            .child(source(
+                "inspection-after-environment",
+                if self.has_kind_comparison() {
+                    "After"
+                } else {
+                    "Capture"
+                },
+                after,
+            ))
+            .into_any_element()
     }
 
     /// Name what the images represent, not the generic environment category.
@@ -147,11 +191,7 @@ impl Shell {
 struct InspectionHeading {
     displayed_path: String,
     profile: String,
-    before: String,
-    after: String,
     profile_icon: ToolIcon,
-    comparison: bool,
-    compact: bool,
 }
 
 impl RenderOnce for InspectionHeading {
@@ -159,79 +199,36 @@ impl RenderOnce for InspectionHeading {
         let Self {
             displayed_path,
             profile,
-            before,
-            after,
             profile_icon,
-            comparison,
-            compact,
         } = self;
-        // Ellipsis-bearing flex children have no useful intrinsic width in
-        // GPUI. Measure native text before capping the two related groups.
-        let measure = |value: &str, size: f32, weight: FontWeight| {
-            let style = gpui::TextStyle {
-                font_family: FONT.into(),
-                font_weight: weight,
-                ..Default::default()
-            };
-            f32::from(
-                window
-                    .text_system()
-                    .shape_line(
-                        SharedString::from(value.to_owned()),
-                        px(size),
-                        &[style.to_run(value.len())],
-                        None,
-                    )
-                    .width
-                    .ceil(),
-            )
-        };
-        let source = |selector: &'static str, role: &'static str, value: String| {
-            div()
-                .id(selector)
-                .debug_selector(move || selector.into())
-                .min_w_0()
-                .h(px(20.))
-                .flex()
-                .items_center()
-                .gap_2()
-                .child(
-                    div()
-                        .w(px(48.))
-                        .flex_shrink_0()
-                        .text_color(rgb(palette().muted))
-                        .child(role),
-                )
-                .child(
-                    div()
-                        .debug_selector(move || format!("{selector}-value"))
-                        .min_w_0()
-                        .flex_1()
-                        .text_ellipsis()
-                        .text_color(rgb(palette().ink))
-                        .child(value),
-                )
-        };
         let (name, dimensions) = profile
             .rsplit_once(" · ")
             .map_or((profile.as_str(), None), |(name, size)| (name, Some(size)));
-        let source_width = (56.
-            + measure(&after, 13., FontWeight::NORMAL).max(if comparison {
-                measure(&before, 13., FontWeight::NORMAL)
-            } else {
-                0.
-            }))
-        .min(if compact { 180. } else { 320. });
-        let identity_width = measure(&displayed_path, 17., FontWeight::SEMIBOLD)
-            .max(measure(&profile, 13., FontWeight::NORMAL) + 28.)
-            .min(440.);
-        let identity_min =
-            dimensions.map_or(80., |size| measure(size, 13., FontWeight::NORMAL) + 40.);
+        // Ellipsized GPUI text needs a finite measure. Keep dimensions beside
+        // the profile rather than stretching them across the heading's width.
+        let style = gpui::TextStyle {
+            font_family: FONT.into(),
+            ..Default::default()
+        };
+        let name_width = f32::from(
+            window
+                .text_system()
+                .shape_line(
+                    SharedString::from(name.to_owned()),
+                    px(13.),
+                    &[style.to_run(name.len())],
+                    None,
+                )
+                .width
+                .ceil(),
+        )
+        .min(220.)
+            + 8.;
         div()
             .debug_selector(|| "inspected-target-context".into())
             .w_full()
             .min_w_0()
-            .h(px(40.))
+            .h(px(44.))
             .flex_shrink_0()
             .flex()
             .items_center()
@@ -241,17 +238,18 @@ impl RenderOnce for InspectionHeading {
             .child(
                 div()
                     .debug_selector(|| "inspection-identity-group".into())
-                    .w(px(identity_width))
-                    .min_w(px(identity_min))
+                    .w_full()
+                    .min_w_0()
                     .flex()
                     .flex_col()
                     .child(
                         div()
                             .id("inspection-path")
                             .debug_selector(|| "inspected-target-path".into())
+                            .whitespace_nowrap()
                             .text_ellipsis()
-                            .text_size(px(17.))
-                            .line_height(px(CONTROL_LINE_HEIGHT))
+                            .text_size(px(20.))
+                            .line_height(px(24.))
                             .font_weight(FontWeight::SEMIBOLD)
                             .child(displayed_path),
                     )
@@ -270,8 +268,8 @@ impl RenderOnce for InspectionHeading {
                                 div()
                                     .debug_selector(|| "inspection-profile-name".into())
                                     .min_w_0()
-                                    .flex_1()
-                                    .text_ellipsis()
+                                    .w(px(name_width))
+                                    .truncate()
                                     .child(name.to_owned()),
                             )
                             .when_some(dimensions, |row, size| {
@@ -284,24 +282,6 @@ impl RenderOnce for InspectionHeading {
                                 )
                             }),
                     ),
-            )
-            .child(
-                div()
-                    .id("inspection-context")
-                    .debug_selector(|| "inspected-target-profile-environments".into())
-                    .min_w_0()
-                    .w(px(source_width))
-                    .flex_shrink_0()
-                    .flex()
-                    .flex_col()
-                    .when(comparison, |row| {
-                        row.child(source("inspection-before-environment", "Before", before))
-                    })
-                    .child(source(
-                        "inspection-after-environment",
-                        if comparison { "After" } else { "Capture" },
-                        after,
-                    )),
             )
             .into_any_element()
     }

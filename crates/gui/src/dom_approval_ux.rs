@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Explicit independently selected kinds share one revision-bound confirmation.
 use super::*;
-use crate::workflow::capture_time;
+use crate::workflow::{capture_time, count_label};
 use regressee_app::engine::dom::{Command, KindKeys, KindSelection};
 use regressee_core::{dom_snapshot::*, domain::CheckKind};
 
@@ -277,15 +277,17 @@ impl Shell {
         } else {
             "Include After screenshot"
         };
-        div().debug_selector(|| "kind-approval-footer".into()).flex_shrink_0().px_6().py_2().bg(rgb(palette().surface)).border_t_1().border_color(rgb(palette().line))
-            .flex().flex_col().gap_2()
-            .child(div().flex().flex_wrap().items_baseline().gap_2().child(div().font_weight(FontWeight::SEMIBOLD).child("Update baseline"))
-                .child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted))
-                     .child(format!("{} screenshots · {} DOM snapshots selected", self.approval_selection.len(), self.dom.selected.len()))))
+        div().debug_selector(|| "kind-approval-footer".into()).flex_shrink_0()
+            .flex().flex_col().gap_3()
+            .child(div().debug_selector(|| "baseline-selection-label".into()).font_weight(FontWeight::SEMIBOLD)
+                .child(format!("{} · {} selected", count_label(self.approval_selection.len(), "screenshot", "screenshots"), count_label(self.dom.selected.len(), "DOM snapshot", "DOM snapshots"))))
             .child(div().debug_selector(|| "baseline-update-explanation".into()).text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted))
                 .child("Use After as the reference for future checks. Review before saving."))
-            .child(div().flex().flex_wrap().gap_2().when(self.control_mounted(Control::Phase5(23)), |row| row.child(self.toggle_control(Control::Phase5(23), label, selected, cx)))
-                .when(self.control_mounted(Control::Phase5(24)), |row| row.child(self.button(Control::Phase5(24), "Review update…", ActionStyle::Primary, cx))))
+            .child(self.baseline_target_context())
+            .when(!self.control_mounted(Control::Phase5(23)), |body| body.child(
+                div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted))
+                    .child("This result cannot update the baseline. Choose an eligible result, or open Details to inspect its sources.")))
+            .child(div().flex().flex_wrap().gap_2().when(self.control_mounted(Control::Phase5(23)), |row| row.child(self.toggle_control(Control::Phase5(23), label, selected, cx))))
             .when(!self.approval_selection.is_empty() || !self.dom.selected.is_empty(), |bar| bar.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child(
                 if self.kind_approval_selection_valid() { "Only the explicitly selected kinds will change. Review their sources before saving." } else { "A selection is stale or cannot update the baseline. Deselect it or refresh; nothing has been saved." })))
             .into_any_element()

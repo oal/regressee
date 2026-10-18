@@ -221,7 +221,9 @@ fn unchanged_review_is_complete_and_next_only_visits_real_changes(cx: &mut TestA
                 );
                 assert!(s.capture_notice().is_some());
                 assert!(s.control_enabled(Control::Phase5(37), cx));
-                assert!(s.control_enabled(Control::Phase5(23), cx));
+                assert!(s.control_enabled(Control::BaselineUpdate, cx));
+                assert!(s.approval_eligible(s.selected_key.as_ref().unwrap()));
+                assert!(!s.control_mounted(Control::Phase5(23)));
                 assert_eq!(
                     s.next_unreviewed_key(),
                     Some(
