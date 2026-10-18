@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MPL-2.0
 //! Inspection chrome has one height regardless of queue visibility or view mode.
 use super::*;
-use regressee_gui::ui::{selector, timezone_select::chevron_sized};
+use regressee_gui::ui::{motion, selector, timezone_select::chevron_sized};
 
 const MODES: [(Control, &str); 6] = [
     (Control::Phase5(6), "Compare"),
@@ -560,6 +560,9 @@ impl Shell {
                     }),
             );
         }
+        // Mount identity is independent of selected mode and keyboard highlight.
+        // Dismissal removes the menu immediately; no exiting controls are kept.
+        let menu = motion::enter("view-menu-entrance", menu, motion::Entrance::Menu, cx);
         gpui::deferred(gpui::anchored().position(bounds.origin).child(menu))
             .with_priority(2)
             .into_any_element()

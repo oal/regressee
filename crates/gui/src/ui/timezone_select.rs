@@ -116,6 +116,7 @@ pub struct TimezoneSelect {
     pub selected: SharedString,
     enabled: bool,
     open: bool,
+    entrance: super::selector::OpenCycle,
     button_focus: FocusHandle,
     search_focus: FocusHandle,
     search: Entity<TextInput>,
@@ -148,6 +149,7 @@ impl TimezoneSelect {
             selected: value.to_owned().into(),
             enabled: true,
             open: false,
+            entrance: super::selector::OpenCycle::default(),
             button_focus: cx.focus_handle().tab_stop(true),
             search_focus,
             search,
@@ -267,6 +269,7 @@ impl TimezoneSelect {
             return;
         }
         self.open = true;
+        self.entrance.opened();
         self.button_focus = self.button_focus.clone().tab_stop(false);
         self.search.update(cx, |input, cx| {
             input.set_enabled(true);
@@ -543,6 +546,12 @@ impl TimezoneSelect {
                         ))
                     }),
             );
+        let popup = super::motion::enter(
+            self.entrance.id("timezone-menu-entrance"),
+            popup,
+            super::motion::Entrance::Menu,
+            cx,
+        );
         deferred(anchored().position(geometry.origin).child(popup))
             .with_priority(1)
             .into_any_element()
@@ -1055,6 +1064,45 @@ mod tests {
         cx.update(|window, cx| window.focus(&host.read(cx).after.read(cx).focus));
         cx.run_until_parked();
         cx.update(|window, cx| assert!(host.read(cx).after.read(cx).focus.is_focused(window)));
+    }
+
+    #[gpui::test]
+    fn entrance_reopens_without_retaining_search_or_replaying_filters(cx: &mut TestAppContext) {
+        let (host, cx) = setup(cx, "UTC");
+        let select = host.read_with(cx, |host, _| host.select.clone());
+        for reduced in [false, true] {
+            cx.update(|window, cx| {
+                cx.set_global(super::super::controls::ReducedMotion(reduced));
+                select.update(cx, |this, cx| {
+                    this.show(window, cx);
+                    let entrance = this.entrance.id("test");
+                    this.refilter("oslo".into(), cx);
+                    this.next(&Next, window, cx);
+                    assert_eq!(this.entrance.id("test"), entrance);
+                    this.dismiss(true, window, cx);
+                    assert!(!this.open);
+                    assert!(this.button_focus.is_focused(window));
+                    assert!(!this.search.read(cx).enabled);
+                    this.select_index(0, window, cx);
+                    assert_eq!(this.selected.as_ref(), "UTC");
+                    // Reopen in the same update: identity changes even though no
+                    // closed frame has painted; search and focus start fresh.
+                    this.show(window, cx);
+                    assert_ne!(this.entrance.id("test"), entrance);
+                    assert!(this.query.is_empty());
+                    assert!(this.search_focus.is_focused(window));
+                    this.dismiss(true, window, cx);
+                });
+            });
+            cx.run_until_parked();
+            assert!(cx.debug_bounds("timezone-popup").is_none());
+        }
+        cx.simulate_keystrokes("enter tab");
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            assert!(!select.read(cx).open);
+            assert!(host.read(cx).after.read(cx).focus.is_focused(window));
+        });
     }
 
     #[gpui::test]

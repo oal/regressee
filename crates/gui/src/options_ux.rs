@@ -138,7 +138,7 @@ impl Shell {
             body,
             &self.options_scroll,
         );
-        panel
+        let panel = panel
             .absolute()
             .top_0()
             .bottom_0()
@@ -158,8 +158,15 @@ impl Shell {
                         .child(help("Discard this unsaved list and its inclusion choices. Saved screenshots and the baseline are kept."))
                         .child(self.button(Control::DiscardPageList, "Discard discovered pages…", ActionStyle::Danger, cx)),
                 )
-            })
-            .into_any_element()
+            });
+        // The panel's identity does not include the selected page, search or
+        // inclusion state, so inspecting another page never replays its arrival.
+        regressee_gui::ui::motion::enter(
+            "page-options-entrance",
+            panel,
+            regressee_gui::ui::motion::Entrance::Panel,
+            cx,
+        )
     }
 
     fn recorded_page_details(&self) -> AnyElement {
@@ -398,7 +405,7 @@ impl Shell {
             .child(help(format!("{} · showing first {}", workflow::count_label(e.mapped.len(), "page mapping", "page mappings"), e.mapped.len().min(16))))
             .child(help("Uses saved environment settings. The access check visits at most 3 sample pages, not the whole website.")))
             .child(controls::status(if e.probed { "Access confirmed for sample pages" } else { "Access not yet confirmed for sample pages" }, Tone::Neutral));
-        controls::disclosure_panel(
+        let panel = controls::disclosure_panel(
             "mapping-preview",
             "Mapped URL preview",
             self.button(
@@ -411,8 +418,13 @@ impl Shell {
             &self.mapping_preview_scroll,
         )
         .h(px(280.))
-        .flex_shrink_0()
-        .into_any_element()
+        .flex_shrink_0();
+        regressee_gui::ui::motion::enter(
+            "mapping-preview-entrance",
+            panel,
+            regressee_gui::ui::motion::Entrance::Panel,
+            cx,
+        )
     }
 }
 

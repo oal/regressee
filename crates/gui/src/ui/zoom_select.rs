@@ -59,6 +59,7 @@ pub struct ZoomSelect {
     compact: bool,
     image_controls_available: bool,
     open: bool,
+    entrance: super::selector::OpenCycle,
     focus: FocusHandle,
     highlighted: usize,
     scroll: UniformListScrollHandle,
@@ -78,6 +79,7 @@ impl ZoomSelect {
             compact: false,
             image_controls_available: false,
             open: false,
+            entrance: super::selector::OpenCycle::default(),
             focus: cx.focus_handle().tab_stop(false),
             highlighted: 0,
             scroll: UniformListScrollHandle::new(),
@@ -141,6 +143,7 @@ impl ZoomSelect {
             self.dismiss(true, window, cx);
         } else {
             self.open = true;
+            self.entrance.opened();
             self.highlighted = current_index(self.fit, self.zoom).unwrap_or(0);
             self.scroll
                 .scroll_to_item(self.highlighted, ScrollStrategy::Center);
@@ -294,6 +297,12 @@ impl ZoomSelect {
                 &self.scroll.0.borrow().base_handle,
                 list,
             ));
+        let popup = super::motion::enter(
+            self.entrance.id("zoom-menu-entrance"),
+            popup,
+            super::motion::Entrance::Menu,
+            cx,
+        );
         deferred(anchored().position(bounds.origin).child(popup))
             .with_priority(1)
             .into_any_element()
@@ -657,6 +666,50 @@ mod tests {
                 assert!(!this.focus.is_focused(window));
             });
             assert!(host.read(cx).chosen.is_empty());
+        });
+    }
+
+    #[gpui::test]
+    fn entrance_reopens_without_retaining_actions_or_restarting_on_navigation(
+        cx: &mut TestAppContext,
+    ) {
+        let (host, cx) = setup(cx);
+        let select = host.read_with(cx, |host, _| host.select.clone());
+        for reduced in [false, true] {
+            cx.update(|window, cx| {
+                cx.set_global(super::super::controls::ReducedMotion(reduced));
+                select.update(cx, |this, cx| {
+                    this.toggle(window, cx);
+                    let entrance = this.entrance.id("test");
+                    this.navigate(3, window, cx);
+                    this.sync(false, 0.75, true, false, cx);
+                    assert_eq!(this.entrance.id("test"), entrance);
+                    this.dismiss(true, window, cx);
+                    assert!(!this.open);
+                    assert!(this.focus.is_focused(window));
+                    // A stale activation after logical dismissal is inert.
+                    this.select(1, window, cx);
+                    this.toggle(window, cx);
+                    assert_ne!(this.entrance.id("test"), entrance);
+                    this.select(1, window, cx);
+                    this.select(1, window, cx);
+                    assert!(!this.open);
+                    assert!(this.focus.is_focused(window));
+                });
+            });
+            cx.run_until_parked();
+            assert!(cx.debug_bounds("zoom-popup").is_none());
+        }
+        host.read_with(cx, |host, _| {
+            assert_eq!(host.chosen, [ZoomChoice::Percent(100); 2]);
+            assert_eq!(host.shell_enter, 0);
+        });
+        // A reopened menu still yields to the next keyboard stop immediately.
+        cx.simulate_keystrokes("enter tab");
+        cx.run_until_parked();
+        cx.update(|window, cx| {
+            assert!(!select.read(cx).open);
+            assert!(host.read(cx).after.is_focused(window));
         });
     }
 

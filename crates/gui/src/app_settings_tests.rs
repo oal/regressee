@@ -517,6 +517,8 @@ fn settings_tab_and_reverse_tab_follow_rendered_groups_at_both_sizes(cx: &mut Te
                 Control::Appearance(AppAppearance::System),
                 Control::Appearance(AppAppearance::Light),
                 Control::Appearance(AppAppearance::Dark),
+                Control::ReducedMotion(false),
+                Control::ReducedMotion(true),
                 Control::Details(Detail::LocalStorage),
             ];
             expected.push(Control::Details(Detail::ManagedNetwork));

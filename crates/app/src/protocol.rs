@@ -11,7 +11,7 @@ use std::{
 };
 use uuid::Uuid;
 
-pub const VERSION: u32 = 8;
+pub const VERSION: u32 = 9;
 pub const MAX_FRAME: usize = 64 * 1024 * 1024;
 /// Leaves room for the bounded request/frozen project and receipt envelope.
 pub const MAX_READ_RESULT_BYTES: usize = 16 * 1024 * 1024;
@@ -567,6 +567,8 @@ pub enum Request {
     },
     Preferences,
     SetAppearance(AppAppearance),
+    AppSettings,
+    SetPreferences(PreferencesUpdate),
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "response", content = "value", deny_unknown_fields)]
@@ -590,6 +592,7 @@ pub enum Response {
         resync: bool,
     },
     Preferences(AppAppearance),
+    AppSettings(AppPreferences),
     Ok,
     Error {
         code: String,

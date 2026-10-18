@@ -67,7 +67,7 @@ impl Fixture {
 
 #[test]
 fn upgrade_stop_is_explicit_and_only_uses_the_known_lifecycle_envelope() -> Result<()> {
-    for version in [6, 7] {
+    for version in [6, 7, 8] {
         let f = Fixture::new(version)?;
         let error = f.client.snapshot().unwrap_err().to_string();
         assert!(error.contains("version_mismatch") && error.contains("regressee engine stop"));
@@ -92,46 +92,48 @@ fn upgrade_stop_is_explicit_and_only_uses_the_known_lifecycle_envelope() -> Resu
 
 #[test]
 fn upgrade_stop_retains_busy_refusal_and_checks_identity_and_cache() -> Result<()> {
-    for case in ["busy", "identity", "cache"] {
-        let f = Fixture::new(7)?;
-        let engine = if case == "identity" {
-            Uuid::new_v4()
-        } else {
-            f.engine
-        };
-        if case == "cache" {
-            ownership::write_json(
-                &f._owner.directory.join("endpoint.json"),
-                &serde_json::json!({
-                    "version":7,"engine":f.engine,"cache":f.client.paths.data.join("other-cache"),
-                }),
-            )?;
-        }
-        let peer = f.peer(
-            7,
-            engine,
-            Response::Error {
-                code: "busy".into(),
-                message: "Jobs, login or agent still need the engine".into(),
-            },
-        );
-        let result = f.client.request(Request::Stop);
-        if case == "busy" {
-            assert!(matches!(result?,Response::Error {code,..} if code=="busy"));
-        } else {
-            assert!(
-                result
-                    .unwrap_err()
-                    .to_string()
-                    .contains(if case == "identity" {
-                        "identity_mismatch"
-                    } else {
-                        "cache_directory_conflict"
-                    })
+    for version in [7, 8] {
+        for case in ["busy", "identity", "cache"] {
+            let f = Fixture::new(version)?;
+            let engine = if case == "identity" {
+                Uuid::new_v4()
+            } else {
+                f.engine
+            };
+            if case == "cache" {
+                ownership::write_json(
+                    &f._owner.directory.join("endpoint.json"),
+                    &serde_json::json!({
+                        "version":version,"engine":f.engine,"cache":f.client.paths.data.join("other-cache"),
+                    }),
+                )?;
+            }
+            let peer = f.peer(
+                version,
+                engine,
+                Response::Error {
+                    code: "busy".into(),
+                    message: "Jobs, login or agent still need the engine".into(),
+                },
             );
+            let result = f.client.request(Request::Stop);
+            if case == "busy" {
+                assert!(matches!(result?,Response::Error {code,..} if code=="busy"));
+            } else {
+                assert!(
+                    result
+                        .unwrap_err()
+                        .to_string()
+                        .contains(if case == "identity" {
+                            "identity_mismatch"
+                        } else {
+                            "cache_directory_conflict"
+                        })
+                );
+            }
+            assert_eq!(peer.join().unwrap()?, case == "busy");
+            assert!(ownership::Ownership::acquire(&f.client.paths).is_err());
         }
-        assert_eq!(peer.join().unwrap()?, case == "busy");
-        assert!(ownership::Ownership::acquire(&f.client.paths).is_err());
     }
     Ok(())
 }

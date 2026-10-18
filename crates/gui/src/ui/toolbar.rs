@@ -557,7 +557,18 @@ pub fn button(
     let focus_name = name.clone();
     let id = id.into();
     let name_id = id.clone();
-    let mut frame = controls::action_frame(id, &focus, ActionStyle::Choice { selected }, enabled);
+    let mut frame = controls::action_frame_colors(
+        id,
+        &focus,
+        ActionStyle::Choice { selected },
+        enabled,
+        if selected {
+            rgb(palette().selected).into()
+        } else {
+            transparent_black()
+        },
+        rgb(palette().action_hover).into(),
+    );
     frame.style().align_self = None;
     frame
         // Quiet tools and menu rows must not cast a shadow from a transparent
@@ -568,11 +579,6 @@ pub fn button(
         .px(px(8.))
         .py(px(0.))
         .gap(px(8.))
-        .bg(if selected {
-            rgb(palette().selected).into()
-        } else {
-            transparent_black()
-        })
         .border_color(if selected {
             rgb(palette().accent).into()
         } else {

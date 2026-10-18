@@ -80,6 +80,7 @@ impl Shell {
                     | Control::SetupRuntime
                     | Control::About
                     | Control::Appearance(_)
+                    | Control::ReducedMotion(_)
                     | Control::Shortcuts
             );
         if !secondary_action
@@ -385,6 +386,7 @@ impl Shell {
                     cx,
                 )))
                 .into_any_element(),
+            cx,
         )
         .into_any_element()
     }
@@ -465,9 +467,12 @@ mod ui_tests {
         cx.update(crate::keyboard_navigation_tests::bind);
         let dir = tempfile::tempdir().unwrap();
         for appearance in [AppAppearance::Light, AppAppearance::Dark] {
-            regressee_storage::AppPreferences { appearance }
-                .save(&AppPaths::isolated(dir.path()))
-                .unwrap();
+            regressee_storage::AppPreferences {
+                appearance,
+                ..Default::default()
+            }
+            .save(&AppPaths::isolated(dir.path()))
+            .unwrap();
             let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
             let owned = jobs.clone();
             owned.appearance.wait_loaded();

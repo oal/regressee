@@ -4,7 +4,13 @@ use super::*;
 
 impl Shell {
     fn apply_appearance(&self, cx: &mut Context<Self>) {
-        if set_dark(self.appearance.preference.is_dark(self.desktop_dark)) {
+        let reduced = self.forced_reduced_motion || self.appearance.reduced_motion;
+        let motion_changed =
+            cx.try_global::<controls::ReducedMotion>().map(|m| m.0) != Some(reduced);
+        if motion_changed {
+            cx.set_global(controls::ReducedMotion(reduced));
+        }
+        if set_dark(self.appearance.preference.is_dark(self.desktop_dark)) || motion_changed {
             // Text inputs, selectors and prompts are cached child entities. A
             // shell notification alone leaves some of their old colors painted.
             cx.refresh_windows();
@@ -55,9 +61,9 @@ impl Shell {
             )));
         }
         let status = if !self.appearance.loaded {
-            "Reading appearance preference…".into()
+            "Reading app preferences…".into()
         } else if self.appearance.saving {
-            "Saving appearance…".into()
+            "Saving app preferences…".into()
         } else if let Some(error) = self.appearance.error {
             error.into()
         } else if self.appearance.preference == AppAppearance::System {
@@ -86,5 +92,38 @@ impl Shell {
                 }))
                 .child(status),
         )
+    }
+
+    pub(super) fn settings_motion(&self, cx: &mut Context<Self>) -> Div {
+        let effective = self.forced_reduced_motion || self.appearance.reduced_motion;
+        let mut choices = div().w_full().flex().gap_2();
+        for (reduced, label) in [(false, "Normal"), (true, "Reduced")] {
+            choices = choices.child(div().flex_1().min_w_0().child(self.choice_button(
+                Control::ReducedMotion(reduced),
+                label,
+                "",
+                effective == reduced,
+                cx,
+            )));
+        }
+        let status = if self.forced_reduced_motion {
+            "Reduced motion is forced by REGRESSEE_REDUCED_MOTION=1. Remove that environment setting and restart to use your remembered choice."
+        } else if !self.appearance.loaded {
+            "Reading app preferences…"
+        } else if self.appearance.saving {
+            "Saving app preferences…"
+        } else if let Some(error) = self.appearance.error {
+            error
+        } else {
+            "Applied immediately and remembered on this computer."
+        };
+        controls::section("Reduce motion", "Reduce movement and keep activity indicators still. Progress and status updates remain visible.")
+            .debug_selector(|| "settings-motion".into())
+            .child(choices)
+            .child(div()
+                .debug_selector(|| "settings-motion-status".into())
+                .text_size(px(13.)).line_height(px(18.))
+                .text_color(rgb(if self.appearance.error.is_some() && !self.forced_reduced_motion { palette().warning } else { palette().muted }))
+                .child(status))
     }
 }

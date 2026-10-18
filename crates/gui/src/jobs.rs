@@ -117,6 +117,9 @@ impl Appearance {
     pub fn choose(&self, value: regressee_core::appearance::AppAppearance) {
         self.inner().choose(value)
     }
+    pub fn choose_reduced_motion(&self, value: bool) {
+        self.inner().choose_reduced_motion(value)
+    }
 }
 pub struct Jobs {
     pub appearance: Appearance,

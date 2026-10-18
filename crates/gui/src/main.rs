@@ -184,6 +184,7 @@ struct Shell {
     history_dirty: bool,
     data_refresh_generation: u64,
     appearance: regressee_app::appearance::Snapshot,
+    forced_reduced_motion: bool,
     desktop_dark: bool,
     appearance_observer: Option<gpui::Subscription>,
     root_focus: FocusHandle,
@@ -409,10 +410,12 @@ impl Shell {
             history_dirty: false,
             data_refresh_generation: 0,
             appearance: jobs.appearance.snapshot(),
+            forced_reduced_motion: std::env::var_os("REGRESSEE_REDUCED_MOTION")
+                .is_some_and(|value| value == "1"),
             desktop_dark: desktop_is_dark(cx.window_appearance()),
             appearance_observer: None,
             root_focus: cx.focus_handle(),
-            handles: (0..(1727 + regressee_gui::task::MAX_TASK_LINKS))
+            handles: (0..(1729 + regressee_gui::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -2985,6 +2988,9 @@ impl Shell {
             }
             Control::Appearance(preference) => {
                 650 + regressee_gui::task::MAX_TASK_LINKS + preference as usize
+            }
+            Control::ReducedMotion(reduced) => {
+                1727 + regressee_gui::task::MAX_TASK_LINKS + reduced as usize
             }
             Control::Navigate(screen) => Screen::ALL.iter().position(|s| *s == screen).unwrap(),
             Control::SetupStage(stage) => 312 + stage.index(),
@@ -5697,6 +5703,11 @@ impl Shell {
                 self.sync_appearance(cx);
                 window.focus(&self.handle(control, cx));
             }
+            Control::ReducedMotion(reduced) => {
+                self.jobs.appearance.choose_reduced_motion(reduced);
+                self.sync_appearance(cx);
+                window.focus(&self.handle(control, cx));
+            }
             Control::CloseOptions => {
                 self.result_filters_open = false;
                 window.focus(&self.handle(Control::Guided(45), cx));
@@ -6477,6 +6488,7 @@ impl Shell {
                 self.dom_review_valid() && self.dom_note_template().is_some()
             }
             Control::Appearance(_) => self.appearance.loaded,
+            Control::ReducedMotion(_) => self.appearance.loaded && !self.forced_reduced_motion,
             Control::Guided(46) | Control::ImageControls => self.viewer_has_pixels(),
             Control::SplitView => self.split_view_available(),
             Control::SplitDivider => self.split_input_allowed(),
@@ -7006,7 +7018,7 @@ impl Shell {
             ChooseProject => screen != Screen::Projects && project,
             PreviousPage => screen == Screen::Projects && self.projects.page > 0,
             NextPage => screen == Screen::Projects && self.projects.more,
-            About | SetupRuntime | Appearance(_) => settings,
+            About | SetupRuntime | Appearance(_) | ReducedMotion(_) => settings,
             CaptureBaseline => {
                 results
                     && (self.focus.review_surface == ReviewSurface::Pages
@@ -9108,15 +9120,20 @@ impl Render for Shell {
             feedback = feedback.child(progress);
         }
         if !shared_agent_feedback && (self.error.is_some() || self.notice.is_some()) {
-            feedback = feedback.child(controls::feedback(
-                self.error.clone().map(Into::into),
-                self.notice.clone().map(Into::into),
-                self.button(
-                    Control::DismissFeedback,
-                    "Dismiss",
-                    ActionStyle::Secondary,
-                    cx,
+            feedback = feedback.child(regressee_gui::ui::motion::enter(
+                "app-feedback-entrance",
+                controls::feedback(
+                    self.error.clone().map(Into::into),
+                    self.notice.clone().map(Into::into),
+                    self.button(
+                        Control::DismissFeedback,
+                        "Dismiss",
+                        ActionStyle::Secondary,
+                        cx,
+                    ),
                 ),
+                regressee_gui::ui::motion::Entrance::Feedback,
+                cx,
             ));
         }
         let mut content = div()
@@ -9463,12 +9480,13 @@ fn main() -> anyhow::Result<()> {
     // Resolve the tiny local preference before showing a window, so a remembered
     // override does not flash the desktop theme. The owner performs all I/O;
     // this startup-only wait happens before entering the native event loop.
-    jobs.appearance.wait_loaded();
+    let preferences = jobs.appearance.wait_loaded();
     let after_ui = jobs.clone();
     application.run(move |cx: &mut App| {
         regressee_gui::ui::dialog::install(cx);
         cx.set_global(controls::ReducedMotion(
-            std::env::var_os("REGRESSEE_REDUCED_MOTION").is_some_and(|value| value == "1"),
+            preferences.reduced_motion
+                || std::env::var_os("REGRESSEE_REDUCED_MOTION").is_some_and(|value| value == "1"),
         ));
         text_input::bind(cx);
         timezone_select::bind(cx);

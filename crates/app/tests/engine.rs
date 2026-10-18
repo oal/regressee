@@ -21,6 +21,66 @@ struct Harness {
     thread: Option<thread::JoinHandle<Result<()>>>,
     client: Client,
 }
+
+#[test]
+fn machine_local_motion_preferences_preserve_appearance_through_engine_and_worker() -> Result<()> {
+    use regressee_core::appearance::AppAppearance;
+    use regressee_storage::{AppPreferences, PreferencesUpdate};
+    let h = Harness::new()?;
+    let preferences = regressee_app::appearance::AppearanceSettings::start_client(h.client.clone());
+    assert!(!preferences.wait_loaded().reduced_motion);
+    preferences.choose(AppAppearance::Dark);
+    preferences.choose_reduced_motion(true);
+    preferences.join_after_ui();
+    assert!(preferences.snapshot().error.is_none());
+    assert_eq!(
+        AppPreferences::load(&h.paths)?,
+        AppPreferences {
+            appearance: AppAppearance::Dark,
+            reduced_motion: true
+        }
+    );
+    // Both legacy appearance entry points must preserve remembered motion.
+    assert!(matches!(
+        h.client
+            .request(Request::SetAppearance(AppAppearance::Light))?,
+        Response::Preferences(AppAppearance::Light)
+    ));
+    let saved = h
+        .client
+        .execute(Operation::SetAppearance(AppAppearance::System), None)?;
+    assert_eq!(saved.state, JobState::Succeeded);
+    assert!(matches!(
+        h.client.request(Request::AppSettings)?,
+        Response::AppSettings(AppPreferences {
+            appearance: AppAppearance::System,
+            reduced_motion: true
+        })
+    ));
+    h.client
+        .request(Request::SetPreferences(PreferencesUpdate {
+            reduced_motion: Some(false),
+            ..Default::default()
+        }))?;
+    assert_eq!(AppPreferences::load(&h.paths)?, AppPreferences::default());
+    let restarted = regressee_app::appearance::AppearanceSettings::start_client(h.client.clone());
+    assert!(!restarted.wait_loaded().reduced_motion);
+    h.client
+        .request(Request::SetPreferences(PreferencesUpdate {
+            reduced_motion: Some(true),
+            ..Default::default()
+        }))?;
+    let deadline = Instant::now() + Duration::from_secs(3);
+    while !restarted.snapshot().reduced_motion {
+        ensure!(
+            Instant::now() < deadline,
+            "remote motion preference did not refresh"
+        );
+        thread::sleep(Duration::from_millis(10));
+    }
+    restarted.join_after_ui();
+    Ok(())
+}
 impl Harness {
     fn new() -> Result<Self> {
         Self::from_root(tempfile::tempdir()?)

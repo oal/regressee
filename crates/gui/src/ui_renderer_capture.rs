@@ -32,6 +32,8 @@ mod ui_image_controls_capture;
 mod ui_keyboard_capture;
 #[path = "ui_loading_feedback_capture.rs"]
 mod ui_loading_feedback_capture;
+#[path = "ui_motion_capture.rs"]
+mod ui_motion_capture;
 #[path = "ui_phase1_capture.rs"]
 mod ui_phase1_capture;
 #[path = "ui_phase2_capture.rs"]
@@ -267,6 +269,14 @@ fn write_frame(
             ("dom_review_source_sha256", include_bytes!("dom_review_ux.rs").as_slice()),
             ("dom_approval_source_sha256", include_bytes!("dom_approval_ux.rs").as_slice()),
             ("workspace_jobs_source_sha256", include_bytes!("workspace_jobs.rs").as_slice()),
+            ("motion_source_sha256", include_bytes!("ui/motion.rs").as_slice()),
+            ("motion_harness_source_sha256", include_bytes!("ui_motion_capture.rs").as_slice()),
+            ("preferences_source_sha256", include_bytes!("../../storage/src/preferences.rs").as_slice()),
+            ("core_appearance_source_sha256", include_bytes!("../../core/src/appearance.rs").as_slice()),
+            ("status_icon_source_sha256", include_bytes!("ui/status_icon.rs").as_slice()),
+            ("preferences_protocol_source_sha256", include_bytes!("../../app/src/protocol.rs").as_slice()),
+            ("preferences_engine_source_sha256", include_bytes!("../../app/src/engine/mod.rs").as_slice()),
+            ("preferences_executor_source_sha256", include_bytes!("../../app/src/engine/executor.rs").as_slice()),
         ] {
             metadata[key] = hex::encode(Sha256::digest(source)).into();
         }

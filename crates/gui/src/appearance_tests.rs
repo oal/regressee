@@ -141,3 +141,155 @@ fn appearance_choices_follow_painted_order_reveal_and_obey_modal_guards(cx: &mut
     });
     owned.join_after_ui();
 }
+
+#[gpui::test]
+fn reduced_motion_keyboard_choice_is_live_reachable_and_machine_local(cx: &mut TestAppContext) {
+    use crate::keyboard_navigation_tests::{bind, press};
+    cx.update(bind);
+    let dir = tempfile::tempdir().unwrap();
+    let (store, project, _, _, _) = approval_fixture::fixture(dir.path());
+    let evidence = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
+    let summary = store.summary().unwrap();
+    let paths = AppPaths::isolated(dir.path());
+    regressee_storage::AppPreferences {
+        appearance: AppAppearance::Dark,
+        reduced_motion: false,
+    }
+    .save(&paths)
+    .unwrap();
+    let (jobs, events) = Jobs::start_without_runtime(paths.clone());
+    let owned = jobs.clone();
+    owned.appearance.wait_loaded();
+    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+    shell.update(cx, |s, cx| {
+        finish_jobs(s, cx);
+        s.focus.screen = Screen::Settings;
+        s.notice = None;
+        s.error = None;
+        s.summary = Some(summary);
+    });
+    for (width, height) in [(1440., 900.), (1280., 800.), (820., 600.)] {
+        cx.simulate_resize(size(px(width), px(height)));
+        crate::phase4_hierarchy_tests::draw(cx);
+        cx.update(|window, cx| {
+            shell.update(cx, |s, cx| {
+                window.focus(&s.handle(Control::Appearance(AppAppearance::Dark), cx));
+            })
+        });
+        for (reduced, key) in [(false, "enter"), (true, "space")] {
+            press(cx, "tab");
+            cx.update(|window, cx| {
+                shell.read_with(cx, |s, cx| {
+                    assert_eq!(s.focused(window, cx), Some(Control::ReducedMotion(reduced)));
+                })
+            });
+            press(cx, key);
+            shell.read_with(cx, |s, cx| {
+                assert_eq!(s.appearance.reduced_motion, reduced);
+                assert_eq!(cx.global::<controls::ReducedMotion>().0, reduced);
+                assert_eq!(s.appearance.preference, AppAppearance::Dark);
+                assert!(s.pending.is_none() && s.task.is_none());
+            });
+            let selector = if reduced {
+                "choice-ReducedMotion(true)"
+            } else {
+                "choice-ReducedMotion(false)"
+            };
+            let bounds = cx.debug_bounds(selector).unwrap();
+            assert!(bounds.size.height >= px(40.));
+            crate::phase1_setup_tests::inside(bounds, cx.debug_bounds("screen-scroll").unwrap());
+        }
+        press(cx, "tab");
+        cx.update(|window, cx| {
+            shell.read_with(cx, |s, cx| {
+                assert_eq!(
+                    s.focused(window, cx),
+                    Some(Control::Details(Detail::LocalStorage))
+                );
+            })
+        });
+    }
+    cx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            s.focus.dialog = true;
+            assert!(!s.control_enabled(Control::ReducedMotion(false), cx));
+            s.activate_control(Control::ReducedMotion(false), window, cx);
+            assert!(s.appearance.reduced_motion);
+            s.focus.dialog = false;
+            s.focus.screen = Screen::Projects;
+            for reduced in [false, true] {
+                assert!(!s.control_mounted(Control::ReducedMotion(reduced)));
+                s.activate_control(Control::ReducedMotion(reduced), window, cx);
+            }
+            assert!(s.appearance.reduced_motion);
+        })
+    });
+    owned.join_after_ui();
+    assert_eq!(
+        regressee_storage::AppPreferences::load(&paths).unwrap(),
+        regressee_storage::AppPreferences {
+            appearance: AppAppearance::Dark,
+            reduced_motion: true
+        }
+    );
+    assert_eq!(
+        serde_json::to_value(store.project_evidence(project).unwrap()).unwrap(),
+        evidence
+    );
+}
+
+#[gpui::test]
+fn forced_reduced_motion_disables_choices_without_overwriting_remembered_preference(
+    cx: &mut TestAppContext,
+) {
+    use crate::keyboard_navigation_tests::{bind, press};
+    cx.update(bind);
+    let dir = tempfile::tempdir().unwrap();
+    let paths = AppPaths::isolated(dir.path());
+    let summary = regressee_storage::Store::open(paths.clone())
+        .unwrap()
+        .summary()
+        .unwrap();
+    let (jobs, events) = Jobs::start_without_runtime(paths.clone());
+    let owned = jobs.clone();
+    owned.appearance.wait_loaded();
+    let (shell, cx) = cx.add_window_view(|_, cx| {
+        let mut shell = Shell::new(cx, jobs, events);
+        shell.forced_reduced_motion = true;
+        shell
+    });
+    shell.update(cx, |s, cx| {
+        finish_jobs(s, cx);
+        s.focus.screen = Screen::Settings;
+        s.summary = Some(summary);
+    });
+    crate::phase4_hierarchy_tests::draw(cx);
+    assert!(cx.debug_bounds("settings-motion-status").is_some());
+    cx.update(|window, cx| {
+        shell.update(cx, |s, cx| {
+            assert!(cx.global::<controls::ReducedMotion>().0);
+            for reduced in [false, true] {
+                assert!(s.control_mounted(Control::ReducedMotion(reduced)));
+                assert!(!s.control_enabled(Control::ReducedMotion(reduced), cx));
+                s.activate_control(Control::ReducedMotion(reduced), window, cx);
+            }
+            assert!(!s.appearance.reduced_motion);
+            window.focus(&s.handle(Control::Appearance(AppAppearance::Dark), cx));
+        })
+    });
+    press(cx, "tab");
+    cx.update(|window, cx| {
+        shell.read_with(cx, |s, cx| {
+            assert_eq!(
+                s.focused(window, cx),
+                Some(Control::Details(Detail::LocalStorage))
+            );
+        })
+    });
+    owned.join_after_ui();
+    assert!(
+        !regressee_storage::AppPreferences::load(&paths)
+            .unwrap()
+            .reduced_motion
+    );
+}

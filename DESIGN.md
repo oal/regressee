@@ -606,13 +606,47 @@ Scoped evidence and qualification limits belong to
 `docs/research/theme-coherence-20261017.md` for the scoped SHIP neutral/solid-chrome
 refinement.
 
-No invented motion scale: state changes are immediate. Unknown-duration activity
-uses a seamless 1.2-second linear pattern for long tasks and a rotating native
-arc for compact reads, driven by native animation frames only while visible,
-independently of worker updates. This communicates activity, not completion.
-`REGRESSEE_REDUCED_MOTION=1` keeps both indicators static; automatic OS
-motion-preference integration and high-contrast behavior remain
-qualification work.
+### Restrained native motion — approved 2026-10-18
+
+The user approved purposeful motion as a refinement of the current workspace.
+Shared native primitives own short hover/selection paint, menu and attached-panel
+reveals, dialog presentation and task-outcome feedback. One authored moment—the
+existing outcome mark and next-action area after an authoritative task reply—
+acknowledges completion without navigating, approving a baseline or inventing a
+successful outcome. Natural deceleration, small distances and finite scheduling
+replace decorative page choreography. No bounce, list-entry stagger, hover lift,
+full-window effect, new dependency or shipping raster.
+
+Logical state, press, focus rings, disabled controls, validation and dismissal
+remain immediate. Animation never changes layout height, control hit targets,
+keyboard order, drafts or explicit save/approval authority. Original screenshots,
+DOM source, result replacement, evidence-kind/view switching, pan/zoom, split
+dragging, ignored-area drawing and search/filter results do not animate. Do not
+crossfade captured evidence. Theme changes also remain immediate.
+
+An explicit remembered reduced-motion choice belongs in App settings; it retains
+legible static feedback and does not change website capture preferences or ZIPs.
+`REGRESSEE_REDUCED_MOTION=1` remains an overriding reduced-motion request. GPUI
+does not expose the desktop motion preference, so automatic OS following is not
+claimed. Unknown-duration activity retains the native 1.2-second linear pattern
+and rotating arc, active only while visible and independently of worker updates.
+These communicate activity, not completion; reduced motion keeps them static.
+Scope, source timings, verification and qualification limits are recorded in
+`docs/research/native-motion-20261018.md`. Older dated no-motion statements
+describe those refinements, not this newly approved extension.
+
+**Motion finish record — 2026-10-18.** Independent confirmation returned scoped
+**PASS** after one batched correction of feedback wiring and two test gaps.
+25 current focused tests and the native capture test pass; the production `ui`
+build passes. The sole confirmation contains 100 source-bound frames covering
+both themes at 1280×800 and 820×600, meaningful normal-motion intermediate states,
+static reduced feedback/dialog/completion and remembered Settings behavior.
+Evidence pixels/geometry, originals, drafts and explicit operation guards remain
+unchanged in the exercised paths. Strict Clippy retains the unattributed
+`crates/gui/src/jobs.rs:564` blocker. This is not whole-suite/lint, OS-input,
+accessibility, cross-platform, frame-pacing or release qualification. The visual
+budget is complete; see `docs/research/native-motion-20261018.md` for both
+preserved review rounds, source receipts and the synthetic-fixture limitations.
 
 ## Shapes
 

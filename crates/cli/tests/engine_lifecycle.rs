@@ -32,6 +32,52 @@ impl Drop for Stop {
 }
 
 #[test]
+fn stopped_protocol_eight_endpoint_upgrades_without_removing_data() -> anyhow::Result<()> {
+    let root = tempfile::tempdir()?;
+    let paths = regressee_storage::AppPaths {
+        data: root.path().join("data"),
+        cache: root.path().join("cache"),
+    };
+    let owner = Ownership::acquire(&paths)?;
+    let old_engine = uuid::Uuid::new_v4();
+    regressee_app::engine::ownership::write_json(
+        &owner.directory.join("endpoint.json"),
+        &serde_json::json!({"version":8,"engine":old_engine,"cache":owner.paths.cache}),
+    )?;
+    let sentinel = paths.data.join("retained-project-data");
+    std::fs::write(&sentinel, b"preserve existing data")?;
+    let client = Client::existing(owner.paths.clone())?;
+    let _stop = Stop(client.clone());
+    drop(owner); // A successful explicit stop leaves this unowned descriptor.
+
+    let started = command(root.path(), "start").output()?;
+    assert!(
+        started.status.success(),
+        "{}\n{}",
+        String::from_utf8_lossy(&started.stdout),
+        String::from_utf8_lossy(&started.stderr)
+    );
+    assert!(client.snapshot().is_ok());
+    let endpoint: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(paths.data.join("engine-v1/endpoint.json"))?)?;
+    assert_eq!(endpoint["version"], regressee_app::protocol::VERSION);
+    assert_ne!(endpoint["engine"], serde_json::json!(old_engine));
+    assert_eq!(std::fs::read(sentinel)?, b"preserve existing data");
+    assert!(Ownership::acquire(&paths).is_err());
+    assert!(matches!(client.request(Request::Stop)?, Response::Ok));
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Ok(owner) = Ownership::acquire(&paths) {
+            drop(owner);
+            break;
+        }
+        assert!(Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(10));
+    }
+    Ok(())
+}
+
+#[test]
 fn simultaneous_autostarts_stale_endpoint_status_and_graceful_stop() -> anyhow::Result<()> {
     let root = tempfile::tempdir()?;
     let mut starts = vec![];

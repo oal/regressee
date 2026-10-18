@@ -353,16 +353,64 @@ impl Shell {
                 .child(format!("{profile} · {}", capture_time(captured_at)))
                 .when(position == current && self.approval_exact_open, |row| row.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).child(format!("Source run: {run}\nArtifact: {artifact}\nPage: {}\nProfile: {}", key.page, key.profile)))));
         }
-        regressee_gui::ui::dialog::overlay().id("approval-modal-backdrop")
-            .child(regressee_gui::ui::dialog::surface(if self.narrow_workspace { 740. } else { 760. }).debug_selector(|| "kind-approval-decision".into())
-                .h(px(520.)).p_6().gap_3()
-                .child(regressee_gui::ui::dialog::heading().child("Use the selected After references for future checks?"))
-                .child(scrollbar::vertical("kind-approval-scrollbar", &self.approval_provenance_scroll,
-                    div().id("kind-approval-sources").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.approval_provenance_scroll).pr(px(scrollbar::GUTTER)).child(flow)))
-                .child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child(format!("Reference {} of {count}. Previous/Next reaches every retained source.", current + 1)))
-                .child(regressee_gui::ui::dialog::footer().flex().flex_wrap().gap_2()
-                    .child(self.guided_button(48, "Previous", cx)).child(self.guided_button(49, "Next", cx)).child(self.guided_button(52, if self.approval_exact_open { "Hide source details" } else { "Source details" }, cx))
-                    .child(self.guided_button(47, "Keep reviewing", cx)).child(self.button(Control::Phase5(25), "Save baseline update", ActionStyle::Primary, cx))))
+        let panel =
+            regressee_gui::ui::dialog::surface(if self.narrow_workspace { 740. } else { 760. })
+                .debug_selector(|| "kind-approval-decision".into())
+                .h(px(520.))
+                .p_6()
+                .gap_3()
+                .child(
+                    regressee_gui::ui::dialog::heading()
+                        .child("Use the selected After references for future checks?"),
+                )
+                .child(scrollbar::vertical(
+                    "kind-approval-scrollbar",
+                    &self.approval_provenance_scroll,
+                    div()
+                        .id("kind-approval-sources")
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_y_scroll()
+                        .track_scroll(&self.approval_provenance_scroll)
+                        .pr(px(scrollbar::GUTTER))
+                        .child(flow),
+                ))
+                .child(
+                    div()
+                        .text_size(px(HELP_TEXT_SIZE))
+                        .line_height(px(HELP_LINE_HEIGHT))
+                        .text_color(rgb(palette().muted))
+                        .child(format!(
+                            "Reference {} of {count}. Previous/Next reaches every retained source.",
+                            current + 1
+                        )),
+                )
+                .child(
+                    regressee_gui::ui::dialog::footer()
+                        .flex()
+                        .flex_wrap()
+                        .gap_2()
+                        .child(self.guided_button(48, "Previous", cx))
+                        .child(self.guided_button(49, "Next", cx))
+                        .child(self.guided_button(
+                            52,
+                            if self.approval_exact_open {
+                                "Hide source details"
+                            } else {
+                                "Source details"
+                            },
+                            cx,
+                        ))
+                        .child(self.guided_button(47, "Keep reviewing", cx))
+                        .child(self.button(
+                            Control::Phase5(25),
+                            "Save baseline update",
+                            ActionStyle::Primary,
+                            cx,
+                        )),
+                );
+        regressee_gui::ui::dialog::present("kind-approval-dialog-entrance", panel, cx)
+            .id("approval-modal-backdrop")
             .into_any_element()
     }
 }

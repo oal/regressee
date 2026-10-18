@@ -6,6 +6,7 @@ pub mod dialog;
 pub mod dom_diff;
 pub mod gpu_diagnostics;
 pub mod interaction;
+pub mod motion;
 pub mod performance;
 pub mod scrollbar;
 pub mod selector;

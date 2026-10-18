@@ -30,7 +30,7 @@ pub mod images;
 mod phase6_corrections_tests;
 mod portability;
 mod preferences;
-pub use preferences::AppPreferences;
+pub use preferences::{AppPreferences, PreferencesUpdate};
 mod retention;
 mod review;
 pub use portability::require_space;

@@ -1389,55 +1389,60 @@ impl Shell {
                     })),
             );
         }
-        regressee_gui::ui::dialog::overlay()
+        let panel =
+            regressee_gui::ui::dialog::surface(if self.narrow_workspace { 740. } else { 760. })
+                .debug_selector(|| "approval-decision".into())
+                .h(px(520.))
+                .p_6()
+                .gap_4()
+                .child(
+                    regressee_gui::ui::dialog::heading().child(if preview.selected.len() == 1 {
+                        "Use this After screenshot for future checks?"
+                    } else {
+                        "Use these After screenshots for future checks?"
+                    }),
+                )
+                .child(scrollbar::vertical(
+                    "approval-scrollbar",
+                    &self.approval_provenance_scroll,
+                    div()
+                        .id("approval-reference-list")
+                        .debug_selector(|| "approval-reference-list".into())
+                        .flex_1()
+                        .min_h_0()
+                        .w_full()
+                        .overflow_y_scroll()
+                        .track_scroll(&self.approval_provenance_scroll)
+                        .pr(px(scrollbar::GUTTER))
+                        .child(flow),
+                ))
+                .child(
+                    div()
+                        .text_size(px(13.))
+                        .line_height(px(HELP_LINE_HEIGHT))
+                        .text_color(rgb(palette().muted))
+                        .child(
+                            "Scroll to see more screenshots. Source details are available above.",
+                        ),
+                )
+                .child(
+                    regressee_gui::ui::dialog::footer()
+                        .flex()
+                        .flex_wrap()
+                        .justify_between()
+                        .gap_2()
+                        .child(self.guided_button(48, "Previous", cx))
+                        .child(self.guided_button(49, "Next", cx))
+                        .child(self.guided_button(47, "Keep reviewing", cx))
+                        .child(self.button(
+                            Control::Phase5(25),
+                            "Save baseline update",
+                            ActionStyle::Primary,
+                            cx,
+                        )),
+                );
+        regressee_gui::ui::dialog::present("approval-dialog-entrance", panel, cx)
             .id("approval-modal-backdrop")
-            .child(
-                regressee_gui::ui::dialog::surface(if self.narrow_workspace { 740. } else { 760. })
-                    .debug_selector(|| "approval-decision".into())
-                    .h(px(520.))
-                    .p_6()
-                    .gap_4()
-                    .child(regressee_gui::ui::dialog::heading().child(
-                        if preview.selected.len() == 1 {
-                            "Use this After screenshot for future checks?"
-                        } else {
-                            "Use these After screenshots for future checks?"
-                        },
-                    ))
-                    .child(scrollbar::vertical(
-                        "approval-scrollbar",
-                        &self.approval_provenance_scroll,
-                        div()
-                            .id("approval-reference-list")
-                            .debug_selector(|| "approval-reference-list".into())
-                            .flex_1()
-                            .min_h_0()
-                            .w_full()
-                            .overflow_y_scroll()
-                            .track_scroll(&self.approval_provenance_scroll)
-                            .pr(px(scrollbar::GUTTER))
-                            .child(flow),
-                    ))
-                    .child(div().text_size(px(13.)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child(
-                        "Scroll to see more screenshots. Source details are available above.",
-                    ))
-                    .child(
-                        regressee_gui::ui::dialog::footer()
-                            .flex()
-                            .flex_wrap()
-                            .justify_between()
-                            .gap_2()
-                            .child(self.guided_button(48, "Previous", cx))
-                            .child(self.guided_button(49, "Next", cx))
-                            .child(self.guided_button(47, "Keep reviewing", cx))
-                            .child(self.button(
-                                Control::Phase5(25),
-                                "Save baseline update",
-                                ActionStyle::Primary,
-                                cx,
-                            )),
-                    ),
-            )
             .into_any_element()
     }
 

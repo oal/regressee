@@ -17,7 +17,7 @@ fn renderer_capture_queue_focus(cx: &mut TestAppContext) {
     let original = serde_json::to_value(store.project_evidence(project).unwrap()).unwrap();
     for (width, height) in [(1440., 900.), (1280., 800.), (820., 600.)] {
         for appearance in [AppAppearance::Light, AppAppearance::Dark] {
-            regressee_storage::AppPreferences { appearance }
+            regressee_storage::AppPreferences { appearance, ..Default::default() }
                 .save(&AppPaths::isolated(dir.path()))
                 .unwrap();
             let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));
@@ -145,7 +145,7 @@ fn renderer_capture_search_fields(cx: &mut TestAppContext) {
     for (width, height) in [(1440., 900.), (1280., 800.), (820., 600.)] {
         for appearance in [AppAppearance::Light, AppAppearance::Dark] {
             for scene in ["review", "pages", "history"] {
-                regressee_storage::AppPreferences { appearance }
+                regressee_storage::AppPreferences { appearance, ..Default::default() }
                     .save(&AppPaths::isolated(dir.path()))
                     .unwrap();
                 let (jobs, events) = Jobs::start_without_runtime(AppPaths::isolated(dir.path()));

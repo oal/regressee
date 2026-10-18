@@ -7,9 +7,33 @@ use regressee_core::appearance::AppAppearance;
 #[serde(default, deny_unknown_fields)]
 pub struct AppPreferences {
     pub appearance: AppAppearance,
+    pub reduced_motion: bool,
+}
+
+/// Partial machine-local update: changing one choice never resets the other.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct PreferencesUpdate {
+    pub appearance: Option<AppAppearance>,
+    pub reduced_motion: Option<bool>,
 }
 
 impl AppPreferences {
+    /// Called by the serial preference owner (or under the engine state lock).
+    pub fn update(paths: &AppPaths, update: PreferencesUpdate) -> Result<Self> {
+        // Explicit choices can repair an unreadable preference file, matching
+        // startup's reported defaults; unsafe paths are still rejected by save.
+        let mut preferences = Self::load(paths).unwrap_or_default();
+        if let Some(appearance) = update.appearance {
+            preferences.appearance = appearance;
+        }
+        if let Some(reduced_motion) = update.reduced_motion {
+            preferences.reduced_motion = reduced_motion;
+        }
+        preferences.save(paths)?;
+        Ok(preferences)
+    }
+
     fn path(paths: &AppPaths) -> PathBuf {
         paths.data.join("app-preferences.json")
     }
@@ -57,7 +81,10 @@ mod tests {
         let paths = AppPaths::isolated(root.path());
         assert_eq!(AppPreferences::load(&paths)?, AppPreferences::default());
         for appearance in AppAppearance::ALL {
-            let preferences = AppPreferences { appearance };
+            let preferences = AppPreferences {
+                appearance,
+                reduced_motion: true,
+            };
             preferences.save(&paths)?;
             assert_eq!(AppPreferences::load(&paths)?, preferences);
         }
@@ -65,6 +92,41 @@ mod tests {
         assert!(!paths.artifacts().exists());
         fs::write(AppPreferences::path(&paths), br#"{"appearance":"unknown"}"#)?;
         assert!(AppPreferences::load(&paths).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn old_preferences_default_motion_and_partial_updates_preserve_other_choices() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let paths = AppPaths::isolated(root.path());
+        private_dir(&paths.data)?;
+        fs::write(AppPreferences::path(&paths), br#"{"appearance":"dark"}"#)?;
+        assert_eq!(
+            AppPreferences::load(&paths)?,
+            AppPreferences {
+                appearance: AppAppearance::Dark,
+                reduced_motion: false
+            }
+        );
+        let motion = AppPreferences::update(
+            &paths,
+            PreferencesUpdate {
+                reduced_motion: Some(true),
+                ..Default::default()
+            },
+        )?;
+        assert_eq!(motion.appearance, AppAppearance::Dark);
+        let appearance = AppPreferences::update(
+            &paths,
+            PreferencesUpdate {
+                appearance: Some(AppAppearance::Light),
+                ..Default::default()
+            },
+        )?;
+        assert!(appearance.reduced_motion);
+        assert_eq!(AppPreferences::load(&paths)?, appearance);
+        assert!(!paths.database().exists());
+        assert!(!paths.artifacts().exists());
         Ok(())
     }
 

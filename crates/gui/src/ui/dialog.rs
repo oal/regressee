@@ -6,6 +6,60 @@ use super::{
     theme::*,
 };
 use gpui::{prelude::*, *};
+use std::time::{Duration, Instant};
+
+const BACKDROP_DURATION: Duration = Duration::from_millis(160);
+
+struct BackdropFade {
+    start: Instant,
+    finished: bool,
+}
+
+impl BackdropFade {
+    fn frame(&mut self, now: Instant, immediate: bool) -> (f32, bool) {
+        let elapsed = now.saturating_duration_since(self.start);
+        self.finished |= immediate || elapsed >= BACKDROP_DURATION;
+        if self.finished {
+            (1., false)
+        } else {
+            let t = elapsed.as_secs_f32() / BACKDROP_DURATION.as_secs_f32();
+            (1. - (1. - t).powi(5), true)
+        }
+    }
+}
+
+#[derive(IntoElement)]
+struct Backdrop;
+
+impl RenderOnce for Backdrop {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        // Only paint fades. The overlay's occluding boundary, focus trap and
+        // dismissal are immediate, even on the first transparent frame.
+        canvas(
+            |bounds, window, cx| {
+                let now = cx.background_executor().now();
+                let immediate = super::motion::reduced(cx)
+                    || bounds.intersect(&window.content_mask().bounds).is_empty();
+                let fade =
+                    window.use_keyed_state("dialog-scrim-entrance", cx, |_, _| BackdropFade {
+                        start: now,
+                        finished: false,
+                    });
+                fade.update(cx, |fade, _| fade.frame(now, immediate))
+            },
+            |bounds, (opacity, active), window, _| {
+                let mut color = rgba((palette().shadow << 8) | 0x66);
+                color.a *= opacity;
+                window.paint_quad(fill(bounds, color));
+                if active {
+                    window.request_animation_frame();
+                }
+            },
+        )
+        .absolute()
+        .inset_0()
+    }
+}
 
 /// All dialogs use the same inset, scrim and occluding pointer boundary.
 pub fn overlay() -> Div {
@@ -18,7 +72,19 @@ pub fn overlay() -> Div {
         .flex()
         .items_center()
         .justify_center()
-        .bg(rgba((palette().shadow << 8) | 0x66))
+        .child(Backdrop)
+}
+
+/// Animate an already assembled surface without changing the existing `Div`
+/// builders. Keep caller-owned key handlers and focus on this immediate overlay.
+/// There is intentionally no retained exit: dismissed decisions cannot activate.
+pub fn present(id: impl Into<ElementId>, panel: impl IntoElement + 'static, cx: &App) -> Div {
+    overlay().child(super::motion::enter(
+        id,
+        panel,
+        super::motion::Entrance::Dialog,
+        cx,
+    ))
 }
 
 /// Set type explicitly: GPUI prompts render outside the shell's inherited style.
@@ -193,68 +259,66 @@ impl Focusable for Confirmation {
 
 impl Render for Confirmation {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        overlay()
+        let panel = surface(560.)
+            .debug_selector(|| "confirmation-dialog".into())
+            .p_6()
+            .gap_4()
+            .child(
+                heading()
+                    .debug_selector(|| "confirmation-title".into())
+                    .child(self.title.clone()),
+            )
+            .when_some(self.detail.clone(), |panel, detail| {
+                panel.child(
+                    div()
+                        .relative()
+                        .min_h_0()
+                        .flex()
+                        .flex_col()
+                        .pr(px(super::scrollbar::GUTTER))
+                        .child(
+                            div()
+                                .id("confirmation-body")
+                                .debug_selector(|| "confirmation-body".into())
+                                .min_h_0()
+                                .max_h(px(320.))
+                                .overflow_y_scroll()
+                                .track_scroll(&self.scroll)
+                                .text_color(rgb(palette().muted))
+                                .child(
+                                    div()
+                                        .debug_selector(|| "confirmation-copy".into())
+                                        .child(detail),
+                                ),
+                        )
+                        .child(self.scrollbar.element(&self.scroll, cx.entity_id())),
+                )
+            })
+            .child(
+                footer()
+                    .debug_selector(|| "confirmation-footer".into())
+                    .flex()
+                    .flex_wrap()
+                    .justify_end()
+                    .gap_3()
+                    .children(self.order.iter().map(|&i| {
+                        controls::action(
+                            ("confirmation", i),
+                            self.buttons[i].label().clone(),
+                            &self.focus[i],
+                            action_style(self.level, &self.buttons[i]),
+                            true,
+                        )
+                        .debug_selector(move || format!("confirmation-action-{i}"))
+                        .on_click(cx.listener(move |this, _, _, cx| this.answer(i, cx)))
+                    })),
+            );
+        present(("confirmation-entrance", cx.entity_id()), panel, cx)
             .debug_selector(|| "confirmation-overlay".into())
             .key_context("Confirmation")
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
-            .child(
-                surface(560.)
-                    .debug_selector(|| "confirmation-dialog".into())
-                    .p_6()
-                    .gap_4()
-                    .child(
-                        heading()
-                            .debug_selector(|| "confirmation-title".into())
-                            .child(self.title.clone()),
-                    )
-                    .when_some(self.detail.clone(), |panel, detail| {
-                        panel.child(
-                            div()
-                                .relative()
-                                .min_h_0()
-                                .flex()
-                                .flex_col()
-                                .pr(px(super::scrollbar::GUTTER))
-                                .child(
-                                    div()
-                                        .id("confirmation-body")
-                                        .debug_selector(|| "confirmation-body".into())
-                                        .min_h_0()
-                                        .max_h(px(320.))
-                                        .overflow_y_scroll()
-                                        .track_scroll(&self.scroll)
-                                        .text_color(rgb(palette().muted))
-                                        .child(
-                                            div()
-                                                .debug_selector(|| "confirmation-copy".into())
-                                                .child(detail),
-                                        ),
-                                )
-                                .child(self.scrollbar.element(&self.scroll, cx.entity_id())),
-                        )
-                    })
-                    .child(
-                        footer()
-                            .debug_selector(|| "confirmation-footer".into())
-                            .flex()
-                            .flex_wrap()
-                            .justify_end()
-                            .gap_3()
-                            .children(self.order.iter().map(|&i| {
-                                controls::action(
-                                    ("confirmation", i),
-                                    self.buttons[i].label().clone(),
-                                    &self.focus[i],
-                                    action_style(self.level, &self.buttons[i]),
-                                    true,
-                                )
-                                .debug_selector(move || format!("confirmation-action-{i}"))
-                                .on_click(cx.listener(move |this, _, _, cx| this.answer(i, cx)))
-                            })),
-                    ),
-            )
     }
 }
 
@@ -331,6 +395,31 @@ mod tests {
             inner.top() >= outer.top() && inner.bottom() <= outer.bottom(),
             "{inner:?} outside {outer:?}"
         );
+    }
+
+    #[test]
+    fn backdrop_reduction_settles_without_replaying_and_reopen_gets_a_fresh_clock() {
+        let now = Instant::now();
+        let mut fade = BackdropFade {
+            start: now,
+            finished: false,
+        };
+        assert_eq!(fade.frame(now, false), (0., true));
+        let (opacity, active) = fade.frame(now + BACKDROP_DURATION / 2, false);
+        assert!(active && (0.9..1.).contains(&opacity));
+        assert_eq!(fade.frame(now + BACKDROP_DURATION / 2, true), (1., false));
+        assert_eq!(fade.frame(now + BACKDROP_DURATION / 2, false), (1., false));
+        let mut reopened = BackdropFade {
+            start: now,
+            finished: false,
+        };
+        assert_eq!(reopened.frame(now, true), (1., false));
+        assert_eq!(reopened.frame(now, false), (1., false));
+        let mut animated = BackdropFade {
+            start: now,
+            finished: false,
+        };
+        assert_eq!(animated.frame(now + BACKDROP_DURATION, false), (1., false));
     }
 
     #[test]
@@ -419,6 +508,84 @@ mod tests {
                     view.read_with(cx, |this, _| assert!(this.trigger.is_focused(window)))
                 });
             }
+        }
+    }
+
+    #[gpui::test]
+    fn entrances_occlude_immediately_and_rapid_dismiss_reopen_restores_safe_focus(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(install);
+        let (view, cx) = cx.add_window_view(|_, cx| Harness {
+            trigger: cx.focus_handle(),
+            answers: Vec::new(),
+            background_clicks: 0,
+        });
+        for reduced in [false, true] {
+            cx.update(|_, cx| cx.set_global(controls::ReducedMotion(reduced)));
+            for _ in 0..2 {
+                let before = view.read_with(cx, |this, _| this.background_clicks);
+                cx.update(|window, cx| {
+                    view.update(cx, |this, cx| {
+                        this.show("The decision is available immediately.", false, window, cx)
+                    });
+                });
+                // Flush prompt installation/initial focus, not an entrance timer.
+                cx.run_until_parked();
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                // No entrance wait: even the first frame blocks the background.
+                let background = cx.debug_bounds("action-background").unwrap();
+                cx.simulate_click(background.center(), Modifiers::none());
+                view.read_with(cx, |this, _| assert_eq!(this.background_clicks, before));
+                cx.simulate_keystrokes("escape");
+                cx.run_until_parked();
+                cx.update(|window, cx| {
+                    let _ = window.draw(cx);
+                });
+                cx.update(|window, cx| {
+                    view.read_with(cx, |this, _| assert!(this.trigger.is_focused(window)))
+                });
+                // The debug-bounds registry caches old selectors, so verify
+                // actual hit testing rather than the presence of cached bounds.
+                cx.simulate_click(background.center(), Modifiers::none());
+                view.read_with(cx, |this, _| assert_eq!(this.background_clicks, before + 1));
+            }
+        }
+        view.read_with(cx, |this, _| assert_eq!(this.answers, [0; 4]));
+    }
+
+    #[gpui::test]
+    fn confirmation_accepts_only_one_answer_during_entrance(cx: &mut TestAppContext) {
+        for reduced in [false, true] {
+            let (confirmation, responses) = cx.update(|cx| {
+                cx.set_global(controls::ReducedMotion(reduced));
+                let confirmation = cx.new(|cx| {
+                    Confirmation::new(
+                        PromptLevel::Warning,
+                        "Confirm?",
+                        None,
+                        &[PromptButton::cancel("Cancel"), PromptButton::ok("Save")],
+                        cx,
+                    )
+                });
+                let responses = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+                let answers = responses.clone();
+                cx.subscribe(&confirmation, move |_, response, _| {
+                    answers.borrow_mut().push(response.0);
+                })
+                .detach();
+                (confirmation, responses)
+            });
+            cx.update(|cx| {
+                confirmation.update(cx, |this, cx| {
+                    this.answer(0, cx);
+                    this.answer(1, cx);
+                });
+            });
+            cx.run_until_parked();
+            assert_eq!(*responses.borrow(), [0]);
         }
     }
 

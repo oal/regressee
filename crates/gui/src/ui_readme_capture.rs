@@ -130,6 +130,7 @@ fn renderer_capture_readme_comparison(cx: &mut TestAppContext) {
     drop(store);
     regressee_storage::AppPreferences {
         appearance: AppAppearance::Light,
+        ..Default::default()
     }
     .save(&paths)
     .unwrap();

@@ -6,7 +6,8 @@ use gpui::{prelude::*, *};
 use std::time::{Duration, Instant};
 
 /// GPUI does not expose the OS motion preference. The app supplies an explicit
-/// reduced-motion override at startup; it never changes completion counters.
+/// reduced-motion override at startup and on runtime preference changes; it never
+/// changes completion counters. Keep this public path for existing callers.
 #[derive(Default)]
 pub struct ReducedMotion(pub bool);
 impl Global for ReducedMotion {}
@@ -153,6 +154,7 @@ fn action_focus(style: StyleRefinement, variant: ActionStyle) -> StyleRefinement
     }
 }
 
+#[cfg(test)]
 fn hover_paint(style: StyleRefinement, background: u32) -> StyleRefinement {
     // Hover is merged after focus in GPUI. Do not overwrite the focus outline.
     style.bg(rgb(background))
@@ -163,14 +165,43 @@ fn interaction(
     focus: &FocusHandle,
     enabled: bool,
     hover_background: u32,
+    background: u32,
+) -> Stateful<Div> {
+    interaction_colors(
+        control,
+        focus,
+        enabled,
+        rgb(background).into(),
+        rgb(hover_background).into(),
+    )
+}
+
+fn interaction_colors(
+    control: Stateful<Div>,
+    focus: &FocusHandle,
+    enabled: bool,
+    background: Hsla,
+    hover_background: Hsla,
 ) -> Stateful<Div> {
     control
+        .relative()
+        // Only the paint layer owns fill. In particular a transparent toolbar
+        // target must not expose its next selected fill beneath the transition.
+        .bg(gpui::transparent_black())
+        .child(super::motion::color_layer(
+            "control-color-motion",
+            background,
+            hover_background,
+            enabled,
+            true,
+            3.,
+        ))
         .when(enabled, |el| {
             el.track_focus(focus)
                 .cursor_pointer()
                 .focus(focus_paint)
-                .hover(move |s| hover_paint(s, hover_background))
-                .active(move |s| hover_paint(s, hover_background))
+                .hover(|s| s.bg(gpui::transparent_black()))
+                .active(|s| s.bg(gpui::transparent_black()))
         })
         .when(!enabled, |el| el.opacity(0.5))
 }
@@ -275,22 +306,46 @@ pub(super) fn action_frame(
     style: ActionStyle,
     enabled: bool,
 ) -> Stateful<Div> {
-    let (_, _, _, hover_background) = action_colors(style);
+    let (background, _, _, hover_background) = action_colors(style);
+    action_frame_colors(
+        id,
+        focus,
+        style,
+        enabled,
+        rgb(background).into(),
+        rgb(hover_background).into(),
+    )
+}
+
+pub(super) fn action_frame_colors(
+    id: impl Into<ElementId>,
+    focus: &FocusHandle,
+    style: ActionStyle,
+    enabled: bool,
+    background: Hsla,
+    hover_background: Hsla,
+) -> Stateful<Div> {
     let id = id.into();
     let action_selector = id.clone();
-    interaction(action_base(style).id(id), focus, enabled, hover_background)
-        .when(!enabled, |el| el.shadow(Vec::new()))
-        .when(enabled, |el| el.focus(move |s| action_focus(s, style)))
-        // Actions fit their label; only navigation fills its column. Editable
-        // fields and selection rows deliberately retain full-width geometry.
-        .when(
-            !matches!(style, ActionStyle::Navigation { .. }),
-            |mut el| {
-                el.style().align_self = Some(AlignSelf::FlexStart);
-                el.max_w_full()
-            },
-        )
-        .debug_selector(move || format!("action-{action_selector}"))
+    interaction_colors(
+        action_base(style).bg(background).id(id),
+        focus,
+        enabled,
+        background,
+        hover_background,
+    )
+    .when(!enabled, |el| el.shadow(Vec::new()))
+    .when(enabled, |el| el.focus(move |s| action_focus(s, style)))
+    // Actions fit their label; only navigation fills its column. Editable
+    // fields and selection rows deliberately retain full-width geometry.
+    .when(
+        !matches!(style, ActionStyle::Navigation { .. }),
+        |mut el| {
+            el.style().align_self = Some(AlignSelf::FlexStart);
+            el.max_w_full()
+        },
+    )
+    .debug_selector(move || format!("action-{action_selector}"))
 }
 
 fn selection_base(selected: bool) -> Div {
@@ -318,6 +373,8 @@ fn indicator_base(selected: bool, radio: bool) -> Div {
         } else {
             palette().control_line
         }))
+        // Keep the authoritative mark immediate: fading a white tick over an
+        // unchecked white box would briefly hide the actual checked value.
         .bg(rgb(if selected && !radio {
             palette().accent
         } else {
@@ -370,6 +427,11 @@ pub fn choice(
         focus,
         enabled,
         palette().selected,
+        if selected {
+            palette().selected
+        } else {
+            palette().surface
+        },
     )
     .debug_selector(move || format!("choice-{row_selector}"))
     .child(
@@ -417,6 +479,11 @@ pub fn check(
         focus,
         enabled,
         palette().selected,
+        if checked {
+            palette().selected
+        } else {
+            palette().surface
+        },
     )
     .debug_selector(move || format!("check-{row_selector}"))
     .child(indicator_base(checked, false).when(checked, |el| {
@@ -489,7 +556,7 @@ pub fn disclosure_toggle(
     let action_selector = id.clone();
     let title_selector = id.clone();
     let state_selector = id.clone();
-    interaction(
+    interaction_colors(
         div()
             .id(id)
             .w_full()
@@ -510,7 +577,8 @@ pub fn disclosure_toggle(
             .font_weight(FontWeight::SEMIBOLD),
         focus,
         enabled,
-        palette().action_hover,
+        transparent_black(),
+        rgb(palette().action_hover).into(),
     )
     // Preserve action selectors so native focus/reveal probes measure the same
     // complete interactive bounds for both ordinary actions and disclosures.
@@ -1407,6 +1475,11 @@ pub fn history_row(
         focus,
         enabled,
         palette().selected,
+        if selected {
+            palette().selected
+        } else {
+            palette().surface
+        },
     )
 }
 
@@ -1507,6 +1580,7 @@ fn progress_track(completed: u32, total: Option<u32>) -> Div {
     let fraction = progress_fraction(completed, total);
     div()
         .debug_selector(|| "progress-track".into())
+        .relative()
         .w_full()
         .h(px(4.))
         .flex_shrink_0()
@@ -1515,9 +1589,44 @@ fn progress_track(completed: u32, total: Option<u32>) -> Div {
             el.child(
                 div()
                     .debug_selector(|| "progress-fill".into())
+                    // Preserve the reported target's diagnostic bounds. Only
+                    // the sibling canvas paints; it never drives layout.
                     .h_full()
-                    .w(relative(fraction))
-                    .bg(rgb(palette().accent)),
+                    .w(relative(fraction)),
+            )
+            .child(
+                canvas(
+                    move |_, window, cx| {
+                        let now = cx.background_executor().now();
+                        window.use_keyed_state("determinate-progress-motion", cx, |_, _| {
+                            super::motion::ProgressState::new(completed, total.unwrap(), now)
+                        })
+                    },
+                    move |bounds, state, window, cx| {
+                        let visible = !bounds.intersect(&window.content_mask().bounds).is_empty();
+                        let immediate = super::motion::reduced(cx) || !visible;
+                        let now = cx.background_executor().now();
+                        let (fraction, active) = state.update(cx, |state, _| {
+                            state.report(completed, total.unwrap(), now, immediate)
+                        });
+                        #[cfg(all(test, feature = "ui-tests"))]
+                        super::motion::record_progress(cx, fraction, active);
+                        if visible {
+                            window.paint_quad(fill(
+                                Bounds::new(
+                                    bounds.origin,
+                                    size(bounds.size.width * fraction, bounds.size.height),
+                                ),
+                                rgb(palette().accent),
+                            ));
+                            if active {
+                                window.request_animation_frame();
+                            }
+                        }
+                    },
+                )
+                .absolute()
+                .inset_0(),
             )
         })
         .when(fraction.is_none(), |el| {
@@ -1546,39 +1655,42 @@ pub fn progress(label: impl Into<SharedString>, completed: u32, total: Option<u3
         .child(progress_track(completed, total))
 }
 /// Protected information dialog only. Root shell traps/restores focus and Escape.
-pub fn dialog(title: impl IntoElement, body: &'static str, close: AnyElement) -> Div {
-    super::dialog::overlay()
-        .debug_selector(|| "information-dialog-overlay".into())
+pub fn dialog(
+    title: impl IntoElement + 'static,
+    body: &'static str,
+    close: AnyElement,
+    cx: &App,
+) -> Div {
+    let panel = super::dialog::surface(520.)
+        .debug_selector(|| "information-dialog".into())
+        .p_6()
+        .gap_4()
         .child(
-            super::dialog::surface(520.)
-                .debug_selector(|| "information-dialog".into())
-                .p_6()
-                .gap_4()
-                .child(
-                    super::dialog::heading()
-                        .debug_selector(|| "information-dialog-title".into())
-                        .child(title),
-                )
-                .child(super::scrollbar::scrollable(
-                    "information-scrollbar",
-                    div()
-                        .id("information-dialog-body")
-                        .debug_selector(|| "information-dialog-body".into())
-                        .min_h_0()
-                        .max_h(px(360.))
-                        .overflow_y_scroll()
-                        .pr(px(super::scrollbar::GUTTER))
-                        .text_color(rgb(palette().muted))
-                        .text_size(px(15.))
-                        .line_height(px(22.))
-                        .child(
-                            div()
-                                .debug_selector(|| "information-dialog-copy".into())
-                                .child(body),
-                        ),
-                ))
-                .child(super::dialog::footer().child(close)),
+            super::dialog::heading()
+                .debug_selector(|| "information-dialog-title".into())
+                .child(title),
         )
+        .child(super::scrollbar::scrollable(
+            "information-scrollbar",
+            div()
+                .id("information-dialog-body")
+                .debug_selector(|| "information-dialog-body".into())
+                .min_h_0()
+                .max_h(px(360.))
+                .overflow_y_scroll()
+                .pr(px(super::scrollbar::GUTTER))
+                .text_color(rgb(palette().muted))
+                .text_size(px(15.))
+                .line_height(px(22.))
+                .child(
+                    div()
+                        .debug_selector(|| "information-dialog-copy".into())
+                        .child(body),
+                ),
+        ))
+        .child(super::dialog::footer().child(close));
+    super::dialog::present("information-dialog-entrance", panel, cx)
+        .debug_selector(|| "information-dialog-overlay".into())
 }
 
 #[cfg(test)]

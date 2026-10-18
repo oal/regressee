@@ -30,6 +30,7 @@ fn renderer_capture_appearance(cx: &mut TestAppContext) {
             ] {
                 regressee_storage::AppPreferences {
                     appearance: preference,
+                    ..Default::default()
                 }
                 .save(&AppPaths::isolated(dir.path()))
                 .unwrap();

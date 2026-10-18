@@ -186,6 +186,15 @@ failures in ordinary language rather than exposing an automation framework.
   do not override this feedback. Scope and qualification limits:
   `docs/research/theme-coherence-20261017.md`.
 
+- On **2026-10-18**, the user approved restrained app-wide native motion:
+  purposeful control, menu, panel, dialog, review and task-outcome feedback within
+  the current unified-neutral/teal identity. Preserve immediate evidence and
+  navigation operations, focus, validation and explicit save/approval guards.
+  Provide a remembered machine-local reduced-motion choice and retain the
+  environment override. No decorative page/list choreography, new dependency,
+  screenshot crossfade or automatic task continuation. Scope and actual
+  verification: `docs/research/native-motion-20261018.md`.
+
 ## Product Principles
 
 1. Ordinary language, sensible defaults, and a clear next safe action first;

@@ -20,6 +20,7 @@ fn renderer_capture_typography(cx: &mut TestAppContext) {
         for preference in [AppAppearance::Light, AppAppearance::Dark] {
             regressee_storage::AppPreferences {
                 appearance: preference,
+                ..Default::default()
             }
             .save(&AppPaths::isolated(dir.path()))
             .unwrap();

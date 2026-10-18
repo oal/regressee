@@ -6,6 +6,7 @@ use regressee_gui::recovery::Destination;
 use regressee_gui::{
     task::{CaptureDetails, CaptureStatus, Kind, Spec, State, Surface, capture_recovery},
     ui::{
+        motion::{self, Entrance},
         status_icon::{StatusIcon, status_icon},
         web_link,
     },
@@ -1175,11 +1176,19 @@ impl Shell {
                     })
                     .font_weight(FontWeight::SEMIBOLD)
                     .when_some(task.result.as_ref(), |el, result| {
-                        el.child(div().flex_shrink_0().pt(px(5.)).child(status_icon(
-                            result.icon,
-                            tone_ink(result.tone),
-                            24.,
-                        )))
+                        // The authoritative reply owns the outcome. Reveal its
+                        // existing mark once per task; never animate the title,
+                        // counts, evidence or the logical completion boundary.
+                        el.child(motion::enter(
+                            ("task-outcome-mark", task.request),
+                            div().flex_shrink_0().pt(px(5.)).child(status_icon(
+                                result.icon,
+                                tone_ink(result.tone),
+                                24.,
+                            )),
+                            Entrance::Completion,
+                            cx,
+                        ))
                     })
                     .child(
                         div()
@@ -1422,6 +1431,18 @@ impl Shell {
                 ));
             }
         }
+        let actions = if task.result.is_some() {
+            // Actions and focus are available immediately. Only their paint
+            // settles; this does not advance to another screen or save anything.
+            motion::enter(
+                ("task-outcome-actions", task.request),
+                actions,
+                Entrance::Completion,
+                cx,
+            )
+        } else {
+            actions.into_any_element()
+        };
         div()
             .debug_selector(|| "task-panel".into())
             .size_full()
@@ -1499,16 +1520,18 @@ impl Shell {
     }
 
     pub(super) fn task_dialog(&self, cx: &mut Context<Self>) -> AnyElement {
-        regressee_gui::ui::dialog::overlay()
-            .debug_selector(|| "task-dialog-overlay".into())
-            .child(
-                regressee_gui::ui::dialog::surface(600.)
-                    .debug_selector(|| "task-dialog".into())
-                    .h(px(480.))
-                    .overflow_hidden()
-                    .child(self.task_panel(cx)),
-            )
-            .into_any_element()
+        let panel = regressee_gui::ui::dialog::surface(600.)
+            .debug_selector(|| "task-dialog".into())
+            .h(px(480.))
+            .overflow_hidden()
+            .child(self.task_panel(cx));
+        regressee_gui::ui::dialog::present(
+            ("task-dialog-entrance", self.task.as_ref().unwrap().request),
+            panel,
+            cx,
+        )
+        .debug_selector(|| "task-dialog-overlay".into())
+        .into_any_element()
     }
 
     pub(super) fn task_owns_workspace(&self) -> bool {
@@ -1522,6 +1545,87 @@ impl Shell {
 mod tests {
     use super::*;
     use gpui::TestAppContext;
+
+    #[gpui::test]
+    fn outcome_motion_keeps_reply_authority_and_immediate_continue(cx: &mut TestAppContext) {
+        for reduced in [false, true] {
+            for (width, height) in [(1280., 800.), (820., 600.)] {
+                for failed in [false, true] {
+                    let dir = tempfile::tempdir().unwrap();
+                    let paths = AppPaths::isolated(dir.path());
+                    regressee_storage::AppPreferences {
+                        reduced_motion: reduced,
+                        ..Default::default()
+                    }
+                    .save(&paths)
+                    .unwrap();
+                    let (jobs, events) = Jobs::start_without_runtime(paths);
+                    let owned = jobs.clone();
+                    assert_eq!(owned.appearance.wait_loaded().reduced_motion, reduced);
+                    let (shell, cx) = cx.add_window_view(|_, cx| Shell::new(cx, jobs, events));
+                    cx.simulate_resize(size(px(width), px(height)));
+                    cx.update(|window, cx| {
+                        shell.update(cx, |s, cx| {
+                            drain_initial_read(s, cx);
+                            s.next_request = 710;
+                            s.pending = Some(710);
+                            s.focus.busy = true;
+                            s.begin_task(Spec {
+                                kind: Kind::Export,
+                                surface: Surface::Dialog,
+                                title: "Saving baseline ZIP",
+                                stop_label: Some("Cancel export"),
+                                pausable: false,
+                                show_result: true,
+                            });
+                            s.apply_update(
+                                Update {
+                                    id: 709,
+                                    reply: Reply::Exported,
+                                },
+                                cx,
+                            );
+                            assert_eq!(s.task.as_ref().unwrap().state, State::Running);
+                            assert!(s.task.as_ref().unwrap().result.is_none());
+                            s.apply_update(
+                                Update {
+                                    id: 710,
+                                    reply: if failed {
+                                        Reply::ProductFailure("Synthetic export failure.".into())
+                                    } else {
+                                        Reply::Exported
+                                    },
+                                },
+                                cx,
+                            );
+                            assert_eq!(s.task.as_ref().unwrap().state, State::Finished);
+                            let outcome = s.task.as_ref().unwrap().result.as_ref().unwrap();
+                            assert_eq!(outcome.failed, failed);
+                            assert_eq!(matches!(outcome.icon, StatusIcon::Error), failed);
+                            assert!(s.visible_controls().contains(&Control::TaskContinue));
+                            cx.notify();
+                        });
+                        let _ = window.draw(cx);
+                        assert_eq!(cx.global::<controls::ReducedMotion>().0, reduced);
+                    });
+                    let title = cx.debug_bounds("task-title-copy").unwrap();
+                    let actions = cx.debug_bounds("task-actions").unwrap();
+                    assert!(title.top() >= px(0.) && title.bottom() <= px(height));
+                    assert!(actions.top() >= title.bottom() && actions.bottom() <= px(height));
+                    // No timer or animation completion authorizes the next action.
+                    cx.update(|window, cx| {
+                        shell.update(cx, |s, cx| {
+                            s.activate_control(Control::TaskContinue, window, cx);
+                            assert!(s.task.is_none());
+                            assert_ne!(s.pending, Some(710));
+                        });
+                        window.remove_window();
+                    });
+                    owned.join_after_ui();
+                }
+            }
+        }
+    }
 
     #[gpui::test]
     fn every_task_workspace_keeps_the_shared_navigation_brand(cx: &mut TestAppContext) {

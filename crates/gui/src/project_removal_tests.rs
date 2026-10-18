@@ -237,6 +237,7 @@ fn removal_layout(cx: &mut TestAppContext, mut inspect: impl FnMut(&str, &mut Vi
         drop(store);
         regressee_storage::AppPreferences {
             appearance: preference,
+            ..Default::default()
         }
         .save(&paths)
         .unwrap();

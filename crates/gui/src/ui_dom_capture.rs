@@ -44,6 +44,7 @@ fn renderer_capture_dom_workflow(cx: &mut TestAppContext) {
                 };
                 regressee_storage::AppPreferences {
                     appearance: preference,
+                    ..Default::default()
                 }
                 .save(&AppPaths::isolated(fixture.root.path()))
                 .unwrap();

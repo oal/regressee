@@ -74,6 +74,17 @@ fn settings_keyboard_press_release_toggles_once_and_preserves_focus(cx: &mut Tes
                         })
                     });
                 }
+                for reduced in [false, true] {
+                    press(cx, "tab");
+                    cx.update(|window, cx| {
+                        shell.read_with(cx, |s, cx| {
+                            assert_eq!(
+                                s.focused(window, cx),
+                                Some(Control::ReducedMotion(reduced))
+                            );
+                        })
+                    });
+                }
             }
             press(cx, "tab");
             cx.update(|window, cx| {

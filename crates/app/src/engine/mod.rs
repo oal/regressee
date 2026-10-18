@@ -193,6 +193,7 @@ impl Shared {
                         | Request::Jobs { .. }
                         | Request::Events { .. }
                         | Request::Preferences
+                        | Request::AppSettings
                         | Request::Control(
                             crate::control::Command::List
                                 | crate::control::Command::Show { .. }
@@ -214,6 +215,7 @@ impl Shared {
             Request::Stop
                 | Request::AdvanceEpoch { .. }
                 | Request::SetAppearance(_)
+                | Request::SetPreferences(_)
                 | Request::Cancel { .. }
                 | Request::Pause { .. }
         ) {
@@ -460,8 +462,18 @@ impl Shared {
                 Response::Preferences(AppPreferences::load(&self.paths)?.appearance)
             }
             Request::SetAppearance(appearance) => {
-                AppPreferences { appearance }.save(&self.paths)?;
+                AppPreferences::update(
+                    &self.paths,
+                    regressee_storage::PreferencesUpdate {
+                        appearance: Some(appearance),
+                        ..Default::default()
+                    },
+                )?;
                 Response::Preferences(appearance)
+            }
+            Request::AppSettings => Response::AppSettings(AppPreferences::load(&self.paths)?),
+            Request::SetPreferences(update) => {
+                Response::AppSettings(AppPreferences::update(&self.paths, update)?)
             }
         })
     }
@@ -975,7 +987,14 @@ fn run_job(
             )?)));
         }
         if let Operation::SetAppearance(appearance) = submitted.operation {
-            AppPreferences { appearance }.save(&shared.paths)?;
+            let _state = shared.state.lock().unwrap();
+            AppPreferences::update(
+                &shared.paths,
+                regressee_storage::PreferencesUpdate {
+                    appearance: Some(appearance),
+                    ..Default::default()
+                },
+            )?;
             return Ok(Outcome::Runtime("Appearance saved".into()));
         }
         validate_intent(store, &submitted.operation)?;

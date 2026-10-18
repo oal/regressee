@@ -320,7 +320,7 @@ impl Shell {
         } else {
             body = body.child(self.selected_capture_details(cx));
         }
-        div()
+        let panel = div()
             .id("viewer-inspector")
             .shadow(regressee_gui::ui::depth::Elevation::Floating.shadows())
             .debug_selector(|| "viewer-inspector".into())
@@ -552,8 +552,15 @@ impl Shell {
                                 .child(capture_diagnostics::SHARING_NOTE),
                         ),
                 )
-            })
-            .into_any_element()
+            });
+        // Only the flyout paints a short entrance. Its final layout and
+        // occlusion are present immediately; the evidence beneath never moves.
+        regressee_gui::ui::motion::enter(
+            "viewer-inspector-entrance",
+            panel,
+            regressee_gui::ui::motion::Entrance::Panel,
+            cx,
+        )
     }
 
     /// Useful facts only. Exact IDs, descriptors and debug structs are opt-in.
