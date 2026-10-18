@@ -89,6 +89,8 @@ Commands:
   agent start --name NAME [--lease SECONDS] | list | show --id UUID
   agent renew [--lease SECONDS] | end | handoff --message TEXT   (require --session)
   agent select --project ID [--kind screenshot|dom --run ID --analysis ID --page ID --profile ID --view compare|before|after|difference|overlay|split] (requires --session; DOM has no overlay/split)
+  integrations status [--host claude-code|codex|github-copilot]
+  integrations install|remove --host claude-code|codex|github-copilot
   capabilities | --version | --build-info | help [AREA]
 
 Complex JSON accepts --file - for bounded stdin. No interactive prompts or --yes.
@@ -276,6 +278,7 @@ fn strict_input<T: DeserializeOwned + serde::Serialize>(path: &str) -> Result<T>
     bail!("invalid_input: expected the exact returned kind approval preview")
 }
 pub enum Plan {
+    Integration { action: String, host: Option<regressee_app::agent_integrations::Host> },
     Agent(regressee_app::control::Command),
     Operation(Operation),
     Configure {
@@ -495,6 +498,11 @@ pub fn plan(a: &mut Args) -> Result<Plan> {
     let area = words[0].to_owned();
     let action = words.get(1).unwrap_or(&"").to_string();
     let operation = match (area.as_str(), action.as_str()) {
+        ("integrations", "status" | "install" | "remove") => {
+            let host = a.take("--host").map(|h| regressee_app::agent_integrations::Host::parse(&h)).transpose()?;
+            ensure!(action == "status" || host.is_some(), "invalid_arguments: --host is required for install/remove");
+            return Ok(Plan::Integration { action, host });
+        }
         ("agent", "start") => {
             return Ok(Plan::Agent(regressee_app::control::Command::Start {
                 name: a.need("--name")?,

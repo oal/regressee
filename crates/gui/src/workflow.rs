@@ -771,6 +771,22 @@ impl Shell {
                 .into_any_element();
         }
         let pages = self.focus.review_surface == ReviewSurface::Pages || self.preview.is_some();
+        let reviewing = self.history_inspection.is_none()
+            && (ReviewProgress::from_evidence(&self.evidence).remaining > 0
+                || self
+                    .evidence
+                    .dom_comparison
+                    .as_ref()
+                    .is_some_and(|analysis| {
+                        analysis.revision.results.iter().any(|result| {
+                            result.outcome.needs_review()
+                                && self
+                                    .saved_dom_decision(analysis.revision.id, &result.key)
+                                    .is_none_or(|d| {
+                                        d.state == regressee_core::domain::ReviewState::Unreviewed
+                                    })
+                        })
+                    }));
         let mut actions = div().flex().flex_wrap().items_center().gap_2();
         if self.focus.candidate {
             actions = actions.child(self.button(
@@ -792,7 +808,7 @@ impl Shell {
             actions = actions.child(self.button(
                 Control::CheckChanges,
                 "Run check",
-                if self.focus.candidate {
+                if self.focus.candidate || reviewing {
                     ActionStyle::Secondary
                 } else {
                     ActionStyle::Primary
@@ -1676,14 +1692,10 @@ impl Shell {
             )
             .child(
                 div().flex().flex_shrink_0().flex_wrap().gap_2()
-                    .when(self.control_mounted(Control::Phase5(23)), |actions| actions.child(self.button(
+                     .when(self.control_mounted(Control::Phase5(23)), |actions| actions.child(self.toggle_control(
                           Control::Phase5(23),
-                          if selected {
-                              "Deselect After screenshot"
-                          } else {
-                              "Select After screenshot"
-                        },
-                         ActionStyle::Choice { selected },
+                          "Include After screenshot",
+                          selected,
                          cx,
                     )))
                     .when(self.control_mounted(Control::Phase5(24)), |actions| actions.child(self.button(

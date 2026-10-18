@@ -219,6 +219,51 @@ not its dated verification records or unchanged appearance-preference behavior.
 Both palettes and foreground/shadow aliases are normative in the frontmatter;
 the native sidecar maps each semantic role to its light or `dark-` sibling.
 
+### Action hierarchy — 2026-10-18
+
+User-approved app-wide Operate refinement after the action-hierarchy critique,
+with **adaptive toolbar labels**. Preserve unified neutrals/teal, system type,
+40px targets, explicit save/delete/capture/baseline authority and independent
+screenshot/DOM evidence. No new dependency, palette, font, raster or motion.
+
+- Content destinations use flat, underlined **tabs**: Screenshots / DOM snapshot
+  and History's Runs / Baselines / Storage. Current selection has a structural
+  underline as well as accent ink; these are not raised commands.
+- Exclusive view/value choices use a connected neutral **segmented tray** with
+  a surface/teal-boundary selected item: DOM presentation, single-image side,
+  review decisions, sensitivity and History run type. Review decisions remain
+  saved judgments, not navigation. All retain their existing activation guards.
+- Independent baseline inclusion, page inclusion and source context use a drawn
+  **checkbox toggle**. Selecting a reference never saves or approves a baseline.
+- **Quiet** icon-plus-label commands separate supporting actions such as Review
+  note and project editing from framed secondary and filled primary commands.
+  Destructive operations retain explicit labels and protected confirmation.
+- Project settings retains its approved continuous form and **Jump to anchors**,
+  not tabs. Form radios, checkboxes and disclosures remain unchanged.
+- Results / Details / Analysis / Image controls show visible toolbar labels at
+  900px working width and above; the simpler DOM toolbar keeps labels from 640px.
+  Compact icon-only forms retain their concise keyboard/pointer names. DOM view
+  selection joins that toolbar rather than consuming a separate source-stage row.
+- Left/Right/Home/End moves focus within compact exclusive groups; Enter/Space
+  explicitly activates. Arrow focus never writes a decision, changes a draft or
+  selects a reference. Existing Tab/reverse-Tab reading order and hidden/disabled
+  filtering remain; DOM presentation follows Results before the queue.
+- Run check remains available but secondary while unreviewed changes remain;
+  completing review restores its primary emphasis. Baseline confirmation remains
+  a visibly separate workflow with its future-check explanation before selection.
+
+Implementation: `crates/gui/src/action_hierarchy.rs`, shared native controls and
+the incumbent surface adapters. Scope and actual verification, including native
+accessibility/platform limits: `docs/research/action-hierarchy-20261018.md`.
+
+Finish: 188 focused tests, the production build and strict shared-UI-library lint
+passed. The one final native confirmation covers 48 synthetic light/dark frames
+at normal/compact desktop sizes, including the repaired History text layer. Two
+pre-existing test failures and production-binary lint blockers remain documented.
+Concurrent integration edits limit current-tree source freshness; no whole-app,
+native-input/accessibility, cross-platform or release pass is claimed. No further
+visual polishing round; see the scoped report and its receipts.
+
 **Key Characteristics:**
 - Persistent project context and a clear next safe action.
 - Real coverage beside a searchable queue and untinted comparison evidence.
@@ -1612,3 +1657,30 @@ remain unchanged. Verification scope and native/platform limits:
 - **Don't** tint screenshot evidence or replace it with decorative imagery.
 - **Don't** call simulated focus/IME tests a native or screen-reader pass.
 - **Don't** equate direction approval, source contrast checks or offscreen captures with usability or release approval.
+
+## Personal agent integrations — 2026-10-18
+
+An ordinary App settings extension of Clear wayfinding, not a new visual system.
+The **Agent integrations** disclosure follows Reduce motion in the existing
+680px-bounded scrolling column. Three ruled host rows name Claude Code, Codex
+and GitHub Copilot, their verified-file state and local path, with explicit
+**Install skill / Update skill / Remove skill / Check again** actions. Reuse
+neutral/teal themes, installed system type, shared 40px-minimum controls and
+13px/18px supporting copy; no new tokens, assets, dependency or motion.
+
+Pending, result and error feedback belongs to the affected host row. Reveal the
+local action and feedback in the real settings scroller; on completion, retain
+or restore the next enabled local action only while the initiating handle still
+owns focus. Never take focus back from navigation, another control or a dialog.
+Installation is reversible managed-file setup, not host loading or permission
+approval. Preserve edited/unrelated files, drafts, evidence and explicit human
+Follow agent / Take control authority; cloud sessions do not connect automatically.
+
+Source: `crates/gui/src/agent_integrations_ux.rs` and `app_settings_ux.rs`, with
+the shared installer in `crates/app/src/agent_integrations.rs`. Independent final
+**SHIP covers only the two scored feedback/focus fixes**, not the whole surface.
+The 48 source-bound Linux GPUI offscreen confirmation pairs cover both themes
+at 1280×800 and 820×600; compact document-bottom views prove the cloud limitation,
+not every preceding guidance line. Verification and native/platform/real-host
+limits: `docs/research/agent-integrations-20261018.md`. No new shipping raster
+requires provenance; incumbent tokens, sidecar and unrelated work remain unchanged.

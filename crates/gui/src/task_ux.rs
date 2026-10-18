@@ -947,6 +947,21 @@ impl Shell {
         let mut controls = self.focus.controls();
         if self.focus.screen == Screen::Results && !self.focus.dialog && !self.focus.approval_dialog
         {
+            // DOM view selection now belongs to the full-width toolbar, before
+            // the queue. Complete-source commands in Details retain their old
+            // evidence/inspector reading order instead of moving with it.
+            if self.dom_active()
+                && !self.viewer_inspector_open()
+                && let Some(toolbar) = controls.iter().position(|c| *c == Control::Guided(50))
+            {
+                let views: Vec<_> = controls
+                    .iter()
+                    .copied()
+                    .filter(|c| matches!(c, Control::DomSource(_)))
+                    .collect();
+                controls.retain(|c| !matches!(c, Control::DomSource(_)));
+                controls.splice(toolbar + 1..toolbar + 1, views);
+            }
             // Page previews and unavailable captures put their evidence controls
             // after the queue. Loaded inspection puts the toolbar above both.
             if !self.inspection_chrome_mounted()

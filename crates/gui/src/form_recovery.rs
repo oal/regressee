@@ -81,6 +81,10 @@ impl Shell {
                     | Control::About
                     | Control::Appearance(_)
                     | Control::ReducedMotion(_)
+                    | Control::AgentInstall(_)
+                    | Control::AgentRemove(_)
+                    | Control::AgentRetry(_)
+                    | Control::AgentRefresh
                     | Control::Shortcuts
             );
         if !secondary_action

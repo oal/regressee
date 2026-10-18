@@ -10,8 +10,10 @@ release qualification. The existing private-check workflow remains separate.
 
 Once the workflow is committed and pushed to the default branch, open
 **Actions → Downloadable Linux and Windows previews → Run workflow**. Choose the
-branch containing the source you want to test. This creates an immutable
-`preview-<run-number>-<short-commit>` release. Alternatively, push a new `v*` tag
+branch containing the source you want to test. Leave `release_tag` empty for an
+immutable `preview-<run-number>-<short-commit>` release, or supply a new version such
+as `v0.1.0-preview.9`. A named manual release creates its tag only after both
+platforms pass their checks. Alternatively, push a new `v*` tag
 (for example, `v0.1.0-preview.1`) to build and publish under that tag. Both triggers
 currently produce experimental prereleases, never a supported stable release.
 

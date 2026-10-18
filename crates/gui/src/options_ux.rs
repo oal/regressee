@@ -254,13 +254,10 @@ impl Shell {
             selected_group =
                 selected_group.child(help("Select a page in the list to change its inclusion."));
         }
-        selected_group = selected_group.child(self.guided_button(
-            22,
-            if selected.is_some_and(|p| p.included) {
-                "Exclude page"
-            } else {
-                "Include page"
-            },
+        selected_group = selected_group.child(self.toggle_control(
+            Control::Guided(22),
+            "Include page in capture",
+            selected.is_some_and(|p| p.included),
             cx,
         ));
         let matches_group = group("Search matches")

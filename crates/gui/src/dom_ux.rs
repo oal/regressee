@@ -128,11 +128,13 @@ impl Shell {
             .flex()
             .flex_wrap()
             .items_center()
-            .gap_2()
+            .gap_0()
+            .border_b_1()
+            .border_color(rgb(palette().line))
             .child(self.button(
                 Control::EvidenceKind(CheckKind::Screenshot),
                 "Screenshots",
-                ActionStyle::Choice {
+                ActionStyle::Tab {
                     selected: !self.dom_active(),
                 },
                 cx,
@@ -140,7 +142,7 @@ impl Shell {
             .child(self.button(
                 Control::EvidenceKind(CheckKind::DomSnapshot),
                 "DOM snapshot",
-                ActionStyle::Choice {
+                ActionStyle::Tab {
                     selected: self.dom_active(),
                 },
                 cx,
@@ -149,6 +151,7 @@ impl Shell {
                 div()
                     .flex_1()
                     .min_w(px(160.))
+                    .pl_3()
                     .text_size(px(HELP_TEXT_SIZE))
                     .line_height(px(HELP_LINE_HEIGHT))
                     .text_color(rgb(palette().muted))
@@ -681,7 +684,7 @@ impl Shell {
         rows
     }
     pub(super) fn dom_stage(&self, cx: &mut Context<Self>) -> AnyElement {
-        let mut stage = div()
+        let stage = div()
             .debug_selector(|| "dom-evidence-stage".into())
             .flex_1()
             .min_h_0()
@@ -690,37 +693,35 @@ impl Shell {
             .flex()
             .flex_col()
             .gap_1();
-        if !self.viewer_inspector_open()
-            && self.dom_source_available(1)
-            && self.dom_source_available(2)
-        {
-            stage = stage.child(
-                div().flex_shrink_0().flex().flex_wrap().gap_1().children(
-                    [
-                        (DomPresentation::Diff, "Diff"),
-                        (DomPresentation::Before, "Before source"),
-                        (DomPresentation::After, "After source"),
-                    ]
-                    .into_iter()
-                    .enumerate()
-                    .map(|(index, (presentation, label))| {
-                        self.button(
-                            Control::DomSource(index),
-                            label,
-                            ActionStyle::Choice {
-                                selected: self.dom.presentation == presentation,
-                            },
-                            cx,
-                        )
-                    }),
-                ),
-            );
-        }
         stage
             .child(div().flex_1().min_h_0().child(self.dom.source.clone()))
             .when(self.viewer_inspector_open(), |stage| {
                 stage.child(self.viewer_inspector(cx))
             })
+            .into_any_element()
+    }
+
+    pub(super) fn dom_view_choices(&self, cx: &mut Context<Self>) -> AnyElement {
+        controls::segmented_group("dom-view-choices")
+            .children(
+                [
+                    (DomPresentation::Diff, "Diff"),
+                    (DomPresentation::Before, "Before source"),
+                    (DomPresentation::After, "After source"),
+                ]
+                .into_iter()
+                .enumerate()
+                .map(|(index, (presentation, label))| {
+                    self.button(
+                        Control::DomSource(index),
+                        label,
+                        ActionStyle::Segment {
+                            selected: self.dom.presentation == presentation,
+                        },
+                        cx,
+                    )
+                }),
+            )
             .into_any_element()
     }
 }

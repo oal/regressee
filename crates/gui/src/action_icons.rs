@@ -14,7 +14,12 @@ impl Shell {
             PagesBaseline => ToolIcon::Baselines,
             SettingsSection(self::SettingsSection::Website) => ToolIcon::Globe,
             SettingsSection(self::SettingsSection::Capture) => ToolIcon::Camera,
-            SettingsSection(self::SettingsSection::Access) => ToolIcon::Globe,
+            SettingsSection(self::SettingsSection::Access) => ToolIcon::Lock,
+            EvidenceKind(regressee_core::domain::CheckKind::Screenshot) => ToolIcon::Image,
+            EvidenceKind(regressee_core::domain::CheckKind::DomSnapshot) => ToolIcon::Source,
+            Phase6(16) => ToolIcon::Runs,
+            Phase6(17) => ToolIcon::Baselines,
+            Phase6(18) => ToolIcon::Storage,
             NewProject => ToolIcon::FolderPlus,
             SelectProject(_) => match self.focus.screen {
                 Screen::History => ToolIcon::Runs,
@@ -41,6 +46,9 @@ impl Shell {
             CaptureBaseline => ToolIcon::Camera,
             Guided(13) => ToolIcon::Zoom,
             SetupRuntime => ToolIcon::Download,
+            AgentInstall(_) => ToolIcon::Download,
+            AgentRemove(_) => ToolIcon::Trash,
+            AgentRefresh | AgentRetry(_) => ToolIcon::Refresh,
             About => ToolIcon::Help,
             Shortcuts => ToolIcon::Keyboard,
             ReviewDetails | DiscoveryDetails | Phase7(0) => ToolIcon::Details,
@@ -71,7 +79,18 @@ impl Shell {
             DeleteProject(_) | DeleteCurrentProject | RemoveEnvironment | RemoveMapping(_) => {
                 ToolIcon::Trash
             }
-            Phase6(19) => ToolIcon::Image,
+            Phase6(19) => {
+                let check = self
+                    .history
+                    .as_ref()
+                    .and_then(|h| h.runs.get(self.run_history_index))
+                    .is_some_and(|r| matches!(r.run.intent, RunIntent::Check { .. }));
+                if check {
+                    ToolIcon::Compare
+                } else {
+                    ToolIcon::Image
+                }
+            }
             Phase6(13) => ToolIcon::Storage,
             CopyCaptureDiagnostics => ToolIcon::Copy,
             _ => return None,

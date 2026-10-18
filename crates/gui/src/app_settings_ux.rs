@@ -343,6 +343,7 @@ impl Shell {
             .child(self.settings_browser(cx))
             .child(self.settings_appearance(cx))
             .child(self.settings_motion(cx))
+            .child(self.settings_integrations(cx))
             .child(self.settings_storage(cx))
             .child(self.settings_network(cx))
             .child(support)

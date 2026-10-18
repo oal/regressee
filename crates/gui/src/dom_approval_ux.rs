@@ -272,18 +272,19 @@ impl Shell {
                 self.approval_selection.contains(key)
             }
         });
-        let label = match (self.dom_active(), selected) {
-            (true, false) => "Select After DOM snapshot",
-            (true, true) => "Deselect After DOM snapshot",
-            (false, false) => "Select After screenshot",
-            (false, true) => "Deselect After screenshot",
+        let label = if self.dom_active() {
+            "Include After DOM snapshot"
+        } else {
+            "Include After screenshot"
         };
         div().debug_selector(|| "kind-approval-footer".into()).flex_shrink_0().px_6().py_2().bg(rgb(palette().surface)).border_t_1().border_color(rgb(palette().line))
             .flex().flex_col().gap_2()
             .child(div().flex().flex_wrap().items_baseline().gap_2().child(div().font_weight(FontWeight::SEMIBOLD).child("Update baseline"))
                 .child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted))
-                    .child(format!("{} screenshots · {} DOM snapshots selected", self.approval_selection.len(), self.dom.selected.len()))))
-            .child(div().flex().flex_wrap().gap_2().when(self.control_mounted(Control::Phase5(23)), |row| row.child(self.button(Control::Phase5(23), label, ActionStyle::Choice { selected }, cx)))
+                     .child(format!("{} screenshots · {} DOM snapshots selected", self.approval_selection.len(), self.dom.selected.len()))))
+            .child(div().debug_selector(|| "baseline-update-explanation".into()).text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted))
+                .child("Use After as the reference for future checks. Review before saving."))
+            .child(div().flex().flex_wrap().gap_2().when(self.control_mounted(Control::Phase5(23)), |row| row.child(self.toggle_control(Control::Phase5(23), label, selected, cx)))
                 .when(self.control_mounted(Control::Phase5(24)), |row| row.child(self.button(Control::Phase5(24), "Review update…", ActionStyle::Primary, cx))))
             .when(!self.approval_selection.is_empty() || !self.dom.selected.is_empty(), |bar| bar.child(div().text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).text_color(rgb(palette().muted)).child(
                 if self.kind_approval_selection_valid() { "Only the explicitly selected kinds will change. Review their sources before saving." } else { "A selection is stale or cannot update the baseline. Deselect it or refresh; nothing has been saved." })))

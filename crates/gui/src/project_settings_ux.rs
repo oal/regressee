@@ -50,7 +50,7 @@ impl Shell {
                         self.button(
                             Control::SettingsSection(section),
                             section.label(),
-                            ActionStyle::Choice {
+                            ActionStyle::Anchor {
                                 selected: section == current,
                             },
                             cx,

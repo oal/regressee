@@ -297,7 +297,6 @@ impl Shell {
                 .flex_wrap()
                 .items_center()
                 .gap_1()
-                .pb_2()
                 .border_b_1()
                 .border_color(rgb(palette().line))
                 .children(
@@ -305,12 +304,12 @@ impl Shell {
                         .into_iter()
                         .enumerate()
                         .map(|(section, label)| {
-                            self.tool_control(
+                            self.action_control(
                                 Control::Phase6(16 + section),
-                                [ToolIcon::Runs, ToolIcon::Baselines, ToolIcon::Storage][section],
-                                Some(label),
                                 label,
-                                self.history_section == section,
+                                ActionStyle::Tab {
+                                    selected: self.history_section == section,
+                                },
                                 cx,
                             )
                         }),
@@ -524,22 +523,17 @@ impl Shell {
             .flex_col()
             .gap_2()
             .child(
-                div().flex().flex_wrap().gap_2().children(
+                controls::segmented_group("history-run-type-choices").children(
                     ["All runs", "Checks", "Baseline captures", "Previews"]
                         .into_iter()
                         .enumerate()
                         .map(|(kind, label)| {
-                            self.tool_control(
+                            self.action_control(
                                 Control::HistoryKind(kind),
-                                [
-                                    ToolIcon::Runs,
-                                    ToolIcon::Compare,
-                                    ToolIcon::Baselines,
-                                    ToolIcon::Image,
-                                ][kind],
-                                Some(label),
                                 label,
-                                self.history_kind == kind,
+                                ActionStyle::Segment {
+                                    selected: self.history_kind == kind,
+                                },
                                 cx,
                             )
                         }),

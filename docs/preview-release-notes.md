@@ -1,17 +1,35 @@
-# DOM comparisons and project management — preview.8
+# Agent integrations and clearer native controls — preview.9
 
-This preview adds independent DOM snapshot comparisons, complete project-removal
-controls, and fixes for new-project access saves and engine upgrade recovery,
-alongside the existing desktop and CLI workflows.
+This preview adds one-click personal agent skill setup and clearer native controls,
+alongside independent DOM snapshot comparisons, project management, and the existing
+desktop and CLI workflows.
 It remains an **unsigned experimental prerelease**, not a supported
 release. The release's source commit and each archive's `build-info.json` identify
 the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
 
-- This retries the unpublished `preview.6` / `preview.7` builds with the required
-  source-policy report argument, fresh package parent and canonical Windows test
-  destination. Named manual releases create their version tag only after checks.
+- **App settings → Agent integrations** installs the bundled Regressee skill for
+  Claude Code, Codex or GitHub Copilot across your local projects. Update/remove
+  controls preserve edited or unrelated files. Setup binds the exact local CLI,
+  data and cache paths without changing host permissions or enabling following.
+  Matching `integrations status|install|remove` commands work without starting an
+  engine. Installed means verified skill files, not a tested host connection;
+  actual host loading and permissions still need validation. Cloud sessions do
+  not automatically connect to the desktop. See [agent setup](agent-skill.md).
+- Agent setup keeps activity, success and errors in the affected host row, with
+  visible local keyboard focus. Completion never takes focus back after you move
+  elsewhere. Existing live saved-data/activity updates and explicit human
+  **Follow agent / Take control** remain unchanged.
+- Tabs, connected choices, independent checkboxes and supporting commands now
+  have distinct native treatments. DOM view choices share the inspection toolbar;
+  toolbar labels adapt to available width. Arrow/Home/End keys move focus between
+  choices without saving a decision. Enter/Space still activates explicitly.
+  Baseline inclusion labels stay stable, and History row text remains readable
+  over its selection/hover treatment. Capture, review and consent guards remain.
+- The release workflow retains the source-policy report, fresh package parent
+  and canonical Windows test destination repaired for `preview.8`.
+  Named manual releases create their version tag only after checks.
   Source/privacy checks and application tests remain mandatory on both platforms.
 - A Windows host job that forbids detached processes remains unsupported for
   background-engine launch. The launcher refuses rather than silently tying the

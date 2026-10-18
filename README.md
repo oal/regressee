@@ -93,9 +93,11 @@ GUI opt-in, with immediate Take control and temporary human handoff. See
 [agent control usage](docs/cli.md#agent-control-and-optional-gui-following).
 See the [engine contract](docs/local-engine.md) and
 [implementation status](docs/agent-cli-status.md) for limits and verification.
-For tool-neutral agents, manually install [the portable skill](docs/agent-skill.md)
-or supply `skills/regressee/SKILL.md` and its references. No host-specific integration
-is implied. A safe [consumer exercise](docs/cli-consumer-exercise.md) uses only the
+In **App settings → Agent integrations**, install the local Regressee skill for
+Claude Code, Codex or GitHub Copilot with one click. Matching `integrations`
+commands and [manual portable-skill setup](docs/agent-skill.md) are also available.
+Installation verifies local files, not host loading or permissions; following
+remains an explicit human choice. A safe [consumer exercise](docs/cli-consumer-exercise.md) uses only the
 packaged CLI and an owned loopback website.
 
 Unknown-duration progress bars animate independently of page-count updates.

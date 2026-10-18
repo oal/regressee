@@ -12,13 +12,28 @@ use std::time::{Duration, Instant};
 pub struct ReducedMotion(pub bool);
 impl Global for ReducedMotion {}
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ActionStyle {
     Primary,
     Secondary,
+    Quiet,
     Danger,
-    Navigation { selected: bool },
-    Choice { selected: bool },
+    Navigation {
+        selected: bool,
+    },
+    Tab {
+        selected: bool,
+    },
+    Segment {
+        selected: bool,
+    },
+    Anchor {
+        selected: bool,
+    },
+    /// Full-width descriptive form choices, not compact view selectors.
+    Choice {
+        selected: bool,
+    },
 }
 
 fn action_colors(style: ActionStyle) -> (u32, u32, u32, u32) {
@@ -34,6 +49,48 @@ fn action_colors(style: ActionStyle) -> (u32, u32, u32, u32) {
             palette().ink,
             palette().control_line,
             palette().action_hover,
+        ),
+        ActionStyle::Quiet => (
+            palette().ground,
+            palette().ink,
+            palette().ground,
+            palette().action_hover,
+        ),
+        ActionStyle::Tab { selected } | ActionStyle::Anchor { selected } => (
+            if selected {
+                palette().surface
+            } else {
+                palette().ground
+            },
+            if selected {
+                palette().accent_hover
+            } else {
+                palette().ink
+            },
+            if selected {
+                palette().accent
+            } else {
+                palette().line
+            },
+            palette().action_hover,
+        ),
+        ActionStyle::Segment { selected } => (
+            if selected {
+                palette().surface
+            } else {
+                palette().action_hover
+            },
+            if selected {
+                palette().accent_hover
+            } else {
+                palette().ink
+            },
+            if selected {
+                palette().accent
+            } else {
+                palette().action_hover
+            },
+            palette().selected,
         ),
         ActionStyle::Danger => (
             palette().error_surface,
@@ -101,9 +158,43 @@ fn action_base(style: ActionStyle) -> Div {
         .border_color(rgb(border))
         .bg(rgb(background))
         .when(
-            !matches!(style, ActionStyle::Navigation { selected: false }),
+            matches!(
+                style,
+                ActionStyle::Primary
+                    | ActionStyle::Secondary
+                    | ActionStyle::Danger
+                    | ActionStyle::Navigation { selected: true }
+                    | ActionStyle::Choice { .. }
+            ),
             |el| el.shadow(Elevation::Control.shadows()),
         )
+        .when(matches!(style, ActionStyle::Quiet), |el| {
+            el.border_color(transparent_black())
+        })
+        .when(
+            matches!(style, ActionStyle::Tab { .. } | ActionStyle::Anchor { .. }),
+            |el| {
+                el.border_0()
+                    .border_b_2()
+                    .rounded(px(0.))
+                    .border_color(match style {
+                        ActionStyle::Anchor { selected: false } => transparent_black(),
+                        _ => rgb(border).into(),
+                    })
+            },
+        )
+        .when(matches!(style, ActionStyle::Segment { .. }), |el| {
+            el.px(px(10.))
+                .py(px(0.))
+                .h(px(CONTROL_HEIGHT))
+                .border_color(
+                    if matches!(style, ActionStyle::Segment { selected: true }) {
+                        rgb(palette().accent).into()
+                    } else {
+                        transparent_black()
+                    },
+                )
+        })
         .text_color(rgb(text))
         .text_size(px(CONTROL_TEXT_SIZE))
         .line_height(px(CONTROL_LINE_HEIGHT))
@@ -327,6 +418,11 @@ pub(super) fn action_frame_colors(
 ) -> Stateful<Div> {
     let id = id.into();
     let action_selector = id.clone();
+    let background = if matches!(style, ActionStyle::Quiet | ActionStyle::Anchor { .. }) {
+        transparent_black()
+    } else {
+        background
+    };
     interaction_colors(
         action_base(style).bg(background).id(id),
         focus,
@@ -346,6 +442,59 @@ pub(super) fn action_frame_colors(
         },
     )
     .debug_selector(move || format!("action-{action_selector}"))
+}
+
+/// One connected tray for exclusive values. Each item retains a 40px target;
+/// callers own the values, focus order and guarded activation, not this paint.
+pub fn segmented_group(id: &'static str) -> Div {
+    let mut group = div()
+        .debug_selector(move || id.into())
+        .flex()
+        .flex_wrap()
+        .items_center()
+        .gap_0()
+        .min_w_0()
+        .max_w_full()
+        .flex_shrink_0()
+        .border_0()
+        .rounded(px(5.))
+        .bg(rgb(palette().action_hover));
+    group.style().align_self = Some(AlignSelf::FlexStart);
+    group
+}
+
+/// Compact independent membership/view toggle, never a command or a tab.
+/// The drawn check remains immediate; focus and activation use ordinary guards.
+pub fn toggle(
+    id: impl Into<ElementId>,
+    label: impl Into<SharedString>,
+    focus: &FocusHandle,
+    checked: bool,
+    enabled: bool,
+) -> Stateful<Div> {
+    let id = id.into();
+    let label_id = id.clone();
+    action_frame(id, focus, ActionStyle::Quiet, enabled)
+        .gap(px(8.))
+        .justify_start()
+        .px(px(8.))
+        .child(indicator_base(checked, false).when(checked, |el| {
+            el.child(
+                canvas(
+                    |_, _, _| (),
+                    |bounds, (), window, _| {
+                        if let Ok(path) = check_path(bounds) {
+                            window.paint_path(path, rgb(palette().on_accent));
+                        }
+                    },
+                )
+                .size(px(12.)),
+            )
+        }))
+        .child(ActionLabel {
+            id: label_id,
+            text: label.into(),
+        })
 }
 
 fn selection_base(selected: bool) -> Div {
@@ -1468,10 +1617,15 @@ pub fn history_row(
     selected: bool,
     enabled: bool,
 ) -> Stateful<Div> {
+    let id = id.into();
     interaction(
-        // page_row owns pointer-only hover; interaction owns focus/hover for
-        // keyboard rows. Registering both hover handlers panics in GPUI.
-        page_row(id, title, details, selected, false).flex_shrink_0(),
+        // Mount the animated background BEFORE the row's copy. Applying
+        // interaction to an already populated page_row paints over its text.
+        div()
+            .id(SharedString::from(format!("history-frame-{id}")))
+            .w_full()
+            .min_w_0()
+            .flex_shrink_0(),
         focus,
         enabled,
         palette().selected,
@@ -1481,6 +1635,9 @@ pub fn history_row(
             palette().surface
         },
     )
+    // Only the outer frame owns input/hover; the inner row retains its labels,
+    // ellipsis, dimensions and separator over a transparent background.
+    .child(page_row(id, title, details, selected, false).bg(transparent_black()))
 }
 
 fn progress_fraction(completed: u32, total: Option<u32>) -> Option<f32> {
@@ -1749,14 +1906,21 @@ mod tests {
         );
     }
 
-    const ACTION_STYLES: [ActionStyle; 7] = [
+    const ACTION_STYLES: [ActionStyle; 14] = [
         ActionStyle::Primary,
         ActionStyle::Secondary,
+        ActionStyle::Quiet,
         ActionStyle::Danger,
         ActionStyle::Navigation { selected: false },
         ActionStyle::Navigation { selected: true },
         ActionStyle::Choice { selected: false },
         ActionStyle::Choice { selected: true },
+        ActionStyle::Tab { selected: false },
+        ActionStyle::Tab { selected: true },
+        ActionStyle::Segment { selected: false },
+        ActionStyle::Segment { selected: true },
+        ActionStyle::Anchor { selected: false },
+        ActionStyle::Anchor { selected: true },
     ];
 
     fn merged_base(mut element: Div) -> Style {
@@ -1946,12 +2110,39 @@ mod tests {
         }
         for selected in [false, true] {
             assert!(merged_base(selection_base(selected)).box_shadow.is_empty());
+            for variant in [
+                ActionStyle::Tab { selected },
+                ActionStyle::Segment { selected },
+                ActionStyle::Anchor { selected },
+                ActionStyle::Quiet,
+            ] {
+                assert!(
+                    merged_base(action_base(variant)).box_shadow.is_empty(),
+                    "{variant:?}"
+                );
+            }
         }
         assert!(
             merged_base(action_base(ActionStyle::Navigation { selected: false }))
                 .box_shadow
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn semantic_selection_ink_is_readable_in_both_themes() {
+        for dark in [false, true] {
+            set_dark(dark);
+            for variant in ACTION_STYLES {
+                let (background, ink, _, hover) = action_colors(variant);
+                assert!(contrast(ink, background) >= 4.5, "{variant:?}, dark={dark}");
+                assert!(
+                    contrast(ink, hover) >= 4.5,
+                    "hover {variant:?}, dark={dark}"
+                );
+            }
+        }
+        set_dark(false);
     }
 
     #[test]

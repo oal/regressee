@@ -10,6 +10,8 @@ use std::{
     path::{Path, PathBuf},
 };
 
+#[path = "ui_action_hierarchy_capture.rs"]
+mod ui_action_hierarchy_capture;
 #[path = "ui_agent_capture.rs"]
 mod ui_agent_capture;
 #[path = "ui_app_settings_capture.rs"]
@@ -197,6 +199,10 @@ fn write_frame(
               ,"phase3_harness_source_sha256": hex::encode(Sha256::digest(include_bytes!("ui_phase3_capture.rs")))
         });
         for (key, source) in [
+            ("agent_integrations_source_sha256", include_bytes!("agent_integrations_ux.rs").as_slice()),
+            ("agent_installer_source_sha256", include_bytes!("../../app/src/agent_integrations.rs").as_slice()),
+            ("action_hierarchy_source_sha256", include_bytes!("action_hierarchy.rs").as_slice()),
+            ("action_hierarchy_harness_source_sha256", include_bytes!("ui_action_hierarchy_capture.rs").as_slice()),
             ("keyboard_test_source_sha256", include_bytes!("keyboard_navigation_tests.rs").as_slice()),
             ("keyboard_harness_source_sha256", include_bytes!("ui_keyboard_capture.rs").as_slice()),
             ("blade_shader_source_sha256", include_bytes!("../../../vendor/gpui/src/platform/blade/shaders.wgsl").as_slice()),

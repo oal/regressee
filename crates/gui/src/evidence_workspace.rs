@@ -321,7 +321,7 @@ impl Shell {
             tools = tools.child(self.tool_control(
                 Control::Guided(50),
                 ToolIcon::Results,
-                None,
+                self.inspection_tool_label("Results"),
                 if self.review_queue_collapsed {
                     "Show results"
                 } else {
@@ -332,6 +332,9 @@ impl Shell {
             ));
         }
         tools = tools.child(toolbar::separator());
+        if self.dom_active() && self.control_mounted(Control::DomSource(0)) {
+            tools = tools.child(self.dom_view_choices(cx));
+        }
         if self.control_mounted(Control::Guided(54)) {
             let label = match self.toolbar_viewer_mode() {
                 1 => "Difference",
@@ -388,29 +391,16 @@ impl Shell {
                     ),
             );
             if self.viewer_mode == 4 {
-                let mut sides = div()
-                    .debug_selector(|| "single-image-sides".into())
-                    .flex()
-                    .flex_shrink_0()
-                    .gap_1();
+                let mut sides = controls::segmented_group("single-image-sides");
                 for (control, label, selected) in [
                     (Control::Guided(57), "Before", !self.full_width_after),
                     (Control::Guided(56), "After", self.full_width_after),
                 ] {
                     // Both destinations stay visible. Selecting the current side
                     // is deliberately idempotent, unlike the old swap action.
-                    let choice = controls::action(
-                        SharedString::from(format!("{control:?}")),
-                        label,
-                        &self.handle(control, cx),
-                        ActionStyle::Choice { selected },
-                        self.control_enabled(control, cx),
-                    )
-                    .shadow(Vec::new())
-                    .h(px(CONTROL_HEIGHT))
-                    .px(px(8.))
-                    .py(px(0.));
-                    sides = sides.child(self.wire_action_control(control, choice, cx));
+                    let choice =
+                        self.action_control(control, label, ActionStyle::Segment { selected }, cx);
+                    sides = sides.child(choice);
                 }
                 tools = tools.child(sides);
             }
@@ -427,7 +417,7 @@ impl Shell {
             tools = tools.child(self.tool_control(
                 Control::ImageControls,
                 ToolIcon::Hand,
-                None,
+                self.inspection_tool_label("Image controls"),
                 "Image controls",
                 self.image_controls_open,
                 cx,
@@ -439,7 +429,7 @@ impl Shell {
             tools = tools.child(self.tool_control(
                 Control::Phase5(36),
                 ToolIcon::Details,
-                None,
+                self.inspection_tool_label("Details"),
                 "Details",
                 self.capture_details_open,
                 cx,
@@ -448,7 +438,7 @@ impl Shell {
                 tools = tools.child(self.tool_control(
                     Control::Guided(44),
                     ToolIcon::Adjustments,
-                    None,
+                    self.inspection_tool_label("Analysis"),
                     "Analysis",
                     self.review_tools,
                     cx,

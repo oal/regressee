@@ -810,13 +810,13 @@ impl Shell {
         // Use the actual workspace width, including the user's sidebar choice.
         // Keep complete action groups rather than accidentally wrapping buttons.
         let compact_actions = self.working_width < 720.;
-        let mut actions = div().flex().flex_wrap().gap_2();
+        let mut actions = controls::segmented_group("review-state-choices");
         if !unchanged {
             for (index, text) in [(20, "Unreviewed"), (21, "Intentional"), (22, "Needs fix")] {
                 actions = actions.child(self.button(
                     Control::Phase5(index),
                     text,
-                    ActionStyle::Choice {
+                    ActionStyle::Segment {
                         selected: matches!(
                             (index, state),
                             (21, Some(ReviewState::Intentional))
@@ -916,7 +916,7 @@ impl Shell {
                             .child(self.button(
                                 Control::Phase5(37),
                                 "Review note",
-                                ActionStyle::Secondary,
+                                ActionStyle::Quiet,
                                 cx,
                             ))
                             .child(div().flex_1())

@@ -601,6 +601,14 @@ adapter. This table distinguishes product operations from GUI-only presentation.
 
 ## Agent control and optional GUI following
 
+For personal skill installation (without starting the engine), use
+`integrations status [--host claude-code|codex|github-copilot]`,
+`integrations install --host HOST` or `integrations remove --host HOST`.
+Install also updates an unchanged managed skill. These commands accept `--json`
+and storage path flags, but reject session/submission flags. They do not modify
+permissions or start a controller. See [agent setup](agent-skill.md) for installation
+paths, conflict recovery, host invocation and the meaning of verified-file status.
+
 ```sh
 r agent start --name 'Release investigation' --lease 90 > agent.json
 SESSION=$(jq -r '.data.session' agent.json)

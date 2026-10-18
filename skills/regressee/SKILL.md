@@ -18,7 +18,7 @@ scope authorized by the user. Do not open unrelated projects or sessions.
    and ask before capture, approval, replacement, deletion or sharing.
 2. Run `regressee --version`, `regressee --build-info`,
    `regressee --json capabilities` and `regressee help`. These are data-free.
-   This skill targets **CLI schema 1 / engine protocol 7**. Refuse incompatible
+   This skill targets **CLI schema 1 / engine protocol 9**. Refuse incompatible
    peers; do not delete locks or start another owner to bypass a mismatch.
 3. Use `--json --data-dir DIR --cache-dir DIR` consistently. IDs are returned
    UUIDs, not labels. Keep stdout envelopes, exit statuses and exact run/analysis/

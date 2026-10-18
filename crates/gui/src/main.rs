@@ -43,10 +43,12 @@ use std::{
     time::Duration,
 };
 
+mod action_hierarchy;
 mod action_icons;
 mod agent_refresh;
 mod agent_ux;
 use regressee_app::protocol::Outcome;
+mod agent_integrations_ux;
 mod analysis_ux;
 mod app_settings_ux;
 mod appearance_ux;
@@ -166,6 +168,7 @@ type SetupPaintBounds = (
 );
 
 struct Shell {
+    integrations: agent_integrations_ux::IntegrationUi,
     dom: dom_ux::DomWorkspace,
     input_gate: regressee_gui::ui::interaction::InputGate,
     agent: regressee_gui::jobs::AgentState,
@@ -392,6 +395,7 @@ impl RenderOnce for ProjectName {
 impl Shell {
     fn new(cx: &mut Context<Self>, jobs: Arc<Jobs>, events: Receiver<Update>) -> Self {
         let mut shell = Self {
+            integrations: Default::default(),
             dom: dom_ux::DomWorkspace::new(cx),
             input_gate: Default::default(),
             agent: Default::default(),
@@ -415,7 +419,7 @@ impl Shell {
             desktop_dark: desktop_is_dark(cx.window_appearance()),
             appearance_observer: None,
             root_focus: cx.focus_handle(),
-            handles: (0..(1729 + regressee_gui::task::MAX_TASK_LINKS))
+            handles: (0..(1739 + regressee_gui::task::MAX_TASK_LINKS))
                 .map(|i| cx.focus_handle().tab_index(i as isize + 1).tab_stop(true))
                 .collect(),
             name: cx.new(|cx| TextInput::with_value("", 6, cx)),
@@ -708,6 +712,7 @@ impl Shell {
         shell
     }
     fn poll_storage(&mut self, cx: &mut Context<Self>) {
+        self.poll_integrations(cx);
         self.poll_agent(cx);
         if self.pending.is_none()
             && self.task.is_none()
@@ -2996,6 +3001,10 @@ impl Shell {
             Control::ReducedMotion(reduced) => {
                 1727 + regressee_gui::task::MAX_TASK_LINKS + reduced as usize
             }
+            Control::AgentInstall(index) => 1729 + regressee_gui::task::MAX_TASK_LINKS + index,
+            Control::AgentRemove(index) => 1732 + regressee_gui::task::MAX_TASK_LINKS + index,
+            Control::AgentRefresh => 1735 + regressee_gui::task::MAX_TASK_LINKS,
+            Control::AgentRetry(index) => 1736 + regressee_gui::task::MAX_TASK_LINKS + index,
             Control::Navigate(screen) => Screen::ALL.iter().position(|s| *s == screen).unwrap(),
             Control::SetupStage(stage) => 312 + stage.index(),
             Control::SettingsSection(section) => {
@@ -5712,6 +5721,12 @@ impl Shell {
                 self.sync_appearance(cx);
                 window.focus(&self.handle(control, cx));
             }
+            Control::AgentInstall(_) | Control::AgentRemove(_) | Control::AgentRetry(_) | Control::AgentRefresh => {
+                self.start_integrations(control, cx);
+                window.focus(&self.handle(control, cx));
+                self.reveal_form_control(control, true, window, cx);
+                self.reveal_integration_feedback(control, window, cx);
+            }
             Control::CloseOptions => {
                 self.result_filters_open = false;
                 window.focus(&self.handle(Control::Guided(45), cx));
@@ -5940,6 +5955,9 @@ impl Shell {
             Control::Details(detail) => {
                 if !self.details.remove(&detail) {
                     self.details.insert(detail);
+                    if detail == Detail::AgentIntegrations {
+                        self.start_integrations(Control::AgentRefresh, cx);
+                    }
                 }
                 cx.notify();
             }
@@ -6266,6 +6284,17 @@ impl Shell {
         .when(
             self.narrow_workspace && self.focus.screen == Screen::Results,
             |el| el.px(px(8.)),
+        )
+        .when(
+            matches!(
+                style,
+                ActionStyle::Tab { .. } | ActionStyle::Segment { .. } | ActionStyle::Anchor { .. }
+            ),
+            |el| {
+                el.on_key_down(cx.listener(move |this, event, window, cx| {
+                    this.selection_key(control, event, window, cx)
+                }))
+            },
         );
         self.wire_action_control(control, element, cx)
     }
@@ -6301,7 +6330,9 @@ impl Shell {
     ) -> gpui::Stateful<Div> {
         let section = matches!(
             control,
-            Control::Details(Detail::ManagedNetwork | Detail::SupportTools)
+            Control::Details(
+                Detail::ManagedNetwork | Detail::SupportTools | Detail::AgentIntegrations
+            )
         );
         let element = controls::disclosure_toggle(
             SharedString::from(format!("{control:?}")),
@@ -6500,6 +6531,9 @@ impl Shell {
             }
             Control::Appearance(_) => self.appearance.loaded,
             Control::ReducedMotion(_) => self.appearance.loaded && !self.forced_reduced_motion,
+            Control::AgentInstall(_) | Control::AgentRemove(_) | Control::AgentRetry(_) | Control::AgentRefresh => {
+                self.integration_enabled(control)
+            }
             Control::Guided(46) | Control::ImageControls => self.viewer_has_pixels(),
             Control::SplitView => self.split_view_available(),
             Control::SplitDivider => self.split_input_allowed(),
@@ -7030,6 +7064,9 @@ impl Shell {
             PreviousPage => screen == Screen::Projects && self.projects.page > 0,
             NextPage => screen == Screen::Projects && self.projects.more,
             About | SetupRuntime | Appearance(_) | ReducedMotion(_) => settings,
+            AgentInstall(_) | AgentRemove(_) | AgentRetry(_) | AgentRefresh => {
+                settings && self.integration_mounted(control)
+            }
             CaptureBaseline => {
                 results
                     && (self.focus.review_surface == ReviewSurface::Pages
@@ -7363,7 +7400,12 @@ impl Shell {
                 analysis && self.review_tools && !self.mask_draw
             }
             Details(Detail::Network) => settings && self.details.contains(&Detail::ManagedNetwork),
-            Details(Detail::Browser | Detail::ManagedNetwork | Detail::SupportTools) => settings,
+            Details(
+                Detail::Browser
+                | Detail::ManagedNetwork
+                | Detail::SupportTools
+                | Detail::AgentIntegrations,
+            ) => settings,
             Details(Detail::LocalStorage) => settings && self.summary.is_some(),
         }
     }
@@ -7502,21 +7544,27 @@ impl Shell {
                             .flex()
                             .flex_wrap()
                             .gap_2()
-                            .child(self.button(
-                                Control::SelectProject(index),
-                                match self.focus.screen {
-                                    Screen::History => "View history",
-                                    Screen::Setup => "Edit settings",
-                                    _ => "View results",
-                                },
-                                ActionStyle::Secondary,
-                                cx,
-                            ))
+                            .child(
+                                div()
+                                    .pr_3()
+                                    .border_r_1()
+                                    .border_color(rgb(palette().line))
+                                    .child(self.button(
+                                        Control::SelectProject(index),
+                                        match self.focus.screen {
+                                            Screen::History => "View history",
+                                            Screen::Setup => "Edit settings",
+                                            _ => "View results",
+                                        },
+                                        ActionStyle::Secondary,
+                                        cx,
+                                    )),
+                            )
                             .when(projects_screen, |el| {
                                 el.child(self.button(
                                     Control::OpenProject(index),
                                     "Edit settings",
-                                    ActionStyle::Secondary,
+                                    ActionStyle::Quiet,
                                     cx,
                                 ))
                                 .child(self.button(
@@ -7941,10 +7989,10 @@ impl Shell {
                     .font_weight(FontWeight::SEMIBOLD)
                     .child("Sensitivity"),
             );
-            let mut actions = div().flex().flex_wrap().gap_2();
+            let mut actions = controls::segmented_group("analysis-sensitivity-choices");
             for (i, label) in [(0, "Sensitive"), (1, "Balanced"), (2, "Relaxed")] {
                 let style = if i <= 2 {
-                    ActionStyle::Choice {
+                    ActionStyle::Segment {
                         selected: self.analysis_policy
                             == regressee_app::review::preset(
                                 [
@@ -8973,6 +9021,7 @@ impl Drop for Shell {
 }
 impl Render for Shell {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.restore_integration_focus(window, cx);
         if self.scope_confirmation_due
             && !self.native_prompt
             && self.task.is_none()

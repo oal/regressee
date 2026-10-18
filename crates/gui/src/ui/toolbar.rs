@@ -113,6 +113,8 @@ pub enum ToolIcon {
     Draw,
     Coordinates,
     Copy,
+    Source,
+    Lock,
 }
 
 fn paths(icon: ToolIcon, bounds: Bounds<Pixels>) -> Vec<Path<Pixels>> {
@@ -131,6 +133,23 @@ fn paths(icon: ToolIcon, bounds: Bounds<Pixels>) -> Vec<Path<Pixels>> {
         }
     };
     match icon {
+        ToolIcon::Source => {
+            line(&[(7., 5.), (2., 10.), (7., 15.)]);
+            line(&[(13., 5.), (18., 10.), (13., 15.)]);
+            line(&[(11., 3.), (9., 17.)]);
+        }
+        ToolIcon::Lock => {
+            line(&[(4., 9.), (16., 9.), (16., 18.), (4., 18.), (4., 9.)]);
+            line(&[
+                (6., 9.),
+                (6., 5.),
+                (8., 2.),
+                (12., 2.),
+                (14., 5.),
+                (14., 9.),
+            ]);
+            line(&[(10., 12.), (10., 15.)]);
+        }
         ToolIcon::Sidebar
         | ToolIcon::Results
         | ToolIcon::Compare
@@ -748,6 +767,8 @@ mod tests {
             ToolIcon::Draw,
             ToolIcon::Coordinates,
             ToolIcon::Copy,
+            ToolIcon::Source,
+            ToolIcon::Lock,
         ] {
             assert!(
                 !paths(

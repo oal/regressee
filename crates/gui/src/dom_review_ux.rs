@@ -317,7 +317,8 @@ impl Shell {
                 .child(div().flex_1().min_w(px(180.)).text_size(px(HELP_TEXT_SIZE)).line_height(px(HELP_LINE_HEIGHT)).child(format!("DOM comparison: {message} Missing coverage needs a new baseline capture; Refresh only reads saved files.")))
                 .when(self.control_mounted(Control::Phase5(33)), |bar| bar.child(self.button(Control::Phase5(33), "Next unreviewed", ActionStyle::Secondary, cx))).into_any_element();
         }
-        let mut actions = div().flex().flex_wrap().gap_2();
+        let compact_actions = self.working_width < 720.;
+        let mut actions = controls::segmented_group("dom-review-state-choices");
         if !unchanged {
             for (index, label, value) in [
                 (20, "Unreviewed", ReviewState::Unreviewed),
@@ -327,18 +328,12 @@ impl Shell {
                 actions = actions.child(self.button(
                     Control::Phase5(index),
                     label,
-                    ActionStyle::Choice {
+                    ActionStyle::Segment {
                         selected: state == value,
                     },
                     cx,
                 ));
             }
-            actions = actions.child(self.button(
-                Control::Phase5(37),
-                "Review note",
-                ActionStyle::Secondary,
-                cx,
-            ));
         }
         div()
             .debug_selector(|| "dom-review-decisions".into())
@@ -368,14 +363,39 @@ impl Shell {
                     ),
             )
             .child(
-                actions.when(self.control_mounted(Control::Phase5(33)), |actions| {
-                    actions.child(self.button(
-                        Control::Phase5(33),
-                        "Next unreviewed",
-                        ActionStyle::Primary,
-                        cx,
-                    ))
-                }),
+                div()
+                    .debug_selector(|| "dom-review-action-groups".into())
+                    .flex()
+                    .items_center()
+                    .gap_4()
+                    .when(compact_actions, |row| row.flex_col().items_start().gap_2())
+                    .when(!unchanged, |row| row.child(actions))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .min_w_0()
+                            .when(compact_actions, |row| row.w_full())
+                            .when(!compact_actions, |row| row.flex_1())
+                            .when(!unchanged, |row| {
+                                row.child(self.button(
+                                    Control::Phase5(37),
+                                    "Review note",
+                                    ActionStyle::Quiet,
+                                    cx,
+                                ))
+                            })
+                            .child(div().flex_1())
+                            .when(self.control_mounted(Control::Phase5(33)), |row| {
+                                row.child(self.button(
+                                    Control::Phase5(33),
+                                    "Next unreviewed",
+                                    ActionStyle::Primary,
+                                    cx,
+                                ))
+                            }),
+                    ),
             )
             .into_any_element()
     }

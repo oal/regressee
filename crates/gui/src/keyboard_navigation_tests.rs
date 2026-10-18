@@ -85,6 +85,14 @@ fn settings_keyboard_press_release_toggles_once_and_preserves_focus(cx: &mut Tes
                         })
                     });
                 }
+                // This optional section remains collapsed in this navigation
+                // regression; the dedicated integration tests exercise setup.
+                press(cx, "tab");
+                cx.update(|window, cx| {
+                    shell.read_with(cx, |s, cx| {
+                        assert_eq!(s.focused(window, cx), Some(Control::Details(Detail::AgentIntegrations)));
+                    })
+                });
             }
             press(cx, "tab");
             cx.update(|window, cx| {

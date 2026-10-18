@@ -727,6 +727,16 @@ fn run(args: &[String], o: &mut Options) -> Result<Output> {
             "confirmation_conflict: ticket ID/action/payload changed"
         );
     }
+    if let Plan::Integration { action, host } = &plan {
+        ensure!(o.session.is_none(), "invalid_arguments: integrations setup is local to your account; omit --session");
+        let installer = regressee_app::agent_integrations::Installer::for_user(&paths(o)?, std::env::current_exe()?)?;
+        let statuses = match action.as_str() {
+            "install" => vec![installer.install(host.unwrap())?],
+            "remove" => vec![installer.remove(host.unwrap())?],
+            _ => host.map_or_else(|| installer.statuses(), |host| vec![installer.status(host)]),
+        };
+        return Output::ok(json!({"integrations":statuses,"scope":"user","host_access_tested":false,"message":"Local skill setup only. No host permissions, agent session or Follow agent setting was changed.","next_step":host.map(|h| h.next_step())}));
+    }
     let stop = interrupted();
     let paths = paths(o)?;
     if matches!(plan, Plan::Serve) {
@@ -967,6 +977,7 @@ fn run(args: &[String], o: &mut Options) -> Result<Output> {
         }
         Plan::Start => Output::ok(client.snapshot()?),
         Plan::Serve => unreachable!(),
+        Plan::Integration { .. } => unreachable!(),
     }
 }
 fn main() -> ExitCode {

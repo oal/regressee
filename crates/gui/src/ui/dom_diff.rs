@@ -494,8 +494,7 @@ pub use model::{
 };
 
 use super::{
-    controls::{self, ActionStyle},
-    interaction, scrollbar,
+    controls, interaction, scrollbar,
     text_input::TextInput,
     theme::*,
     toolbar::{self, ToolIcon},
@@ -1136,11 +1135,11 @@ impl DomDiff {
     ) -> Stateful<Div> {
         let target = cx.entity();
         let frame = if control == Control::Context {
-            controls::action(
+            controls::toggle(
                 id,
                 label,
                 &self.handle(control),
-                ActionStyle::Secondary,
+                !self.expanded.is_empty(),
                 self.control_enabled(control),
             )
         } else {
@@ -2183,7 +2182,6 @@ impl Render for DomDiff {
                 }
             }));
         if let Some(document) = ready {
-            let show_context = self.expanded.is_empty();
             // Short desktop windows must retain readable source rows. The tools
             // keep their 40px targets and a separate, visible reading scroller;
             // keyboard focus reveals the real search/change row, not a proxy.
@@ -2291,11 +2289,7 @@ impl Render for DomDiff {
                         .child(self.control(
                             Control::Context,
                             "dom-diff-context",
-                            if show_context {
-                                "Show context"
-                            } else {
-                                "Hide context"
-                            },
+                            "Unchanged lines",
                             cx,
                         ))
                         .child(self.control(Control::Copy, "dom-diff-copy", "Copy selection", cx)),
