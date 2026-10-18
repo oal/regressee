@@ -177,6 +177,21 @@
       "what": "Favicon and touch icon derived from the mark asset",
       "transform": "Crop 180x180+57+0, resized onto an opaque white 180px field",
       "sha256": "989d820b709ad42bb126d3d3c9bcd3147ec392844a215601e07f1b7d04a61534"
+    },
+    {
+      "file": "fonts/Roboto-latin.woff2",
+      "origin": "Roboto variable font (latin subset), fetched from Google Fonts v51 by the user's request for the web surface",
+      "what": "The page's typeface, self-hosted; loaded with @font-face from the page's own files, never from a hosted stylesheet",
+      "transform": "None (byte-identical download); the license text ships beside it as fonts/LICENSE-Roboto.txt",
+      "license": "Apache License 2.0",
+      "sha256": "1404ca348bd75ef836f4dd8b6f2cc719458642d1237c368296b2fc652dca47dc"
+    },
+    {
+      "file": "fonts/LICENSE-Roboto.txt",
+      "origin": "googlefonts/roboto LICENSE",
+      "what": "Apache-2.0 license text for the self-hosted Roboto font file",
+      "transform": "None",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
     }
   ]
 }

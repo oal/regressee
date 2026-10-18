@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Regressee — see exactly what changed on your website</title>
-<meta name="description" content="Regressee is a local desktop app that captures a website as a baseline and shows what changed after every deploy — screenshots and DOM structure — for you to review and approve. Public beta for Windows and Linux.">
+<meta name="description" content="Capture your site as a baseline, review what changed after every deploy in screenshots and page structure, and approve what you accept. Local desktop app, public beta for Windows and Linux.">
 <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f4f4">
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1b1b1b">
 <link rel="canonical" href="https://oal.github.io/regressee/">
@@ -70,12 +70,12 @@
         Regressee
       </span>
       <h1 id="hero-title">See exactly what changed on your website.</h1>
-      <p class="offer-copy">Capture every page once as a baseline. After each deploy, review the differences in screenshots and DOM structure, then decide what to accept.</p>
+      <p class="offer-copy">Capture your site once as a baseline. After every deploy, review what changed in screenshots and page structure, and approve the changes you accept.</p>
       <div class="offer-actions">
         <a class="btn btn-primary" id="hero-download" href="#download">Download beta</a>
         <a class="btn btn-secondary" href="https://github.com/oal/regressee">View on GitHub</a>
       </div>
-      <p class="offer-meta">Public beta · Linux &amp; Windows x86_64 · MPL-2.0 · macOS not yet</p>
+      <p class="offer-meta">Public beta · Windows &amp; Linux · MPL-2.0</p>
     </div>
 
     <div class="hero-way">
@@ -112,7 +112,6 @@
       </div>
       <p class="hero-note">
         <span class="lead">Checking a release without a baseline.</span>
-        <span class="sub">Screenshots: a demo project on a synthetic fixture site — unmodified app pixels.</span>
       </p>
     </div>
 
@@ -139,26 +138,26 @@
     <div class="wrap">
       <div class="section-head">
         <h2 class="h2" id="how-title">What a check does</h2>
-        <p class="lede">You point Regressee at your site once and save a baseline. After that, every check revisits the same recorded pages and screen sizes. Nothing is rediscovered, skipped or silently dropped.</p>
+        <p class="lede">Point Regressee at your site once and save a baseline. From then on, every check revisits the same pages at the same screen sizes, so each run compares like with like.</p>
       </div>
       <ol class="runline" id="runline">
         <span class="track" aria-hidden="true"><span class="track-fill" id="track-fill"></span></span>
         <li class="stop">
           <h3 class="h3">Revisit</h3>
-          <p>Every page in the saved baseline list is opened at the same screen sizes, with the same capture settings. A check never discovers new pages on its own.</p>
+          <p>Every page from the baseline is opened at the same screen sizes with the same settings, so the comparison stays fair from run to run.</p>
         </li>
         <li class="stop">
           <h3 class="h3">Compare</h3>
-          <p>Screenshots are compared against the baseline, and DOM snapshots are diffed line by line. Failed or missing captures are reported as not compared, never as unchanged.</p>
+          <p>Screenshots are compared against the baseline, and page structure is checked line by line. Anything that failed to load is reported as not compared, so a broken capture can never pass as a clean result.</p>
           <p class="receipt"><span>Changed</span><span>No significant change</span><span>Not compared</span></p>
         </li>
         <li class="stop">
           <h3 class="h3">Review</h3>
-          <p>Before, after and difference views sit side by side, with overlay, heatmap or a draggable split. Adjust sensitivity or mark ignored areas afterwards; the original captures are never altered.</p>
+          <p>Compare before and after side by side, or switch to difference, overlay, heatmap or a draggable split. Tune the sensitivity or mark areas to ignore, and your original captures stay untouched.</p>
         </li>
         <li class="stop">
           <h3 class="h3">Approve</h3>
-          <p>Select the changes you accept and save a new baseline version. Earlier versions and every run stay in History until you delete them.</p>
+          <p>Approve the changes you accept into a new baseline version. Earlier versions and every run stay in History until you choose to delete them.</p>
         </li>
       </ol>
     </div>
@@ -169,17 +168,17 @@
     <div class="wrap">
       <div class="section-head">
         <h2 class="h2" id="features-title">What&rsquo;s in the box</h2>
-        <p class="lede">Real app pixels from a demo project. Set your appearance to System, Light or Dark and the screenshots follow, exactly as the app does.</p>
+        <p class="lede">Every screen below is the real app. Switch to Light or Dark and the screenshots follow along.</p>
       </div>
 
       <div class="feature">
         <div>
-          <h3>Guided capture, not a test script</h3>
-          <p>Start from a URL. Regressee walks the visible links inside limits you set in plain language: website boundaries, skipped paths, a page limit. It then shows the page list it found. Capture full pages or just the visible screen, at mobile, tablet and desktop sizes, as screenshots, DOM snapshots or both.</p>
+          <h3>Point it at your site</h3>
+          <p>Enter a URL and Regressee follows the visible links, inside the boundaries you set: a page limit, skipped paths, one section of the site. You review the page list it found before anything is captured, then choose mobile, tablet and desktop sizes, and whether to capture screenshots, page structure or both.</p>
           <ul>
-            <li>Page-list preview before anything is saved</li>
-            <li>Time and disk estimates on the capture plan</li>
-            <li>Its own private browser, nothing for you to install</li>
+            <li>Review the page list before anything is captured</li>
+            <li>Time and disk estimates before you start</li>
+            <li>Sets up its own private browser, so there is nothing to install</li>
           </ul>
         </div>
         <figure>
@@ -189,18 +188,18 @@
             <img class="only-dark" src="assets/shots/pages-dark.png" width="1280" height="800" loading="lazy" decoding="async"
                  alt="Pages &amp; baseline in dark appearance: six discovered page addresses, each marked as included, with a Page options panel showing capture estimates.">
           </div>
-          <figcaption>Pages &amp; baseline — the reviewed page list, with estimates before you start.</figcaption>
+          <figcaption>Pages &amp; baseline: the page list, with time and disk estimates.</figcaption>
         </figure>
       </div>
 
       <div class="feature is-flipped">
         <div>
-          <h3>Screenshots and structure, judged separately</h3>
-          <p>A page can look identical and still change underneath. Screenshot and DOM results are reported and approved independently, and the DOM view shows an inert, normalized diff of the live document, including template contents and open shadow roots.</p>
+          <h3>Catch what screenshots miss</h3>
+          <p>A swapped link, a changed label, a heading that lost its level: changes that never show up in a screenshot. Regressee compares the page structure line by line and shows what was added or removed, in source you can read. Screenshot and structure results are approved separately, so one never hides the other.</p>
           <ul>
-            <li>Added and removed lines without executing the page</li>
-            <li>Balanced sensitivity, adjustable without recapturing</li>
-            <li>Areas you ignore never alter the original screenshots</li>
+            <li>Added and removed lines, shown as readable source</li>
+            <li>Sensitivity you can tune without recapturing</li>
+            <li>Mark areas to ignore and keep the originals intact</li>
           </ul>
         </div>
         <figure>
@@ -210,16 +209,16 @@
             <img class="only-dark" src="assets/shots/dom-diff-dark.png" width="1280" height="800" loading="lazy" decoding="async"
                  alt="DOM snapshot review in dark appearance: added and removed lines in an inert source diff with before and after line numbers.">
           </div>
-          <figcaption>DOM snapshot — added and removed lines, reviewed separately from screenshots.</figcaption>
+          <figcaption>DOM snapshot: added and removed lines, approved separately.</figcaption>
         </figure>
       </div>
 
       <div class="feature">
         <div>
           <h3>Baselines you approve, history you keep</h3>
-          <p>Nothing becomes a baseline until you save it. Approve selected results into a new version, keep whole-baseline saves explicit, and inspect every run, version and storage figure in History. Cleanup previews exactly what it would remove.</p>
+          <p>Nothing becomes a baseline until you save it. Approve the results you accept into a new version, keep earlier versions as long as you like, and see every run and its disk use in History. Cleanup shows you what it will remove first.</p>
           <ul>
-            <li>Earlier versions remain until you delete them</li>
+            <li>Earlier versions stay until you delete them</li>
             <li>Storage use, low-space warnings and manual cleanup</li>
             <li>Results, notes and decisions recorded per run</li>
           </ul>
@@ -231,29 +230,29 @@
             <img class="only-dark" src="assets/shots/history-dark.png" width="1280" height="800" loading="lazy" decoding="async"
                  alt="History in dark appearance: completed runs with capture counts and the selected check's recorded details.">
           </div>
-          <figcaption>History — runs, baseline versions and storage, kept on your machine.</figcaption>
+          <figcaption>History: runs, baseline versions and storage, all local.</figcaption>
         </figure>
       </div>
 
       <div class="also">
         <div>
-          <h3 class="h3">Also in the box</h3>
+          <h3 class="h3">A few more things</h3>
           <dl class="also-list">
             <div>
               <dt>Sites with a login</dt>
-            <dd>Sign in through the app&rsquo;s managed browser. Saved sessions are encrypted with an OS-protected key, and production and staging logins stay separate.</dd>
+            <dd>Sign in through the app&rsquo;s own browser. Sessions are encrypted with an OS-protected key, and production and staging logins stay separate.</dd>
           </div>
           <div>
             <dt>Share a baseline</dt>
-            <dd>Export a baseline ZIP and import it as a new local project. Login sessions and secret keys never travel with it; recipients use their own.</dd>
+            <dd>Export a baseline as a ZIP and import it on another machine. Logins and keys stay behind, so each person signs in for themselves.</dd>
           </div>
           <div>
             <dt>CLI and agent skill</dt>
-            <dd>The same engine runs in a terminal, with a portable skill for Claude Code, Codex or GitHub Copilot. Reports are local HTML files.</dd>
+            <dd>Run the same engine from a terminal, with a skill for Claude Code, Codex or GitHub Copilot. Reports are plain HTML files on your disk.</dd>
           </div>
           <div>
             <dt>Local by default</dt>
-            <dd>Projects, screenshots and baselines live on your machine. No account, no cloud, nothing uploaded; diagnostics are previewed before you save them.</dd>
+            <dd>Projects, screenshots and baselines stay on your machine. No account and no cloud, and diagnostics are shown to you before anything is saved.</dd>
           </div>
           </dl>
         </div>
@@ -264,7 +263,7 @@
             <img class="only-dark" src="assets/shots/settings-dark.png" width="1280" height="800" loading="lazy" decoding="async"
                  alt="App settings in dark appearance: the private browser is ready, appearance is set to Dark, and reduced motion is chosen.">
           </div>
-          <figcaption>App settings — the managed browser, appearance and reduced motion, remembered per machine.</figcaption>
+          <figcaption>App settings: browser, appearance and reduced motion.</figcaption>
         </figure>
       </div>
     </div>
@@ -275,7 +274,7 @@
     <div class="wrap">
       <div class="section-head">
         <h2 class="h2" id="dl-title">Download the beta</h2>
-        <p class="lede">Portable preview builds for Windows and Linux x86_64. No developer tools needed. The app downloads its own private browser on first use, so that first run needs internet access.</p>
+        <p class="lede">Preview builds for Windows and Linux x86_64. Nothing to install first: Regressee sets up its own private browser the first time you run it, which needs an internet connection.</p>
       </div>
       <div class="dl-grid">
         <div class="dl-item">
@@ -285,7 +284,7 @@
           </div>
           <p class="dl-file">regressee-desktop-windows-x86_64.zip · 36.1 MB</p>
           <a class="btn btn-primary" href="https://github.com/oal/regressee/releases/download/v0.1.0-preview.10/regressee-desktop-windows-x86_64.zip">Download .zip</a>
-          <p class="dl-help">Extract the archive and keep both executables (<b>regressee</b> and <b>regressee-desktop</b>) together, then launch <b>regressee-desktop</b>. This build is unsigned, so Windows may show a publisher warning.</p>
+          <p class="dl-help">Unzip the archive, keep the two executables (<b>regressee</b> and <b>regressee-desktop</b>) together, and launch <b>regressee-desktop</b>. The build is unsigned, so Windows may warn about the publisher.</p>
         </div>
         <div class="dl-item">
           <div class="dl-head">
@@ -294,15 +293,15 @@
           </div>
           <p class="dl-file">regressee-desktop-linux-x86_64.tar.gz · 42.9 MB</p>
           <a class="btn btn-primary" href="https://github.com/oal/regressee/releases/download/v0.1.0-preview.10/regressee-desktop-linux-x86_64.tar.gz">Download .tar.gz</a>
-          <p class="dl-help">A portable directory, not an installer or AppImage. It targets Ubuntu 24.04-compatible systems and needs a working graphics backend; see the support matrix for details.</p>
+          <p class="dl-help">A portable directory you can run from anywhere. Built for Ubuntu 24.04-compatible systems with a working graphics backend; the support matrix has the details.</p>
         </div>
       </div>
-      <p class="dl-more">CLI-only builds (no GUI, for scripts and agents):
+      <p class="dl-more">Prefer a terminal? CLI-only builds are here:
         <a href="https://github.com/oal/regressee/releases/download/v0.1.0-preview.10/regressee-cli-linux-x86_64.tar.gz">Linux</a> ·
         <a href="https://github.com/oal/regressee/releases/download/v0.1.0-preview.10/regressee-cli-windows-x86_64.zip">Windows</a>.
-        All previews, checksums (SHA256SUMS) and the source archive live on <a href="https://github.com/oal/regressee/releases">GitHub Releases</a>.
+        Checksums, all previews and the source archive are on <a href="https://github.com/oal/regressee/releases">GitHub Releases</a>.
       </p>
-      <p class="dl-note">Version v0.1.0-preview.10 (18 October 2026) · macOS capture is not available yet. These are unsigned, experimental test builds: a public beta, not a supported production release.</p>
+      <p class="dl-note">Version v0.1.0-preview.10 · macOS is not available yet. These are unsigned preview builds from a public beta.</p>
     </div>
   </section>
 
@@ -311,31 +310,31 @@
     <div class="wrap">
       <div class="section-head">
         <h2 class="h2" id="truth-title">Good to know</h2>
-        <p class="lede">What Regressee will and will not tell you.</p>
+        <p class="lede">A few things worth knowing before you rely on it.</p>
       </div>
       <dl class="truth-list">
         <div>
-          <dt>A difference is not a defect</dt>
-          <dd>Regressee shows what changed; you decide what it means. Failed or missing captures are never shown as unchanged pages.</dd>
+          <dt>You decide what a change means</dt>
+          <dd>Regressee shows what changed; whether it matters is your call. A failed capture is always listed as not compared.</dd>
         </div>
         <div>
-          <dt>Coverage has limits</dt>
-          <dd>Fonts, operating systems, dynamic content and slow-loading pages can all affect comparisons. Every capture records warnings; review them before trusting a result.</dd>
+          <dt>Some pages are harder to capture</dt>
+          <dd>Fonts, operating systems, dynamic content and slow pages can all affect a comparison. Every capture keeps its warnings, so you can judge the result for yourself.</dd>
         </div>
         <div>
-          <dt>DOM snapshots are not redaction</dt>
-          <dd>Script bodies, inline handlers and form values are excluded, but hidden text and attributes can still reveal private content. Inspect exports before you share them.</dd>
+          <dt>Private content can hide in structure</dt>
+          <dd>Script bodies, handlers and form values are left out, but hidden text and attributes can still appear. Check an export before you share it.</dd>
         </div>
         <div>
-          <dt>Screen sizes are emulated</dt>
-          <dd>Phone and tablet profiles are Chromium emulation, not real iOS or Safari devices, and full-page capture has size limits.</dd>
+          <dt>Phone and tablet checks are emulated</dt>
+          <dd>They use Chromium&rsquo;s device emulation, so real iOS and Safari rendering can differ. Very tall pages have capture size limits too.</dd>
         </div>
         <div>
           <dt>Visit only sites you are allowed to check</dt>
-          <dd>Use read-only test accounts where you can. Page loads and scripts can change server data even when you never click or submit anything.</dd>
+          <dd>Use read-only test accounts where you can. Loading a page can change server data, even when you never click or submit anything.</dd>
         </div>
       </dl>
-      <p class="truth-more"><a href="https://github.com/oal/regressee#important-limitations">Read the full limitations in the README</a></p>
+      <p class="truth-more"><a href="https://github.com/oal/regressee#important-limitations">See the full limitations in the README</a></p>
     </div>
   </section>
 </main>
@@ -378,7 +377,7 @@
         </ul>
       </nav>
     </div>
-    <p class="footer-legal">Regressee is free software under the Mozilla Public License 2.0. Screenshots on this page show a synthetic demo project, not a customer site.</p>
+    <p class="footer-legal">Regressee is free software under the Mozilla Public License 2.0. The page&rsquo;s Roboto typeface is licensed under the Apache License 2.0.</p>
   </div>
 </footer>
 
