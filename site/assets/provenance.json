@@ -1,0 +1,182 @@
+{
+  "note": "Provenance for every raster shipped with site/. Sources are the repository's own synthetic fixtures and the opt-in native capture harness; no customer site, external image or generative imagery is included. Screenshot pixels are displayed unmodified; the only per-file work is metadata stripping and, for thumbs/icons, the crop/resize recorded here.",
+  "generated": "2026-10-18",
+  "files": [
+    {
+      "file": "shots/review-light.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "Review workspace, light theme",
+      "capture": "confirmation/hierarchy-light-1280x800-review.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "dd865f8e7940233e791c8bafa6c6de4fe142c6f91c877af447ef2eadfcc9d023"
+    },
+    {
+      "file": "shots/review-dark.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "Review workspace, dark theme",
+      "capture": "confirmation/hierarchy-dark-1280x800-review.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "29d31285562115149af99df2d4dc7bd1462b771f4cceaab05833e8d1aa4493b9"
+    },
+    {
+      "file": "shots/pages-light.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "Pages & baseline with the Page options panel, light",
+      "capture": "confirmation/hierarchy-light-1280x800-page-options.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "87d7a0b714b27ae92d382cb5c96d3b34d6ac64b68c6b7e4b5f2c4319dd39ee37"
+    },
+    {
+      "file": "shots/pages-dark.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "Pages & baseline with the Page options panel, dark",
+      "capture": "confirmation/hierarchy-dark-1280x800-page-options.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "07f48a8dc4ab8b03014a98eefd3afd186d1c590bb54efade3113a1a108b3795a"
+    },
+    {
+      "file": "shots/dom-diff-light.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "DOM snapshot diff, light",
+      "capture": "confirmation/hierarchy-light-1280x800-dom-diff.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "37ab95bd1526c37f197c377b5f7cd210ac48dd38ce02808996b16cd5279d1fe3"
+    },
+    {
+      "file": "shots/dom-diff-dark.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "DOM snapshot diff, dark",
+      "capture": "confirmation/hierarchy-dark-1280x800-dom-diff.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "ea91345968f7bbb455c49a5d582ad0f7aa69a98fbdaad4694e494bfa5d35a22c"
+    },
+    {
+      "file": "shots/history-light.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "History runs list and selected run, light",
+      "capture": "confirmation/hierarchy-light-1280x800-history-runs.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "445b51fa3b80bb9d011286279d2b48068376ed0a0093bda5064028ec6b66e965"
+    },
+    {
+      "file": "shots/history-dark.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "History runs list and selected run, dark",
+      "capture": "confirmation/hierarchy-dark-1280x800-history-runs.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "727a114cd6d894ebc290a77b4245b09420e6139a8c6d8a73f9004e3b5523db16"
+    },
+    {
+      "file": "shots/settings-light.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "App settings (private browser, appearance, reduced motion), light",
+      "capture": "confirmation/hierarchy-light-1280x800-app-settings.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "21013e39bc77c85eedc39e1c68df712682a0d8f10a243f221ee4f6b696acf434"
+    },
+    {
+      "file": "shots/settings-dark.png",
+      "origin": "Regressee native GPUI offscreen capture set",
+      "what": "App settings (private browser, appearance, reduced motion), dark",
+      "capture": "confirmation/hierarchy-dark-1280x800-app-settings.png",
+      "harness": "crates/gui/src/ui_action_hierarchy_capture.rs (opt-in confirmation run, 2026-10-18)",
+      "fixture": "scripts/ui-review-fixtures.mjs \u2014 synthetic site, no external requests (confirmation/website-fixtures/provenance.json)",
+      "transform": "Metadata stripped (source-binding text chunks removed) and lossless PNG re-encoding only; no pixel, crop, tint or resample changes",
+      "sha256": "2be4a174b25d806f04e59781e91c1d6bb6b58504c0a076ab8c5f808639ff4b2d"
+    },
+    {
+      "file": "thumbs/shot-01.png",
+      "origin": "Synthetic demo-site fixture image from the same confirmation set",
+      "what": "desktop-before.png crop 560x420+140+150 (demo site hero copy)",
+      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
+      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
+      "sha256": "210f5e6410d023724ebc3de0346faa77b915a6978c59aa25f3338c3d9dcb335a"
+    },
+    {
+      "file": "thumbs/shot-02.png",
+      "origin": "Synthetic demo-site fixture image from the same confirmation set",
+      "what": "desktop-before.png crop 534x430+743+130 (demo site hero image)",
+      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
+      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
+      "sha256": "7cbf26416b14d3de98aac266123fd174bca4c907a48f0c16b3e30dca2cbc3fe2"
+    },
+    {
+      "file": "thumbs/shot-03.png",
+      "origin": "Synthetic demo-site fixture image from the same confirmation set",
+      "what": "desktop-before.png crop 357x283+156+727 (Field jacket product tile)",
+      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
+      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
+      "sha256": "56deacad4c681b08e3656859ec9227c833edb048beb8672c354013402d9ad363"
+    },
+    {
+      "file": "thumbs/shot-04.png",
+      "origin": "Synthetic demo-site fixture image from the same confirmation set",
+      "what": "desktop-before.png crop 359x283+538+727 (Weekend tote product tile)",
+      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
+      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
+      "sha256": "261e6c4614e32f602cad5bd4433ad84e7455fc01eba41b5c83595989907278ff"
+    },
+    {
+      "file": "thumbs/shot-05.png",
+      "origin": "Synthetic demo-site fixture image from the same confirmation set",
+      "what": "desktop-before.png crop 359x283+920+727 (Coastal overshirt product tile)",
+      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
+      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
+      "sha256": "ef3b45e7542c54f6f5d7641be364b329999abf76c1c1baefa04bf8e9d6a2cd3b"
+    },
+    {
+      "file": "thumbs/shot-06.png",
+      "origin": "Synthetic demo-site fixture image from the same confirmation set",
+      "what": "mobile-before.png crop 390x293+0+0 (demo site mobile header)",
+      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
+      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
+      "sha256": "908c66fc62996db5f3c046aa4db9012c7af530e1ed0794db860cd72513eb7f67"
+    },
+    {
+      "file": "logo-light.png",
+      "origin": "assets/brand/logo-light.png",
+      "what": "Regressee eye-through-slider mark asset (user-supplied originals; the wordmark on the page is live text)",
+      "transform": "Byte-identical copy apart from PNG metadata stripping",
+      "sha256": "2300f7aa61375a60f3820ecb636f45e410650b89e16aae0249e476962d6836a6"
+    },
+    {
+      "file": "logo-dark.png",
+      "origin": "assets/brand/logo-dark.png",
+      "what": "Regressee eye-through-slider mark asset (user-supplied originals; the wordmark on the page is live text)",
+      "transform": "Byte-identical copy apart from PNG metadata stripping",
+      "sha256": "b7c34661f229c193f7365b583f5bcd2e3cc7033538cc3524e1dc5fa45cd35569"
+    },
+    {
+      "file": "icon-180.png",
+      "origin": "assets/brand/logo-light.png",
+      "what": "Favicon and touch icon derived from the mark asset",
+      "transform": "Crop 180x180+57+0, resize to 180px, transparent background preserved",
+      "sha256": "5bfb2f3536bad1dfc82a0f26fe08a3511fdd382ff76a37fbe21d005569a0660e"
+    },
+    {
+      "file": "apple-touch-icon.png",
+      "origin": "assets/brand/logo-light.png",
+      "what": "Favicon and touch icon derived from the mark asset",
+      "transform": "Crop 180x180+57+0, resized onto an opaque white 180px field",
+      "sha256": "989d820b709ad42bb126d3d3c9bcd3147ec392844a215601e07f1b7d04a61534"
+    }
+  ]
+}
