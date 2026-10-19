@@ -151,6 +151,10 @@ The wider UI-inclusive suite is not green: recorded-History filter/default-sourc
 Discovery-details availability and a long-name project-header layout assertion
 remain known issues. A Project-settings Tab test also retains an outdated
 Capture-plan jump expectation. These are not hidden by the focused removal checks.
+The pre-existing Foundation matrix also records additional simulated-UI assertion
+failures, two macOS runtime-readiness assertions, a Windows unused-mut lint, and a
+CLI synthetic-worker startup timeout. This connection fix does not resolve or
+disable those checks; the Linux/Windows preview publishing gates remain mandatory.
 Native desktop input, accessibility, clean installation, default graphics,
 cross-platform usability and full release/license qualification remain pending
 or blocked. Windows/NVDA and macOS/VoiceOver have not been qualified; macOS is
