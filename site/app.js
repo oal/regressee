@@ -57,7 +57,7 @@
 
   /* --------------------------------------------- platform download */
   var heroDownload = document.getElementById("hero-download");
-  var RELEASES = "https://github.com/oal/regressee/releases/download/v0.1.0-preview.10/";
+  var RELEASES = "https://github.com/oal/regressee/releases/download/v0.1.0-preview.12/";
   if (heroDownload) {
     var platform = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || "";
     if (/win/i.test(platform)) {

@@ -38,3 +38,21 @@ Foundation matrix failures. No tests or security guards were disabled.
 
 The next workflow must still pass both platform jobs and all packaging, source
 identity, dependency/ABI, and publish gates before a release can be claimed.
+
+## Published recovery
+
+- Release input and immutable tag target:
+  `3ed467d734048d41e52420f872681d0b0b217bb8`.
+- Successful workflow: <https://github.com/oal/regressee/actions/runs/39306501017>.
+- Published unsigned experimental prerelease:
+  <https://github.com/oal/regressee/releases/tag/v0.1.0-preview.12>.
+- Both platform application tests, production builds, CLI dependency boundaries,
+  native ABI/DLL inspections, source identity merge, and publishing passed. The
+  Windows contention regression passed in both early and full application tests.
+- All four product/platform archives, source archive, source manifest and
+  checksums are present. Published asset digests match `SHA256SUMS`; the downloaded
+  source manifest's checksum and pipe-fix source hashes match the tagged sources.
+  The manifest records the website omission and excludes internal research.
+- Desktop archive sizes still round to 36.1 MB (Windows) and 42.9 MB (Linux), so
+  website size labels remain accurate. Only download/version references change;
+  the owner's separately committed website redesign is preserved.
