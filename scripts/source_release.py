@@ -151,6 +151,10 @@ def classify(path, is_dir):
         return "omit"
     if parts[0] in INTERNAL_ROOT:
         return "omit"
+    if parts[0] == "site":
+        # Separately deployed marketing website, not an application build input.
+        # Required source references into it still fail validate_sources below.
+        return "omit"
     if parts[0] == "skills":
         if is_dir and any(p.startswith(path + "/") for p in SKILL_FILES):
             return "walk"
@@ -660,8 +664,9 @@ def build(source, output, epoch):
                                      "requires": ["source-completeness-and-content-privacy-review", "matching-executable-binding",
                                                   "target-specific-third-party-notices-and-sources", "owner-legal-security-review",
                                                   "source-availability-and-hosting-authorization", "phase6-and-phase7-qualification"]},
-                    "omission_policy": ["runtime-build-output", "private-userdata-cache-credentials-logs-keys-sessionstate",
-                                        "internal-work-status-research-decisions-and-evidence", "no-symlink-following"],
+                     "omission_policy": ["runtime-build-output", "private-userdata-cache-credentials-logs-keys-sessionstate",
+                                         "internal-work-status-research-decisions-and-evidence", "separately-deployed-website",
+                                         "no-symlink-following"],
                     "normalization": {"uid": 0, "gid": 0, "uname": "", "gname": "", "mtime": epoch,
                                       "file_mode": "0644", "script_mode": "0755", "tar": "ustar", "gzip_filename": ""}}
         encoded = json_bytes(manifest)

@@ -1,4 +1,4 @@
-# Windows page-discovery connection recovery — preview.11
+# Windows page-discovery connection recovery — preview.12
 
 This preview fixes a temporary Windows background-engine connection failure that
 could interrupt finding pages after browser setup. It retains the clearer review
@@ -22,6 +22,12 @@ the exact build; the application crate version remains `0.1.0`.
 - Added retry, timeout and permanent-error regressions, plus a native Windows
   named-pipe contention regression in the release workflow's early engine tests.
   Hosted Windows Server checks do not qualify Windows 11 desktop behavior.
+- The failed preview.11 attempt passed Linux/Windows application tests, including
+  the native Windows pipe-contention regression, but packaging refused the new
+  website directory as unclassified. The source policy now explicitly omits that
+  separately deployed website from application archives and records the omission.
+  Required application references into omitted files still refuse packaging;
+  source completeness, privacy and cross-platform identity checks are retained.
 - Review keeps the inspected path and screen-size profile together, with recorded
   Before/After environments on their own line. A stronger selected-result
   treatment and clearer evidence boundaries improve light/dark hierarchy without

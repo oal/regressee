@@ -236,6 +236,19 @@ class SyntheticSourceTests(unittest.TestCase):
                 target.symlink_to(name)
                 self.refused("needed-source-symlink-rejected")
 
+    def test_separately_deployed_site_is_omitted_but_required_references_still_refuse(self):
+        put(self.root, "site/index.html", SENTINEL)
+        put(self.root, "site/assets/film.mp4", SENTINEL)
+        self.build()
+        paths = {row["path"] for row in self.manifest()["source_files"]}
+        self.assertFalse(any(path.startswith("site/") for path in paths))
+        self.assertIn("separately-deployed-website", self.manifest()["omission_policy"])
+        with tarfile.open(self.output / "source.tar.gz", "r:gz") as archive:
+            for member in archive:
+                self.assertNotIn(SENTINEL, archive.extractfile(member).read())
+        put(self.root, "crates/app/src/lib.rs", 'include_str!("../../../site/index.html");\n')
+        self.refused("required-referenced-source-omitted", self.parent / "required-site")
+
     def test_needed_directory_symlink_refused_without_following(self):
         (self.root / "worker/linked").symlink_to(self.root / "crates", target_is_directory=True)
         self.refused("needed-source-symlink-rejected")

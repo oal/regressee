@@ -252,7 +252,8 @@ def package(root, output, target, revision, product="all", binary_dir=None, allo
     identity = digest(source.json_bytes(rows))
     source_manifest = {"schema": 1, "source_commit": revision, "dirty": dirty,
                        "source_inventory_sha256": identity, "files": rows,
-                       "omissions": ["private-runtime-build-data-credentials", "internal-docs-reviews-evidence-design-context"],
+                       "omissions": ["private-runtime-build-data-credentials", "internal-docs-reviews-evidence-design-context",
+                                     "separately-deployed-website"],
                        "approved": False}
     blobs = {"regressee-source.tar.gz": tar_bytes("regressee-source", selected, epoch),
              "regressee-source.json": json_bytes(source_manifest)}

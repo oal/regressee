@@ -134,6 +134,24 @@ class PreviewTests(unittest.TestCase):
         self.assertEqual(len(names), 4)
         self.assertNotIn("regressee-desktop", self.files())
 
+    def test_separately_deployed_site_is_omitted_from_both_platform_packages(self):
+        sentinel = b"SEPARATE-WEBSITE-NOT-APPLICATION-SOURCE"
+        put(self.root, "site/index.html", sentinel)
+        put(self.root, "site/assets/film.mp4", sentinel)
+        for target in preview.TARGETS:
+            with self.subTest(target=target):
+                self.output = self.parent / target
+                self.build(target)
+                manifest = json.loads((self.output / "regressee-source.json").read_bytes())
+                self.assertIn("separately-deployed-website", manifest["omissions"])
+                self.assertFalse(any(row["path"].startswith("site/") for row in manifest["files"]))
+                with tarfile.open(self.output / "regressee-source.tar.gz") as archive:
+                    for member in archive:
+                        self.assertFalse(member.name.startswith("regressee-source/site/"))
+                        self.assertNotIn(sentinel, archive.extractfile(member).read())
+                for product in preview.PRODUCTS:
+                    self.assertNotIn(sentinel, b"".join(self.files(product, target).values()))
+
     def test_actual_release_notes_link_only_to_included_public_documents(self):
         actual = Path(__file__).resolve().parent.parent
         notes = (actual / "docs/preview-release-notes.md").read_bytes()
@@ -144,6 +162,14 @@ class PreviewTests(unittest.TestCase):
         self.assertNotIn("docs/research/", text)
         for link in re.findall(r"\]\(([^)]+)\)", text):
             self.assertIn("help/" + link, files)
+
+    def test_actual_checkout_source_policy_covers_application_inputs_before_long_builds(self):
+        actual = Path(__file__).resolve().parent.parent
+        files = preview.selected_sources(actual)
+        self.assertIn("Cargo.lock", files)
+        self.assertIn("crates/app/src/engine/ipc/pipe_connect.rs", files)
+        self.assertIn("crates/app/src/engine/windows_pipe_tests.rs", files)
+        self.assertFalse(any(path.startswith("site/") for path in files))
 
     def test_invalid_skill_frontmatter_is_refused_before_archive_output(self):
         put(self.root, "skills/regressee/SKILL.md", "---\nname: regressee\ndescription: CLI: authorized\n---\n# Body")
