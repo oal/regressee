@@ -56,3 +56,13 @@ identity, dependency/ABI, and publish gates before a release can be claimed.
 - Desktop archive sizes still round to 36.1 MB (Windows) and 42.9 MB (Linux), so
   website size labels remain accurate. Only download/version references change;
   the owner's separately committed website redesign is preserved.
+- The downloaded Windows desktop ZIP's SHA-256 is
+  `e42b7f154781bf3d3c49196adceb73d76bf4f1a6da9f01804e116d4ad7aab579`,
+  matching `SHA256SUMS`. ZIP integrity, every internal checksum, both production
+  executable hashes/features, source identity and build receipt were verified
+  without executing the Windows binaries. Bundled notes identify preview.12 and
+  the OS error 231 correction.
+- Website update: `c8159813ce4eddbe7bedbabffec95b4f8539688d`.
+  Pages run <https://github.com/oal/regressee/actions/runs/39315832625> passed.
+  The live HTML and platform script point to preview.12; all four deployed
+  desktop/CLI download URLs return HTTP 200.
