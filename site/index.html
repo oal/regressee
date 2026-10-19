@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Regressee — see exactly what changed on your website</title>
 <meta name="description" content="Capture your site as a baseline, review what changed after every deploy in screenshots and page structure, and approve what you accept. Local desktop app, public beta for Windows and Linux.">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f4f4">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#1b1b1b">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#f4f4f1">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#131312">
 <link rel="canonical" href="https://oal.github.io/regressee/">
 <link rel="icon" href="assets/icon-180.png" type="image/png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
@@ -21,16 +21,17 @@
   } catch (error) { /* A blocked storage just means the system default stands. */ }
 </script>
 </head>
-<body class="settling">
+<body>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="topbar">
+<header class="slugbar">
   <a class="brand" href="#main">
     <img class="only-light" src="assets/logo-light.png" width="294" height="180" alt="">
     <img class="only-dark" src="assets/logo-dark.png" width="294" height="180" alt="">
     <span>Regressee</span>
   </a>
-  <nav class="topnav" aria-label="Page">
+  <span class="colourbar" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span>
+  <nav class="tabnav" aria-label="Page">
     <a href="#how">How it works</a>
     <a href="#features">Features</a>
     <a href="#download">Download</a>
@@ -58,116 +59,129 @@
 
 <main id="main">
 
-  <!-- The opening is the comparison: the old way on the left, Regressee on the
-       right, and one seam you can drag. Sighted desktop visitors drag it; every
-       visitor reads the same offer from the card on the seam. -->
-  <section class="hero" aria-labelledby="hero-title">
+  <!-- The opening is the product film: the check captured from the app,
+       mounted as the hero proof beside the job ticket. -->
+  <section class="press" aria-labelledby="hero-title">
 
-    <div class="offer">
-      <span class="offer-brand">
-        <img class="only-light" src="assets/logo-light.png" width="294" height="180" alt="">
-        <img class="only-dark" src="assets/logo-dark.png" width="294" height="180" alt="">
-        Regressee
-      </span>
-      <h1 id="hero-title">See exactly what changed on your website.</h1>
-      <p class="offer-copy">Capture your site once as a baseline, then review what changed after every deploy in screenshots and page structure. You decide what to accept.</p>
-      <div class="offer-actions">
-        <a class="btn btn-primary" id="hero-download" href="#download">Download beta</a>
-        <a class="btn btn-secondary" href="https://github.com/oal/regressee">View on GitHub</a>
+    <svg class="reg tl" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M11 1v20M1 11h20" stroke="currentColor" stroke-width="1"/></svg>
+    <svg class="reg tr" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M11 1v20M1 11h20" stroke="currentColor" stroke-width="1"/></svg>
+    <svg class="reg bl" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M11 1v20M1 11h20" stroke="currentColor" stroke-width="1"/></svg>
+    <svg class="reg br" viewBox="0 0 22 22" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1"/><path d="M11 1v20M1 11h20" stroke="currentColor" stroke-width="1"/></svg>
+
+    <div class="press-grid">
+
+      <div class="ticket">
+        <div class="ticket-head">
+          <span class="label">Job ticket</span>
+          <span class="label">Baseline v3 → check</span>
+        </div>
+        <dl class="ticket-rows">
+          <div><dt>Site</dt><dd>yoursite.com (illustrative)</dd></div>
+          <div><dt>Baseline</dt><dd>v3 · 9 Oct 2026</dd></div>
+          <div><dt>This check</dt><dd>14 Oct 2026 · Desktop + Phone</dd></div>
+          <div><dt>Result</dt><dd>124 pages · 3 changed · 1 not compared</dd></div>
+        </dl>
+
+        <h1 id="hero-title">See exactly what changed on your website.</h1>
+        <p class="support">Capture your site once as a baseline, then review what changed after every deploy in screenshots and page structure. You decide what to accept.</p>
+        <div class="actions">
+          <a class="btn btn-primary" id="hero-download" href="#download">Download beta</a>
+          <a class="btn btn-secondary" href="https://github.com/oal/regressee">View on GitHub</a>
+        </div>
+        <p class="meta">Public beta · Windows &amp; Linux · MPL-2.0</p>
+
+        <div class="marks">
+          <span class="label">Marks</span>
+          <ul>
+            <li><span class="mark ring" aria-hidden="true"></span>Changed — your judgement, never an automatic defect</li>
+            <li><span class="mark tick" aria-hidden="true"></span>No significant change against the baseline</li>
+            <li><span class="mark out" aria-hidden="true"></span>Not compared — a failed capture can never pass</li>
+          </ul>
+        </div>
+
+        <div class="settle">
+          <div class="stack" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div class="plate" aria-hidden="true">APPROVED</div>
+          <p><b>Approval files the proof</b> into the next baseline version.</p>
+        </div>
       </div>
-      <p class="offer-meta">Public beta · Windows &amp; Linux · MPL-2.0</p>
-    </div>
 
-    <div class="hero-way">
-      <div class="way-artifacts" aria-hidden="true">
-        <figure class="artifact artifact-folder">
-          <p class="artifact-title">Screenshots — 14 Oct 2026</p>
-          <div class="artifact-grid">
-            <figure><img src="assets/thumbs/shot-01.png" alt=""><figcaption>shot-01.png</figcaption></figure>
-            <figure><img src="assets/thumbs/shot-02.png" alt=""><figcaption>shot-02.png</figcaption></figure>
-            <figure><img src="assets/thumbs/shot-03.png" alt=""><figcaption>shot-03.png</figcaption></figure>
-            <figure><img src="assets/thumbs/shot-04.png" alt=""><figcaption>shot-04.png</figcaption></figure>
-            <figure><img src="assets/thumbs/shot-05.png" alt=""><figcaption>shot-05.png</figcaption></figure>
-            <figure><img src="assets/thumbs/shot-06.png" alt=""><figcaption>shot-06.png</figcaption></figure>
-          </div>
-        </figure>
-        <figure class="artifact artifact-list">
-          <p class="artifact-title">Page checklist.xlsx</p>
-          <table class="artifact-table">
-            <thead><tr><th>Page</th><th>Checked</th><th>OK?</th></tr></thead>
-            <tbody>
-              <tr><td>/</td><td><span class="box box-yes"></span></td><td class="state">yes</td></tr>
-              <tr><td>/pricing</td><td><span class="box box-yes"></span></td><td class="state">yes</td></tr>
-              <tr><td>/checkout</td><td><span class="box box-maybe"></span></td><td class="state">maybe</td></tr>
-              <tr><td>/account/orders</td><td><span class="box"></span></td><td class="state">?</td></tr>
-              <tr><td>/faq</td><td><span class="box box-yes"></span></td><td class="state">yes</td></tr>
-              <tr><td>/blog</td><td><span class="box box-maybe"></span></td><td class="state">maybe</td></tr>
-            </tbody>
-          </table>
-        </figure>
-        <figure class="artifact artifact-note">
-          <p>Can someone check the cart page before we ship?</p>
-          <p class="meta">— posted 09:14</p>
+      <div class="proof film-proof">
+        <figure class="film-sheet">
+          <video id="hero-film" class="hero-film" controls muted loop playsinline preload="metadata" aria-label="Regressee product tour — silent, 60 seconds"
+                 poster="assets/regressee-check-poster.jpg">
+            <source src="assets/regressee-check.mp4" type="video/mp4">
+            <p>Your browser cannot play this video. It shows the Regressee desktop app
+            capturing a baseline of a demo site, running a check after a small CSS
+            change, reviewing the changed button in Before / After / difference views,
+            and saving the approved change as a new baseline version.</p>
+          </video>
+          <figcaption class="film-caption">
+            <span><span class="label">Demo</span> — Regressee checking a demo site, captured from the app.</span>
+            <span>Silent film · 60 seconds · no audio to miss</span>
+          </figcaption>
         </figure>
       </div>
-      <p class="hero-note">
-        <span class="lead">Checking a release without a baseline.</span>
-      </p>
     </div>
 
-    <div class="hero-stage">
-      <img class="only-light" src="assets/shots/review-light.png" width="1280" height="800"
-           alt="Regressee's review workspace: the results queue on the left, the Before and After screenshots of a page side by side, and the review decisions at the bottom.">
-      <img class="only-dark" src="assets/shots/review-dark.png" width="1280" height="800"
-           alt="Regressee's review workspace in dark appearance: the results queue on the left, the Before and After screenshots of a page side by side, and the review decisions at the bottom.">
-    </div>
-
-    <div class="seam" role="slider" tabindex="0"
-         aria-label="Old way compared with Regressee"
-         aria-valuemin="30" aria-valuemax="70" aria-valuenow="46"
-         aria-valuetext="46 percent for the old way">
-      <span class="seam-pill" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="7"/><path d="M10.4 9.4 7.8 12l2.6 2.6M13.6 9.4l2.6 2.6-2.6 2.6"/></svg>
-        Drag to compare
-      </span>
+    <div class="inkbar">
+      <div class="inkbar-label">
+        <span class="label">Ink bar</span>
+        <b>Every checked page</b>
+      </div>
+      <div class="tabs" aria-hidden="true">
+        <i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ch"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="nc"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ch"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ch"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i><i class="ok"></i>
+      </div>
+      <div class="inkbar-meta">
+        <b>3 changed · 1 not compared</b>
+        <span>24 of 124 pages shown · Desktop 1440 + Phone 390</span>
+        <div class="session" aria-hidden="true">
+          <span class="label">This session</span>
+          <span class="slot" data-slot>—</span>
+          <span class="slot" data-slot>—</span>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- What a check does — the run line. -->
+  <!-- What a check does — the press sequence. -->
   <section class="section" id="how" aria-labelledby="how-title">
     <div class="wrap">
       <div class="section-head">
-        <h2 class="h2" id="how-title">What a check does</h2>
+        <h2 id="how-title">What a check does</h2>
         <p class="lede">Point Regressee at your site once and save a baseline. From then on, every check revisits the same pages at the same screen sizes, so each run compares like with like.</p>
       </div>
-      <ol class="runline" id="runline">
-        <span class="track" aria-hidden="true"><span class="track-fill" id="track-fill"></span></span>
-        <li class="stop">
-          <h3 class="h3">Revisit</h3>
+      <ol class="pressline">
+        <li class="step">
+          <h3><span class="step-no">1</span>Revisit</h3>
           <p>Every page from the baseline is opened at the same screen sizes with the same settings, so the comparison stays fair from run to run.</p>
         </li>
-        <li class="stop">
-          <h3 class="h3">Compare</h3>
+        <li class="step">
+          <h3><span class="step-no">2</span>Compare</h3>
           <p>Screenshots are compared against the baseline, and page structure is checked line by line. Anything that failed to load is reported as not compared, so a broken capture can never pass as a clean result.</p>
-          <p class="receipt"><span>Changed</span><span>No significant change</span><span>Not compared</span></p>
+          <p class="receipt">
+            <span><span class="mark ring" aria-hidden="true"></span>Changed</span>
+            <span><span class="mark tick" aria-hidden="true"></span>No significant change</span>
+            <span><span class="mark out" aria-hidden="true"></span>Not compared</span>
+          </p>
         </li>
-        <li class="stop">
-          <h3 class="h3">Review</h3>
+        <li class="step">
+          <h3><span class="step-no">3</span>Review</h3>
           <p>Compare before and after side by side, or switch to difference, overlay, heatmap or a draggable split. Tune the sensitivity or mark areas to ignore, and your original captures stay untouched.</p>
         </li>
-        <li class="stop">
-          <h3 class="h3">Approve</h3>
+        <li class="step">
+          <h3><span class="step-no">4</span>Approve</h3>
           <p>Approve the changes you accept into a new baseline version. Earlier versions and every run stay in History until you choose to delete them.</p>
         </li>
       </ol>
     </div>
   </section>
 
-  <!-- Features, carried by real app pixels. -->
+  <!-- Features, carried by real app pixels mounted as evidence. -->
   <section class="section" id="features" aria-labelledby="features-title">
     <div class="wrap">
       <div class="section-head">
-        <h2 class="h2" id="features-title">What&rsquo;s in the box</h2>
+        <h2 id="features-title">What&rsquo;s in the box</h2>
         <p class="lede">Everything you need to check a site before and after a release. Switch to Light or Dark and the screenshots follow.</p>
       </div>
 
@@ -181,13 +195,11 @@
             <li>Sets up its own private browser, so there is nothing to install</li>
           </ul>
         </div>
-        <figure>
-          <div class="shot-frame">
-            <img class="only-light" src="assets/shots/pages-light.png" width="1280" height="800" loading="lazy" decoding="async"
-                 alt="Pages &amp; baseline: six discovered page addresses, each marked as included, with a Page options panel showing capture estimates of twelve screenshots, six to ninety-six mebibytes and one to three minutes.">
-            <img class="only-dark" src="assets/shots/pages-dark.png" width="1280" height="800" loading="lazy" decoding="async"
-                 alt="Pages &amp; baseline in dark appearance: six discovered page addresses, each marked as included, with a Page options panel showing capture estimates.">
-          </div>
+        <figure class="evidence">
+          <img class="only-light" src="assets/shots/pages-light.png" width="1280" height="800" loading="lazy" decoding="async"
+               alt="Pages &amp; baseline: six discovered page addresses, each marked as included, with a Page options panel showing capture estimates of twelve screenshots, six to ninety-six mebibytes and one to three minutes.">
+          <img class="only-dark" src="assets/shots/pages-dark.png" width="1280" height="800" loading="lazy" decoding="async"
+               alt="Pages &amp; baseline in dark appearance: six discovered page addresses, each marked as included, with a Page options panel showing capture estimates.">
           <figcaption>Pages &amp; baseline: the page list, with time and disk estimates.</figcaption>
         </figure>
       </div>
@@ -202,13 +214,11 @@
             <li>Mark areas to ignore and keep the originals intact</li>
           </ul>
         </div>
-        <figure>
-          <div class="shot-frame">
-            <img class="only-light" src="assets/shots/dom-diff-light.png" width="1280" height="800" loading="lazy" decoding="async"
-                 alt="DOM snapshot review: two added lines and two removed lines in a body element, shown as an inert source diff with before and after line numbers.">
-            <img class="only-dark" src="assets/shots/dom-diff-dark.png" width="1280" height="800" loading="lazy" decoding="async"
-                 alt="DOM snapshot review in dark appearance: added and removed lines in an inert source diff with before and after line numbers.">
-          </div>
+        <figure class="evidence">
+          <img class="only-light" src="assets/shots/dom-diff-light.png" width="1280" height="800" loading="lazy" decoding="async"
+               alt="DOM snapshot review: two added lines and two removed lines in a body element, shown as an inert source diff with before and after line numbers.">
+          <img class="only-dark" src="assets/shots/dom-diff-dark.png" width="1280" height="800" loading="lazy" decoding="async"
+               alt="DOM snapshot review in dark appearance: added and removed lines in an inert source diff with before and after line numbers.">
           <figcaption>DOM snapshot: added and removed lines, approved separately.</figcaption>
         </figure>
       </div>
@@ -223,57 +233,53 @@
             <li>Results, notes and decisions recorded per run</li>
           </ul>
         </div>
-        <figure>
-          <div class="shot-frame">
-            <img class="only-light" src="assets/shots/history-light.png" width="1280" height="800" loading="lazy" decoding="async"
-                 alt="History: three completed runs listed with capture counts, and the selected comparison check with its finish time and locally recorded state.">
-            <img class="only-dark" src="assets/shots/history-dark.png" width="1280" height="800" loading="lazy" decoding="async"
-                 alt="History in dark appearance: completed runs with capture counts and the selected check's recorded details.">
-          </div>
+        <figure class="evidence">
+          <img class="only-light" src="assets/shots/history-light.png" width="1280" height="800" loading="lazy" decoding="async"
+               alt="History: three completed runs listed with capture counts, and the selected comparison check with its finish time and locally recorded state.">
+          <img class="only-dark" src="assets/shots/history-dark.png" width="1280" height="800" loading="lazy" decoding="async"
+               alt="History in dark appearance: completed runs with capture counts and the selected check's recorded details.">
           <figcaption>History: runs, baseline versions and storage, all local.</figcaption>
         </figure>
       </div>
 
       <div class="also">
         <div>
-          <h3 class="h3">A few more things</h3>
+          <h3>A few more things</h3>
           <dl class="also-list">
             <div>
               <dt>Sites with a login</dt>
-            <dd>Sign in through the app&rsquo;s own browser. Sessions are encrypted with an OS-protected key, and production and staging logins stay separate.</dd>
-          </div>
-          <div>
-            <dt>Share a baseline</dt>
-            <dd>Export a baseline as a ZIP and import it on another machine. Logins and keys stay behind, so each person signs in for themselves.</dd>
-          </div>
-          <div>
-            <dt>CLI and agent skill</dt>
-            <dd>Run the same engine from a terminal, with a skill for Claude Code, Codex or GitHub Copilot. Reports are plain HTML files on your disk.</dd>
-          </div>
-          <div>
-            <dt>Local by default</dt>
-            <dd>Projects, screenshots and baselines stay on your machine. No account and no cloud, and diagnostics are shown to you before anything is saved.</dd>
-          </div>
+              <dd>Sign in through the app&rsquo;s own browser. Sessions are encrypted with an OS-protected key, and production and staging logins stay separate.</dd>
+            </div>
+            <div>
+              <dt>Share a baseline</dt>
+              <dd>Export a baseline as a ZIP and import it on another machine. Logins and keys stay behind, so each person signs in for themselves.</dd>
+            </div>
+            <div>
+              <dt>CLI and agent skill</dt>
+              <dd>Run the same engine from a terminal, with a skill for Claude Code, Codex or GitHub Copilot. Reports are plain HTML files on your disk.</dd>
+            </div>
+            <div>
+              <dt>Local by default</dt>
+              <dd>Projects, screenshots and baselines stay on your machine. No account and no cloud, and diagnostics are shown to you before anything is saved.</dd>
+            </div>
           </dl>
         </div>
-        <figure>
-          <div class="shot-frame">
-            <img class="only-light" src="assets/shots/settings-light.png" width="1280" height="800" loading="lazy" decoding="async"
-                 alt="App settings: the private browser is ready, appearance is set to Light, and reduced motion is chosen.">
-            <img class="only-dark" src="assets/shots/settings-dark.png" width="1280" height="800" loading="lazy" decoding="async"
-                 alt="App settings in dark appearance: the private browser is ready, appearance is set to Dark, and reduced motion is chosen.">
-          </div>
+        <figure class="evidence">
+          <img class="only-light" src="assets/shots/settings-light.png" width="1280" height="800" loading="lazy" decoding="async"
+               alt="App settings: the private browser is ready, appearance is set to Light, and reduced motion is chosen.">
+          <img class="only-dark" src="assets/shots/settings-dark.png" width="1280" height="800" loading="lazy" decoding="async"
+               alt="App settings in dark appearance: the private browser is ready, appearance is set to Dark, and reduced motion is chosen.">
           <figcaption>App settings: browser, appearance and reduced motion.</figcaption>
         </figure>
       </div>
     </div>
   </section>
 
-  <!-- Downloads. -->
+  <!-- Downloads: the order forms. -->
   <section class="section download" id="download" aria-labelledby="dl-title">
     <div class="wrap">
       <div class="section-head">
-        <h2 class="h2" id="dl-title">Download the beta</h2>
+        <h2 id="dl-title">Download the beta</h2>
         <p class="lede">Preview builds for Windows and Linux x86_64. Nothing to install first: Regressee sets up its own private browser the first time you run it, which needs an internet connection.</p>
       </div>
       <div class="dl-grid">
@@ -301,7 +307,10 @@
         <a href="https://github.com/oal/regressee/releases/download/v0.1.0-preview.10/regressee-cli-windows-x86_64.zip">Windows</a>.
         Checksums, all previews and the source archive are on <a href="https://github.com/oal/regressee/releases">GitHub Releases</a>.
       </p>
-      <p class="dl-note">Version v0.1.0-preview.10 · macOS is not available yet. These are unsigned preview builds from a public beta.</p>
+      <div class="stamp-note">
+        <span class="stamp" aria-hidden="true">Unsigned preview</span>
+        <p>Version v0.1.0-preview.10 · macOS is not available yet. These are unsigned preview builds from a public beta.</p>
+      </div>
     </div>
   </section>
 
@@ -309,10 +318,10 @@
   <section class="section" aria-labelledby="truth-title">
     <div class="wrap">
       <div class="section-head">
-        <h2 class="h2" id="truth-title">Good to know</h2>
+        <h2 id="truth-title">Good to know</h2>
         <p class="lede">A few things worth knowing before you rely on it.</p>
       </div>
-      <dl class="truth-list">
+      <dl class="notes-list">
         <div>
           <dt>You decide what a change means</dt>
           <dd>Regressee shows what changed; whether it matters is your call. A failed capture is always listed as not compared.</dd>
@@ -334,24 +343,24 @@
           <dd>Use read-only test accounts where you can. Loading a page can change server data, even when you never click or submit anything.</dd>
         </div>
       </dl>
-      <p class="truth-more"><a href="https://github.com/oal/regressee#important-limitations">See the full limitations in the README</a></p>
+      <p class="notes-more"><a href="https://github.com/oal/regressee#important-limitations">See the full limitations in the README</a></p>
     </div>
   </section>
 </main>
 
-<footer class="footer">
+<footer class="imprint">
   <div class="wrap">
-    <div class="footer-grid">
+    <div class="imprint-grid">
       <div>
-        <span class="footer-brand">
+        <span class="imprint-brand">
           <img class="only-light" src="assets/logo-light.png" width="294" height="180" alt="">
           <img class="only-dark" src="assets/logo-dark.png" width="294" height="180" alt="">
           Regressee
         </span>
-        <p class="footer-tag">Local-first website regression checks. Built with Rust and GPUI.</p>
+        <p class="imprint-tag">Local-first website regression checks. Built with Rust and GPUI.</p>
       </div>
       <nav aria-label="Product">
-        <p class="footer-head">Product</p>
+        <p class="imprint-head">Product</p>
         <ul>
           <li><a href="#how">What a check does</a></li>
           <li><a href="#features">Features</a></li>
@@ -360,7 +369,7 @@
         </ul>
       </nav>
       <nav aria-label="Docs">
-        <p class="footer-head">Docs</p>
+        <p class="imprint-head">Docs</p>
         <ul>
           <li><a href="https://github.com/oal/regressee/blob/main/docs/first-run-guide.md">First-run guide</a></li>
           <li><a href="https://github.com/oal/regressee/blob/main/docs/cli.md">Terminal app</a></li>
@@ -369,7 +378,7 @@
         </ul>
       </nav>
       <nav aria-label="Project">
-        <p class="footer-head">Project</p>
+        <p class="imprint-head">Project</p>
         <ul>
           <li><a href="https://github.com/oal/regressee">GitHub</a></li>
           <li><a href="https://github.com/oal/regressee/blob/main/docs/support-matrix.md">Support matrix</a></li>
@@ -377,7 +386,7 @@
         </ul>
       </nav>
     </div>
-    <p class="footer-legal">Regressee is free software under the Mozilla Public License 2.0. The page&rsquo;s Roboto typeface is licensed under the Apache License 2.0.</p>
+    <p class="imprint-legal">Regressee is free software under the Mozilla Public License 2.0. The page&rsquo;s Archivo typeface is licensed under the SIL Open Font License 1.1.</p>
   </div>
 </footer>
 

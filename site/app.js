@@ -1,16 +1,16 @@
 /* Regressee landing page behaviour.
-   Four small jobs, none of them required for the page to read:
+   Three small jobs, none of them required for the page to read:
    1. remember an appearance choice (System / Light / Dark) like the app does;
    2. open the download the visitor's platform actually needs;
-   3. settle and drive the seam between the old way and Regressee;
-   4. light the check's run line as it comes into view. */
+   3. the proofing loupe: drag it, or move it with the arrow keys, to read the
+      baseline pull underneath the check. Home returns it to the heading
+      change; the page also keeps a small, honest record of this session's
+      readings next to the ink bar. */
 
 (function () {
   "use strict";
 
   var root = document.documentElement;
-  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var splitMode = window.matchMedia("(min-width: 821px)");
 
   /* ------------------------------------------------ appearance choice */
   var themeRadios = Array.prototype.slice.call(document.querySelectorAll('input[name="theme"]'));
@@ -33,8 +33,25 @@
     } catch (error) { /* session-only when storage is unavailable */ }
   }
 
+  /* ------------------------------------- this session's record (decorative) */
+  var slots = Array.prototype.slice.call(document.querySelectorAll("[data-slot]"));
+  var noted = [];
+
+  function note(text) {
+    if (!slots.length || noted.indexOf(text) !== -1) return;
+    noted.push(text);
+    slots.forEach(function (slot, index) {
+      if (index >= noted.length) return;
+      slot.textContent = noted[index];
+      slot.classList.add("on");
+    });
+  }
+
   themeRadios.forEach(function (radio) {
-    radio.addEventListener("change", function () { applyTheme(radio.value); });
+    radio.addEventListener("change", function () {
+      applyTheme(radio.value);
+      note("appearance: " + radio.value);
+    });
   });
   applyTheme(storedTheme());
 
@@ -53,129 +70,116 @@
     /* Anything else keeps "Download beta" pointing at the download section. */
   }
 
-  /* --------------------------------------------------- the seam */
-  var hero = document.querySelector(".hero");
-  var seam = hero && hero.querySelector(".seam");
-  var MIN_SPLIT = 30;
-  var MAX_SPLIT = 70;
-
-  function setSplit(percent) {
-    var value = Math.max(MIN_SPLIT, Math.min(MAX_SPLIT, percent));
-    hero.style.setProperty("--split", value.toFixed(1) + "%");
-    if (seam) {
-      seam.setAttribute("aria-valuenow", String(Math.round(value)));
-      seam.setAttribute("aria-valuetext", Math.round(value) + " percent for the old way, " + Math.round(100 - value) + " percent for Regressee");
-    }
-  }
-
-  function currentSplit() {
-    var inline = parseFloat(hero.style.getPropertyValue("--split"));
-    if (!isNaN(inline)) return inline;
-    var base = parseFloat(getComputedStyle(hero).getPropertyValue("--split"));
-    return isNaN(base) ? 46 : base;
-  }
-
-  /* Settle the seam once on load so the drag is discoverable. */
-  requestAnimationFrame(function () {
-    document.body.classList.remove("settling");
-    if (!reducedMotion.matches && splitMode.matches && hero) {
-      hero.style.setProperty("--split", "46%");
-    }
-  });
-
-  if (hero && seam) {
+  /* --------------------------------------------------- the proofing loupe */
+  var proofPage = document.getElementById("proof-page");
+  var loupe = document.getElementById("loupe");
+  var heading = document.getElementById("demo-heading");
+  var loupeMode = window.matchMedia("(min-width: 821px)");
+  if (proofPage && loupe) {
+    var RADIUS = 78; /* half of the loupe's 156px box in styles.css */
+    var EDGE = 4;
+    var x = 0;
+    var y = 0;
+    var home = null;
+    var proofW = 0;
+    var proofH = 0;
     var dragging = false;
+    var loupeUsed = false;
 
-    var onPointerMove = function (event) {
-      if (!dragging) return;
-      setSplit((event.clientX / window.innerWidth) * 100);
-    };
+    function clamp() {
+      x = Math.min(Math.max(x, RADIUS + EDGE), Math.max(RADIUS + EDGE, proofW - RADIUS - EDGE));
+      y = Math.min(Math.max(y, RADIUS + EDGE), Math.max(RADIUS + EDGE, proofH - RADIUS - EDGE));
+    }
 
-    var onPointerUp = function () {
-      if (!dragging) return;
-      dragging = false;
-      hero.classList.remove("is-dragging");
-      window.removeEventListener("pointermove", onPointerMove);
-      window.removeEventListener("pointerup", onPointerUp);
-      window.removeEventListener("pointercancel", onPointerUp);
-    };
+    function place() {
+      proofPage.style.setProperty("--loupe-x", x.toFixed(1) + "px");
+      proofPage.style.setProperty("--loupe-y", y.toFixed(1) + "px");
+      var percent = Math.round((x / Math.max(1, proofW)) * 100);
+      loupe.setAttribute("aria-valuenow", String(percent));
+      loupe.setAttribute("aria-valuetext", percent + " percent across the proof — hold it over a circled correction to read the baseline pull");
+    }
 
-    /* Both the seam column and its pill are drag handles; the pill sits to the
-       left of the seam so it never covers the app evidence. The move and release
-       listeners live on the window so the drag keeps working past the handle. */
-    var bindDrag = function (handle) {
-      handle.addEventListener("pointerdown", function (event) {
-        if (!splitMode.matches) return;
-        dragging = true;
-        hero.classList.add("is-dragging");
-        window.addEventListener("pointermove", onPointerMove);
-        window.addEventListener("pointerup", onPointerUp);
-        window.addEventListener("pointercancel", onPointerUp);
-        event.preventDefault();
-      });
-    };
+    function measure() {
+      proofW = proofPage.clientWidth;
+      proofH = proofPage.clientHeight;
+      proofPage.style.setProperty("--proof-w", proofW + "px");
+      proofPage.style.setProperty("--proof-h", proofH + "px");
+      var anchor = document.querySelector(".circled") || heading;
+      if (!home && anchor) {
+        var pageRect = proofPage.getBoundingClientRect();
+        var anchorRect = anchor.getBoundingClientRect();
+        home = {
+          x: anchorRect.left - pageRect.left + anchorRect.width * 0.5,
+          y: anchorRect.top - pageRect.top + anchorRect.height * 0.5
+        };
+        x = home.x;
+        y = home.y;
+      }
+      clamp();
+      place();
+    }
 
-    bindDrag(seam);
-    var pill = seam.querySelector(".seam-pill");
-    if (pill) bindDrag(pill);
+    function moveTo(clientX, clientY) {
+      var rect = proofPage.getBoundingClientRect();
+      x = clientX - rect.left;
+      y = clientY - rect.top;
+      clamp();
+      place();
+    }
 
-    seam.addEventListener("keydown", function (event) {
-      if (!splitMode.matches) return;
-      var step = event.shiftKey ? 10 : 1;
-      var next = null;
-      if (event.key === "ArrowLeft") next = currentSplit() - step;
-      else if (event.key === "ArrowRight") next = currentSplit() + step;
-      else if (event.key === "Home") next = MIN_SPLIT;
-      else if (event.key === "End") next = MAX_SPLIT;
-      if (next === null) return;
+    loupe.addEventListener("pointerdown", function (event) {
+      if (!loupeMode.matches) return;
+      dragging = true;
+      loupeUsed = true;
+      loupe.classList.add("is-dragging");
+      if (loupe.setPointerCapture) loupe.setPointerCapture(event.pointerId);
+      moveTo(event.clientX, event.clientY);
       event.preventDefault();
-      setSplit(next);
     });
 
-    /* Leaving split mode must not strand an inline width on the stacked layout. */
-    var onSplitModeChange = function (event) {
-      if (!event.matches) hero.style.removeProperty("--split");
-    };
-    if (splitMode.addEventListener) splitMode.addEventListener("change", onSplitModeChange);
-    else splitMode.addListener(onSplitModeChange);
-  }
+    loupe.addEventListener("pointermove", function (event) {
+      if (!dragging) return;
+      moveTo(event.clientX, event.clientY);
+    });
 
-  /* ------------------------------------------------ the run line */
-  var runline = document.getElementById("runline");
-  var fill = document.getElementById("track-fill");
-  if (runline && fill && "IntersectionObserver" in window) {
-    var stops = Array.prototype.slice.call(runline.querySelectorAll(".stop"));
+    function endDrag() {
+      if (!dragging) return;
+      dragging = false;
+      loupe.classList.remove("is-dragging");
+      note("loupe: baseline read");
+    }
 
-    if (reducedMotion.matches) {
-      stops.forEach(function (stop) { stop.classList.add("is-active"); });
-      fill.style.width = "100%";
-    } else {
-      var timers = [];
-      fill.style.width = "0%";
-      var run = function () {
-        stops.forEach(function (stop, index) {
-          timers.push(window.setTimeout(function () {
-            stop.classList.add("is-active");
-            fill.style.width = (stops.length > 1 ? (index / (stops.length - 1)) * 100 : 100) + "%";
-          }, index * 140));
-        });
-      };
+    loupe.addEventListener("pointerup", endDrag);
+    loupe.addEventListener("pointercancel", endDrag);
 
-      var observer = new IntersectionObserver(function (entries) {
-        entries.forEach(function (entry) {
-          if (!entry.isIntersecting) return;
-          observer.disconnect();
-          run();
-        });
-      }, { threshold: 0.35 });
-      observer.observe(runline);
+    loupe.addEventListener("keydown", function (event) {
+      var stepX = event.shiftKey ? proofW * 0.10 : proofW * 0.01;
+      var stepY = event.shiftKey ? proofH * 0.10 : proofH * 0.02;
+      var handled = true;
+      if (event.key === "ArrowLeft") { x -= stepX; }
+      else if (event.key === "ArrowRight") { x += stepX; }
+      else if (event.key === "ArrowUp") { y -= stepY; }
+      else if (event.key === "ArrowDown") { y += stepY; }
+      else if (event.key === "Home") { x = home ? home.x : x; y = home ? home.y : y; }
+      else { handled = false; }
+      if (!handled) return;
+      event.preventDefault();
+      loupeUsed = true;
+      clamp();
+      place();
+      note("loupe: baseline read");
+    });
 
-      reducedMotion.addEventListener && reducedMotion.addEventListener("change", function (event) {
-        if (!event.matches) return;
-        timers.forEach(window.clearTimeout);
-        stops.forEach(function (stop) { stop.classList.add("is-active"); });
-        fill.style.width = "100%";
+    /* Measure now, and again once the font has settled, so the loupe starts on
+       the heading while the visitor has not moved it themselves. */
+    measure();
+    if (document.fonts && document.fonts.ready && document.fonts.ready.then) {
+      document.fonts.ready.then(function () {
+        if (!loupeUsed) home = null;
+        measure();
       });
     }
+    window.addEventListener("resize", measure);
+    if ("ResizeObserver" in window) new ResizeObserver(measure).observe(proofPage);
   }
 })();

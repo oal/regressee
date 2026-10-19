@@ -64,6 +64,32 @@ colors:
   dark-dom-removed: "#40282f"
   dark-dom-selection: "#315d52"
   dark-dom-search: "#4b3c1e"
+  web-stock: "#f4f4f1"
+  web-sheet: "#ffffff"
+  web-sheet-raised: "#fbfbf8"
+  web-ink: "#171717"
+  web-ink-soft: "#3f3f3a"
+  web-muted: "#5f5f58"
+  web-hairline: "#d8d8d2"
+  web-rule: "#c6c6bf"
+  web-ghost: "#b3b3ac"
+  web-teal: "#007970"
+  web-teal-deep: "#00685f"
+  web-on-teal: "#ffffff"
+  web-correction: "#c7261e"
+  web-dark-stock: "#131312"
+  web-dark-sheet: "#1d1d1b"
+  web-dark-sheet-raised: "#222220"
+  web-dark-ink: "#f2f2ec"
+  web-dark-ink-soft: "#d7d7cf"
+  web-dark-muted: "#b0b0a8"
+  web-dark-hairline: "#35352f"
+  web-dark-rule: "#4a4a43"
+  web-dark-ghost: "#6f6f68"
+  web-dark-teal: "#65d9bf"
+  web-dark-teal-deep: "#85e7d1"
+  web-dark-on-teal: "#0b2b26"
+  web-dark-correction: "#ff8a7e"
 typography:
   headline:
     fontFamily: "Segoe UI, .AppleSystemUIFont, DejaVu Sans"
@@ -98,15 +124,48 @@ typography:
     fontSize: "13px"
     fontWeight: 400
     lineHeight: "18px"
+  web-display:
+    fontFamily: "Archivo, Segoe UI, system-ui, sans-serif"
+    fontSize: "clamp(36px, 3.6vw, 50px)"
+    fontWeight: 760
+    lineHeight: 1.05
+    letterSpacing: "-0.022em"
+  web-heading:
+    fontSize: "clamp(27px, 2.6vw, 38px)"
+    fontWeight: 740
+    lineHeight: 1.08
+    letterSpacing: "-0.018em"
+  web-title:
+    fontSize: "21px"
+    fontWeight: 700
+    lineHeight: 1.33
+  web-body:
+    fontSize: "16px"
+    fontWeight: 400
+    lineHeight: 1.62
+  web-body-small:
+    fontSize: "15px"
+    fontWeight: 400
+    lineHeight: 1.5
+  web-label:
+    fontSize: "11px"
+    fontWeight: 650
+    letterSpacing: "0.14em"
 rounded:
   status: "3px"
   control: "4px"
+  web-control: "0px"
 spacing:
   tight: "4px"
   related: "8px"
   row: "12px"
   group: "16px"
   section: "24px"
+  web-tight: "6px"
+  web-related: "10px"
+  web-row: "14px"
+  web-group: "20px"
+  web-section: "88px"
 components:
   button-primary:
     backgroundColor: "{colors.accent}"
@@ -168,6 +227,26 @@ components:
     padding: "0px 8px"
     height: "40px"
     width: "40px"
+  web-button-primary:
+    backgroundColor: "{colors.web-teal}"
+    textColor: "{colors.web-on-teal}"
+    typography: "{typography.web-body-small}"
+    rounded: "{rounded.web-control}"
+    padding: "10px 20px"
+    height: "44px"
+  web-button-primary-hover:
+    backgroundColor: "{colors.web-teal-deep}"
+    textColor: "{colors.web-on-teal}"
+  web-button-secondary:
+    backgroundColor: "{colors.web-sheet}"
+    textColor: "{colors.web-ink}"
+    typography: "{typography.web-body-small}"
+    rounded: "{rounded.web-control}"
+    padding: "10px 20px"
+    height: "44px"
+  web-button-secondary-hover:
+    backgroundColor: "{colors.web-stock}"
+    textColor: "{colors.web-ink}"
 ---
 
 # Design System: Regressee — Clear wayfinding
@@ -439,6 +518,28 @@ information status labels may use the mint tint.
 
 **The Evidence Rule.** A change classification is never rendered as a confirmed defect, and missing screenshots are never rendered as an unchanged result.
 
+### Web surface — Proof rendition (2026-10-18)
+
+Owner-approved own web rendition of the brand, not a token-for-token extension of
+the native system: keep the mark, the teal family, the honest voice and untinted
+captures; the landing page has its own palette strategy, type voice and scale.
+`site/styles.css` is authoritative; the `web-` frontmatter tokens mirror it.
+
+- **Press stock** (`web-stock`, dark `web-dark-stock`): the page field in light,
+  the darkroom bench in dark. **Sheet** (`web-sheet`, dark `web-dark-sheet`) is
+  the pulled proof, lifted in dark; the demo evidence frame inside it stays white
+  in both appearances because capture evidence is never tinted.
+- **Approved teal** (`web-teal`, dark `web-dark-teal`) is the action and approval
+  ink. **Correction red** (`web-correction`, dark `web-dark-correction`) belongs
+  only to change marks, correction numbers and the unsigned-preview stamp.
+- **Process neutrals** (`web-ink`, `web-ink-soft`, `web-muted`, `web-hairline`,
+  `web-rule`, `web-ghost`) separate ink from sheet by rule and dot, never by hue.
+
+**The Three Marks Rule.** A change classification is rendered with its own mark
+and its own words: a hand-drawn red ring for changed, a teal tick for no
+significant change, a dashed outline for not compared. No mark may imply a
+defect, and a failed capture is never drawn as unchanged.
+
 ## Typography
 
 Use installed system UI type, not bundled brand fonts. The frontmatter family
@@ -471,6 +572,17 @@ boxes and row geometry; selection never shifts text insets or hit targets.
 
 Screenshot switches keep the selected path/profile heading and inspection toolbar
 mounted during the matching image read; zoom stays disabled until pixels arrive.
+
+### Web surface — Archivo press voice (2026-10-18)
+
+The landing page replaces installed system type with **Archivo** (variable,
+weights 100–900, widths 62–125%), self-hosted as
+`site/assets/fonts/Archivo-latin.woff2` with the SIL OFL 1.1 text beside it.
+`web-display` sets the hook in a heavy, slightly condensed grotesque with
+tabular numerals; `web-heading` runs section heads; `web-body` is 16/1.62 with a
+65–75ch measure; `web-label` is the 11px letterspaced sheet furniture (job
+ticket, ink bar, imprint heads). The native app's installed-system-type rule is
+unchanged and does not apply to the site.
 
 ## Layout
 
@@ -642,6 +754,19 @@ Scoped verification and qualification limits:
 `docs/research/shared-dialogs-20261015.md`. No new palette tokens, decorative
 assets or shipping rasters were introduced.
 
+### Web landing page — the press sheet (2026-10-18)
+
+Persuade surface, served by GitHub Pages as plain `site/` with no build step:
+a 60px sticky slug line; a full-height press-sheet hero (job ticket column
+`minmax(340px, 392px)` beside the pulled proof, corrections in the proof's right
+margin, the ink bar along the bottom); a `1240px` wrap with 80px insets below the
+hero; an 88px section rhythm separated by full-bleed hairlines. At 1440×900 the
+ink bar lands at the viewport edge. At ≤960px the ticket stacks above the proof
+and the ink bar wraps; at ≤820px the loupe gives way to inline "was" annotations
+and a single-column notes list; the slug nav hides at 960px and the appearance
+tray at 480px. Registration targets sit at the press corners, on the run line and
+on evidence captions.
+
 ## Elevation & Depth
 
 **App-wide depth refinement — 2026-10-16.** The user requested subtle shadows
@@ -726,6 +851,16 @@ accessibility, cross-platform, frame-pacing or release qualification. The visual
 budget is complete; see `docs/research/native-motion-20261018.md` for both
 preserved review rounds, source receipts and the synthetic-fixture limitations.
 
+### Web proof sheets (2026-10-18)
+
+Sheets are flat stock that casts paper shadows: `--shadow-paper`
+(`0 1px 2px`, `0 10px 28px`), `--shadow-sheet` (`0 1px 3px`, `0 18px 44px`) and
+`--shadow-lift` (`0 2px 6px`, `0 26px 60px`) — soft, offset and low-alpha, never
+hard offset blocks. Controls are square-cornered and unshadowed except the
+primary action's paper lift. The one authored moment is the approved plate
+settling onto the stack (460ms exponential ease-out, disabled under reduced
+motion); no entrance choreography elsewhere.
+
 ## Shapes
 
 Use small control corners and straight horizontal list rules; status labels are
@@ -752,6 +887,14 @@ Historical environment context travels with its reference, not today's settings.
 History rows support direct selection; storage totals load separately and missing
 measurement is not zero. Local syntax/range feedback stays beside touched fields,
 while saving, browser visits, baseline changes, exports and deletion stay explicit.
+
+### Web surface (2026-10-18)
+
+Square corners (`rounded.web-control: 0px`) and 1px hairlines carry the press
+world: no rounded cards, no coloured side stripes. Circles belong to the world's
+instruments — registration targets, the proofing loupe, correction rings and
+their numbered callouts — all drawn with authored CSS or SVG, never glyphs or
+emoji.
 
 ## Components
 
@@ -1619,6 +1762,26 @@ pixels at 1280×800 and 820×600. See
 `docs/research/ui-carry-through-verification-20261011.md`; this is offscreen-layout
 acceptance, not native input, accessibility or public-release certification.
 
+### Web landing components (2026-10-18)
+
+- **Slug line** (60px): mark and name, six-swatch process bar, page tabs, the
+  System/Light/Dark radiogroup and the primary download; sticky on stock with a
+  hairline; the process bar hides below 1100px.
+- **Job ticket**: dotted-leader rows (Site / Baseline / This check / Result), the
+  hook, support copy, Download beta, View on GitHub, the beta line, the
+  three-mark key and the filing motif. Its illustrative data names the demo site.
+- **Proof sheet**: the demo page pulled as a proof; baseline ghost under the
+  changed regions, red correction rings with numbered callouts, three marginal
+  corrections, and the caption "Illustrative proof — synthetic example site; not
+  captured evidence."
+- **Proofing loupe**: a 156px circular reveal of the baseline pull; pointer drag,
+  Arrow keys (Shift ×10), Home reset; `role="slider"` with percent value text;
+  hidden at ≤820px where inline "was" annotations take over.
+- **Ink bar**: one identical tab per checked page in its state (changed / no
+  significant change / not compared), the run counts and the session's record.
+- **Evidence sheets**: app captures mounted on paper with a registration-bullet
+  caption, the light/dark pair per theme, never tinted.
+
 ## DOM snapshot evidence — 2026-10-17
 
 User-confirmed extension of the current neutral/teal Clear wayfinding workspace,
@@ -1704,6 +1867,20 @@ remain unchanged. Verification scope and native/platform limits:
 - **Don't** tint screenshot evidence or replace it with decorative imagery.
 - **Don't** call simulated focus/IME tests a native or screen-reader pass.
 - **Don't** equate direction approval, source contrast checks or offscreen captures with usability or release approval.
+
+### Web surface — 2026-10-18
+
+- **Do** keep the press world scoped to the web; the native system keeps Clear
+  wayfinding, neutral chrome and installed system type.
+- **Do** keep every shipping raster's provenance in
+  `site/assets/provenance.json` and the Archivo licence beside its file; the page
+  loads nothing from third parties at runtime.
+- **Do** keep the three honest outcomes and the "failed capture is not compared"
+  rule in every state and at every width.
+- **Don't** tint, crop or restyle app captures to match the page; evidence is
+  untinted in both appearances.
+- **Don't** add a second display face, a rounded component or a decorative band
+  to the press furniture.
 
 ## Personal agent integrations — 2026-10-18
 

@@ -103,22 +103,6 @@
       "sha256": "2be4a174b25d806f04e59781e91c1d6bb6b58504c0a076ab8c5f808639ff4b2d"
     },
     {
-      "file": "thumbs/shot-01.png",
-      "origin": "Synthetic demo-site fixture image from the same confirmation set",
-      "what": "desktop-before.png crop 560x420+140+150 (demo site hero copy)",
-      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
-      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
-      "sha256": "210f5e6410d023724ebc3de0346faa77b915a6978c59aa25f3338c3d9dcb335a"
-    },
-    {
-      "file": "thumbs/shot-02.png",
-      "origin": "Synthetic demo-site fixture image from the same confirmation set",
-      "what": "desktop-before.png crop 534x430+743+130 (demo site hero image)",
-      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
-      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
-      "sha256": "7cbf26416b14d3de98aac266123fd174bca4c907a48f0c16b3e30dca2cbc3fe2"
-    },
-    {
       "file": "thumbs/shot-03.png",
       "origin": "Synthetic demo-site fixture image from the same confirmation set",
       "what": "desktop-before.png crop 357x283+156+727 (Field jacket product tile)",
@@ -141,14 +125,6 @@
       "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
       "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
       "sha256": "ef3b45e7542c54f6f5d7641be364b329999abf76c1c1baefa04bf8e9d6a2cd3b"
-    },
-    {
-      "file": "thumbs/shot-06.png",
-      "origin": "Synthetic demo-site fixture image from the same confirmation set",
-      "what": "mobile-before.png crop 390x293+0+0 (demo site mobile header)",
-      "capture": "confirmation/website-fixtures/desktop-before.png and mobile-before.png",
-      "transform": "Crop, downscale to 384px wide (Lanczos), metadata stripped",
-      "sha256": "908c66fc62996db5f3c046aa4db9012c7af530e1ed0794db860cd72513eb7f67"
     },
     {
       "file": "logo-light.png",
@@ -179,19 +155,19 @@
       "sha256": "989d820b709ad42bb126d3d3c9bcd3147ec392844a215601e07f1b7d04a61534"
     },
     {
-      "file": "fonts/Roboto-latin.woff2",
-      "origin": "Roboto variable font (latin subset), fetched from Google Fonts v51 by the user's request for the web surface",
-      "what": "The page's typeface, self-hosted; loaded with @font-face from the page's own files, never from a hosted stylesheet",
-      "transform": "None (byte-identical download); the license text ships beside it as fonts/LICENSE-Roboto.txt",
-      "license": "Apache License 2.0",
-      "sha256": "1404ca348bd75ef836f4dd8b6f2cc719458642d1237c368296b2fc652dca47dc"
+      "file": "fonts/Archivo-latin.woff2",
+      "origin": "Archivo variable font (latin subset), fetched from Google Fonts v25 for the owner-approved web type voice (2026-10-18)",
+      "what": "The page's typeface, self-hosted; loaded with @font-face from the page's own files, never from a hosted stylesheet; weights 100-900 at widths 62-125%",
+      "transform": "None (byte-identical download); the OFL text ships beside it as fonts/OFL-Archivo.txt",
+      "license": "SIL Open Font License 1.1",
+      "sha256": "e3a28eade21a900c7155a247757f4b2834c07bb7ef07ad7efa55cebaac1e8f5e"
     },
     {
-      "file": "fonts/LICENSE-Roboto.txt",
-      "origin": "googlefonts/roboto LICENSE",
-      "what": "Apache-2.0 license text for the self-hosted Roboto font file",
+      "file": "fonts/OFL-Archivo.txt",
+      "origin": "google/fonts ofl/archivo OFL.txt",
+      "what": "SIL Open Font License 1.1 text for the self-hosted Archivo font file",
       "transform": "None",
-      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+      "sha256": "108b4e57c9c796d3d38d0428ca7ee39de47ad93187302718d9b2d8864b9b716b"
     }
   ]
 }
