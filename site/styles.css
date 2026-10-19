@@ -338,12 +338,7 @@ a:hover { color: var(--link-hover); }
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 14px;
-  padding: 14px;
-  background: var(--sheet);
-  border: 1px solid var(--hair);
-  box-shadow: var(--shadow-paper);
+  gap: 12px;
 }
 .hero-film {
   display: block;
@@ -367,18 +362,16 @@ a:hover { color: var(--link-hover); }
 }
 
 @media (max-width: 860px) {
-  .film-sheet { padding: 10px; }
   .film-caption { flex-direction: column; gap: 6px; }
 }
 
 /* ------------------------------------------------------------ the press */
 .press {
   position: relative;
-  min-height: calc(100svh - var(--strip-h));
   display: flex;
   flex-direction: column;
   gap: 20px;
-  padding: 24px 40px 12px;
+  padding: 36px 40px 44px;
   border-bottom: 1px solid var(--hair);
 }
 
@@ -389,16 +382,14 @@ a:hover { color: var(--link-hover); }
 .reg.br { right: 12px; bottom: 12px; }
 
 .press-grid {
-  flex: 1;
-  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(340px, 392px) minmax(0, 1fr);
-  gap: 34px;
-  align-items: stretch;
+  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  gap: 44px;
+  align-items: center;
 }
 
 /* job ticket */
-.ticket { display: flex; flex-direction: column; }
+.ticket { display: flex; flex-direction: column; justify-content: center; }
 .ticket-head {
   display: flex;
   align-items: baseline;
@@ -429,7 +420,7 @@ a:hover { color: var(--link-hover); }
 .ticket-rows dd { margin: 0; text-align: right; font-size: 12.5px; }
 
 .ticket h1 {
-  margin-top: 20px;
+  margin-top: 0;
   font-size: var(--fs-h1);
   font-weight: 760;
   font-stretch: 96%;
