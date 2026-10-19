@@ -8,6 +8,8 @@ mod ipc;
 pub mod ownership;
 pub mod text;
 mod viewer;
+#[cfg(all(test, windows))]
+mod windows_pipe_tests;
 use crate::{product::Product, protocol::*};
 use anyhow::{Context, Result, ensure};
 pub use client::{Client, Launcher, Rejected, lifecycle};

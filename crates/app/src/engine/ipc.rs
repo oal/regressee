@@ -9,6 +9,9 @@ pub trait Io: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> Io for T {}
 pub type Stream = Box<dyn Io>;
 pub const IO_TIMEOUT: Duration = Duration::from_secs(5);
+#[cfg(any(windows, test))]
+mod pipe_connect;
+
 pub fn key(paths: &AppPaths) -> String {
     hex::encode(Sha256::digest(paths.data.as_os_str().as_encoded_bytes()))
 }

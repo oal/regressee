@@ -112,5 +112,7 @@ impl Listener {
     }
 }
 pub async fn connect(paths: &AppPaths) -> Result<Stream> {
-    Ok(Box::new(ClientOptions::new().open(name(paths))?))
+    let name = name(paths);
+    let stream = pipe_connect::connect(|| ClientOptions::new().open(&name), IO_TIMEOUT).await?;
+    Ok(Box::new(stream))
 }

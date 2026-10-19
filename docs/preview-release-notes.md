@@ -1,14 +1,27 @@
-# Clearer review workspace and baseline updates — preview.10
+# Windows page-discovery connection recovery — preview.11
 
-This preview clarifies the review workspace and moves baseline selection into an
-on-demand panel, alongside personal agent integrations, independent DOM snapshot
-comparisons, project management, and the existing desktop and CLI workflows.
+This preview fixes a temporary Windows background-engine connection failure that
+could interrupt finding pages after browser setup. It retains the clearer review
+workspace, on-demand baseline selection, personal agent integrations, independent
+DOM snapshot comparisons, and the existing desktop and CLI workflows.
 It remains an **unsigned experimental prerelease**, not a supported
 release. The release's source commit and each archive's `build-info.json` identify
 the exact build; the application crate version remains `0.1.0`.
 
 ## What changed
 
+- Windows connections now retry **All pipe instances are busy (OS error 231)**
+  briefly, for at most five seconds, instead of immediately failing page discovery
+  or another engine request. Only opening the connection is retried: handshakes
+  and product commands are never automatically replayed. Other connection errors
+  still fail immediately.
+- If the background engine remains busy, the failure explains that it stayed
+  busy and asks you to wait a moment and try again, rather than showing the raw
+  Windows pipe error. Reinstalling the private browser or deleting project data
+  is not required for temporary connection contention.
+- Added retry, timeout and permanent-error regressions, plus a native Windows
+  named-pipe contention regression in the release workflow's early engine tests.
+  Hosted Windows Server checks do not qualify Windows 11 desktop behavior.
 - Review keeps the inspected path and screen-size profile together, with recorded
   Before/After environments on their own line. A stronger selected-result
   treatment and clearer evidence boundaries improve light/dark hierarchy without
